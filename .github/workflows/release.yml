@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Validate tag matches app version
+        shell: pwsh
+        run: |
+          $tag = "${env:GITHUB_REF_NAME}"
+          if (-not $tag.StartsWith("v")) { throw "Expected tag to start with 'v' (got '$tag')" }
+          $expected = $tag.Substring(1)
+          $conf = Get-Content -Raw "src-tauri/tauri.conf.json" | ConvertFrom-Json
+          $actual = "$($conf.version)"
+          if ($actual -ne $expected) {
+            throw "Tag version ($expected) does not match src-tauri/tauri.conf.json version ($actual)."
+          }
+
+      - name: Install Tauri CLI
+        working-directory: src-tauri
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Install Windows bundler tools
+        shell: pwsh
+        run: |
+          choco install nsis wixtoolset --no-progress -y
+
+      - name: Build (Tauri)
+        working-directory: src-tauri
+        run: cargo tauri build --bundles nsis,msi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            src-tauri/target/release/midimaster.exe
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.zip

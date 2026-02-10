@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MIDIMaster</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <header>
+    <div class="app-title">
+      <img class="app-logo" src="assets/MIDIMaster.png" alt="MIDIMaster logo" />
+      <span class="app-name"><span class="app-name-strong">MIDI</span><span class="app-name-light">Master</span></span>
+    </div>
+    <div class="header-buttons">
+      <button id="connections-button" class="header-icon-button" type="button" aria-label="Open plugins">
+        🔗
+      </button>
+      <button id="settings-button" class="header-icon-button" type="button" aria-label="Open settings">
+        ⚙
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div id="alert-overlay" class="target-panel hidden">
+      <div class="target-panel-content alert-panel-content">
+        <div class="target-panel-header">
+          <span id="alert-title">Alert</span>
+          <button id="alert-close" type="button" class="target-panel-close">×</button>
+        </div>
+        <div class="alert-panel-body">
+          <p id="alert-message"></p>
+          <div class="alert-panel-actions">
+            <button id="alert-ok" type="button">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="setup-screen" class="card">
+      <h2>Setup</h2>
+      <p>Select MIDI devices to connect.</p>
+
+      <div class="setup-form">
+        <div class="form-group">
+          <label for="midi-device">Input Device</label>
+          <select id="midi-device" title="Input Device"></select>
+        </div>
+
+        <div class="form-group">
+          <label for="midi-output-device">Output Device</label>
+          <select id="midi-output-device" title="Output Device"></select>
+        </div>
+
+        <div class="form-actions">
+          <button id="refresh-midi" class="secondary-button">Refresh</button>
+          <button id="connect-midi" class="primary-button">Connect</button>
+        </div>
+      </div>
+
+      <div id="midi-status" class="status">Not connected</div>
+    </section>
+
+    <section id="main-screen" class="hidden">
+      <div class="main-top">
+        <div class="card">
+          <h2>Connected Devices</h2>
+          <div class="row device-row">
+            <div class="device-status-container">
+              <div id="connected-device" class="status">Input: Not connected</div>
+              <div id="connected-output-device" class="status">Output: Not connected</div>
+            </div>
+            <button id="disconnect-midi">Change Devices</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Profiles</h2>
+          <div class="row profile-row">
+            <div class="profile-select" id="profiles-dropdown">
+              <button id="profile-toggle" class="select-button" type="button">
+                <span id="profile-current">Select profile</span>
+                <span class="caret">▾</span>
+              </button>
+              <div id="profile-list" class="dropdown hidden"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="card bindings-card">
+        <h2>Bindings</h2>
+        <div class="binding-headers">
+          <span>Name</span>
+          <span>Volume</span>
+          <span>Mode</span>
+          <span>Target</span>
+          <span class="binding-actions-header">Actions</span>
+        </div>
+        <div id="bindings" class="list"></div>
+        <div class="binding-add-footer">
+          <button id="binding-add-footer-button" type="button" class="binding-add-button">＋ Create binding</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+    <div id="target-panel" class="target-panel hidden">
+      <div class="target-panel-content">
+        <div class="target-panel-header">
+          <div class="target-panel-header-left">
+            <button id="target-panel-back" type="button" class="target-panel-back" title="Back" aria-label="Back">←</button>
+            <span id="target-panel-title">Select Target</span>
+          </div>
+          <button id="target-panel-close" type="button" class="target-panel-close">×</button>
+        </div>
+        <div id="target-panel-list" class="target-panel-list"></div>
+      </div>
+    </div>
+
+  <div id="learn-panel" class="target-panel hidden">
+    <div class="target-panel-content learn-panel-content">
+      <div class="target-panel-header">
+        <span>Waiting for MIDI Input</span>
+        <button id="learn-panel-close" type="button" class="target-panel-close">×</button>
+      </div>
+      <div class="learn-panel-body">
+        <div class="learn-panel-spinner" aria-hidden="true"></div>
+        <p id="learn-panel-message">Move a control on your MIDI device to create a binding.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-panel" class="target-panel hidden">
+    <div class="target-panel-content settings-panel-content">
+      <div class="target-panel-header">
+        <span>Settings</span>
+        <button id="settings-panel-close" type="button" class="target-panel-close">×</button>
+      </div>
+      <div class="settings-panel-body">
+        <div class="settings-grid">
+          <div class="settings-column">
+            <div class="settings-section">
+              <div class="settings-title">On-screen display</div>
+              <select id="osd-enabled">
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="settings-section">
+              <div class="settings-title">Monitor</div>
+              <select id="osd-monitor"></select>
+            </div>
+            <div class="settings-section">
+              <div class="settings-title">Position</div>
+              <div class="osd-position-picker" id="osd-position-picker">
+                <div class="osd-position-screen"></div>
+                <button type="button" class="osd-position-dot" data-anchor="top-left" aria-label="Top left"></button>
+                <button type="button" class="osd-position-dot" data-anchor="top-center"
+                  aria-label="Top center"></button>
+                <button type="button" class="osd-position-dot" data-anchor="top-right" aria-label="Top right"></button>
+                <button type="button" class="osd-position-dot" data-anchor="center-left"
+                  aria-label="Center left"></button>
+                <button type="button" class="osd-position-dot" data-anchor="center" aria-label="Center"></button>
+                <button type="button" class="osd-position-dot" data-anchor="center-right"
+                  aria-label="Center right"></button>
+                <button type="button" class="osd-position-dot" data-anchor="bottom-left"
+                  aria-label="Bottom left"></button>
+                <button type="button" class="osd-position-dot" data-anchor="bottom-center"
+                  aria-label="Bottom center"></button>
+                <button type="button" class="osd-position-dot" data-anchor="bottom-right"
+                  aria-label="Bottom right"></button>
+              </div>
+            </div>
+          </div>
+          <div class="settings-column">
+            <div class="settings-section">
+              <div class="settings-title">Start with Windows</div>
+              <select id="start-with-windows">
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="settings-section">
+              <div class="settings-title">Start in tray</div>
+              <select id="start-in-tray">
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="settings-section">
+              <div class="settings-title">Minimize to tray</div>
+              <select id="minimize-to-tray">
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="settings-section">
+              <div class="settings-title">Exit to tray</div>
+              <select id="exit-to-tray">
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="settings-section settings-reset-section">
+              <button id="reset-app-data" type="button" class="settings-reset">Reset app data</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="connections-panel" class="target-panel hidden">
+    <div class="target-panel-content connections-panel-content">
+      <div class="target-panel-header">
+        <span>Plugins</span>
+        <button id="connections-panel-close" type="button" class="target-panel-close">×</button>
+      </div>
+      <div class="connections-panel-body">
+        <div id="connections-sidebar" class="connections-sidebar"></div>
+
+        <div id="connections-content" class="connections-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="volume-osd" class="osd" aria-live="polite" aria-atomic="true">
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+
+</html>

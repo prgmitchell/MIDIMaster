@@ -1,0 +1,19 @@
+src-tauri/target/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Node
+node_modules/
+
+# Rust
+target/
+
+# Tauri
+src-tauri/gen/

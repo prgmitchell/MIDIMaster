@@ -1,0 +1,12 @@
+{
+  "identifier": "default",
+  "description": "Default permissions for MIDIMaster",
+  "local": true,
+  "windows": ["main", "osd"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit"
+  ]
+}

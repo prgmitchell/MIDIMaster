@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MIDIMaster",
+  "version": "0.1.0",
+  "identifier": "com.midimaster.midimaster",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "MIDIMaster",
+        "width": 1040,
+        "height": 740,
+        "minWidth": 1000,
+        "minHeight": 600,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' blob:; connect-src 'self' https: http: ws: wss:; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "icon": ["icons/MIDIMaster.png", "icons/icon.ico"]
+  }
+}
