@@ -1151,6 +1151,7 @@ fn main() {
             set_theme_preference,
             set_midi_device_preferences,
             clear_midi_device_preferences,
+            set_active_profile_preference,
             reset_app_data,
             list_playback_devices,
             list_recording_devices,

@@ -175,6 +175,31 @@ pub fn clear_midi_device_preferences(state: State<AppState>) -> Result<(), Strin
 }
 
 #[tauri::command]
+pub fn set_active_profile_preference(
+    state: State<AppState>,
+    profile_name: String,
+) -> Result<(), String> {
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    let trimmed = profile_name.trim().to_string();
+    settings.active_profile_name = if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    };
+    let updated = settings.clone();
+    drop(settings);
+
+    state
+        .app_settings_store
+        .save(&updated)
+        .map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn reset_app_data(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     state
         .profile_store

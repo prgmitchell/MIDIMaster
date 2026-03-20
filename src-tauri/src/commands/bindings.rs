@@ -13,6 +13,7 @@ pub fn add_binding(state: State<AppState>, binding: Binding) -> Result<(), Strin
         bindings: Vec::new(),
         osd_settings: model::OsdSettings::default(),
         plugin_settings: std::collections::HashMap::new(),
+        midi_device_preference: model::MidiDevicePreference::default(),
     });
     profile.bindings.retain(|existing| {
         !(existing.device_id == binding.device_id && existing.control == binding.control)

@@ -1760,6 +1760,32 @@ body.osd-only .osd {
   gap: 4px;
 }
 
+.connected-device-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.connected-device-badge--unavailable {
+  background: #fdebec;
+  border-color: #f4c2c7;
+  color: #9d2d33;
+}
+
+body.dark-mode .connected-device-badge--unavailable {
+  background: rgba(157, 45, 51, 0.25);
+  border-color: rgba(244, 194, 199, 0.35);
+  color: #ffd1d5;
+}
+
 /* Setup Screen Redesign */
 .setup-form {
   display: flex;

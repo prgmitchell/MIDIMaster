@@ -15,6 +15,10 @@ export function createProfilesFeature({
   getOsdSettings,
   setOsdSettings,
   applyOsdSettings,
+  getCurrentMidiPreference,
+  getActiveProfileMidiPreference,
+  setActiveProfileMidiPreference,
+  onProfileLoaded,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createProfilesFeature: invoke is required");
@@ -37,6 +41,31 @@ export function createProfilesFeature({
       monitor_name: current.monitorName || null,
       monitor_id: current.monitorId || null,
       anchor: current.anchor || defaults.anchor || "top-right",
+    };
+  }
+
+  function buildPersistedMidiDevicePreference(source) {
+    const current = (source && typeof source === "object") ? source : {};
+    const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
+    const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
+    const inputDeviceName = String(current.inputDeviceName || current.input_device_name || "").trim();
+    const outputDeviceName = String(current.outputDeviceName || current.output_device_name || "").trim();
+
+    return {
+      input_device_id: inputDeviceId || null,
+      output_device_id: outputDeviceId || null,
+      input_device_name: inputDeviceName || null,
+      output_device_name: outputDeviceName || null,
+    };
+  }
+
+  function toClientMidiDevicePreference(source) {
+    const persisted = buildPersistedMidiDevicePreference(source);
+    return {
+      inputDeviceId: persisted.input_device_id || "",
+      outputDeviceId: persisted.output_device_id || "",
+      inputDeviceName: persisted.input_device_name || "",
+      outputDeviceName: persisted.output_device_name || "",
     };
   }
 
@@ -63,12 +92,17 @@ export function createProfilesFeature({
     try {
       localStorage.setItem("activeProfileName", profile.name);
     } catch { }
+    await invoke("set_active_profile_preference", { profileName: profile.name }).catch(() => { });
 
     const pps = (profile.plugin_settings && typeof profile.plugin_settings === "object")
       ? profile.plugin_settings
       : {};
     if (typeof setProfilePluginSettings === "function") {
       setProfilePluginSettings(pps);
+    }
+    const midiPref = toClientMidiDevicePreference(profile.midi_device_preference);
+    if (typeof setActiveProfileMidiPreference === "function") {
+      setActiveProfileMidiPreference(midiPref);
     }
 
     const nextBindings = (profile.bindings || []).map((binding, index) => ({
@@ -108,6 +142,12 @@ export function createProfilesFeature({
       renderBindings();
     }
     setProfileSelection(profile.name);
+    if (typeof onProfileLoaded === "function") {
+      await onProfileLoaded({
+        name: profile.name,
+        midiDevicePreference: midiPref,
+      });
+    }
   }
 
   async function deleteProfileByName(name) {
@@ -121,6 +161,7 @@ export function createProfilesFeature({
         setActiveProfileName("Default");
       }
       try { localStorage.setItem("activeProfileName", "Default"); } catch { }
+      await invoke("set_active_profile_preference", { profileName: "Default" }).catch(() => { });
       if (typeof setBindings === "function") {
         setBindings([]);
       }
@@ -149,6 +190,9 @@ export function createProfilesFeature({
             (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
           ),
           plugin_settings: {},
+          midi_device_preference: buildPersistedMidiDevicePreference(
+            (typeof getCurrentMidiPreference === "function") ? getCurrentMidiPreference() : null
+          ),
         },
       });
       profiles = await invoke("list_profiles");
@@ -175,6 +219,9 @@ export function createProfilesFeature({
     const createProfile = async () => {
       const name = createInput.value.trim();
       if (!name) return;
+      const inheritedMidi = (typeof getCurrentMidiPreference === "function")
+        ? getCurrentMidiPreference()
+        : null;
       await invoke("save_profile", {
         profile: {
           name,
@@ -183,6 +230,7 @@ export function createProfilesFeature({
             (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
           ),
           plugin_settings: {},
+          midi_device_preference: buildPersistedMidiDevicePreference(inheritedMidi),
         },
       });
       await loadProfileByName(name);
@@ -288,6 +336,7 @@ export function createProfilesFeature({
         setActiveProfileName(name);
       }
       try { localStorage.setItem("activeProfileName", name); } catch { }
+      await invoke("set_active_profile_preference", { profileName: name }).catch(() => { });
       setProfileSelection(name);
 
       const bindings = (typeof getBindings === "function") ? (getBindings() || []) : [];
@@ -305,6 +354,9 @@ export function createProfilesFeature({
           bindings,
           osd_settings: buildPersistedOsdSettings(osd),
           plugin_settings,
+          midi_device_preference: buildPersistedMidiDevicePreference(
+            (typeof getActiveProfileMidiPreference === "function") ? getActiveProfileMidiPreference() : null
+          ),
         },
       });
     }, 500);
@@ -328,6 +380,14 @@ export function createProfilesFeature({
     const host = (typeof getPluginHost === "function") ? getPluginHost() : null;
     if (host) {
       try { host.setProfileState({ name, plugin_settings: merged }); } catch { }
+    }
+    await saveBindingsForProfile();
+  }
+
+  async function updateProfileMidiPreference(nextPreference) {
+    const next = toClientMidiDevicePreference(nextPreference);
+    if (typeof setActiveProfileMidiPreference === "function") {
+      setActiveProfileMidiPreference(next);
     }
     await saveBindingsForProfile();
   }
@@ -361,5 +421,6 @@ export function createProfilesFeature({
     closeProfileDropdown,
     saveBindingsForProfile,
     updateProfilePluginSettings,
+    updateProfileMidiPreference,
   };
 }

@@ -295,6 +295,12 @@ let recordingDevices = [];
 let bindings = [];
 let profilePluginSettings = {};
 let activeProfileName = "";
+let activeProfileMidiPreference = {
+  inputDeviceId: "",
+  outputDeviceId: "",
+  inputDeviceName: "",
+  outputDeviceName: "",
+};
 let targetMenuListenerBound = false;
 const masterIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><path d='M5 4h2v10H5zM11 4h2v10h-2z' fill='white'/></svg>";
 const focusIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><circle cx='9' cy='9' r='5.5' stroke='white' stroke-width='2' fill='none'/><circle cx='9' cy='9' r='1.5' fill='white'/></svg>";
@@ -313,6 +319,22 @@ let persistedMidiInputId = "";
 let persistedMidiOutputId = "";
 let persistedMidiInputName = "";
 let persistedMidiOutputName = "";
+let persistedActiveProfileName = "";
+
+function normalizeProfileMidiPreference(source) {
+  const current = (source && typeof source === "object") ? source : {};
+  return {
+    inputDeviceId: String(current.inputDeviceId || current.input_device_id || "").trim(),
+    outputDeviceId: String(current.outputDeviceId || current.output_device_id || "").trim(),
+    inputDeviceName: String(current.inputDeviceName || current.input_device_name || "").trim(),
+    outputDeviceName: String(current.outputDeviceName || current.output_device_name || "").trim(),
+  };
+}
+
+function hasProfileMidiPreference(source) {
+  const pref = normalizeProfileMidiPreference(source);
+  return Boolean(pref.inputDeviceId && pref.outputDeviceId);
+}
 
 function updateThemeToggleMeta(isDark) {
   if (!themeToggleButton) return;
@@ -446,6 +468,8 @@ async function hydrateClientPreferences() {
     persistedMidiOutputId = savedOutputId || "";
     persistedMidiInputName = savedInputName || "";
     persistedMidiOutputName = savedOutputName || "";
+    const savedActiveProfileName = settings.active_profile_name ?? settings.activeProfileName ?? "";
+    persistedActiveProfileName = String(savedActiveProfileName || "").trim();
 
     try {
       if (persistedMidiInputId && !localStorage.getItem(midiInputStorageKey)) {
@@ -459,6 +483,9 @@ async function hydrateClientPreferences() {
       }
       if (persistedMidiOutputName && !localStorage.getItem(midiOutputNameStorageKey)) {
         localStorage.setItem(midiOutputNameStorageKey, persistedMidiOutputName);
+      }
+      if (persistedActiveProfileName) {
+        localStorage.setItem("activeProfileName", persistedActiveProfileName);
       }
     } catch {
       // ignore storage failures
@@ -508,17 +535,45 @@ function showSetup(statusText) {
   setupScreen.classList.remove("hidden");
   mainScreen.classList.add("hidden");
   connectedDevice.textContent = "Not connected";
+  connectedOutputDevice.textContent = "Not connected";
   midiFeature?.stopSessionRefresh?.();
   if (statusText) {
     midiStatus.textContent = statusText;
   }
 }
 
+function renderConnectedDeviceStatus(element, prefix, value) {
+  if (!element) return;
+  const raw = String(value || "").trim();
+  if (!raw) {
+    element.textContent = `${prefix}: Connected`;
+    return;
+  }
+
+  const unavailableSuffix = " (Unavailable)";
+  if (!raw.endsWith(unavailableSuffix)) {
+    element.textContent = `${prefix}: ${raw}`;
+    return;
+  }
+
+  const baseName = raw.slice(0, -unavailableSuffix.length).trim() || raw;
+  element.textContent = "";
+
+  const label = document.createElement("span");
+  label.textContent = `${prefix}: ${baseName} `;
+  element.appendChild(label);
+
+  const badge = document.createElement("span");
+  badge.className = "connected-device-badge connected-device-badge--unavailable";
+  badge.textContent = "Unavailable";
+  element.appendChild(badge);
+}
+
 function showMain(inputName, outputName) {
   setupScreen.classList.add("hidden");
   mainScreen.classList.remove("hidden");
-  connectedDevice.textContent = "Input: " + (inputName || "Connected");
-  connectedOutputDevice.textContent = "Output: " + (outputName || "Connected");
+  renderConnectedDeviceStatus(connectedDevice, "Input", inputName || "Connected");
+  renderConnectedDeviceStatus(connectedOutputDevice, "Output", outputName || "Connected");
 }
 
 function startSessionRefresh() {
@@ -719,6 +774,18 @@ profilesFeature = createProfilesFeature({
   getOsdSettings: () => osdSettings,
   setOsdSettings: (next) => { osdSettings = next; },
   applyOsdSettings,
+  getCurrentMidiPreference: () => (
+    midiFeature?.getCurrentConnectedPreference?.()
+    || activeProfileMidiPreference
+  ),
+  getActiveProfileMidiPreference: () => activeProfileMidiPreference,
+  setActiveProfileMidiPreference: (next) => {
+    activeProfileMidiPreference = normalizeProfileMidiPreference(next);
+  },
+  onProfileLoaded: async ({ midiDevicePreference }) => {
+    activeProfileMidiPreference = normalizeProfileMidiPreference(midiDevicePreference);
+    await midiFeature?.syncToProfileDevice?.(activeProfileMidiPreference);
+  },
 });
 profilesFeature.bindUi();
 
@@ -818,6 +885,11 @@ midiFeature = createMidiFeature({
   getSavedMidiDeviceIds,
   saveMidiDeviceIds,
   clearSavedMidiDeviceIds,
+  onProfileDeviceSelected: async (nextPreference) => {
+    const normalized = normalizeProfileMidiPreference(nextPreference);
+    activeProfileMidiPreference = normalized;
+    await profilesFeature?.updateProfileMidiPreference?.(normalized);
+  },
 });
 midiFeature.bindUi();
 
@@ -1496,6 +1568,7 @@ async function startMainApp() {
     activeProfileName = profile.name;
     localStorage.setItem("activeProfileName", profile.name);
     profilePluginSettings = (profile.plugin_settings && typeof profile.plugin_settings === "object") ? profile.plugin_settings : {};
+    activeProfileMidiPreference = normalizeProfileMidiPreference(profile.midi_device_preference);
     bindings = (profile.bindings || []).map((binding, index) => ({
       ...binding,
       name: binding.name?.trim() || bindingFallbackName(binding, index),
@@ -1518,13 +1591,23 @@ async function startMainApp() {
     setProfileSelection(profile.name);
     await applyOsdSettings(osdSettings);
   } else {
-    const storedProfile = localStorage.getItem("activeProfileName") || "Default";
+    const storedProfile = localStorage.getItem("activeProfileName") || persistedActiveProfileName || "Default";
     await loadProfileByName(storedProfile).catch(() => { });
   }
 
   await refreshProfiles(activeProfileName || "Default");
-  await attemptAutoConnect(deviceData);
-  if (savedDevice && mainScreen.classList.contains("hidden")) {
+
+  const profileHasMidiPreference = hasProfileMidiPreference(activeProfileMidiPreference);
+  let usedLegacyFallback = false;
+
+  if (profileHasMidiPreference) {
+    await midiFeature?.syncToProfileDevice?.(activeProfileMidiPreference);
+  } else {
+    usedLegacyFallback = true;
+    await attemptAutoConnect(deviceData);
+  }
+
+  if (usedLegacyFallback && savedDevice && mainScreen.classList.contains("hidden")) {
     showSetup("Select MIDI devices to connect.");
   }
 }
