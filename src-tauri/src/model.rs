@@ -50,6 +50,19 @@ pub struct MidiControl {
     pub msg_type: MidiMessageType,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum BindingControlKind {
+    Auto,
+    Button,
+    Continuous,
+}
+
+impl Default for BindingControlKind {
+    fn default() -> Self {
+        BindingControlKind::Auto
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MidiMode {
     Absolute,
@@ -315,6 +328,8 @@ pub struct Binding {
     pub name: String,
     pub device_id: String,
     pub control: MidiControl,
+    #[serde(default)]
+    pub control_kind: BindingControlKind,
     pub target: BindingTarget,
     #[serde(default)]
     pub action: BindingAction,
@@ -390,4 +405,6 @@ pub struct LearnedControl {
     pub controller: u8,
     #[serde(default)]
     pub msg_type: MidiMessageType,
+    #[serde(default)]
+    pub control_kind: BindingControlKind,
 }

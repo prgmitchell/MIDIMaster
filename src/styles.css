@@ -36,6 +36,11 @@ body.osd-only.dark-mode {
   background: transparent;
 }
 
+:root {
+  --bindings-grid-cols: minmax(140px, 1fr) minmax(180px, 1fr) minmax(130px, 160px) minmax(180px, 1.5fr) minmax(120px, auto);
+  --bindings-grid-gap: 18px;
+}
+
 body.osd-only header,
 body.osd-only main {
   display: none;
@@ -576,8 +581,8 @@ main {
 
 .binding-headers {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1fr) minmax(110px, 130px) minmax(180px, 1.5fr) minmax(120px, auto);
-  gap: 24px;
+  grid-template-columns: var(--bindings-grid-cols);
+  gap: var(--bindings-grid-gap);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -667,10 +672,10 @@ button:hover {
 
 .binding-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1fr) minmax(110px, 130px) minmax(180px, 1.5fr) minmax(120px, auto);
-  gap: 24px;
+  grid-template-columns: var(--bindings-grid-cols);
+  gap: var(--bindings-grid-gap);
   align-items: center;
-  min-width: 800px;
+  min-width: 820px;
   flex: 1;
   /* Ensure content doesn't squish and overlap */
 }

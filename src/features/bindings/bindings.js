@@ -101,6 +101,21 @@ export function createBindingsFeature({
     return isBindingTargetMenuOpen() || isBindingNameEditing() || isBindingSelectEditing();
   }
 
+  function normalizeControlKind(raw) {
+    const value = String(raw || "Auto");
+    if (value === "Button" || value === "Continuous" || value === "Auto") {
+      return value;
+    }
+    return "Auto";
+  }
+
+  function effectiveIsButton(binding) {
+    const controlKind = normalizeControlKind(binding?.control_kind);
+    if (controlKind === "Button") return true;
+    if (controlKind === "Continuous") return false;
+    return binding?.control?.msg_type === "Note";
+  }
+
   function updateBindingValues() {
     const sliders = document.querySelectorAll(".binding-volume-slider");
     sliders.forEach((slider) => {
@@ -207,7 +222,8 @@ export function createBindingsFeature({
         const controlInfo = document.createElement("div");
         controlInfo.textContent = labelForControl(binding.control);
 
-        const isButton = binding.control?.msg_type === "Note";
+        const controlKind = normalizeControlKind(binding.control_kind);
+        const isButton = effectiveIsButton(binding);
         console.log(
           "renderBindings binding:",
           binding.id,
@@ -215,35 +231,122 @@ export function createBindingsFeature({
           binding.action,
           "msg_type:",
           binding.control?.msg_type,
+          "control_kind:",
+          controlKind,
           "isButton:",
           isButton,
         );
 
-        const modeSelect = document.createElement("select");
-        if (isButton) {
-          const option = document.createElement("option");
-          option.value = "Toggle";
-          option.textContent = "Toggle";
-          modeSelect.appendChild(option);
-          modeSelect.disabled = true;
-          modeSelect.title = "Button bindings toggle mute state";
-        } else {
-          ["Absolute", "Relative"].forEach((mode) => {
-            const option = document.createElement("option");
-            option.value = mode;
-            option.textContent = mode;
-            if (binding.mode === mode) {
-              option.selected = true;
-            }
-            modeSelect.appendChild(option);
-          });
+        const modeDropdown = document.createElement("div");
+        modeDropdown.className = "target-dropdown";
+        const modeButton = document.createElement("button");
+        modeButton.type = "button";
+        modeButton.className = "target-button";
+        modeButton.title = "Control Mode";
+        const modeDisplay = document.createElement("span");
+        modeDisplay.className = "target-display";
+        const modeCaret = document.createElement("span");
+        modeCaret.className = "caret";
+        modeCaret.textContent = "\u25be";
+        modeButton.appendChild(modeDisplay);
+        modeButton.appendChild(modeCaret);
+        const modeMenu = document.createElement("div");
+        modeMenu.className = "target-menu hidden";
 
-          modeSelect.addEventListener("change", () => {
-            binding.mode = modeSelect.value;
-            invoke("add_binding", { binding });
-            saveProfile();
-          });
+        const modeOptions = [
+          { value: "button", label: "Button", badge: null },
+          { value: "fader_abs", label: "Fader", badge: "Absolute" },
+          { value: "fader_rel", label: "Fader", badge: "Relative" },
+        ];
+
+        let modeValue = "fader_abs";
+        if (effectiveIsButton(binding)) {
+          modeValue = "button";
+        } else if (binding.mode === "Relative") {
+          modeValue = "fader_rel";
         }
+
+        const renderModeLabel = (container, option) => {
+          container.innerHTML = "";
+          const label = document.createElement("span");
+          label.className = "target-label";
+          const content = document.createElement("span");
+          content.className = "target-label-content";
+          const main = document.createElement("span");
+          main.className = "target-label-main";
+          main.textContent = option.label;
+          content.appendChild(main);
+          if (option.badge) {
+            const tags = document.createElement("span");
+            tags.className = "target-label-tags";
+            const badge = document.createElement("span");
+            badge.className = "target-tag target-tag--neutral";
+            badge.textContent = option.badge;
+            tags.appendChild(badge);
+            content.appendChild(tags);
+          }
+          label.appendChild(content);
+          container.appendChild(label);
+        };
+
+        const applyModeSelection = async (nextModeValue) => {
+          if (nextModeValue === "button") {
+            binding.control_kind = "Button";
+            binding.action = "ToggleMute";
+          } else if (nextModeValue === "fader_rel") {
+            binding.control_kind = "Continuous";
+            binding.mode = "Relative";
+            binding.action = "Volume";
+          } else {
+            binding.control_kind = "Continuous";
+            binding.mode = "Absolute";
+            binding.action = "Volume";
+          }
+
+          await invoke("add_binding", { binding });
+          await saveProfile();
+          renderBindings();
+        };
+
+        modeOptions.forEach((option) => {
+          const optionButton = document.createElement("button");
+          optionButton.type = "button";
+          optionButton.className = "target-option";
+          if (option.value === modeValue) {
+            optionButton.classList.add("selected");
+          }
+          const optionLabel = document.createElement("span");
+          optionLabel.className = "target-label";
+          renderModeLabel(optionLabel, option);
+          optionButton.appendChild(optionLabel);
+          optionButton.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            modeDropdown.classList.remove("open");
+            modeMenu.classList.add("hidden");
+            await applyModeSelection(option.value);
+          });
+          modeMenu.appendChild(optionButton);
+        });
+
+        const activeModeOption = modeOptions.find((option) => option.value === modeValue) || modeOptions[0];
+        renderModeLabel(modeDisplay, activeModeOption);
+
+        modeButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          document.querySelectorAll(".target-dropdown.open").forEach((dropdown) => {
+            if (dropdown !== modeDropdown) {
+              dropdown.classList.remove("open");
+              dropdown.querySelector(".target-menu")?.classList.add("hidden");
+            }
+          });
+          modeDropdown.classList.toggle("open");
+          modeMenu.classList.toggle("hidden");
+        });
+
+        modeDropdown.appendChild(modeButton);
+        modeDropdown.appendChild(modeMenu);
 
         const targetSelect = buildTarget(binding.target, isButton, binding.action);
         targetSelect.addEventListener("change", async () => {
@@ -521,7 +624,7 @@ export function createBindingsFeature({
 
         row.appendChild(nameField);
         row.appendChild(volumeGroup);
-        row.appendChild(modeSelect);
+        row.appendChild(modeDropdown);
         row.appendChild(targetSelect);
         row.appendChild(actions);
         item.appendChild(row);

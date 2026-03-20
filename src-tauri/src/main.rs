@@ -105,6 +105,34 @@ use audio::windows::WindowsAudioBackend;
 #[cfg(not(target_os = "windows"))]
 use audio::unsupported::UnsupportedAudioBackend;
 
+#[derive(Debug, Clone)]
+struct LearnCandidate {
+    control: LearnedControl,
+    last_seen_at: Instant,
+    saw_zero: bool,
+    saw_max: bool,
+}
+
+fn classify_cc_candidate(saw_zero: bool, saw_max: bool) -> model::BindingControlKind {
+    if saw_zero && saw_max {
+        model::BindingControlKind::Button
+    } else {
+        model::BindingControlKind::Continuous
+    }
+}
+
+fn classify_learned_control(candidate: &LearnCandidate) -> LearnedControl {
+    let mut learned = candidate.control.clone();
+    learned.control_kind = match learned.msg_type {
+        model::MidiMessageType::Note => model::BindingControlKind::Button,
+        model::MidiMessageType::ControlChange => {
+            classify_cc_candidate(candidate.saw_zero, candidate.saw_max)
+        }
+        model::MidiMessageType::PitchBend => model::BindingControlKind::Continuous,
+    };
+    learned
+}
+
 struct AppState {
     audio: Box<dyn AudioBackend>,
     midi: Arc<Mutex<MidiManager>>,
@@ -114,7 +142,7 @@ struct AppState {
     binding_state: Arc<Mutex<HashMap<BindingKey, BindingState>>>,
     feedback_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
     learn_pending: Mutex<bool>,
-    learn_candidate: Mutex<Option<(LearnedControl, Instant)>>,
+    learn_candidate: Mutex<Option<LearnCandidate>>,
     learned_control: Mutex<Option<LearnedControl>>,
     osd_last_update: Mutex<Option<Instant>>,
     osd_settings: Mutex<OsdSettings>,
@@ -320,35 +348,68 @@ impl AppState {
         let mut learn_pending = self.learn_pending.lock().map_err(|_| "Lock poisoned")?;
         if *learn_pending {
             let msg_type = event.msg_type.clone();
-            let learned = LearnedControl {
+            let base_learned = LearnedControl {
                 device_id: event.device_id.clone(),
                 channel: event.channel,
                 controller: event.controller,
                 msg_type: msg_type.clone(),
+                control_kind: model::BindingControlKind::Auto,
             };
 
             if matches!(msg_type, model::MidiMessageType::Note) {
-                // Buffer note events as candidates to filter out touch-sense faders
-                if let Ok(mut candidate) = self.learn_candidate.lock() {
-                    *candidate = Some((learned, Instant::now()));
+                // Buffer note events first. Touch-sensitive faders may emit a Note before
+                // the actual CC/PitchBend movement event, which should win.
+                if let Ok(mut candidate_guard) = self.learn_candidate.lock() {
+                    let now = Instant::now();
+                    *candidate_guard = Some(LearnCandidate {
+                        control: base_learned,
+                        last_seen_at: now,
+                        saw_zero: event.value == 0,
+                        saw_max: event.value == 127,
+                    });
                 }
                 return Ok(());
             }
 
-            // Immediate accept for non-Note events (CC, PitchBend)
-            *learn_pending = false;
-            drop(learn_pending);
-
-            // Clear any pending candidate
-            if let Ok(mut candidate) = self.learn_candidate.lock() {
-                *candidate = None;
+            if matches!(msg_type, model::MidiMessageType::PitchBend) {
+                // Pitch bend is continuous by definition.
+                let mut learned = base_learned.clone();
+                learned.control_kind = model::BindingControlKind::Continuous;
+                *learn_pending = false;
+                drop(learn_pending);
+                if let Ok(mut candidate) = self.learn_candidate.lock() {
+                    *candidate = None;
+                }
+                *self.learned_control.lock().map_err(|_| "Lock poisoned")? = Some(learned);
+                return Ok(());
             }
 
-            *self.learned_control.lock().map_err(|_| "Lock poisoned")? = Some(learned.clone());
-            // println!(
-            //   "MIDI learn: device={} channel={} controller={} msg_type={:?}",
-            //   learned.device_id, learned.channel, learned.controller, learned.msg_type
-            // );
+            // For CC, sample a short stream to detect button-like 127/0 press-release pairs.
+            if let Ok(mut candidate_guard) = self.learn_candidate.lock() {
+                let now = Instant::now();
+                let is_zero = event.value == 0;
+                let is_max = event.value == 127;
+                match candidate_guard.as_mut() {
+                    Some(candidate)
+                        if candidate.control.device_id == base_learned.device_id
+                            && candidate.control.channel == base_learned.channel
+                            && candidate.control.controller == base_learned.controller
+                            && candidate.control.msg_type == base_learned.msg_type =>
+                    {
+                        candidate.last_seen_at = now;
+                        candidate.saw_zero |= is_zero;
+                        candidate.saw_max |= is_max;
+                    }
+                    _ => {
+                        *candidate_guard = Some(LearnCandidate {
+                            control: base_learned,
+                            last_seen_at: now,
+                            saw_zero: is_zero,
+                            saw_max: is_max,
+                        });
+                    }
+                }
+            }
             return Ok(());
         }
 
@@ -876,6 +937,59 @@ fn shutdown_lights(state: &AppState) {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn candidate_with_values(
+        msg_type: model::MidiMessageType,
+        saw_zero: bool,
+        saw_max: bool,
+    ) -> LearnCandidate {
+        let now = Instant::now();
+        LearnCandidate {
+            control: LearnedControl {
+                device_id: "midi:0".to_string(),
+                channel: 0,
+                controller: 1,
+                msg_type,
+                control_kind: model::BindingControlKind::Auto,
+            },
+            last_seen_at: now,
+            saw_zero,
+            saw_max,
+        }
+    }
+
+    #[test]
+    fn learn_note_is_classified_as_button() {
+        let candidate = candidate_with_values(model::MidiMessageType::Note, false, false);
+        let learned = classify_learned_control(&candidate);
+        assert_eq!(learned.control_kind, model::BindingControlKind::Button);
+    }
+
+    #[test]
+    fn learn_cc_127_and_0_is_classified_as_button() {
+        let candidate = candidate_with_values(model::MidiMessageType::ControlChange, true, true);
+        let learned = classify_learned_control(&candidate);
+        assert_eq!(learned.control_kind, model::BindingControlKind::Button);
+    }
+
+    #[test]
+    fn learn_cc_varied_values_without_min_max_is_continuous() {
+        let candidate = candidate_with_values(model::MidiMessageType::ControlChange, false, false);
+        let learned = classify_learned_control(&candidate);
+        assert_eq!(learned.control_kind, model::BindingControlKind::Continuous);
+    }
+
+    #[test]
+    fn learn_cc_single_127_only_is_continuous() {
+        let candidate = candidate_with_values(model::MidiMessageType::ControlChange, false, true);
+        let learned = classify_learned_control(&candidate);
+        assert_eq!(learned.control_kind, model::BindingControlKind::Continuous);
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(
@@ -1057,9 +1171,10 @@ fn main() {
                     // Check for expired learn candidates
                     let mut commit_candidate = None;
                     if let Ok(mut candidate_guard) = state.learn_candidate.lock() {
-                        if let Some((_, time)) = &*candidate_guard {
-                            if time.elapsed() > Duration::from_millis(150) {
-                                commit_candidate = candidate_guard.take().map(|(l, _)| l);
+                        if let Some(candidate) = &*candidate_guard {
+                            if candidate.last_seen_at.elapsed() > Duration::from_millis(150) {
+                                commit_candidate =
+                                    candidate_guard.take().map(|c| classify_learned_control(&c));
                             }
                         }
                     }

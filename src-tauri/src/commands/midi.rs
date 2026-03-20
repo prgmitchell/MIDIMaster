@@ -105,6 +105,10 @@ pub fn start_midi_learn(state: State<AppState>) -> Result<(), String> {
         .lock()
         .map_err(|_| "Lock poisoned".to_string())? = true;
     *state
+        .learn_candidate
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())? = None;
+    *state
         .learned_control
         .lock()
         .map_err(|_| "Lock poisoned".to_string())? = None;

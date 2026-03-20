@@ -1297,7 +1297,8 @@ function buildTargetSelect(currentTarget, isBindingButton = false, currentAction
 
 function createBindingFromLearn(payload) {
   const msgType = payload.msg_type || "ControlChange";
-  const isButton = msgType === "Note";
+  const controlKind = payload.control_kind || "Auto";
+  const isButton = controlKind === "Button" || (controlKind === "Auto" && msgType === "Note");
   const control = {
     channel: payload.channel,
     controller: payload.controller,
@@ -1309,6 +1310,7 @@ function createBindingFromLearn(payload) {
     name: defaultName,
     device_id: payload.device_id,
     control,
+    control_kind: controlKind,
     target: "Unset",
     action: isButton ? "ToggleMute" : "Volume",
     mode: "Absolute",
