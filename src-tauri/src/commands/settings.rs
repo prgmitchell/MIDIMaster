@@ -1,8 +1,6 @@
-use crate::{app_settings::AppSettings, model::OsdSettings, AppState};
+use crate::{app_settings::AppSettings, collect_monitor_descriptors, model::OsdSettings, AppState};
 use serde::Serialize;
 use tauri::{AppHandle, State};
-
-use crate::windows_display::{display_device_id, monitor_display_name};
 
 #[derive(Clone, Serialize)]
 pub struct MonitorInfo {
@@ -14,34 +12,14 @@ pub struct MonitorInfo {
 
 #[tauri::command]
 pub fn list_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
-    let monitors = app
-        .available_monitors()
-        .map_err(|_| "Failed to load monitors".to_string())?;
-    let primary = app.primary_monitor().ok().flatten();
+    let monitors = collect_monitor_descriptors(&app)?;
     Ok(monitors
         .iter()
-        .enumerate()
-        .map(|(index, monitor)| {
-            let raw_name = monitor
-                .name()
-                .cloned()
-                .unwrap_or_else(|| format!("Monitor {}", index + 1));
-            let stable_id = display_device_id(&raw_name).unwrap_or_else(|| raw_name.clone());
-            let name = monitor_display_name(&raw_name).unwrap_or_else(|| raw_name.clone());
-            let is_primary = primary
-                .as_ref()
-                .map(|primary| {
-                    primary.name() == monitor.name()
-                        && primary.size() == monitor.size()
-                        && primary.position() == monitor.position()
-                })
-                .unwrap_or(false);
-            MonitorInfo {
-                index,
-                name,
-                stable_id,
-                is_primary,
-            }
+        .map(|monitor| MonitorInfo {
+            index: monitor.index,
+            name: monitor.friendly_name.clone(),
+            stable_id: monitor.stable_id.clone(),
+            is_primary: monitor.is_primary,
         })
         .collect())
 }

@@ -120,25 +120,6 @@ export function createSettingsFeature({
     }
   }
 
-  function reconcileMonitorSelection() {
-    const options = (typeof getMonitorOptions === "function") ? (getMonitorOptions() || []) : [];
-    const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
-    if (!options.length || !current.monitorId) return false;
-
-    const matchIndex = options.findIndex((m) => m && m.stable_id === current.monitorId);
-    if (matchIndex !== -1 && matchIndex !== current.monitorIndex) {
-      const next = { ...current, monitorIndex: matchIndex };
-      if (typeof setOsdSettings === "function") {
-        setOsdSettings(next);
-      }
-      if (d.osdMonitorSelect) {
-        d.osdMonitorSelect.value = String(matchIndex);
-      }
-      return true;
-    }
-    return false;
-  }
-
   function syncAppSettingsUI(nextSettings) {
     const current = (typeof getAppSettings === "function") ? (getAppSettings() || {}) : {};
     const merged = { ...current, ...(nextSettings || {}) };
@@ -204,11 +185,9 @@ export function createSettingsFeature({
 
     if (d.settingsButton) {
       d.settingsButton.addEventListener("click", async () => {
-        await loadMonitorOptions();
         await loadOsdSettings();
-        reconcileMonitorSelection();
+        await loadMonitorOptions();
         await loadAppSettings();
-        await applyOsdSettings((typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {});
         syncAppSettingsUI((typeof getAppSettings === "function") ? (getAppSettings() || {}) : {});
         openSettingsPanel();
       });
@@ -272,7 +251,6 @@ export function createSettingsFeature({
     loadMonitorOptions,
     loadOsdSettings,
     applyOsdSettings,
-    reconcileMonitorSelection,
     loadAppSettings,
     syncAppSettingsUI,
     persistAppSettings,

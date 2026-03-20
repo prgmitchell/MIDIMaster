@@ -1,5 +1,35 @@
-use crate::{model::Profile, model::ProfileSummary, AppState};
+use crate::{collect_monitor_descriptors, model::Profile, model::ProfileSummary, AppState};
 use tauri::{AppHandle, State};
+
+fn heal_legacy_osd_monitor_id(app: &AppHandle, profile: &mut Profile) -> bool {
+    let needs_heal = profile
+        .osd_settings
+        .monitor_id
+        .as_ref()
+        .map(|id| id.trim().is_empty())
+        .unwrap_or(true);
+    if !needs_heal {
+        return false;
+    }
+
+    let monitors = match collect_monitor_descriptors(app) {
+        Ok(monitors) => monitors,
+        Err(_) => return false,
+    };
+    if monitors.is_empty() {
+        return false;
+    }
+
+    let selected = monitors
+        .get(profile.osd_settings.monitor_index)
+        .or_else(|| monitors.iter().find(|m| m.is_primary))
+        .unwrap_or(&monitors[0]);
+
+    profile.osd_settings.monitor_index = selected.index;
+    profile.osd_settings.monitor_name = Some(selected.friendly_name.clone());
+    profile.osd_settings.monitor_id = Some(selected.stable_id.clone());
+    true
+}
 
 #[tauri::command]
 pub fn list_profiles(state: State<AppState>) -> Result<Vec<ProfileSummary>, String> {
@@ -15,11 +45,18 @@ pub fn load_profile(
     state: State<AppState>,
     name: String,
 ) -> Result<Profile, String> {
-    let profile = state
+    let mut profile = state
         .profile_store
         .load_profile(&name)
         .map_err(|err| err.to_string())?
         .ok_or_else(|| "Profile not found".to_string())?;
+
+    if heal_legacy_osd_monitor_id(&app, &mut profile) {
+        state
+            .profile_store
+            .save_profile(profile.clone())
+            .map_err(|err| err.to_string())?;
+    }
 
     *state
         .active_profile

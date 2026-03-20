@@ -94,6 +94,8 @@ use plugin_api::{
     ensure_builtin_plugin, get_plugins_dir, install_plugin_package, list_plugins,
     read_plugin_base64, read_plugin_text, set_plugin_enabled, uninstall_plugin,
 };
+use std::thread::sleep as thread_sleep;
+use std::time::Duration as StdDuration;
 use store_api::{fetch_store_catalog, install_store_plugin};
 use ws_bridge::{get_wavelink_ws_port, ws_close, ws_open, ws_send, WsHub};
 
@@ -117,6 +119,101 @@ struct AppState {
     osd_last_update: Mutex<Option<Instant>>,
     osd_settings: Mutex<OsdSettings>,
     app_settings: Mutex<AppSettings>,
+}
+
+#[derive(Clone)]
+pub(crate) struct MonitorDescriptor {
+    pub index: usize,
+    pub friendly_name: String,
+    pub stable_id: String,
+    pub is_primary: bool,
+    pub monitor: tauri::Monitor,
+}
+
+pub(crate) fn collect_monitor_descriptors(
+    app: &AppHandle,
+) -> Result<Vec<MonitorDescriptor>, String> {
+    let monitors = app
+        .available_monitors()
+        .map_err(|_| "Failed to load monitors".to_string())?;
+    let primary = app.primary_monitor().ok().flatten();
+
+    Ok(monitors
+        .iter()
+        .enumerate()
+        .map(|(index, monitor)| {
+            let raw_name = monitor
+                .name()
+                .cloned()
+                .unwrap_or_else(|| format!("Monitor {}", index + 1));
+            let stable_id = display_device_id(&raw_name).unwrap_or_else(|| raw_name.clone());
+            let friendly_name = monitor_display_name(&raw_name).unwrap_or_else(|| raw_name.clone());
+            let is_primary = primary
+                .as_ref()
+                .map(|p| {
+                    p.name() == monitor.name()
+                        && p.size() == monitor.size()
+                        && p.position() == monitor.position()
+                })
+                .unwrap_or(false);
+
+            MonitorDescriptor {
+                index,
+                friendly_name,
+                stable_id,
+                is_primary,
+                monitor: monitor.clone(),
+            }
+        })
+        .collect())
+}
+
+#[derive(Clone)]
+struct SelectedMonitor {
+    monitor: tauri::Monitor,
+}
+
+fn resolve_monitor_for_osd(app: &AppHandle, settings: &OsdSettings) -> Option<SelectedMonitor> {
+    let requested_id = settings.monitor_id.as_ref().and_then(|id| {
+        let trimmed = id.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
+
+    // Retry only when an explicit monitor ID was requested but not yet enumerated.
+    let max_attempts = if requested_id.is_some() { 7 } else { 1 };
+
+    for attempt in 0..max_attempts {
+        let descriptors = collect_monitor_descriptors(app).ok()?;
+
+        if let Some(ref id) = requested_id {
+            if let Some(found) = descriptors.iter().find(|m| m.stable_id == *id) {
+                return Some(SelectedMonitor {
+                    monitor: found.monitor.clone(),
+                });
+            }
+
+            if attempt + 1 < max_attempts {
+                thread_sleep(StdDuration::from_millis(250));
+                continue;
+            }
+        }
+
+        if let Some(primary) = descriptors
+            .iter()
+            .find(|m| m.is_primary)
+            .or_else(|| descriptors.first())
+        {
+            return Some(SelectedMonitor {
+                monitor: primary.monitor.clone(),
+            });
+        }
+    }
+
+    None
 }
 
 impl AppState {
@@ -155,39 +252,9 @@ impl AppState {
             }
         }
 
-        let monitor = app
-            .available_monitors()
-            .ok()
-            .and_then(|monitors| {
-                // First try to find by monitor_id if provided
-                if let Some(ref id) = settings.monitor_id {
-                    if let Some(m) = monitors.iter().find(|m| {
-                        let raw_name = m.name().cloned().unwrap_or_default();
-                        let m_id = display_device_id(&raw_name).unwrap_or_else(|| raw_name);
-                        m_id == *id
-                    }) {
-                        return Some(m.clone());
-                    }
-                }
-                // Then try to find by name if provided (legacy)
-                if let Some(ref name) = settings.monitor_name {
-                    if let Some(m) = monitors.iter().find(|m| {
-                        let raw_name = m.name().cloned().unwrap_or_default();
-                        let m_name = monitor_display_name(&raw_name).unwrap_or_else(|| raw_name);
-                        m_name == *name
-                    }) {
-                        return Some(m.clone());
-                    }
-                }
-                // Fall back to index
-                monitors
-                    .get(settings.monitor_index)
-                    .cloned()
-                    .or_else(|| monitors.first().cloned())
-            })
-            .or_else(|| app.primary_monitor().ok().flatten());
-
-        if let Some(monitor) = monitor {
+        let selected = resolve_monitor_for_osd(app, settings);
+        if let Some(selected) = selected {
+            let monitor = selected.monitor;
             let scale_factor = monitor.scale_factor();
             let size = monitor.size();
             let position = monitor.position();

@@ -492,6 +492,7 @@ const defaultOsdSettings = {
   enabled: true,
   monitorIndex: 0,
   monitorName: null,
+  monitorId: null,
   anchor: "top-right",
 };
 
@@ -1109,13 +1110,6 @@ async function loadMonitorOptions() {
   }
 }
 
-function reconcileMonitorSelection() {
-  if (settingsFeature && typeof settingsFeature.reconcileMonitorSelection === "function") {
-    return settingsFeature.reconcileMonitorSelection();
-  }
-  return false;
-}
-
 function syncAppSettingsUI(nextSettings) {
   if (settingsFeature && typeof settingsFeature.syncAppSettingsUI === "function") {
     return settingsFeature.syncAppSettingsUI(nextSettings);
@@ -1514,11 +1508,6 @@ async function startMainApp() {
         monitorId: profile.osd_settings.monitor_id || null,
         anchor: profile.osd_settings.anchor || "top-right",
       };
-      
-      // Reconcile index if ID matches a different monitor (e.g. after cable swap/reboot)
-      reconcileMonitorSelection();
-      
-      await applyOsdSettings(osdSettings);
     }
     try {
       await startPluginHostIfNeeded();
@@ -1527,10 +1516,12 @@ async function startMainApp() {
       console.error("renderBindings failed", e);
     }
     setProfileSelection(profile.name);
+    await applyOsdSettings(osdSettings);
   } else {
     const storedProfile = localStorage.getItem("activeProfileName") || "Default";
     await loadProfileByName(storedProfile).catch(() => { });
   }
+
   await refreshProfiles(activeProfileName || "Default");
   await attemptAutoConnect(deviceData);
   if (savedDevice && mainScreen.classList.contains("hidden")) {

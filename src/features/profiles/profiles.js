@@ -29,6 +29,17 @@ export function createProfilesFeature({
   let pendingProfileDeleteName = null;
   let saveProfileTimer = null;
 
+  function buildPersistedOsdSettings(source) {
+    const current = (source && typeof source === "object") ? source : {};
+    return {
+      enabled: Boolean(current.enabled ?? defaults.enabled),
+      monitor_index: Number(current.monitorIndex ?? defaults.monitorIndex ?? 0),
+      monitor_name: current.monitorName || null,
+      monitor_id: current.monitorId || null,
+      anchor: current.anchor || defaults.anchor || "top-right",
+    };
+  }
+
   function setProfileSelection(name) {
     if (!d.profileCurrent) return;
     d.profileCurrent.textContent = name ? String(name) : "Select profile";
@@ -134,11 +145,9 @@ export function createProfilesFeature({
         profile: {
           name: "Default",
           bindings: [],
-          osd_settings: {
-            enabled: defaults.enabled,
-            monitor_index: defaults.monitorIndex,
-            anchor: defaults.anchor,
-          },
+          osd_settings: buildPersistedOsdSettings(
+            (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
+          ),
           plugin_settings: {},
         },
       });
@@ -170,11 +179,9 @@ export function createProfilesFeature({
         profile: {
           name,
           bindings: [],
-          osd_settings: {
-            enabled: defaults.enabled,
-            monitor_index: defaults.monitorIndex,
-            anchor: defaults.anchor,
-          },
+          osd_settings: buildPersistedOsdSettings(
+            (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
+          ),
           plugin_settings: {},
         },
       });
@@ -296,11 +303,7 @@ export function createProfilesFeature({
         profile: {
           name,
           bindings,
-          osd_settings: {
-            enabled: Boolean(osd.enabled),
-            monitor_index: Number(osd.monitorIndex ?? 0),
-            anchor: osd.anchor || "top-right",
-          },
+          osd_settings: buildPersistedOsdSettings(osd),
           plugin_settings,
         },
       });
