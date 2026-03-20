@@ -1,3 +1,9 @@
+import {
+  closeOpenDropdowns,
+  renderLabelWithBadges,
+  wireDropdownToggle,
+} from "../ui/dropdown_badges.js";
+
 export function createSettingsFeature({
   invoke,
   dom,
@@ -12,6 +18,10 @@ export function createSettingsFeature({
     throw new Error("createSettingsFeature: invoke is required");
   }
   const d = (dom && typeof dom === "object") ? dom : {};
+  let monitorDropdownEl = null;
+  let monitorMenuEl = null;
+  let monitorDisplayEl = null;
+  let monitorDocClickBound = false;
 
   function closeSettingsPanel() {
     if (!d.settingsPanel) return;
@@ -84,6 +94,126 @@ export function createSettingsFeature({
     return String(name).trim().replace(/^\\\\\.\\/, "");
   }
 
+  function formatMonitorOptionLabel(monitor, index) {
+    const base = formatMonitorName(monitor?.name) || `Monitor ${index + 1}`;
+    return base;
+  }
+
+  function closeMonitorDropdown() {
+    if (!monitorDropdownEl) return;
+    closeOpenDropdowns({ except: null });
+  }
+
+  function renderMonitorDisplay(option) {
+    if (!monitorDisplayEl) return;
+    renderLabelWithBadges(monitorDisplayEl, {
+      text: option?.label || "Monitor",
+      badges: option?.isPrimary ? [{ text: "MAIN", kind: "neutral" }] : [],
+      truncate: true,
+    });
+  }
+
+  function ensureMonitorDropdown() {
+    if (!d.osdMonitorSelect) return;
+
+    if (monitorDropdownEl && monitorDropdownEl.isConnected) {
+      return;
+    }
+
+    d.osdMonitorSelect.classList.add("hidden");
+
+    monitorDropdownEl = document.createElement("div");
+    monitorDropdownEl.className = "target-dropdown settings-monitor-dropdown";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "target-button";
+    button.title = "Monitor";
+
+    monitorDisplayEl = document.createElement("span");
+    monitorDisplayEl.className = "target-display";
+
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    caret.textContent = "\u25be";
+
+    button.appendChild(monitorDisplayEl);
+    button.appendChild(caret);
+
+    monitorMenuEl = document.createElement("div");
+    monitorMenuEl.className = "target-menu hidden";
+
+    wireDropdownToggle({ root: monitorDropdownEl, menu: monitorMenuEl, trigger: button });
+
+    monitorDropdownEl.appendChild(button);
+    monitorDropdownEl.appendChild(monitorMenuEl);
+    d.osdMonitorSelect.insertAdjacentElement("afterend", monitorDropdownEl);
+
+    if (!monitorDocClickBound) {
+      monitorDocClickBound = true;
+      document.addEventListener("click", (event) => {
+        if (!monitorDropdownEl) return;
+        if (monitorDropdownEl.contains(event.target)) return;
+        closeMonitorDropdown();
+      });
+    }
+  }
+
+  function renderMonitorDropdownOptions(monitors) {
+    ensureMonitorDropdown();
+    if (!monitorMenuEl || !d.osdMonitorSelect) return;
+
+    const list = Array.isArray(monitors) ? monitors : [];
+    monitorMenuEl.innerHTML = "";
+    const currentValue = String(d.osdMonitorSelect.value || "0");
+    let activeOption = null;
+
+    list.forEach((monitor, index) => {
+      const value = String(monitor.index ?? index);
+      const optionModel = {
+        value,
+        label: formatMonitorOptionLabel(monitor, index),
+        isPrimary: Boolean(monitor.is_primary),
+      };
+      if (value === currentValue) {
+        activeOption = optionModel;
+      }
+
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "target-option";
+      if (value === currentValue) {
+        item.classList.add("selected");
+      }
+
+      const textWrap = document.createElement("span");
+      textWrap.className = "target-label";
+      renderLabelWithBadges(textWrap, {
+        text: optionModel.label,
+        badges: optionModel.isPrimary ? [{ text: "MAIN", kind: "neutral" }] : [],
+        truncate: false,
+      });
+      item.appendChild(textWrap);
+
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        d.osdMonitorSelect.value = value;
+        d.osdMonitorSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        renderMonitorDisplay(optionModel);
+        closeMonitorDropdown();
+      });
+
+      monitorMenuEl.appendChild(item);
+    });
+
+    if (!activeOption) {
+      const fallbackText = d.osdMonitorSelect.options[d.osdMonitorSelect.selectedIndex]?.textContent || "Monitor";
+      activeOption = { value: currentValue, label: fallbackText, isPrimary: /\bMAIN\b/i.test(fallbackText) };
+    }
+    renderMonitorDisplay(activeOption);
+  }
+
   async function loadMonitorOptions() {
     let next = [];
     try {
@@ -106,8 +236,7 @@ export function createSettingsFeature({
         option.value = String(monitor.index ?? index);
         option.dataset.rawName = monitor.name || "";
         option.dataset.stableId = monitor.stable_id || "";
-        const label = formatMonitorName(monitor.name) || `Monitor ${index + 1}`;
-        option.textContent = monitor.is_primary ? `${label} (Main)` : label;
+        option.textContent = formatMonitorOptionLabel(monitor, index);
         d.osdMonitorSelect.appendChild(option);
       });
       if (next.length === 0) {
@@ -117,6 +246,7 @@ export function createSettingsFeature({
         d.osdMonitorSelect.appendChild(option);
       }
       d.osdMonitorSelect.value = String(current.monitorIndex ?? 0);
+      renderMonitorDropdownOptions(next);
     }
   }
 
@@ -206,6 +336,8 @@ export function createSettingsFeature({
         const monitorName = selectedOption?.dataset?.rawName || null;
         const monitorId = selectedOption?.dataset?.stableId || null;
         applyOsdSettings({ monitorIndex: nextIndex, monitorName, monitorId });
+        const currentMonitors = (typeof getMonitorOptions === "function") ? (getMonitorOptions() || []) : [];
+        renderMonitorDropdownOptions(currentMonitors);
       });
     }
 

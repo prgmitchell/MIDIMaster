@@ -1,3 +1,5 @@
+import { closeOpenDropdowns, renderLabelFromRawWithTags } from "../ui/dropdown_badges.js";
+
 export function createTargetsFeature({
   dom,
   masterIconData,
@@ -33,127 +35,8 @@ export function createTargetsFeature({
     return mediaPlayPauseIconData;
   }
 
-  function parseLabelParts(rawLabel) {
-    const label = String(rawLabel || "").trim();
-    if (!label) {
-      return { base: "", tags: [] };
-    }
-
-    const tags = [];
-    const tagPattern = /\(([^()]+)\)/g;
-    let match = null;
-    while ((match = tagPattern.exec(label)) !== null) {
-      const tag = String(match[1] || "").trim();
-      if (tag) tags.push(tag);
-    }
-
-    const base = label.replace(/\s*\([^()]+\)/g, " ").replace(/\s+/g, " ").trim();
-    return { base: base || label, tags };
-  }
-
-  function tagVariant(tag) {
-    const text = String(tag || "").toLowerCase();
-    if (!text) return "neutral";
-    if (text.includes("mix")) return "mix";
-    if (text.includes("unavailable") || text.includes("disconnected") || text.includes("connecting")) {
-      return "state";
-    }
-    if (
-      text.includes("toggle")
-      || text.includes("mute")
-      || text.includes("media")
-      || text.includes("stop")
-      || text.includes("play")
-      || text.includes("next")
-      || text.includes("prev")
-      || text.includes("record")
-      || text.includes("stream")
-      || text.includes("visibility")
-      || text.includes("trigger")
-      || text.includes("action")
-    ) {
-      return "action";
-    }
-    return "neutral";
-  }
-
-  function appendLabelWithTags(labelEl, rawLabel, extraTags = [], truncateMain = true) {
-    labelEl.textContent = "";
-    const { base, tags } = parseLabelParts(rawLabel);
-    const allTags = [...tags, ...extraTags.filter(Boolean).map((t) => String(t).trim()).filter(Boolean)];
-    const uniqueTags = [];
-    const seenTags = new Set();
-    for (const tag of allTags) {
-      const key = tag.toLowerCase();
-      if (seenTags.has(key)) continue;
-      seenTags.add(key);
-      uniqueTags.push(tag);
-    }
-
-    let visibleTags = uniqueTags.map((tag) => ({ text: tag, kind: tagVariant(tag), hiddenTags: [] }));
-    if (truncateMain && uniqueTags.length > 1) {
-      const baseLen = (base || rawLabel || "").length;
-      const tagTextLen = uniqueTags.reduce((sum, t) => sum + String(t).length, 0);
-      const shouldCollapse = uniqueTags.length > 2 || (baseLen + tagTextLen > 24);
-
-      if (!shouldCollapse) {
-        const keepAll = uniqueTags.map((tag) => ({ text: tag, kind: tagVariant(tag), hiddenTags: [] }));
-        visibleTags = keepAll;
-      } else {
-      const tagPriority = (tag) => {
-        const variant = tagVariant(tag);
-        if (variant === "action") return 0;
-        if (variant === "mix") return 1;
-        if (variant === "state") return 2;
-        return 3;
-      };
-      const sorted = [...uniqueTags].sort((a, b) => tagPriority(a) - tagPriority(b));
-      const first = sorted[0];
-      const hidden = sorted.slice(1);
-      const restCount = hidden.length;
-      visibleTags = [{ text: first, kind: tagVariant(first), hiddenTags: [] }];
-      if (restCount > 0) {
-        visibleTags.push({ text: `+${restCount}`, kind: "count", hiddenTags: hidden });
-      }
-      }
-    }
-
-    const content = document.createElement("span");
-    content.className = "target-label-content";
-
-    const main = document.createElement("span");
-    main.className = `target-label-main${truncateMain ? " is-truncated" : ""}`;
-    main.textContent = base || rawLabel || "Target";
-    content.appendChild(main);
-
-    if (visibleTags.length > 0) {
-      const tagsWrap = document.createElement("span");
-      tagsWrap.className = "target-label-tags";
-      visibleTags.forEach((tag) => {
-        const badge = document.createElement("span");
-        badge.className = `target-tag target-tag--${tag.kind}`;
-        badge.textContent = tag.text;
-        if (tag.kind === "count" && tag.hiddenTags.length > 0) {
-          const hiddenList = tag.hiddenTags.join(", ");
-          badge.title = hiddenList;
-          badge.setAttribute("aria-label", `Additional tags: ${hiddenList}`);
-        }
-        tagsWrap.appendChild(badge);
-      });
-      content.appendChild(tagsWrap);
-    }
-
-    labelEl.appendChild(content);
-  }
-
   function closeTargetMenus(except = null) {
-    document.querySelectorAll(".target-dropdown.open").forEach((dropdown) => {
-      if (dropdown === except) {
-        return;
-      }
-      dropdown.classList.remove("open");
-      dropdown.querySelector(".target-menu")?.classList.add("hidden");
-    });
+    closeOpenDropdowns({ except });
   }
 
   function createTargetIcon(option) {
@@ -229,7 +112,11 @@ export function createTargetsFeature({
       item.appendChild(createTargetIcon(option));
       const label = document.createElement("span");
       label.className = "target-label";
-      appendLabelWithTags(label, option.label, [], false);
+      renderLabelFromRawWithTags(label, {
+        rawLabel: option.label,
+        extraTags: [],
+        truncateMain: false,
+      });
       item.appendChild(label);
       item.classList.toggle(
         "selected",
@@ -512,7 +399,11 @@ export function createTargetsFeature({
       const label = document.createElement("span");
       label.className = "target-label";
       const actionTag = (action && isBindingButton) ? actionLabel(action) : null;
-      appendLabelWithTags(label, option.label, actionTag ? [actionTag] : [], true);
+      renderLabelFromRawWithTags(label, {
+        rawLabel: option.label,
+        extraTags: actionTag ? [actionTag] : [],
+        truncateMain: true,
+      });
 
       display.appendChild(icon);
       display.appendChild(label);

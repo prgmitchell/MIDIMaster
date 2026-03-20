@@ -1,3 +1,8 @@
+import {
+  renderLabelWithBadges,
+  wireDropdownToggle,
+} from "../ui/dropdown_badges.js";
+
 export function createBindingsFeature({
   invoke,
   dom,
@@ -266,28 +271,11 @@ export function createBindingsFeature({
           modeValue = "fader_rel";
         }
 
-        const renderModeLabel = (container, option) => {
-          container.innerHTML = "";
-          const label = document.createElement("span");
-          label.className = "target-label";
-          const content = document.createElement("span");
-          content.className = "target-label-content";
-          const main = document.createElement("span");
-          main.className = "target-label-main";
-          main.textContent = option.label;
-          content.appendChild(main);
-          if (option.badge) {
-            const tags = document.createElement("span");
-            tags.className = "target-label-tags";
-            const badge = document.createElement("span");
-            badge.className = "target-tag target-tag--neutral";
-            badge.textContent = option.badge;
-            tags.appendChild(badge);
-            content.appendChild(tags);
-          }
-          label.appendChild(content);
-          container.appendChild(label);
-        };
+        const renderModeLabel = (container, option) => renderLabelWithBadges(container, {
+          text: option?.label || "",
+          badges: option?.badge ? [{ text: option.badge, kind: "neutral" }] : [],
+          truncate: false,
+        });
 
         const applyModeSelection = async (nextModeValue) => {
           if (nextModeValue === "button") {
@@ -332,18 +320,7 @@ export function createBindingsFeature({
         const activeModeOption = modeOptions.find((option) => option.value === modeValue) || modeOptions[0];
         renderModeLabel(modeDisplay, activeModeOption);
 
-        modeButton.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          document.querySelectorAll(".target-dropdown.open").forEach((dropdown) => {
-            if (dropdown !== modeDropdown) {
-              dropdown.classList.remove("open");
-              dropdown.querySelector(".target-menu")?.classList.add("hidden");
-            }
-          });
-          modeDropdown.classList.toggle("open");
-          modeMenu.classList.toggle("hidden");
-        });
+        wireDropdownToggle({ root: modeDropdown, menu: modeMenu, trigger: modeButton });
 
         modeDropdown.appendChild(modeButton);
         modeDropdown.appendChild(modeMenu);

@@ -1,0 +1,198 @@
+export function renderLabelWithBadges(
+  container,
+  { text = "", badges = [], truncate = true } = {},
+) {
+  if (!container) return;
+  container.innerHTML = "";
+
+  const label = document.createElement("span");
+  label.className = "target-label";
+
+  const content = document.createElement("span");
+  content.className = "target-label-content";
+
+  const main = document.createElement("span");
+  main.className = `target-label-main${truncate ? " is-truncated" : ""}`;
+  main.textContent = String(text || "");
+  content.appendChild(main);
+
+  const badgeList = Array.isArray(badges) ? badges : [];
+  const normalized = badgeList
+    .map((badge) => {
+      if (typeof badge === "string") {
+        return { text: badge, kind: "neutral" };
+      }
+      if (badge && typeof badge === "object") {
+        return {
+          text: String(badge.text || ""),
+          kind: String(badge.kind || "neutral"),
+        };
+      }
+      return null;
+    })
+    .filter((badge) => badge && badge.text);
+
+  if (normalized.length > 0) {
+    const tags = document.createElement("span");
+    tags.className = "target-label-tags";
+    normalized.forEach((badge) => {
+      const el = document.createElement("span");
+      el.className = `target-tag target-tag--${badge.kind}`;
+      el.textContent = badge.text;
+      tags.appendChild(el);
+    });
+    content.appendChild(tags);
+  }
+
+  label.appendChild(content);
+  container.appendChild(label);
+}
+
+function parseLabelParts(rawLabel) {
+  const label = String(rawLabel || "").trim();
+  if (!label) {
+    return { base: "", tags: [] };
+  }
+
+  const tags = [];
+  const tagPattern = /\(([^()]+)\)/g;
+  let match = null;
+  while ((match = tagPattern.exec(label)) !== null) {
+    const tag = String(match[1] || "").trim();
+    if (tag) tags.push(tag);
+  }
+
+  const base = label.replace(/\s*\([^()]+\)/g, " ").replace(/\s+/g, " ").trim();
+  return { base: base || label, tags };
+}
+
+function tagVariant(tag) {
+  const text = String(tag || "").toLowerCase();
+  if (!text) return "neutral";
+  if (text.includes("mix")) return "mix";
+  if (text.includes("unavailable") || text.includes("disconnected") || text.includes("connecting")) {
+    return "state";
+  }
+  if (
+    text.includes("toggle")
+    || text.includes("mute")
+    || text.includes("media")
+    || text.includes("stop")
+    || text.includes("play")
+    || text.includes("next")
+    || text.includes("prev")
+    || text.includes("record")
+    || text.includes("stream")
+    || text.includes("visibility")
+    || text.includes("trigger")
+    || text.includes("action")
+  ) {
+    return "action";
+  }
+  return "neutral";
+}
+
+export function renderLabelFromRawWithTags(
+  container,
+  { rawLabel = "", extraTags = [], truncateMain = true } = {},
+) {
+  if (!container) return;
+
+  const { base, tags } = parseLabelParts(rawLabel);
+  const normalizedExtraTags = Array.isArray(extraTags)
+    ? extraTags.filter(Boolean).map((t) => String(t).trim()).filter(Boolean)
+    : [];
+  const allTags = [...tags, ...normalizedExtraTags];
+
+  const uniqueTags = [];
+  const seenTags = new Set();
+  for (const tag of allTags) {
+    const key = tag.toLowerCase();
+    if (seenTags.has(key)) continue;
+    seenTags.add(key);
+    uniqueTags.push(tag);
+  }
+
+  let visibleTags = uniqueTags.map((tag) => ({ text: tag, kind: tagVariant(tag), hiddenTags: [] }));
+  if (truncateMain && uniqueTags.length > 1) {
+    const baseLen = (base || rawLabel || "").length;
+    const tagTextLen = uniqueTags.reduce((sum, t) => sum + String(t).length, 0);
+    const shouldCollapse = uniqueTags.length > 2 || (baseLen + tagTextLen > 24);
+
+    if (!shouldCollapse) {
+      visibleTags = uniqueTags.map((tag) => ({ text: tag, kind: tagVariant(tag), hiddenTags: [] }));
+    } else {
+      const tagPriority = (tag) => {
+        const variant = tagVariant(tag);
+        if (variant === "action") return 0;
+        if (variant === "mix") return 1;
+        if (variant === "state") return 2;
+        return 3;
+      };
+      const sorted = [...uniqueTags].sort((a, b) => tagPriority(a) - tagPriority(b));
+      const first = sorted[0];
+      const hidden = sorted.slice(1);
+      const restCount = hidden.length;
+      visibleTags = [{ text: first, kind: tagVariant(first), hiddenTags: [] }];
+      if (restCount > 0) {
+        visibleTags.push({ text: `+${restCount}`, kind: "count", hiddenTags: hidden });
+      }
+    }
+  }
+
+  const badges = visibleTags.map((tag) => ({
+    text: tag.text,
+    kind: tag.kind,
+    hiddenTags: tag.hiddenTags || [],
+  }));
+  renderLabelWithBadges(container, {
+    text: base || rawLabel || "Target",
+    badges,
+    truncate: truncateMain,
+  });
+
+  if (!container.firstElementChild) return;
+  const badgeElements = container.querySelectorAll(".target-tag");
+  badges.forEach((badge, index) => {
+    if (badge.kind === "count" && Array.isArray(badge.hiddenTags) && badge.hiddenTags.length > 0) {
+      const el = badgeElements[index];
+      if (el) {
+        const hiddenList = badge.hiddenTags.join(", ");
+        el.title = hiddenList;
+        el.setAttribute("aria-label", `Additional tags: ${hiddenList}`);
+      }
+    }
+  });
+}
+
+export function closeOpenDropdowns({ except = null } = {}) {
+  document.querySelectorAll(".target-dropdown.open").forEach((dropdown) => {
+    if (except && dropdown === except) return;
+    dropdown.classList.remove("open");
+    dropdown.querySelector(".target-menu")?.classList.add("hidden");
+  });
+}
+
+export function wireDropdownToggle({ root, menu, trigger }) {
+  if (!root || !menu || !trigger) return () => {};
+
+  const onTriggerClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const opening = menu.classList.contains("hidden");
+    closeOpenDropdowns({ except: root });
+    if (opening) {
+      root.classList.add("open");
+      menu.classList.remove("hidden");
+    } else {
+      root.classList.remove("open");
+      menu.classList.add("hidden");
+    }
+  };
+
+  trigger.addEventListener("click", onTriggerClick);
+
+  return () => {
+    trigger.removeEventListener("click", onTriggerClick);
+  };
+}
