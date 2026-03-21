@@ -9,7 +9,10 @@ const APP_INFO_TIMEOUT_MS = 1500;
 const VOLUME_WRITE_INTERVAL_MS = 16;
 const VOLUME_WRITE_EPSILON = 0.002;
 const STATE_REFRESH_DEBOUNCE_MS = 120;
-const LOCAL_WRITE_QUIET_MS = 250;
+const LOCAL_WRITE_QUIET_MS = 1200;
+const FEEDBACK_INTENT_HOLD_MS = 1200;
+const FEEDBACK_INTENT_MATCH_EPSILON = 0.02;
+let rpcSequence = 10;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -167,6 +170,7 @@ export async function activate(ctx) {
   let channelsRefreshTimer = null;
   let mixesRefreshTimer = null;
   let lastLocalVolumeWriteAt = 0;
+  const primaryFeedbackIntentByBinding = new Map(); // binding_id -> { value, at }
   const pendingAppInfoByWsId = new Map();
 
   function endpointKey(endpoint) {
@@ -398,6 +402,16 @@ export async function activate(ctx) {
             }
           }
           if (value != null) {
+            const intent = primaryFeedbackIntentByBinding.get(b.id);
+            const now = Date.now();
+            if (intent && (now - intent.at) < FEEDBACK_INTENT_HOLD_MS) {
+              const delta = Math.abs(Number(value) - Number(intent.value));
+              if (delta > FEEDBACK_INTENT_MATCH_EPSILON) {
+                // Ignore stale echo while local write settles.
+                continue;
+              }
+              primaryFeedbackIntentByBinding.delete(b.id);
+            }
             await ctx.feedback.set(b.id, value, "Volume", { silent: true });
           }
         } else if (action === "ToggleMute") {
@@ -467,7 +481,15 @@ export async function activate(ctx) {
     if (!wsId) {
       throw new Error("Wave Link not connected");
     }
-    const req = { jsonrpc: "2.0", method, id };
+    // Keep state query ids stable (1/2/3), but use unique ids for rapid write
+    // traffic so Wave Link bridge responses cannot collide under high frequency.
+    let requestId = id;
+    if (id !== 1 && id !== 2 && id !== 3) {
+      rpcSequence += 1;
+      if (rpcSequence > 2_000_000_000) rpcSequence = 10;
+      requestId = rpcSequence;
+    }
+    const req = { jsonrpc: "2.0", method, id: requestId };
     if (params && typeof params === "object" && Object.keys(params).length > 0) {
       req.params = params;
     }
@@ -884,6 +906,9 @@ export async function activate(ctx) {
       const bindingId = payload?.binding_id;
       const action = payload?.action;
       const value = payload?.value;
+      const isPrimaryTarget = payload?.is_primary_target !== false;
+      const targetIndex = Number(payload?.target_index ?? 0);
+      const targetCount = Number(payload?.target_count ?? 1);
       const endpoint = normalizeEndpoint({ Integration: payload?.target });
       if (!endpoint) return;
 
@@ -892,8 +917,10 @@ export async function activate(ctx) {
         if (action === "Volume") {
           // Update UI/OSD and internal state immediately (optimistic), then coalesce
           // websocket writes to keep rapid fader motion smooth.
-          if (bindingId) {
-            ctx.feedback.set(bindingId, level, "Volume").catch(() => {});
+          // Latch user intent so background sync doesn't snap the motorized fader
+          // back to stale levels right after release.
+          if (bindingId && isPrimaryTarget) {
+            primaryFeedbackIntentByBinding.set(bindingId, { value: level, at: Date.now() });
           }
 
           if (!wsId) {
@@ -901,6 +928,12 @@ export async function activate(ctx) {
           }
 
           queueVolumeWrite(endpoint, level);
+          // For multi-target bindings, Rust emits one event per target in order.
+          // Flush immediately after the last target event for the current tick so
+          // grouped targets update in real time while preserving anti-jitter logic.
+          if (Number.isFinite(targetCount) && targetCount > 1 && targetIndex >= targetCount - 1) {
+            flushVolumeWrites().catch(() => {});
+          }
           return;
         } else if (action === "ToggleMute") {
           const muted = level > 0.5;
@@ -920,7 +953,7 @@ export async function activate(ctx) {
           }
         }
 
-        if (bindingId) {
+        if (bindingId && isPrimaryTarget && action !== "Volume") {
           await ctx.feedback.set(
             bindingId,
             action === "ToggleMute" ? (level > 0.5 ? 1.0 : 0.0) : level,

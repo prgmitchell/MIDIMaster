@@ -437,6 +437,10 @@ impl AppState {
                 return Ok(());
             }
         };
+        let targets = binding.normalized_targets();
+        if targets.is_empty() {
+            return Ok(());
+        }
 
         let volume = {
             let mut states = self.binding_state.lock().map_err(|_| "Lock poisoned")?;
@@ -516,113 +520,97 @@ impl AppState {
                 return Ok(());
             }
 
-            let muted = match &binding.target {
-                model::BindingTarget::Master => {
-                    let sessions = self.audio.list_sessions().map_err(|err| err.to_string())?;
-                    let master = sessions.iter().find(|session| session.is_master);
-                    let current_muted = master.map(|session| session.is_muted).unwrap_or(false);
-                    let new_muted = !current_muted;
-                    self.audio
-                        .set_master_mute(new_muted)
-                        .map_err(|err| err.to_string())?;
-                    new_muted
-                }
-                model::BindingTarget::Focus => {
-                    if let Some(focused) = self.audio.focused_session().ok().flatten() {
-                        let new_muted = !focused.is_muted;
-                        self.audio
-                            .set_focused_session_mute(new_muted)
-                            .map_err(|err| err.to_string())?;
-                        new_muted
-                    } else {
-                        return Ok(());
-                    }
-                }
-                model::BindingTarget::Application { name } => {
-                    let sessions = self.audio.list_sessions().map_err(|err| err.to_string())?;
-                    let target = name.to_lowercase();
-                    let session = sessions.iter().find(|session| {
-                        if let Some(path) = &session.process_path {
-                            if let Some(stem) = std::path::Path::new(path)
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                            {
-                                if stem.to_lowercase() == target {
-                                    return true;
-                                }
-                            }
-                        }
-                        if let Some(name) = &session.process_name {
-                            let stem = name.strip_suffix(".exe").unwrap_or(name);
-                            if stem.to_lowercase() == target {
-                                return true;
-                            }
-                        }
-                        session.display_name.to_lowercase() == target
-                    });
-                    if let Some(session) = session {
-                        let new_muted = !session.is_muted;
-                        self.audio
-                            .set_application_mute(name, new_muted)
-                            .map_err(|err| err.to_string())?;
-                        new_muted
-                    } else {
-                        return Ok(());
-                    }
-                }
-                model::BindingTarget::Device { device_id } => {
-                    let playback = self.audio.list_playback_devices().unwrap_or_default();
-                    let recording = self.audio.list_recording_devices().unwrap_or_default();
-                    let (kind, raw_id) = parse_device_target(device_id);
-                    let device = match kind {
-                        DeviceTargetKind::Playback => {
-                            playback.iter().find(|device| device.id == raw_id)
-                        }
-                        DeviceTargetKind::Recording => {
-                            recording.iter().find(|device| device.id == raw_id)
-                        }
-                    };
-                    if let Some(device) = device {
-                        let new_muted = !device.is_muted;
-                        self.audio
-                            .set_device_mute(device_id, new_muted)
-                            .map_err(|err| err.to_string())?;
-                        new_muted
-                    } else {
-                        return Ok(());
-                    }
-                }
-                model::BindingTarget::Integration {
-                    integration_id,
-                    kind,
-                    data,
-                } => {
-                    let current_val = self
-                        .feedback_values
-                        .lock()
-                        .ok()
-                        .and_then(|fb| fb.get(&key).cloned())
-                        .unwrap_or(0.0);
-                    let is_currently_muted = current_val > 0.5;
-                    let new_muted = !is_currently_muted;
+            let current_val = self
+                .feedback_values
+                .lock()
+                .ok()
+                .and_then(|fb| fb.get(&key).cloned())
+                .unwrap_or(0.0);
+            let muted = !(current_val > 0.5);
+            let mut any_applied = false;
 
-                    let payload = serde_json::json!({
-                      "binding_id": binding.id,
-                      "action": "ToggleMute",
-                      "value": if new_muted { 1.0 } else { 0.0 },
-                      "target": {
-                        "integration_id": integration_id,
-                        "kind": kind,
-                        "data": data,
-                      }
-                    });
-                    let _ = app.emit("integration_binding_triggered", payload);
-                    return Ok(());
+            for (target_index, target) in targets.iter().enumerate() {
+                match target {
+                    model::BindingTarget::Master => {
+                        if let Err(err) = self.audio.set_master_mute(muted) {
+                            eprintln!(
+                                "Failed to set master mute for binding {}: {}",
+                                binding.id, err
+                            );
+                        } else {
+                            any_applied = true;
+                        }
+                    }
+                    model::BindingTarget::Focus => {
+                        if let Some(_focused) = self.audio.focused_session().ok().flatten() {
+                            if let Err(err) = self.audio.set_focused_session_mute(muted) {
+                                eprintln!(
+                                    "Failed to set focused mute for binding {}: {}",
+                                    binding.id, err
+                                );
+                            } else {
+                                any_applied = true;
+                            }
+                        }
+                    }
+                    model::BindingTarget::Session { session_id } => {
+                        if let Err(err) = self.audio.set_session_mute(session_id, muted) {
+                            eprintln!(
+                                "Failed to set session mute for binding {} ({}): {}",
+                                binding.id, session_id, err
+                            );
+                        } else {
+                            any_applied = true;
+                        }
+                    }
+                    model::BindingTarget::Application { name } => {
+                        if let Err(err) = self.audio.set_application_mute(name, muted) {
+                            eprintln!(
+                                "Failed to set application mute for binding {} ({}): {}",
+                                binding.id, name, err
+                            );
+                        } else {
+                            any_applied = true;
+                        }
+                    }
+                    model::BindingTarget::Device { device_id } => {
+                        if let Err(err) = self.audio.set_device_mute(device_id, muted) {
+                            eprintln!(
+                                "Failed to set device mute for binding {} ({}): {}",
+                                binding.id, device_id, err
+                            );
+                        } else {
+                            any_applied = true;
+                        }
+                    }
+                    model::BindingTarget::Integration {
+                        integration_id,
+                        kind,
+                        data,
+                    } => {
+                        let payload = serde_json::json!({
+                          "binding_id": binding.id,
+                          "action": "ToggleMute",
+                          "value": if muted { 1.0 } else { 0.0 },
+                          "target_index": target_index,
+                          "target_count": targets.len(),
+                          "is_primary_target": target_index == 0,
+                          "target": {
+                            "integration_id": integration_id,
+                            "kind": kind,
+                            "data": data,
+                          }
+                        });
+                        let _ = app.emit("integration_binding_triggered", payload);
+                        any_applied = true;
+                    }
+                    model::BindingTarget::Unset | model::BindingTarget::MediaControl => {}
                 }
-                _ => {
-                    return Ok(());
-                }
-            };
+            }
+
+            if !any_applied {
+                return Ok(());
+            }
 
             if let Ok(mut last_update) = self.osd_last_update.lock() {
                 *last_update = Some(Instant::now());
@@ -643,36 +631,38 @@ impl AppState {
                 );
             }
 
-            let focus_session = if matches!(&binding.target, model::BindingTarget::Focus) {
-                self.audio.focused_session().ok().flatten()
-            } else {
-                None
-            };
-
-            let payload = serde_json::json!({
-              "target": binding.target,
-              "muted": muted,
-              "action": "toggle_mute",
-              "focus_session": focus_session,
-            });
-            let _ = app.emit("mute_update", payload.clone());
-
             let settings_enabled = self
                 .osd_settings
                 .lock()
                 .map(|settings| settings.enabled)
                 .unwrap_or(true);
 
-            if settings_enabled {
-                if let Some(osd_window) = app.get_webview_window("osd") {
-                    let _ = osd_window.show();
-                    let _ = osd_window.emit("mute_update", payload.clone());
-                    if let Ok(payload_json) = serde_json::to_string(&payload) {
-                        let script = format!(
-                            "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-                            payload_json
-                        );
-                        let _ = osd_window.eval(&script);
+            for target in &targets {
+                let focus_session = if matches!(target, model::BindingTarget::Focus) {
+                    self.audio.focused_session().ok().flatten()
+                } else {
+                    None
+                };
+                let payload = serde_json::json!({
+                  "target": target,
+                  "muted": muted,
+                  "action": "toggle_mute",
+                  "focus_session": focus_session,
+                  "binding_id": binding.id
+                });
+                let _ = app.emit("mute_update", payload.clone());
+
+                if settings_enabled {
+                    if let Some(osd_window) = app.get_webview_window("osd") {
+                        let _ = osd_window.show();
+                        let _ = osd_window.emit("mute_update", payload.clone());
+                        if let Ok(payload_json) = serde_json::to_string(&payload) {
+                            let script = format!(
+                                "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
+                                payload_json
+                            );
+                            let _ = osd_window.eval(&script);
+                        }
                     }
                 }
             }
@@ -680,48 +670,86 @@ impl AppState {
             return Ok(());
         }
 
-        match &binding.target {
-            model::BindingTarget::Master => self
-                .audio
-                .set_master_volume(volume)
-                .map_err(|err| err.to_string())?,
-            model::BindingTarget::Focus => self
-                .audio
-                .set_focused_session_volume(volume)
-                .map_err(|err| err.to_string())?,
-            model::BindingTarget::Session { session_id } => self
-                .audio
-                .set_session_volume(session_id, volume)
-                .map_err(|err| err.to_string())?,
-            model::BindingTarget::Application { name } => self
-                .audio
-                .set_application_volume(name, volume)
-                .map_err(|err| err.to_string())?,
-            model::BindingTarget::Device { device_id } => self
-                .audio
-                .set_device_volume(device_id, volume)
-                .map_err(|err| err.to_string())?,
-            model::BindingTarget::Unset | model::BindingTarget::MediaControl => {
-                return Ok(());
+        let mut any_applied = false;
+        for (target_index, target) in targets.iter().enumerate() {
+            match target {
+                model::BindingTarget::Master => {
+                    if let Err(err) = self.audio.set_master_volume(volume) {
+                        eprintln!(
+                            "Failed to set master volume for binding {}: {}",
+                            binding.id, err
+                        );
+                    } else {
+                        any_applied = true;
+                    }
+                }
+                model::BindingTarget::Focus => {
+                    if let Err(err) = self.audio.set_focused_session_volume(volume) {
+                        eprintln!(
+                            "Failed to set focused volume for binding {}: {}",
+                            binding.id, err
+                        );
+                    } else {
+                        any_applied = true;
+                    }
+                }
+                model::BindingTarget::Session { session_id } => {
+                    if let Err(err) = self.audio.set_session_volume(session_id, volume) {
+                        eprintln!(
+                            "Failed to set session volume for binding {} ({}): {}",
+                            binding.id, session_id, err
+                        );
+                    } else {
+                        any_applied = true;
+                    }
+                }
+                model::BindingTarget::Application { name } => {
+                    if let Err(err) = self.audio.set_application_volume(name, volume) {
+                        eprintln!(
+                            "Failed to set application volume for binding {} ({}): {}",
+                            binding.id, name, err
+                        );
+                    } else {
+                        any_applied = true;
+                    }
+                }
+                model::BindingTarget::Device { device_id } => {
+                    if let Err(err) = self.audio.set_device_volume(device_id, volume) {
+                        eprintln!(
+                            "Failed to set device volume for binding {} ({}): {}",
+                            binding.id, device_id, err
+                        );
+                    } else {
+                        any_applied = true;
+                    }
+                }
+                model::BindingTarget::Integration {
+                    integration_id,
+                    kind,
+                    data,
+                } => {
+                    let payload = serde_json::json!({
+                      "binding_id": binding.id,
+                      "action": "Volume",
+                      "value": volume,
+                      "target_index": target_index,
+                      "target_count": targets.len(),
+                      "is_primary_target": target_index == 0,
+                      "target": {
+                        "integration_id": integration_id,
+                        "kind": kind,
+                        "data": data,
+                      }
+                    });
+                    let _ = app.emit("integration_binding_triggered", payload);
+                    any_applied = true;
+                }
+                model::BindingTarget::Unset | model::BindingTarget::MediaControl => {}
             }
-            model::BindingTarget::Integration {
-                integration_id,
-                kind,
-                data,
-            } => {
-                let payload = serde_json::json!({
-                  "binding_id": binding.id,
-                  "action": "Volume",
-                  "value": volume,
-                  "target": {
-                    "integration_id": integration_id,
-                    "kind": kind,
-                    "data": data,
-                  }
-                });
-                let _ = app.emit("integration_binding_triggered", payload);
-                return Ok(());
-            }
+        }
+
+        if !any_applied {
+            return Ok(());
         }
 
         if let Ok(mut feedback) = self.feedback_values.lock() {
@@ -742,33 +770,36 @@ impl AppState {
             );
         }
 
-        let focus_session = if matches!(&binding.target, model::BindingTarget::Focus) {
-            self.audio.focused_session().ok().flatten()
-        } else {
-            None
-        };
-        let payload = serde_json::json!({
-          "target": binding.target,
-          "volume": volume,
-          "focus_session": focus_session,
-          "binding_id": binding.id
-        });
-        let _ = app.emit("volume_update", payload.clone());
         let settings_enabled = self
             .osd_settings
             .lock()
             .map(|settings| settings.enabled)
             .unwrap_or(true);
-        if settings_enabled {
-            if let Some(osd_window) = app.get_webview_window("osd") {
-                let _ = osd_window.show();
-                let _ = osd_window.emit("volume_update", payload.clone());
-                if let Ok(payload_json) = serde_json::to_string(&payload) {
-                    let script = format!(
-                        "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-                        payload_json
-                    );
-                    let _ = osd_window.eval(&script);
+        for target in &targets {
+            let focus_session = if matches!(target, model::BindingTarget::Focus) {
+                self.audio.focused_session().ok().flatten()
+            } else {
+                None
+            };
+            let payload = serde_json::json!({
+              "target": target,
+              "volume": volume,
+              "focus_session": focus_session,
+              "binding_id": binding.id
+            });
+            let _ = app.emit("volume_update", payload.clone());
+
+            if settings_enabled {
+                if let Some(osd_window) = app.get_webview_window("osd") {
+                    let _ = osd_window.show();
+                    let _ = osd_window.emit("volume_update", payload.clone());
+                    if let Ok(payload_json) = serde_json::to_string(&payload) {
+                        let script = format!(
+                            "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
+                            payload_json
+                        );
+                        let _ = osd_window.eval(&script);
+                    }
                 }
             }
         }
@@ -789,6 +820,7 @@ impl AppState {
         };
 
         for binding in &profile.bindings {
+            let primary_target = binding.primary_target();
             if matches!(
                 binding.action,
                 model::BindingAction::MediaPlayPause
@@ -800,7 +832,7 @@ impl AppState {
             }
 
             let value = if binding.action == model::BindingAction::ToggleMute {
-                match &binding.target {
+                match &primary_target {
                     model::BindingTarget::Master => sessions
                         .iter()
                         .find(|session| session.is_master)
@@ -858,7 +890,7 @@ impl AppState {
                     model::BindingTarget::Integration { .. } => None,
                 }
             } else {
-                match &binding.target {
+                match &primary_target {
                     model::BindingTarget::Master => sessions
                         .iter()
                         .find(|session| session.is_master)

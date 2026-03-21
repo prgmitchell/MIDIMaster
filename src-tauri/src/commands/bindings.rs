@@ -3,7 +3,15 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 #[tauri::command]
-pub fn add_binding(state: State<AppState>, binding: Binding) -> Result<(), String> {
+pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), String> {
+    binding.ensure_targets();
+    if binding.targets.is_empty() {
+        return Err("Binding must have at least one target".to_string());
+    }
+    if binding.targets.len() > 8 {
+        return Err("Binding cannot have more than 8 targets".to_string());
+    }
+
     let mut profile_guard = state
         .active_profile
         .lock()
@@ -86,16 +94,17 @@ pub fn update_midi_feedback(
     };
 
     for binding in &profile.bindings {
+        let binding_targets = binding.normalized_targets();
         let matches = if let Some(ref id) = binding_id {
             binding.id == *id
         } else if let Some(ref act) = action {
             if binding.action != *act {
                 false
             } else {
-                binding.target == target
+                binding_targets.iter().any(|t| *t == target)
             }
         } else {
-            binding.target == target
+            binding_targets.iter().any(|t| *t == target)
         };
 
         if matches {
@@ -167,6 +176,7 @@ pub fn set_binding_feedback(
         Some(b) => b,
         None => return Ok(()),
     };
+    let primary_target = binding.primary_target();
 
     let key = BindingKey::from_binding(binding);
 
@@ -237,13 +247,13 @@ pub fn set_binding_feedback(
     match effective_action {
         model::BindingAction::ToggleMute => {
             let muted = value > 0.5;
-            let focus_session = if matches!(&binding.target, model::BindingTarget::Focus) {
+            let focus_session = if matches!(&primary_target, model::BindingTarget::Focus) {
                 state.audio.focused_session().ok().flatten()
             } else {
                 None
             };
             let payload = serde_json::json!({
-              "target": binding.target,
+              "target": primary_target,
               "muted": muted,
               "action": "toggle_mute",
               "focus_session": focus_session,
@@ -266,13 +276,13 @@ pub fn set_binding_feedback(
             }
         }
         model::BindingAction::Volume => {
-            let focus_session = if matches!(&binding.target, model::BindingTarget::Focus) {
+            let focus_session = if matches!(&primary_target, model::BindingTarget::Focus) {
                 state.audio.focused_session().ok().flatten()
             } else {
                 None
             };
             let payload = serde_json::json!({
-              "target": binding.target,
+              "target": primary_target,
               "volume": value,
               "focus_session": focus_session,
               "binding_id": binding.id,

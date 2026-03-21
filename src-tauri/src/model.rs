@@ -116,6 +116,12 @@ pub enum BindingTarget {
     Unset,
 }
 
+impl Default for BindingTarget {
+    fn default() -> Self {
+        BindingTarget::Unset
+    }
+}
+
 // Backward-compatible deserialization for legacy enum variants.
 //
 // Older profiles stored OBS/WaveLink targets as dedicated enum variants.
@@ -330,12 +336,51 @@ pub struct Binding {
     pub control: MidiControl,
     #[serde(default)]
     pub control_kind: BindingControlKind,
+    #[serde(default)]
+    pub targets: Vec<BindingTarget>,
+    #[serde(default, skip_serializing)]
     pub target: BindingTarget,
     #[serde(default)]
     pub action: BindingAction,
     pub mode: MidiMode,
     pub deadzone: f32,
     pub debounce_ms: u64,
+}
+
+impl Binding {
+    pub fn normalized_targets(&self) -> Vec<BindingTarget> {
+        if !self.targets.is_empty() {
+            self.targets.clone()
+        } else if self.target != BindingTarget::Unset {
+            vec![self.target.clone()]
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn primary_target(&self) -> BindingTarget {
+        self.normalized_targets()
+            .into_iter()
+            .next()
+            .unwrap_or(BindingTarget::Unset)
+    }
+
+    pub fn ensure_targets(&mut self) {
+        if self.targets.is_empty() && self.target != BindingTarget::Unset {
+            self.targets.push(self.target.clone());
+        }
+        if self.targets.len() > 1 {
+            self.targets.retain(|t| *t != BindingTarget::Unset);
+        }
+        if self.targets.len() > 8 {
+            self.targets.truncate(8);
+        }
+        if let Some(first) = self.targets.first().cloned() {
+            self.target = first;
+        } else {
+            self.target = BindingTarget::Unset;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -407,4 +452,92 @@ pub struct LearnedControl {
     pub msg_type: MidiMessageType,
     #[serde(default)]
     pub control_kind: BindingControlKind,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn binding_base_json() -> serde_json::Value {
+        serde_json::json!({
+            "id": "b1",
+            "name": "Binding 1",
+            "device_id": "midi-dev",
+            "control": {
+                "channel": 0,
+                "controller": 7,
+                "msg_type": "ControlChange"
+            },
+            "control_kind": "Continuous",
+            "action": "Volume",
+            "mode": "Absolute",
+            "deadzone": 0.0,
+            "debounce_ms": 0
+        })
+    }
+
+    #[test]
+    fn deserialize_legacy_target_into_targets() {
+        let mut json = binding_base_json();
+        json.as_object_mut()
+            .unwrap()
+            .insert("target".to_string(), serde_json::json!("Master"));
+
+        let mut binding: Binding =
+            serde_json::from_value(json).expect("binding should deserialize");
+        binding.ensure_targets();
+
+        assert_eq!(binding.targets.len(), 1);
+        assert_eq!(binding.targets[0], BindingTarget::Master);
+    }
+
+    #[test]
+    fn deserialize_targets_shape_unchanged() {
+        let mut json = binding_base_json();
+        json.as_object_mut().unwrap().insert(
+            "targets".to_string(),
+            serde_json::json!([
+                "Master",
+                { "Application": { "name": "spotify" } }
+            ]),
+        );
+
+        let mut binding: Binding =
+            serde_json::from_value(json).expect("binding should deserialize");
+        binding.ensure_targets();
+
+        assert_eq!(binding.targets.len(), 2);
+        assert_eq!(binding.targets[0], BindingTarget::Master);
+        assert_eq!(
+            binding.targets[1],
+            BindingTarget::Application {
+                name: "spotify".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn serialize_binding_uses_targets_not_target() {
+        let binding = Binding {
+            id: "b2".to_string(),
+            name: "Binding 2".to_string(),
+            device_id: "midi-dev".to_string(),
+            control: MidiControl {
+                channel: 0,
+                controller: 8,
+                msg_type: MidiMessageType::ControlChange,
+            },
+            control_kind: BindingControlKind::Continuous,
+            targets: vec![BindingTarget::Master],
+            target: BindingTarget::Master,
+            action: BindingAction::Volume,
+            mode: MidiMode::Absolute,
+            deadzone: 0.0,
+            debounce_ms: 0,
+        };
+
+        let json = serde_json::to_value(binding).expect("binding should serialize");
+        assert!(json.get("targets").is_some());
+        assert!(json.get("target").is_none());
+    }
 }

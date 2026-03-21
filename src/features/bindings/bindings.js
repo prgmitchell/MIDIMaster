@@ -121,6 +121,29 @@ export function createBindingsFeature({
     return binding?.control?.msg_type === "Note";
   }
 
+  function getTargets(binding) {
+    if (!binding || typeof binding !== "object") return [];
+    if (Array.isArray(binding.targets) && binding.targets.length > 0) {
+      const normalized = binding.targets.filter(Boolean).filter((t) => t !== "Unset").slice(0, 8);
+      if (normalized.length > 0) return normalized;
+    }
+    if (binding.target != null) {
+      return [binding.target];
+    }
+    return [];
+  }
+
+  function setTargets(binding, targets) {
+    const normalized = Array.isArray(targets) ? targets.filter(Boolean).slice(0, 8) : [];
+    if (normalized.length === 0) normalized.push("Unset");
+    binding.targets = normalized;
+    binding.target = normalized[0] || "Unset";
+  }
+
+  function getPrimaryTarget(binding) {
+    return getTargets(binding)[0] || "Unset";
+  }
+
   function updateBindingValues() {
     const sliders = document.querySelectorAll(".binding-volume-slider");
     sliders.forEach((slider) => {
@@ -182,6 +205,7 @@ export function createBindingsFeature({
 
     bindings.forEach((binding, index) => {
       try {
+        setTargets(binding, getTargets(binding));
         const item = document.createElement("div");
         item.className = "list-item binding-item";
 
@@ -325,26 +349,12 @@ export function createBindingsFeature({
         modeDropdown.appendChild(modeButton);
         modeDropdown.appendChild(modeMenu);
 
-        const targetSelect = buildTarget(binding.target, isButton, binding.action);
+        const targetSelect = buildTarget(getTargets(binding), isButton, binding.action);
         targetSelect.addEventListener("change", async () => {
-          const kind = targetSelect.dataset.kind || "master";
-          const selected = targetSelect.__selectedTarget;
-
-          if (selected !== undefined) {
-            binding.target = selected;
-          } else {
-            if (kind === "master") {
-              binding.target = "Master";
-            } else if (kind === "focus") {
-              binding.target = "Focus";
-            } else if (kind === "device") {
-              binding.target = { Device: { device_id: targetSelect.value } };
-            } else if (kind === "session") {
-              binding.target = { Application: { name: targetSelect.value } };
-            } else {
-              binding.target = "Unset";
-            }
-          }
+          const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
+            ? targetSelect.__selectedTargets
+            : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
+          setTargets(binding, selectedTargets);
 
           if (isButton) {
             binding.action = targetSelect.dataset.action || binding.action || "ToggleMute";
@@ -353,21 +363,24 @@ export function createBindingsFeature({
           }
 
           if (!isButton) {
-            const newVolume = getVol(binding.target);
+            const primaryTarget = getPrimaryTarget(binding);
+            const newVolume = getVol(primaryTarget);
             if (volumeSlider) {
               volumeSlider.value = newVolume;
               updateSliderFill(volumeSlider);
+              volumeSlider.dataset.targetJson = JSON.stringify(primaryTarget);
             }
 
-            const newMuted = getMuted(binding.target);
+            const newMuted = getMuted(primaryTarget);
             if (muteButton) {
               muteButton.innerHTML = newMuted ? "\ud83d\udd07" : "\ud83d\udd0a";
               muteButton.classList.toggle("muted", newMuted);
+              muteButton.dataset.targetJson = JSON.stringify(primaryTarget);
             }
           }
 
-          invoke("add_binding", { binding });
-          saveProfile();
+          await invoke("add_binding", { binding });
+          await saveProfile();
 
           try {
             getHost()?.setBindings?.(getB());
@@ -386,13 +399,14 @@ export function createBindingsFeature({
           volumeSlider.disabled = true;
           volumeSlider.style.visibility = "hidden";
         } else {
-          const v = getVol(binding.target);
+          const primaryTarget = getPrimaryTarget(binding);
+          const v = getVol(primaryTarget);
 
           if (v !== null) bindingLastValues[binding.id] = v;
           volumeSlider.value = v ?? bindingLastValues[binding.id] ?? 0;
           updateSliderFill(volumeSlider);
 
-          const targetJson = JSON.stringify(binding.target);
+          const targetJson = JSON.stringify(primaryTarget);
           volumeSlider.dataset.targetJson = targetJson;
           volumeSlider.dataset.bindingId = binding.id;
 
@@ -402,62 +416,61 @@ export function createBindingsFeature({
             bindingLastValues[binding.id] = vol;
             updateSliderFill(e.target);
             try {
-              const target = binding.target;
               let invoked = false;
-
-              if (target === "Master" || target?.Master != null) {
-                await invoke("set_master_volume", { volume: vol });
-                invoked = true;
-              } else if (target === "Focus" || target?.Focus != null) {
-                // Focus volume not supported through this path.
-              } else {
+              const targets = getTargets(binding);
+              for (const target of targets) {
+                if (target === "Master" || target?.Master != null) {
+                  await invoke("set_master_volume", { volume: vol });
+                  invoked = true;
+                  continue;
+                }
+                if (target === "Focus" || target?.Focus != null) {
+                  continue;
+                }
                 const appContainer = target.Application || target.application;
                 if (appContainer) {
                   const appName = appContainer.name ?? target.name;
                   await invoke("set_application_volume", { name: appName, volume: vol });
                   invoked = true;
-                } else {
-                  const sessionContainer = target.Session || target.session;
-                  if (sessionContainer) {
-                    const sessId = sessionContainer.session_id ?? sessionContainer.sessionId ?? target.session_id;
-                    await invoke("set_session_volume", { sessionId: sessId, volume: vol });
-                    invoked = true;
-                  } else {
-                    const deviceContainer = target.Device || target.device;
-                    if (deviceContainer) {
-                      let devId = deviceContainer.device_id ?? deviceContainer.deviceId ?? target.device_id;
-
-                      if (devId && typeof devId === "string") {
-                        devId = devId.trim();
-                        if (!devId.startsWith("recording:") && !devId.startsWith("playback:")) {
-                          const recordingDevices = getRecording();
-                          const playbackDevices = getPlayback();
-                          if (Array.isArray(recordingDevices) && recordingDevices.some((d) => d && d.id === devId)) {
-                            devId = `recording:${devId}`;
-                          } else if (Array.isArray(playbackDevices) && playbackDevices.some((d) => d && d.id === devId)) {
-                            devId = `playback:${devId}`;
-                          }
-                        }
-                      }
-
-                      console.log("[JS] set_device_volume inputs:", { devId, vol });
-                      await invoke("set_device_volume", { deviceId: devId, volume: vol });
-                      invoked = true;
-                    } else {
-                      if (await trigIntegration(binding, "Volume", vol)) {
-                        invoked = true;
+                  continue;
+                }
+                const sessionContainer = target.Session || target.session;
+                if (sessionContainer) {
+                  const sessId = sessionContainer.session_id ?? sessionContainer.sessionId ?? target.session_id;
+                  await invoke("set_session_volume", { sessionId: sessId, volume: vol });
+                  invoked = true;
+                  continue;
+                }
+                const deviceContainer = target.Device || target.device;
+                if (deviceContainer) {
+                  let devId = deviceContainer.device_id ?? deviceContainer.deviceId ?? target.device_id;
+                  if (devId && typeof devId === "string") {
+                    devId = devId.trim();
+                    if (!devId.startsWith("recording:") && !devId.startsWith("playback:")) {
+                      const recordingDevices = getRecording();
+                      const playbackDevices = getPlayback();
+                      if (Array.isArray(recordingDevices) && recordingDevices.some((d) => d && d.id === devId)) {
+                        devId = `recording:${devId}`;
+                      } else if (Array.isArray(playbackDevices) && playbackDevices.some((d) => d && d.id === devId)) {
+                        devId = `playback:${devId}`;
                       }
                     }
                   }
+                  await invoke("set_device_volume", { deviceId: devId, volume: vol });
+                  invoked = true;
                 }
               }
+              if (await trigIntegration(binding, "Volume", vol)) invoked = true;
 
               if (invoked) {
-                showVolOsd(target, vol);
+                const primaryTarget = getPrimaryTarget(binding);
+                showVolOsd(primaryTarget, vol);
 
                 volumeSlider.dataset.lastMidiUpdate = Date.now();
-                if (!extractInteg(target)) {
-                  invoke("update_midi_feedback", { target, value: vol, action: "Volume" });
+                for (const target of getTargets(binding)) {
+                  if (!extractInteg(target)) {
+                    invoke("update_midi_feedback", { target, value: vol, action: "Volume" });
+                  }
                 }
               }
             } catch (err) {
@@ -470,12 +483,13 @@ export function createBindingsFeature({
         muteButton.type = "button";
         muteButton.className = "binding-mute-button";
         muteButton.title = "Toggle Mute";
+        const primaryTarget = getPrimaryTarget(binding);
         const isMuted = (bindingMuteValues[binding.id] != null)
           ? Boolean(bindingMuteValues[binding.id])
-          : Boolean(getMuted(binding.target));
+          : Boolean(getMuted(primaryTarget));
         muteButton.innerHTML = isMuted ? "\ud83d\udd07" : "\ud83d\udd0a";
         muteButton.classList.toggle("muted", isMuted);
-        muteButton.dataset.targetJson = JSON.stringify(binding.target);
+        muteButton.dataset.targetJson = JSON.stringify(primaryTarget);
 
         if (isButton) {
           muteButton.disabled = true;
@@ -488,59 +502,63 @@ export function createBindingsFeature({
           const newMuted = !currentlyMuted;
 
           try {
-            const target = binding.target;
             let invoked = false;
-
-            if (target === "Master" || target?.Master != null) {
-              await invoke("set_master_mute", { muted: newMuted });
-              invoked = true;
-            } else if (target === "Focus" || target?.Focus != null) {
-              // Focus mute not supported
-            } else {
+            const targets = getTargets(binding);
+            for (const target of targets) {
+              if (target === "Master" || target?.Master != null) {
+                await invoke("set_master_mute", { muted: newMuted });
+                invoked = true;
+                continue;
+              }
+              if (target === "Focus" || target?.Focus != null) {
+                continue;
+              }
               const appContainer = target.Application || target.application;
               if (appContainer) {
                 const appName = appContainer.name ?? target.name;
                 await invoke("set_application_mute", { name: appName, muted: newMuted });
                 invoked = true;
-              } else {
-                const sessionContainer = target.Session || target.session;
-                if (sessionContainer) {
-                  const sessId = sessionContainer.session_id ?? sessionContainer.sessionId ?? target.session_id;
-                  await invoke("set_session_mute", { sessionId: sessId, muted: newMuted });
-                  invoked = true;
-                } else {
-                  const deviceContainer = target.Device || target.device;
-                  if (deviceContainer) {
-                    let devId = deviceContainer.device_id ?? deviceContainer.deviceId ?? target.device_id;
-                    if (devId && typeof devId === "string") {
-                      devId = devId.trim();
-                      if (!devId.startsWith("recording:") && !devId.startsWith("playback:")) {
-                        const recordingDevices = getRecording();
-                        const playbackDevices = getPlayback();
-                        if (Array.isArray(recordingDevices) && recordingDevices.some((d) => d && d.id === devId)) {
-                          devId = `recording:${devId}`;
-                        } else if (Array.isArray(playbackDevices) && playbackDevices.some((d) => d && d.id === devId)) {
-                          devId = `playback:${devId}`;
-                        }
-                      }
-                    }
-                    if (devId) {
-                      await invoke("set_device_mute", { device_id: devId, muted: newMuted });
-                      invoked = true;
-                    } else {
-                      if (await trigIntegration(binding, "ToggleMute", newMuted ? 1.0 : 0.0)) {
-                        invoked = true;
-                      }
+                continue;
+              }
+              const sessionContainer = target.Session || target.session;
+              if (sessionContainer) {
+                const sessId = sessionContainer.session_id ?? sessionContainer.sessionId ?? target.session_id;
+                await invoke("set_session_mute", { sessionId: sessId, muted: newMuted });
+                invoked = true;
+                continue;
+              }
+              const deviceContainer = target.Device || target.device;
+              if (deviceContainer) {
+                let devId = deviceContainer.device_id ?? deviceContainer.deviceId ?? target.device_id;
+                if (devId && typeof devId === "string") {
+                  devId = devId.trim();
+                  if (!devId.startsWith("recording:") && !devId.startsWith("playback:")) {
+                    const recordingDevices = getRecording();
+                    const playbackDevices = getPlayback();
+                    if (Array.isArray(recordingDevices) && recordingDevices.some((d) => d && d.id === devId)) {
+                      devId = `recording:${devId}`;
+                    } else if (Array.isArray(playbackDevices) && playbackDevices.some((d) => d && d.id === devId)) {
+                      devId = `playback:${devId}`;
                     }
                   }
                 }
+                if (devId) {
+                  await invoke("set_device_mute", { device_id: devId, muted: newMuted });
+                  invoked = true;
+                }
               }
             }
+            if (await trigIntegration(binding, "ToggleMute", newMuted ? 1.0 : 0.0)) invoked = true;
 
             if (invoked) {
-              showMutOsd(target, newMuted);
+              showMutOsd(getPrimaryTarget(binding), newMuted);
               muteButton.innerHTML = newMuted ? "\ud83d\udd07" : "\ud83d\udd0a";
               muteButton.classList.toggle("muted", newMuted);
+              for (const target of getTargets(binding)) {
+                if (!extractInteg(target)) {
+                  invoke("update_midi_feedback", { target, value: newMuted ? 1.0 : 0.0, action: "ToggleMute" });
+                }
+              }
             }
           } catch (err) {
             console.error("Failed to toggle mute:", err);

@@ -743,6 +743,81 @@ button:hover {
   gap: 8px;
   min-width: 0;
   flex: 1;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.target-chips-wrap {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.target-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d7dcea;
+  background: #f4f6fb;
+  border-radius: 999px;
+  padding: 2px 8px 2px 4px;
+  max-width: 240px;
+}
+
+
+.target-chip-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.target-chip-label {
+  min-width: 0;
+}
+
+.target-chip .target-label-content {
+  gap: 4px;
+}
+
+.target-chip .target-label-main {
+  font-size: 12px;
+}
+
+.target-chip-remove {
+  border: none;
+  background: transparent;
+  color: #5d6478;
+  cursor: pointer;
+  border-radius: 999px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.target-chip-remove:hover {
+  color: #12264f;
+  background: rgba(40, 64, 110, 0.12);
+}
+
+body.dark-mode .target-chip {
+  background: #27324a;
+  border-color: #3f4f75;
+}
+
+
+body.dark-mode .target-chip-remove {
+  color: #c9d3ed;
+}
+
+body.dark-mode .target-chip-remove:hover {
+  color: #ffffff;
+  background: rgba(180, 206, 255, 0.28);
 }
 
 .target-label {

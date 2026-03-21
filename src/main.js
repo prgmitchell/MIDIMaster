@@ -97,68 +97,108 @@ function hydrateIntegrationDisplayMetadata() {
   let changed = false;
 
   for (const b of bindings) {
-    const integ = b?.target?.Integration || b?.target?.integration;
-    if (!integ || typeof integ !== "object" || !integ.integration_id) continue;
-    const data = (integ.data && typeof integ.data === "object") ? integ.data : {};
+    const targets = getBindingTargets(b);
+    let updatedAny = false;
+    const nextTargets = targets.map((t) => {
+      const integ = t?.Integration || t?.integration;
+      if (!integ || typeof integ !== "object" || !integ.integration_id) return t;
+      const data = (integ.data && typeof integ.data === "object") ? integ.data : {};
 
-    // Sanitize stored labels (older builds stored status suffixes).
-    if (typeof data.label === "string") {
-      const suffixes = [" (Unavailable)", " (Connecting...)", " (Disconnected)"];
-      let nextLabel = data.label;
-      for (const s of suffixes) {
-        if (nextLabel.endsWith(s)) {
-          nextLabel = nextLabel.slice(0, -s.length);
+      if (typeof data.label === "string") {
+        const suffixes = [" (Unavailable)", " (Connecting...)", " (Disconnected)"];
+        let nextLabel = data.label;
+        for (const s of suffixes) {
+          if (nextLabel.endsWith(s)) nextLabel = nextLabel.slice(0, -s.length);
+        }
+        if (nextLabel !== data.label) {
+          updatedAny = true;
+          return {
+            Integration: {
+              integration_id: String(integ.integration_id),
+              kind: String(integ.kind || ""),
+              data: { ...data, label: nextLabel },
+            },
+          };
         }
       }
-      if (nextLabel !== data.label) {
-        const nextData = { ...data, label: nextLabel };
-        b.target = {
+
+      const hasLabel = typeof data.label === "string" && data.label.trim().length > 0;
+      const hasIcon = typeof data.icon_data === "string" && data.icon_data.trim().length > 0;
+      if (hasLabel && hasIcon) return t;
+
+      let desc = null;
+      try {
+        const handler = pluginHost?.getIntegration?.(integ.integration_id);
+        if (handler && typeof handler.describeTarget === "function") {
+          desc = handler.describeTarget({ Integration: integ });
+        }
+      } catch {
+        desc = null;
+      }
+
+      if (!desc || typeof desc !== "object") return t;
+      const next = { ...data };
+      if (!hasLabel && typeof desc.label === "string" && desc.label.trim()) next.label = desc.label;
+      if (!hasIcon && typeof desc.icon_data === "string" && desc.icon_data.trim()) next.icon_data = desc.icon_data;
+
+      if (next.label !== data.label || next.icon_data !== data.icon_data) {
+        updatedAny = true;
+        return {
           Integration: {
             integration_id: String(integ.integration_id),
             kind: String(integ.kind || ""),
-            data: nextData,
+            data: next,
           },
         };
-        changed = true;
-        continue;
       }
-    }
+      return t;
+    });
 
-    const hasLabel = typeof data.label === "string" && data.label.trim().length > 0;
-    const hasIcon = typeof data.icon_data === "string" && data.icon_data.trim().length > 0;
-    if (hasLabel && hasIcon) continue;
-
-    let desc = null;
-    try {
-      const handler = pluginHost?.getIntegration?.(integ.integration_id);
-      if (handler && typeof handler.describeTarget === "function") {
-        desc = handler.describeTarget({ Integration: integ });
-      }
-    } catch {
-      desc = null;
-    }
-
-    if (!desc || typeof desc !== "object") continue;
-    const next = { ...data };
-    if (!hasLabel && typeof desc.label === "string" && desc.label.trim()) {
-      next.label = desc.label;
-    }
-    if (!hasIcon && typeof desc.icon_data === "string" && desc.icon_data.trim()) {
-      next.icon_data = desc.icon_data;
-    }
-    if (next.label !== data.label || next.icon_data !== data.icon_data) {
-      b.target = {
-        Integration: {
-          integration_id: String(integ.integration_id),
-          kind: String(integ.kind || ""),
-          data: next,
-        },
-      };
+    if (updatedAny) {
+      setBindingTargets(b, nextTargets);
       changed = true;
     }
   }
 
   return changed;
+}
+
+function getBindingTargets(binding) {
+  if (!binding || typeof binding !== "object") return [];
+  if (Array.isArray(binding.targets) && binding.targets.length > 0) {
+    const normalized = binding.targets.filter(Boolean).filter((t) => t !== "Unset").slice(0, 8);
+    if (normalized.length > 0) return normalized;
+  }
+  if (binding.target != null) {
+    return [binding.target];
+  }
+  return [];
+}
+
+function setBindingTargets(binding, targets) {
+  if (!binding || typeof binding !== "object") return;
+  const normalized = Array.isArray(targets) ? targets.filter(Boolean).slice(0, 8) : [];
+  if (normalized.length === 0) normalized.push("Unset");
+  binding.targets = normalized;
+  binding.target = normalized[0] || "Unset";
+}
+
+function getPrimaryBindingTarget(binding) {
+  return getBindingTargets(binding)[0] || "Unset";
+}
+
+function bindingHasIntegrationTarget(binding) {
+  return getBindingTargets(binding).some((target) => {
+    const integ = target?.Integration || target?.integration;
+    return Boolean(integ && typeof integ === "object" && integ.integration_id);
+  });
+}
+
+function normalizeBinding(binding) {
+  if (!binding || typeof binding !== "object") return binding;
+  const out = { ...binding };
+  setBindingTargets(out, getBindingTargets(out));
+  return out;
 }
 
 async function updateProfilePluginSettings(pluginId, nextSettings) {
@@ -189,18 +229,27 @@ function extractIntegrationTarget(target) {
 
 async function triggerIntegration(binding, action, value) {
   if (!pluginHost || !binding) return false;
-  const target = extractIntegrationTarget(binding.target);
-  if (!target) return false;
-  const handler = pluginHost.getIntegration(target.integration_id);
-  if (!handler || typeof handler.onBindingTriggered !== "function") return false;
+  const targets = getBindingTargets(binding);
+  let invoked = false;
+  for (let i = 0; i < targets.length; i += 1) {
+    const rawTarget = targets[i];
+    const target = extractIntegrationTarget(rawTarget);
+    if (!target) continue;
+    const handler = pluginHost.getIntegration(target.integration_id);
+    if (!handler || typeof handler.onBindingTriggered !== "function") continue;
 
-  await handler.onBindingTriggered({
-    binding_id: binding.id,
-    action,
-    value,
-    target,
-  });
-  return true;
+    await handler.onBindingTriggered({
+      binding_id: binding.id,
+      action,
+      value,
+      target,
+      target_index: i,
+      target_count: targets.length,
+      is_primary_target: i === 0,
+    });
+    invoked = true;
+  }
+  return invoked;
 }
 
 const midiSelect = document.getElementById("midi-device");
@@ -985,7 +1034,7 @@ function resolveOsdVolume(binding, payload) {
       // Prefer last known feedback for integrations (and everything else).
       current = (bindingLastValues[binding.id] != null)
         ? bindingLastValues[binding.id]
-        : (resolveTargetVolume(binding.target) ?? 0);
+        : (resolveTargetVolume(getPrimaryBindingTarget(binding)) ?? 0);
     }
     const next = Math.min(1, Math.max(0, current + delta * 0.02));
     osdBindingValues.set(binding.id, next);
@@ -1311,6 +1360,7 @@ function createBindingFromLearn(payload) {
     device_id: payload.device_id,
     control,
     control_kind: controlKind,
+    targets: ["Unset"],
     target: "Unset",
     action: isButton ? "ToggleMute" : "Volume",
     mode: "Absolute",
@@ -1408,13 +1458,13 @@ async function setupListeners() {
     }
 
     const binding = findBindingForEvent(payload);
-    if (!binding || binding.target === "Unset") {
+    if (!binding || getBindingTargets(binding).length === 0) {
       return;
     }
     if (binding.action === "ToggleMute") {
       return;
     }
-    if (binding.target && (binding.target.Integration || binding.target.integration)) {
+    if (bindingHasIntegrationTarget(binding)) {
       // Integrations drive OSD/feedback through set_binding_feedback.
       // We still update the slider directly below to keep UI responsive.
     }
@@ -1434,8 +1484,8 @@ async function setupListeners() {
       directSlider.dataset.lastMidiUpdate = Date.now().toString();
     }
 
-    if (!(binding.target && (binding.target.Integration || binding.target.integration))) {
-      showVolumeOsd(binding.target, volume);
+    if (!bindingHasIntegrationTarget(binding)) {
+      showVolumeOsd(getPrimaryBindingTarget(binding), volume);
     }
   });
 
@@ -1571,10 +1621,11 @@ async function startMainApp() {
     localStorage.setItem("activeProfileName", profile.name);
     profilePluginSettings = (profile.plugin_settings && typeof profile.plugin_settings === "object") ? profile.plugin_settings : {};
     activeProfileMidiPreference = normalizeProfileMidiPreference(profile.midi_device_preference);
-    bindings = (profile.bindings || []).map((binding, index) => ({
-      ...binding,
-      name: binding.name?.trim() || bindingFallbackName(binding, index),
-    }));
+    bindings = (profile.bindings || []).map((binding, index) => {
+      const normalized = normalizeBinding(binding);
+      normalized.name = normalized.name?.trim() || bindingFallbackName(normalized, index);
+      return normalized;
+    });
     if (profile.osd_settings) {
       osdSettings = {
         enabled: Boolean(profile.osd_settings.enabled),

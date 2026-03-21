@@ -136,6 +136,7 @@ export function createTargetsFeature({
         if (activeTargetPanelSelect) {
           const res = activeTargetPanelSelect(option);
           if (res === false) {
+            item.classList.toggle("selected");
             return;
           }
         }
@@ -362,10 +363,42 @@ export function createTargetsFeature({
     button.appendChild(display);
     button.appendChild(caret);
 
-    let selectedTarget = currentTarget;
+    const normalizeTargets = (value) => {
+      if (Array.isArray(value)) {
+        return value.filter((v) => v && v !== "Unset").slice(0, 8);
+      }
+      if (value != null && value !== "Unset") {
+        return [value];
+      }
+      return [];
+    };
+
+    const targetIdentity = (target) => {
+      if (!target) return "";
+      if (target === "Master" || target?.Master != null) return "master";
+      if (target === "Focus" || target?.Focus != null) return "focus";
+      if (target === "MediaControl") return "media-control";
+      const integration = target?.Integration || target?.integration;
+      if (integration) {
+        return `integration:${targetKey(integration)}`;
+      }
+      const app = target?.Application || target?.application;
+      if (app?.name) return `app:${String(app.name).toLowerCase()}`;
+      const session = target?.Session || target?.session;
+      if (session?.session_id || session?.sessionId) {
+        return `session:${session.session_id ?? session.sessionId}`;
+      }
+      const device = target?.Device || target?.device;
+      if (device?.device_id || device?.deviceId) {
+        return `device:${device.device_id ?? device.deviceId}`;
+      }
+      return JSON.stringify(target);
+    };
+
+    let selectedTargets = normalizeTargets(currentTarget);
     let selectedAction = isBindingButton ? (currentAction || "ToggleMute") : "Volume";
 
-    const { options, selectedValue, selectedKind, activeIntegrationOption } = buildTargetOptions(currentTarget, isBindingButton);
+    const { options, selectedValue, selectedKind, activeIntegrationOption } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
     const placeholderOption = {
       value: "",
       label: "Select an application or device",
@@ -383,30 +416,59 @@ export function createTargetsFeature({
       return action;
     };
 
-    const setDisplay = (option, action = null) => {
+    const renderChip = (target, index) => {
+      const displayOption = resolveDisplay(target) || { label: "Target", icon_data: null };
+      const chip = document.createElement("span");
+      chip.className = "target-chip";
+      chip.dataset.index = String(index);
+
+      const icon = createTargetIcon(displayOption);
+      icon.classList.add("target-chip-icon");
+      chip.appendChild(icon);
+
+      const label = document.createElement("span");
+      label.className = "target-chip-label";
+      renderLabelFromRawWithTags(label, {
+        rawLabel: displayOption.label,
+        extraTags: [],
+        truncateMain: true,
+      });
+      chip.appendChild(label);
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "target-chip-remove";
+      remove.title = "Remove target";
+      remove.setAttribute("aria-label", "Remove target");
+      remove.textContent = "×";
+      remove.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const idx = Number(chip.dataset.index);
+        if (Number.isNaN(idx)) return;
+        selectedTargets = selectedTargets.filter((_, i) => i !== idx);
+        syncContainerValue(false);
+        container.dispatchEvent(new Event("change"));
+      });
+      chip.appendChild(remove);
+      return chip;
+    };
+
+    const setDisplay = () => {
       display.innerHTML = "";
-      if (option.kind === "placeholder") {
+      if (selectedTargets.length === 0) {
         const label = document.createElement("span");
         label.className = "target-placeholder";
-        label.textContent = option.label;
+        label.textContent = placeholderOption.label;
         display.appendChild(label);
         return;
       }
-      const displayOption = (option.kind === "media-control" && isBindingButton)
-        ? { ...option, icon_data: mediaIconForAction(action) }
-        : option;
-      const icon = createTargetIcon(displayOption);
-      const label = document.createElement("span");
-      label.className = "target-label";
-      const actionTag = (action && isBindingButton) ? actionLabel(action) : null;
-      renderLabelFromRawWithTags(label, {
-        rawLabel: option.label,
-        extraTags: actionTag ? [actionTag] : [],
-        truncateMain: true,
+      const chipsWrap = document.createElement("span");
+      chipsWrap.className = "target-chips-wrap";
+      selectedTargets.forEach((target, index) => {
+        chipsWrap.appendChild(renderChip(target, index));
       });
-
-      display.appendChild(icon);
-      display.appendChild(label);
+      display.appendChild(chipsWrap);
     };
 
     const mapOptionToTarget = (option) => {
@@ -448,29 +510,29 @@ export function createTargetsFeature({
       return selectedTarget;
     };
 
+    const syncContainerValue = (markUnavailable = false) => {
+      container.__selectedTargets = [...selectedTargets];
+      container.__selectedTarget = selectedTargets[0] || "Unset";
+      container.value = selectedTargets.length ? targetIdentity(selectedTargets[0]) : "";
+      container.dataset.kind = selectedTargets.length ? "multi" : "placeholder";
+      container.classList.toggle("target-unavailable", Boolean(markUnavailable));
+      container.dataset.action = selectedAction;
+      setDisplay();
+    };
+
     const selectOption = (option, action = null, emit = true) => {
-      container.value = option.value;
-      container.dataset.kind = option.kind || "master";
+      if (action) selectedAction = action;
 
-      if (option.ghost) {
-        container.classList.add("target-unavailable");
-      } else {
-        container.classList.remove("target-unavailable");
+      const mapped = mapOptionToTarget(option);
+      const key = targetIdentity(mapped);
+      const exists = selectedTargets.findIndex((t) => targetIdentity(t) === key);
+      if (exists >= 0) {
+        selectedTargets.splice(exists, 1);
+      } else if (selectedTargets.length < 8) {
+        selectedTargets.push(mapped);
       }
-      if (option.sceneName) container.dataset.sceneName = option.sceneName;
-      container.dataset.mixType = option.mixType || "";
-
-      if (action) {
-        container.dataset.action = action;
-        selectedAction = action;
-      }
-
-      setDisplay(option, selectedAction);
-      selectedTarget = mapOptionToTarget(option);
-      container.__selectedTarget = selectedTarget;
-      if (emit) {
-        container.dispatchEvent(new Event("change"));
-      }
+      syncContainerValue(Boolean(option.ghost));
+      if (emit) container.dispatchEvent(new Event("change"));
     };
 
     let initial = selectedKind === "placeholder"
@@ -486,17 +548,20 @@ export function createTargetsFeature({
     }
 
     container.dataset.action = selectedAction;
-    selectOption(initial, selectedAction, false);
+    if (selectedTargets.length === 0 && initial && initial.kind !== "placeholder") {
+      selectedTargets = [mapOptionToTarget(initial)];
+    }
+    syncContainerValue(false);
 
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      const { options, selectedValue, selectedKind } = buildTargetOptions(selectedTarget, isBindingButton);
+      const { options } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
 
       const openRootTargetPanel = () => {
         openTargetPanel(
           options,
-          selectedValue,
-          selectedKind,
+          null,
+          null,
           (targetOption) => {
             if (targetOption.kind === "integration-root") {
               showIntegrationSubmenu(targetOption.value, [], null).catch(() => { });
@@ -525,6 +590,7 @@ export function createTargetsFeature({
             selectOption(targetOption);
             return true;
           },
+          "Select Targets",
         );
       };
 

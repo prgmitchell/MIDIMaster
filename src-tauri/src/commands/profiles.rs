@@ -31,6 +31,19 @@ fn heal_legacy_osd_monitor_id(app: &AppHandle, profile: &mut Profile) -> bool {
     true
 }
 
+fn normalize_profile_bindings(profile: &mut Profile) -> bool {
+    let mut changed = false;
+    for binding in &mut profile.bindings {
+        let before_targets = binding.targets.clone();
+        let before_target = binding.target.clone();
+        binding.ensure_targets();
+        if binding.targets != before_targets || binding.target != before_target {
+            changed = true;
+        }
+    }
+    changed
+}
+
 #[tauri::command]
 pub fn list_profiles(state: State<AppState>) -> Result<Vec<ProfileSummary>, String> {
     state
@@ -51,7 +64,14 @@ pub fn load_profile(
         .map_err(|err| err.to_string())?
         .ok_or_else(|| "Profile not found".to_string())?;
 
+    let bindings_changed = normalize_profile_bindings(&mut profile);
+
     if heal_legacy_osd_monitor_id(&app, &mut profile) {
+        state
+            .profile_store
+            .save_profile(profile.clone())
+            .map_err(|err| err.to_string())?;
+    } else if bindings_changed {
         state
             .profile_store
             .save_profile(profile.clone())
@@ -75,8 +95,9 @@ pub fn load_profile(
 pub fn save_profile(
     app: AppHandle,
     state: State<AppState>,
-    profile: Profile,
+    mut profile: Profile,
 ) -> Result<(), String> {
+    normalize_profile_bindings(&mut profile);
     state
         .profile_store
         .save_profile(profile.clone())
@@ -104,9 +125,12 @@ pub fn delete_profile(state: State<AppState>, name: String) -> Result<(), String
 
 #[tauri::command]
 pub fn get_active_profile(state: State<AppState>) -> Result<Option<Profile>, String> {
-    Ok(state
+    let mut active = state
         .active_profile
         .lock()
-        .map_err(|_| "Lock poisoned".to_string())?
-        .clone())
+        .map_err(|_| "Lock poisoned".to_string())?;
+    if let Some(profile) = active.as_mut() {
+        normalize_profile_bindings(profile);
+    }
+    Ok(active.clone())
 }
