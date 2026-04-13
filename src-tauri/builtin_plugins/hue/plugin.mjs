@@ -747,6 +747,9 @@ export async function activate(ctx) {
     id: "hue",
     name: "Philips Hue",
     icon_data: iconDataUrl || null,
+    buttonActions: [
+      { label: "Toggle", value: "ToggleMute" },
+    ],
     describeTarget: (target) => {
       const t = normalizeIntegrationTarget(target);
       if (!t) {

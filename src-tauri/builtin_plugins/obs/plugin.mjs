@@ -552,6 +552,10 @@ export async function activate(ctx) {
     id: "obs",
     name: "OBS Studio",
     icon_data: iconDataUrl || null,
+    buttonActions: [
+      { label: "Trigger", value: "Volume" },
+      { label: "Toggle Mute", value: "ToggleMute" },
+    ],
     describeTarget: (target) => {
       const t = target?.Integration || target?.integration;
       const data = t?.data || {};
@@ -606,6 +610,7 @@ export async function activate(ctx) {
           label: `Switch to ${sceneName}`,
           icon_data: iconDataUrl || null,
           target: makeSceneTarget(sceneName),
+          buttonActions: [{ label: "Switch Scene", value: "Volume" }],
         });
 
         // Fetch scene items live so the list matches OBS state.
@@ -620,6 +625,7 @@ export async function activate(ctx) {
               label: `${sourceName} (Toggle Visibility)`,
               icon_data: iconDataUrl || null,
               target: makeSourceToggleTarget(sceneName, sourceName),
+              buttonActions: [{ label: "Toggle Visibility", value: "ToggleMute" }],
             });
           }
         } catch {
@@ -646,6 +652,7 @@ export async function activate(ctx) {
           label: titleCaseAction(a),
           icon_data: iconDataUrl || null,
           target: makeActionTarget(a),
+          buttonActions: [{ label: titleCaseAction(a), value: "Volume" }],
         });
       }
 
@@ -672,6 +679,7 @@ export async function activate(ctx) {
           label: String(name),
           icon_data: iconDataUrl || null,
           target: { Integration: { integration_id: "obs", kind: "input", data: { input_name: String(name) } } },
+          buttonActions: [{ label: "Toggle Mute", value: "ToggleMute" }],
         });
       }
 

@@ -412,15 +412,21 @@ export function createTargetsFeature({
     };
 
     const actionLabel = (action, target = null) => {
+      // Check if the integration declares a custom label for this action
       const integ = integrationFromTarget(target);
-      if (action === "ToggleMute") {
-        if (integ?.integration_id === "hue") return "Toggle";
-        return "Toggle Mute";
+      if (integ?.integration_id) {
+        const pluginHost = getHost();
+        const handler = pluginHost?.getIntegration(integ.integration_id);
+        if (Array.isArray(handler?.buttonActions)) {
+          const match = handler.buttonActions.find((a) => a.value === action);
+          if (match?.label) return match.label;
+        }
       }
       if (action === "MediaPlayPause") return "Media Play/Pause";
       if (action === "MediaNextTrack") return "Media Next Track";
       if (action === "MediaPrevTrack") return "Media Previous Track";
       if (action === "MediaStop") return "Media Stop";
+      if (action === "ToggleMute") return "Toggle Mute";
       if (action === "Volume" && isBindingButton) return "Trigger";
       return action;
     };
@@ -601,19 +607,32 @@ export function createTargetsFeature({
           ];
         }
 
-        const integ = targetOption?.target?.Integration || targetOption?.target?.integration;
-        if (integ?.integration_id === "hue") {
-          return [{ label: "Toggle", value: "ToggleMute", kind: "action" }];
-        }
-        if (integ?.integration_id === "wavelink") {
-          const k = String(integ.kind || "").toLowerCase();
-          // Wave Link source targets should only allow mute toggle.
-          if (k === "mix" || k === "channel" || k === "channel_mix") {
-            return [{ label: "Toggle Mute", value: "ToggleMute", kind: "action" }];
-          }
-          return [{ label: "Toggle Mute", value: "ToggleMute", kind: "action" }];
+        // Check per-target buttonActions first (set by plugins in getTargetOptions)
+        if (Array.isArray(targetOption?.buttonActions) && targetOption.buttonActions.length > 0) {
+          return targetOption.buttonActions.map((a) => ({
+            label: a.label || a.value || "Action",
+            value: a.value || "Volume",
+            kind: "action",
+            icon_data: a.icon_data || null,
+          }));
         }
 
+        // Then check integration-level buttonActions (set by plugins in registerIntegration)
+        const integ = targetOption?.target?.Integration || targetOption?.target?.integration;
+        if (integ?.integration_id) {
+          const pluginHost = getHost();
+          const handler = pluginHost?.getIntegration(integ.integration_id);
+          if (Array.isArray(handler?.buttonActions) && handler.buttonActions.length > 0) {
+            return handler.buttonActions.map((a) => ({
+              label: a.label || a.value || "Action",
+              value: a.value || "Volume",
+              kind: "action",
+              icon_data: a.icon_data || null,
+            }));
+          }
+        }
+
+        // Default fallback for integrations without declared actions
         return [
           { label: "Trigger", value: "Volume", kind: "action" },
           { label: "Toggle Mute", value: "ToggleMute", kind: "action" },
@@ -688,13 +707,18 @@ export function createTargetsFeature({
                 nav: o.nav,
               };
             }
-            return {
+            const mapped = {
               label: o.label || "Integration Target",
               icon_data: o.icon_data || handler?.icon_data || null,
               kind: o.kind || "integration-target",
               value: targetKey((o.target?.Integration || o.target?.integration) || {}),
               target: o.target,
             };
+            // Carry per-target buttonActions from plugin's getTargetOptions
+            if (Array.isArray(o.buttonActions) && o.buttonActions.length > 0) {
+              mapped.buttonActions = o.buttonActions;
+            }
+            return mapped;
           });
 
         openTargetPanel(
