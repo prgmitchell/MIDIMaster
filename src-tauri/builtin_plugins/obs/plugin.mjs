@@ -566,7 +566,7 @@ export async function activate(ctx) {
       let label = (typeof data.label === "string" && data.label.trim()) ? data.label : "";
       if (!label) {
         if (t?.kind === "input") label = String(data.input_name || "OBS Input");
-        else if (t?.kind === "source") label = `${data.source_name || "Source"} (Toggle Visibility)`;
+        else if (t?.kind === "source") label = String(data.source_name || "Source");
         else if (t?.kind === "scene") label = String(data.scene_name || "OBS Scene");
         else if (t?.kind === "action") label = titleCaseAction(data.action || "Action");
         else label = "OBS Studio";
@@ -607,7 +607,7 @@ export async function activate(ctx) {
         const sceneName = String(nav.sceneName);
 
         opts.push({
-          label: `Switch to ${sceneName}`,
+          label: String(sceneName),
           icon_data: iconDataUrl || null,
           target: makeSceneTarget(sceneName),
           buttonActions: [{ label: "Switch Scene", value: "Volume" }],
@@ -622,7 +622,7 @@ export async function activate(ctx) {
             const sourceName = item?.sourceName;
             if (!sourceName) continue;
             opts.push({
-              label: `${sourceName} (Toggle Visibility)`,
+              label: String(sourceName),
               icon_data: iconDataUrl || null,
               target: makeSourceToggleTarget(sceneName, sourceName),
               buttonActions: [{ label: "Toggle Visibility", value: "ToggleMute" }],
