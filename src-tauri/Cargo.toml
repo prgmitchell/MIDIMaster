@@ -11,7 +11,7 @@ description = "Bind MIDI controls to system audio, devices, and plugin integrati
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "devtools"] }
 tauri-plugin-window-state = "2.0.0"
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }

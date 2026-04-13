@@ -1612,6 +1612,15 @@ fn main() {
                 )
                 .build(app)?;
 
+            // Open devtools if --devtools flag or MIDIMASTER_DEVTOOLS env var is set
+            let open_devtools = std::env::args().any(|a| a == "--devtools")
+                || std::env::var("MIDIMASTER_DEVTOOLS").map_or(false, |v| v == "1");
+            if open_devtools {
+                if let Some(w) = app.get_webview_window("main") {
+                    w.open_devtools();
+                }
+            }
+
             let app_handle = app.handle().clone();
             if let Some(main_window) = app.get_webview_window("main") {
                 let app_handle = app_handle.clone();
