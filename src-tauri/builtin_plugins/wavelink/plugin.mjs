@@ -796,6 +796,9 @@ export async function activate(ctx) {
     id: "wavelink",
     name: "Wave Link",
     icon_data: iconDataUrl || null,
+    buttonActions: [
+      { label: "Toggle Mute", value: "ToggleMute" },
+    ],
     describeTarget: (target) => {
       const t = target?.Integration || target?.integration;
       const data = t?.data || {};
