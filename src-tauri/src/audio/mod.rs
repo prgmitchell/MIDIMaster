@@ -17,6 +17,7 @@ pub trait AudioBackend: Send + Sync {
     fn set_focused_session_mute(&self, muted: bool) -> anyhow::Result<()>;
     fn set_application_mute(&self, name: &str, muted: bool) -> anyhow::Result<()>;
     fn set_device_mute(&self, device_id: &str, muted: bool) -> anyhow::Result<()>;
+    fn set_default_device(&self, device_id: &str) -> anyhow::Result<()>;
 }
 
 #[cfg(target_os = "windows")]

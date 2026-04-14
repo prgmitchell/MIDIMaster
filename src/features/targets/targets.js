@@ -28,6 +28,8 @@ export function createTargetsFeature({
   let activeTargetPanelSelect = null;
   let activeTargetPanelBack = null;
   const HOTKEY_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2' y='4' width='16' height='12' rx='3' fill='%231a2446' stroke='%2398a6cc' stroke-width='1.2'/><rect x='4' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='7' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='10' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='13' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='5.2' y='10.6' width='9.6' height='2.2' rx='0.8' fill='%23c7d2f3'/></svg>";
+  const TOGGLE_MUTE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M3 8.2v3.6h2.6l3.3 2.8V5.4L5.6 8.2H3z' fill='%23c7d2f3'/><path d='M12.4 7.1l4.5 5.8M16.9 7.1l-4.5 5.8' stroke='%23f7a7a7' stroke-width='1.5' stroke-linecap='round'/></svg>";
+  const SET_DEFAULT_DEVICE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='5' width='15.6' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6 10h4.6M8.6 7.4L11.2 10l-2.6 2.6' stroke='%23c7d2f3' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/><path d='M13.7 8.1v3.8M15.6 10l-1.9 1.9M11.8 10l1.9 1.9' stroke='%2386d6a7' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
 
   function mediaIconForAction(action) {
     if (action === "MediaNextTrack") return mediaNextTrackIconData;
@@ -441,6 +443,7 @@ export function createTargetsFeature({
       if (action === "MediaStop") return "Media Stop";
       if (action === "Hotkey") return "Hotkey";
       if (action === "ToggleMute") return "Toggle Mute";
+      if (action === "SetDefaultDevice") return "Set Default";
       if (action === "Volume" && isBindingButton) return "Trigger";
       return action;
     };
@@ -481,7 +484,8 @@ export function createTargetsFeature({
       renderLabelFromRawWithTags(label, {
         rawLabel: displayOption.label,
         extraTags: actionTags,
-        truncateMain: !isBindingButton,
+        truncateMain: true,
+        collapseTags: false,
       });
       chip.appendChild(label);
 
@@ -655,7 +659,28 @@ export function createTargetsFeature({
           ];
         }
         if (targetOption?.kind === "master" || targetOption?.kind === "focus") {
-          return [{ label: "Toggle Mute", value: "ToggleMute", kind: "action" }];
+          return [{
+            label: "Toggle Mute",
+            value: "ToggleMute",
+            kind: "action",
+            icon_data: TOGGLE_MUTE_ICON_DATA,
+          }];
+        }
+        if (targetOption?.kind === "device") {
+          return [
+            {
+              label: "Toggle Mute",
+              value: "ToggleMute",
+              kind: "action",
+              icon_data: TOGGLE_MUTE_ICON_DATA,
+            },
+            {
+              label: "Set Default Device",
+              value: "SetDefaultDevice",
+              kind: "action",
+              icon_data: SET_DEFAULT_DEVICE_ICON_DATA,
+            },
+          ];
         }
 
         // Check per-target buttonActions first (set by plugins in getTargetOptions)

@@ -66,4 +66,8 @@ impl AudioBackend for UnsupportedAudioBackend {
     fn set_device_mute(&self, _device_id: &str, _muted: bool) -> Result<()> {
         Err(anyhow!("Audio backend not implemented on this OS"))
     }
+
+    fn set_default_device(&self, _device_id: &str) -> Result<()> {
+        Err(anyhow!("Audio backend not implemented on this OS"))
+    }
 }

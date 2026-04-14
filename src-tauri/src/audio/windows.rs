@@ -11,7 +11,7 @@ use std::ffi::{OsStr, OsString};
 use std::mem::size_of;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::Path;
-use windows::core::{Interface, PCWSTR, PWSTR};
+use windows::core::{IUnknown_Vtbl, Interface, GUID, HRESULT, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, PROPERTYKEY, RPC_E_CHANGED_MODE};
 use windows::Win32::Graphics::Gdi::{
     DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER,
@@ -19,8 +19,9 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 use windows::Win32::Media::Audio::{
-    eCapture, eMultimedia, eRender, EDataFlow, IAudioSessionControl2, IAudioSessionManager2,
-    IMMDevice, IMMDeviceEnumerator, ISimpleAudioVolume, MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
+    eCapture, eCommunications, eConsole, eMultimedia, eRender, EDataFlow, ERole,
+    IAudioSessionControl2, IAudioSessionManager2, IMMDevice, IMMDeviceEnumerator,
+    ISimpleAudioVolume, MMDeviceEnumerator, DEVICE_STATE_ACTIVE, WAVEFORMATEX,
 };
 use windows::Win32::System::Com::StructuredStorage::{
     PropVariantClear, PropVariantToStringAlloc, PROPVARIANT,
@@ -311,6 +312,26 @@ impl AudioBackend for WindowsAudioBackend {
         Err(anyhow!("Device not found"))
     }
 
+    fn set_default_device(&self, device_id: &str) -> Result<()> {
+        let _com = init_com()?;
+        let enumerator = get_device_enumerator()?;
+        let (kind, raw_id) = parse_device_target(device_id);
+        let flow = match kind {
+            DeviceTargetKind::Playback => eRender,
+            DeviceTargetKind::Recording => eCapture,
+        };
+
+        let exists = enumerate_active_devices(&enumerator, flow)?
+            .iter()
+            .any(|(_, id)| id == raw_id);
+        if !exists {
+            return Err(anyhow!("Device not found"));
+        }
+
+        set_default_audio_endpoint(raw_id)?;
+        Ok(())
+    }
+
     fn set_session_mute(&self, session_id: &str, muted: bool) -> Result<()> {
         let _com = init_com()?;
         let enumerator = get_device_enumerator()?;
@@ -355,6 +376,105 @@ fn enumerate_active_devices(
         }
     }
     Ok(devices)
+}
+
+fn set_default_audio_endpoint(device_id: &str) -> Result<()> {
+    let policy: IPolicyConfig =
+        unsafe { CoCreateInstance(&CLSID_POLICY_CONFIG_CLIENT, None, CLSCTX_ALL) }?;
+    let wide = to_wide(device_id);
+    unsafe {
+        policy.set_default_endpoint(PCWSTR(wide.as_ptr()), eConsole)?;
+        policy.set_default_endpoint(PCWSTR(wide.as_ptr()), eMultimedia)?;
+        policy.set_default_endpoint(PCWSTR(wide.as_ptr()), eCommunications)?;
+    }
+    Ok(())
+}
+
+fn to_wide(value: &str) -> Vec<u16> {
+    OsStr::new(value)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
+}
+
+const CLSID_POLICY_CONFIG_CLIENT: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
+
+#[repr(transparent)]
+#[derive(Clone, PartialEq, Eq)]
+struct IPolicyConfig(windows::core::IUnknown);
+
+unsafe impl Interface for IPolicyConfig {
+    type Vtable = IPolicyConfig_Vtbl;
+    const IID: GUID = GUID::from_u128(0xf8679f50_850a_41cf_9c72_430f290290c8);
+}
+
+impl IPolicyConfig {
+    unsafe fn set_default_endpoint(
+        &self,
+        device_id: PCWSTR,
+        role: ERole,
+    ) -> windows::core::Result<()> {
+        (Interface::vtable(self).SetDefaultEndpoint)(Interface::as_raw(self), device_id, role).ok()
+    }
+}
+
+#[repr(C)]
+#[allow(non_snake_case)]
+struct IPolicyConfig_Vtbl {
+    pub base__: IUnknown_Vtbl,
+    pub GetMixFormat: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        *mut *mut WAVEFORMATEX,
+    ) -> HRESULT,
+    pub GetDeviceFormat: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        i32,
+        *mut *mut WAVEFORMATEX,
+    ) -> HRESULT,
+    pub ResetDeviceFormat: unsafe extern "system" fn(*mut core::ffi::c_void, PCWSTR) -> HRESULT,
+    pub SetDeviceFormat: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        *mut WAVEFORMATEX,
+        *mut WAVEFORMATEX,
+    ) -> HRESULT,
+    pub GetProcessingPeriod: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        i32,
+        *mut i64,
+        *mut i64,
+    ) -> HRESULT,
+    pub SetProcessingPeriod:
+        unsafe extern "system" fn(*mut core::ffi::c_void, PCWSTR, *mut i64) -> HRESULT,
+    pub GetShareMode: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        *mut core::ffi::c_void,
+    ) -> HRESULT,
+    pub SetShareMode: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        *mut core::ffi::c_void,
+    ) -> HRESULT,
+    pub GetPropertyValue: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        *const PROPERTYKEY,
+        *mut PROPVARIANT,
+    ) -> HRESULT,
+    pub SetPropertyValue: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        PCWSTR,
+        *const PROPERTYKEY,
+        *const PROPVARIANT,
+    ) -> HRESULT,
+    pub SetDefaultEndpoint:
+        unsafe extern "system" fn(*mut core::ffi::c_void, PCWSTR, ERole) -> HRESULT,
+    pub SetEndpointVisibility:
+        unsafe extern "system" fn(*mut core::ffi::c_void, PCWSTR, i32) -> HRESULT,
 }
 
 fn list_devices_for_flow(

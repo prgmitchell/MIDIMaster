@@ -110,6 +110,7 @@ impl Default for RelativeFormat {
 pub enum BindingAction {
     Volume,
     ToggleMute,
+    SetDefaultDevice,
     MediaPlayPause,
     MediaNextTrack,
     MediaPrevTrack,
@@ -615,5 +616,16 @@ mod tests {
         let json = serde_json::to_value(binding).expect("binding should serialize");
         assert!(json.get("targets").is_some());
         assert!(json.get("target").is_none());
+    }
+
+    #[test]
+    fn deserialize_set_default_device_action() {
+        let mut json = binding_base_json();
+        json.as_object_mut()
+            .unwrap()
+            .insert("action".to_string(), serde_json::json!("SetDefaultDevice"));
+
+        let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+        assert_eq!(binding.action, BindingAction::SetDefaultDevice);
     }
 }

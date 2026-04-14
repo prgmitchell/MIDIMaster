@@ -52,7 +52,12 @@ export function renderLabelWithBadges(
 
 export function renderLabelFromRawWithTags(
   container,
-  { rawLabel = "", extraTags = [], truncateMain = true } = {},
+  {
+    rawLabel = "",
+    extraTags = [],
+    truncateMain = true,
+    collapseTags = true,
+  } = {},
 ) {
   if (!container) return;
 
@@ -83,7 +88,7 @@ export function renderLabelFromRawWithTags(
   }
 
   let visibleTags = uniqueTags.map((tag) => ({ text: tag, kind: tagVariant(tag), hiddenTags: [] }));
-  if (truncateMain && uniqueTags.length > 1) {
+  if (truncateMain && collapseTags && uniqueTags.length > 1) {
     const baseLen = (base || rawLabel || "").length;
     const tagTextLen = uniqueTags.reduce((sum, t) => sum + String(t).length, 0);
     const shouldCollapse = uniqueTags.length > 2 || (baseLen + tagTextLen > 24);

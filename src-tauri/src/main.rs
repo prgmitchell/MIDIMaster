@@ -813,6 +813,45 @@ impl AppState {
             return Ok(());
         }
 
+        if binding.action == model::BindingAction::SetDefaultDevice {
+            if event.value == 0 {
+                run_logger::debug(
+                    "bindings",
+                    "set_default_device_ignored_release",
+                    &format!("binding_id={} action={:?}", binding.id, binding.action),
+                );
+                return Ok(());
+            }
+
+            let mut any_applied = false;
+            for target in &targets {
+                if let model::BindingTarget::Device { device_id } = target {
+                    if let Err(err) = self.audio.set_default_device(device_id) {
+                        run_logger::error(
+                            "bindings",
+                            "set_default_device_failed",
+                            &format!(
+                                "binding_id={} device_id={} error={}",
+                                binding.id, device_id, err
+                            ),
+                        );
+                    } else {
+                        any_applied = true;
+                    }
+                }
+            }
+
+            if !any_applied {
+                run_logger::warn(
+                    "bindings",
+                    "set_default_device_no_target_applied",
+                    &format!("binding_id={} targets={}", binding.id, targets.len()),
+                );
+            }
+
+            return Ok(());
+        }
+
         // Handle toggle mute action for button bindings
         if binding.action == model::BindingAction::ToggleMute {
             // Mark user activity to prevent stale feedback loop
@@ -1246,6 +1285,7 @@ impl AppState {
                     | model::BindingAction::MediaPrevTrack
                     | model::BindingAction::MediaStop
                     | model::BindingAction::Hotkey
+                    | model::BindingAction::SetDefaultDevice
             ) {
                 continue;
             }

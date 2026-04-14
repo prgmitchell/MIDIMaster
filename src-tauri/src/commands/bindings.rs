@@ -319,6 +319,23 @@ fn apply_binding_action_internal(
                 );
                 any_applied = true;
             }
+            (
+                model::BindingAction::SetDefaultDevice,
+                model::BindingTarget::Device { device_id },
+            ) => {
+                if let Err(err) = state.audio.set_default_device(device_id) {
+                    run_logger::warn(
+                        "bindings_cmd",
+                        "apply_action_set_default_device_failed",
+                        &format!(
+                            "binding_id={} device_id={} error={}",
+                            binding.id, device_id, err
+                        ),
+                    );
+                } else {
+                    any_applied = true;
+                }
+            }
             _ => {}
         }
     }
@@ -767,7 +784,9 @@ pub fn apply_binding_action(
     let effective_action = action.unwrap_or_else(|| binding.action.clone());
     if !matches!(
         effective_action,
-        model::BindingAction::Volume | model::BindingAction::ToggleMute
+        model::BindingAction::Volume
+            | model::BindingAction::ToggleMute
+            | model::BindingAction::SetDefaultDevice
     ) {
         run_logger::warn(
             "bindings_cmd",

@@ -287,8 +287,6 @@ body.dark-mode .mode-chip .mode-chip-icon {
 .target-chip .target-label-main {
   font-size: 12px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .target-chip-remove {
@@ -375,9 +373,17 @@ body.dark-mode .target-chip-remove:hover {
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  max-width: 84px;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.binding-row .target-chip {
+  max-width: 100%;
+}
+
+.binding-row .target-chip .target-tag {
+  max-width: 220px;
 }
 
 .target-tag--mix {
