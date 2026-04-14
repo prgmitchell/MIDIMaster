@@ -36,6 +36,11 @@ let targetsFeature = null;
 let osdFeature = null;
 let midiFeature = null;
 
+// Keep the app feeling native by disabling the default browser context menu.
+document.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+
 async function startPluginHostIfNeeded() {
   if (isOsdWindow) return;
 
@@ -1908,4 +1913,3 @@ window.addEventListener("load", () => {
 window.addEventListener("beforeunload", () => {
   invoke("stop_midi_device").catch(() => { });
 });
-
