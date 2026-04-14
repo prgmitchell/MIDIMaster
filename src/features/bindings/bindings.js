@@ -122,6 +122,21 @@ export function createBindingsFeature({
     return "Auto";
   }
 
+  function normalizeRelativeFormat(raw) {
+    const value = String(raw || "Auto");
+    if (value === "Auto") return value;
+    return "Auto";
+  }
+
+  function ensureBindingShape(binding) {
+    if (!binding || typeof binding !== "object") return;
+    if (!binding.mode || (binding.mode !== "Absolute" && binding.mode !== "Relative")) {
+      binding.mode = "Absolute";
+    }
+    // Backend auto-detect is always used for relative controls.
+    binding.relative_format = "Auto";
+  }
+
   function effectiveIsButton(binding) {
     const controlKind = normalizeControlKind(binding?.control_kind);
     if (controlKind === "Button") return true;
@@ -398,6 +413,7 @@ export function createBindingsFeature({
   }
 
   async function persistBinding(binding) {
+    ensureBindingShape(binding);
     await invoke("add_binding", { binding });
     await saveProfile();
     try {
@@ -588,6 +604,7 @@ export function createBindingsFeature({
 
     bindings.forEach((binding, index) => {
       try {
+        ensureBindingShape(binding);
         setTargets(binding, getTargets(binding));
         const item = document.createElement("div");
         item.className = "list-item binding-item";
@@ -748,10 +765,12 @@ export function createBindingsFeature({
           } else if (nextModeValue === "fader_rel") {
             binding.control_kind = "Continuous";
             binding.mode = "Relative";
+            binding.relative_format = "Auto";
             binding.action = "Volume";
           } else {
             binding.control_kind = "Continuous";
             binding.mode = "Absolute";
+            binding.relative_format = "Auto";
             binding.action = "Volume";
           }
 

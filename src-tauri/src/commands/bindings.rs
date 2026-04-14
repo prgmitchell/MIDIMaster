@@ -171,16 +171,8 @@ fn apply_binding_action_internal(
                 }
             }
             (model::BindingAction::Volume, model::BindingTarget::Focus) => {
-                if state.audio.focused_session().ok().flatten().is_some() {
-                    if let Err(err) = state.audio.set_focused_session_volume(value) {
-                        run_logger::warn(
-                            "bindings_cmd",
-                            "apply_action_volume_focus_failed",
-                            &format!("binding_id={} error={}", binding.id, err),
-                        );
-                    } else {
-                        any_applied = true;
-                    }
+                if state.apply_focus_volume_with_retry(&binding.id, value) {
+                    any_applied = true;
                 }
             }
             (model::BindingAction::Volume, model::BindingTarget::Session { session_id }) => {
@@ -340,13 +332,15 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
         "bindings_cmd",
         "add_requested",
         &format!(
-            "binding_id={} device_id={} channel={} controller={} action={:?} control_kind={:?}",
+            "binding_id={} device_id={} channel={} controller={} action={:?} control_kind={:?} mode={:?} relative_format={:?}",
             binding.id,
             binding.device_id,
             binding.control.channel,
             binding.control.controller,
             binding.action,
-            binding.control_kind
+            binding.control_kind,
+            binding.mode,
+            binding.relative_format
         ),
     );
     binding.ensure_targets();

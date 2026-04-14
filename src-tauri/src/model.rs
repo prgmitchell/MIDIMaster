@@ -92,6 +92,20 @@ impl Default for MidiMode {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum RelativeFormat {
+    Auto,
+    TwosComplement,
+    BinaryOffset,
+    SignMagnitude,
+}
+
+impl Default for RelativeFormat {
+    fn default() -> Self {
+        RelativeFormat::Auto
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BindingAction {
     Volume,
@@ -378,6 +392,8 @@ pub struct Binding {
     #[serde(default)]
     pub action: BindingAction,
     pub mode: MidiMode,
+    #[serde(default)]
+    pub relative_format: RelativeFormat,
     pub deadzone: f32,
     pub debounce_ms: u64,
     #[serde(default)]
@@ -573,6 +589,7 @@ mod tests {
             target: BindingTarget::Master,
             action: BindingAction::Volume,
             mode: MidiMode::Absolute,
+            relative_format: RelativeFormat::Auto,
             deadzone: 0.0,
             debounce_ms: 0,
             mute_control: None,

@@ -77,6 +77,7 @@ struct AppState {
     active_profile: Mutex<Option<Profile>>,
     binding_state: Arc<Mutex<HashMap<BindingKey, BindingState>>>,
     feedback_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
+    focus_volume_failure_logs: Mutex<HashMap<String, Instant>>,
     mute_transition_until: Mutex<HashMap<BindingKey, Instant>>,
     last_target_mute_state: Mutex<HashMap<BindingKey, bool>>,
     learn_pending: Mutex<bool>,
@@ -88,6 +89,60 @@ struct AppState {
 }
 
 impl AppState {
+    fn clear_focus_volume_failure_log(&self, binding_id: &str) {
+        if let Ok(mut logs) = self.focus_volume_failure_logs.lock() {
+            logs.remove(binding_id);
+        }
+    }
+
+    fn should_log_focus_volume_failure(&self, binding_id: &str) -> bool {
+        const LOG_THROTTLE: Duration = Duration::from_secs(2);
+        let now = Instant::now();
+        if let Ok(mut logs) = self.focus_volume_failure_logs.lock() {
+            if let Some(last) = logs.get(binding_id) {
+                if now.duration_since(*last) < LOG_THROTTLE {
+                    return false;
+                }
+            }
+            logs.insert(binding_id.to_string(), now);
+            return true;
+        }
+        true
+    }
+
+    pub(crate) fn apply_focus_volume_with_retry(&self, binding_id: &str, volume: f32) -> bool {
+        if self.audio.set_focused_session_volume(volume).is_ok() {
+            self.clear_focus_volume_failure_log(binding_id);
+            return true;
+        }
+
+        let fallback_focus = self.audio.focused_session().ok().flatten();
+        if let Some(ref session) = fallback_focus {
+            if self.audio.set_session_volume(&session.id, volume).is_ok() {
+                self.clear_focus_volume_failure_log(binding_id);
+                run_logger::info(
+                    "bindings",
+                    "set_focus_volume_fallback_applied",
+                    &format!("binding_id={} session_id={}", binding_id, session.id),
+                );
+                return true;
+            }
+        }
+
+        if self.should_log_focus_volume_failure(binding_id) {
+            run_logger::error(
+                "bindings",
+                "set_focus_volume_failed",
+                &format!(
+                    "binding_id={} error=Focused session not found; fallback_session_present={}",
+                    binding_id,
+                    fallback_focus.is_some()
+                ),
+            );
+        }
+        false
+    }
+
     fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
         let Some(osd_window) = app.get_webview_window("osd") else {
             return;
@@ -684,6 +739,11 @@ impl AppState {
             let state = states.entry(key.clone()).or_insert_with(|| BindingState {
                 last_value: 0.0,
                 last_update: Instant::now(),
+                relative_auto_format: None,
+                relative_seen_midpoint: false,
+                relative_seen_sign_band: false,
+                relative_seen_high_negative: false,
+                relative_seen_low_negative_hint: false,
             });
             apply_midi_event(&binding, &event, state)
         };
@@ -975,13 +1035,7 @@ impl AppState {
                     }
                 }
                 model::BindingTarget::Focus => {
-                    if let Err(err) = self.audio.set_focused_session_volume(volume) {
-                        run_logger::error(
-                            "bindings",
-                            "set_focus_volume_failed",
-                            &format!("binding_id={} error={}", binding.id, err),
-                        );
-                    } else {
+                    if self.apply_focus_volume_with_retry(&binding.id, volume) {
                         any_applied = true;
                     }
                 }
@@ -1545,6 +1599,7 @@ fn main() {
                 active_profile: Mutex::new(None),
                 binding_state: Arc::new(Mutex::new(HashMap::new())),
                 feedback_values: Arc::new(Mutex::new(HashMap::new())),
+                focus_volume_failure_logs: Mutex::new(HashMap::new()),
                 mute_transition_until: Mutex::new(HashMap::new()),
                 last_target_mute_state: Mutex::new(HashMap::new()),
                 learn_pending: Mutex::new(false),

@@ -210,6 +210,8 @@ function normalizeBinding(binding) {
   if (!binding || typeof binding !== "object") return binding;
   const out = { ...binding };
   setBindingTargets(out, getBindingTargets(out));
+  out.mode = (out.mode === "Relative") ? "Relative" : "Absolute";
+  out.relative_format = "Auto";
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
   return out;
 }
@@ -810,6 +812,7 @@ const bindingMuteValues = {}; // Track last known mute per binding ID (from feed
 
 let lastVolumeUpdateAt = 0;
 const osdBindingValues = new Map();
+const osdRelativeAutoFormatByBinding = new Map();
 let osdSettings = { ...defaultOsdSettings };
 let monitorOptions = [];
 let appSettings = {
@@ -1095,16 +1098,66 @@ function createTargetIcon(option) {
   return targetsFeature?.createTargetIcon?.(option) || document.createElement("span");
 }
 
-function relativeDelta(value) {
-  if (value === 0 || value === 64) {
-    return 0;
-  }
-  if (value >= 1 && value <= 63) {
+function normalizeRelativeFormat(raw) {
+  const value = String(raw || "Auto");
+  if (
+    value === "Auto"
+    || value === "TwosComplement"
+    || value === "BinaryOffset"
+    || value === "SignMagnitude"
+  ) {
     return value;
   }
-  if (value >= 65 && value <= 127) {
-    return -(value - 64);
+  return "Auto";
+}
+
+function decodeRelativeTwosComplement(value) {
+  if (value === 0 || value === 64) return 0;
+  if (value >= 1 && value <= 63) return value;
+  if (value >= 65 && value <= 127) return value - 128;
+  return null;
+}
+
+function decodeRelativeBinaryOffset(value) {
+  if (value === 0 || value === 64) return 0;
+  if (value >= 1 && value <= 63) return -(64 - value);
+  if (value >= 65 && value <= 127) return value - 64;
+  return null;
+}
+
+function decodeRelativeSignMagnitude(value) {
+  if (value === 0 || value === 64) return 0;
+  if (value >= 1 && value <= 63) return value;
+  if (value >= 65 && value <= 127) return -(value - 64);
+  return null;
+}
+
+function detectRelativeFormatAuto(value, previousFormat) {
+  if (previousFormat && previousFormat !== "Auto") {
+    return previousFormat;
   }
+  if (value >= 96 && value <= 127) return "TwosComplement";
+  if (value === 63) return "BinaryOffset";
+  if (value >= 65 && value <= 95) return "SignMagnitude";
+  return null;
+}
+
+function decodeRelativeDelta(binding, value) {
+  const configured = normalizeRelativeFormat(binding?.relative_format);
+  let format = configured;
+  if (format === "Auto") {
+    const key = String(binding?.id || "");
+    const previouslyDetected = key ? osdRelativeAutoFormatByBinding.get(key) : null;
+    const detected = detectRelativeFormatAuto(value, previouslyDetected);
+    if (detected && key) {
+      osdRelativeAutoFormatByBinding.set(key, detected);
+    }
+    format = detected || previouslyDetected || "TwosComplement";
+  }
+
+  if (format === "TwosComplement") return decodeRelativeTwosComplement(value);
+  if (format === "BinaryOffset") return decodeRelativeBinaryOffset(value);
+  if (format === "SignMagnitude") return decodeRelativeSignMagnitude(value);
   return null;
 }
 
@@ -1135,7 +1188,7 @@ function resolveOsdVolume(binding, payload) {
     return null;
   }
   if (binding.mode === "Relative") {
-    const delta = relativeDelta(payload.value);
+    const delta = decodeRelativeDelta(binding, payload.value);
     if (delta == null) {
       return null;
     }
@@ -1443,6 +1496,7 @@ function createBindingFromLearn(payload) {
     target: "Unset",
     action: isButton ? "ToggleMute" : "Volume",
     mode: "Absolute",
+    relative_format: "Auto",
     deadzone: 0,
     debounce_ms: 0,
     mute_control: null,
