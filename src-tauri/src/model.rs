@@ -114,12 +114,21 @@ pub enum BindingAction {
     MediaNextTrack,
     MediaPrevTrack,
     MediaStop,
+    Hotkey,
 }
 
 impl Default for BindingAction {
     fn default() -> Self {
         BindingAction::Volume
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HotkeyMapping {
+    #[serde(default)]
+    pub keys: Vec<String>,
+    #[serde(default)]
+    pub display: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -162,6 +171,7 @@ pub enum BindingTarget {
         data: serde_json::Value,
     },
     MediaControl,
+    Hotkey,
     Unset,
 }
 
@@ -193,6 +203,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
             "Master" => Ok(BindingTarget::Master),
             "Focus" => Ok(BindingTarget::Focus),
             "MediaControl" => Ok(BindingTarget::MediaControl),
+            "Hotkey" => Ok(BindingTarget::Hotkey),
             "Unset" => Ok(BindingTarget::Unset),
             other => Err(format!("Unknown BindingTarget string: {}", other)),
         };
@@ -260,6 +271,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
         }
         "Unset" => Ok(BindingTarget::Unset),
         "MediaControl" => Ok(BindingTarget::MediaControl),
+        "Hotkey" => Ok(BindingTarget::Hotkey),
 
         // New generic integration target
         "Integration" => {
@@ -402,6 +414,8 @@ pub struct Binding {
     pub assign_control: Option<AuxiliaryControl>,
     #[serde(default)]
     pub assign_mode: AssignMode,
+    #[serde(default)]
+    pub hotkey: Option<HotkeyMapping>,
 }
 
 impl Binding {
@@ -595,6 +609,7 @@ mod tests {
             mute_control: None,
             assign_control: None,
             assign_mode: AssignMode::Add,
+            hotkey: None,
         };
 
         let json = serde_json::to_value(binding).expect("binding should serialize");

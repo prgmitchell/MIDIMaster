@@ -218,6 +218,7 @@ function normalizeBinding(binding) {
   out.mode = (out.mode === "Relative") ? "Relative" : "Absolute";
   out.relative_format = "Auto";
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
+  if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
   return out;
 }
 
@@ -1379,8 +1380,8 @@ function buildTargetOptions(currentTarget, isButton = false) {
   return targetsFeature?.buildTargetOptions?.(currentTarget, isButton);
 }
 
-function buildTargetSelect(currentTarget, isBindingButton = false, currentAction = "Volume") {
-  return targetsFeature?.buildTargetSelect?.(currentTarget, isBindingButton, currentAction);
+function buildTargetSelect(currentTarget, isBindingButton = false, currentAction = "Volume", currentHotkeyDisplay = "") {
+  return targetsFeature?.buildTargetSelect?.(currentTarget, isBindingButton, currentAction, currentHotkeyDisplay);
 }
 
 const LEARN_PANEL_DEFAULT_TITLE = "Waiting for MIDI Input";
@@ -1507,6 +1508,7 @@ function createBindingFromLearn(payload) {
     mute_control: null,
     assign_control: null,
     assign_mode: "Add",
+    hotkey: null,
   };
 }
 

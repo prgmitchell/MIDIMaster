@@ -27,7 +27,7 @@ use device_target::{parse_device_target, DeviceTargetKind};
 use midi::MidiManager;
 use model::{LearnedControl, MidiEvent, OsdSettings, Profile};
 use monitors::resolve_monitor_for_osd;
-use runtime_helpers::{classify_learned_control, send_media_key, LearnCandidate};
+use runtime_helpers::{classify_learned_control, send_hotkey, send_media_key, LearnCandidate};
 use windows_autostart::set_windows_autostart;
 
 use profile_store::ProfileStore;
@@ -788,6 +788,31 @@ impl AppState {
             return Ok(());
         }
 
+        if binding.action == model::BindingAction::Hotkey {
+            if event.value == 0 {
+                run_logger::debug(
+                    "bindings",
+                    "hotkey_action_ignored_release",
+                    &format!("binding_id={} action={:?}", binding.id, binding.action),
+                );
+                return Ok(());
+            }
+            if let Some(hotkey) = &binding.hotkey {
+                if !hotkey.keys.is_empty() {
+                    send_hotkey(&hotkey.keys);
+                    run_logger::info(
+                        "bindings",
+                        "hotkey_action_sent",
+                        &format!(
+                            "binding_id={} action={:?} hotkey={}",
+                            binding.id, binding.action, hotkey.display
+                        ),
+                    );
+                }
+            }
+            return Ok(());
+        }
+
         // Handle toggle mute action for button bindings
         if binding.action == model::BindingAction::ToggleMute {
             // Mark user activity to prevent stale feedback loop
@@ -930,7 +955,9 @@ impl AppState {
                         let _ = app.emit("integration_binding_triggered", payload);
                         any_applied = true;
                     }
-                    model::BindingTarget::Unset | model::BindingTarget::MediaControl => {}
+                    model::BindingTarget::Unset
+                    | model::BindingTarget::MediaControl
+                    | model::BindingTarget::Hotkey => {}
                 }
             }
 
@@ -1099,7 +1126,9 @@ impl AppState {
                     let _ = app.emit("integration_binding_triggered", payload);
                     any_applied = true;
                 }
-                model::BindingTarget::Unset | model::BindingTarget::MediaControl => {}
+                model::BindingTarget::Unset
+                | model::BindingTarget::MediaControl
+                | model::BindingTarget::Hotkey => {}
             }
         }
 
@@ -1216,6 +1245,7 @@ impl AppState {
                     | model::BindingAction::MediaNextTrack
                     | model::BindingAction::MediaPrevTrack
                     | model::BindingAction::MediaStop
+                    | model::BindingAction::Hotkey
             ) {
                 continue;
             }
@@ -1277,6 +1307,7 @@ impl AppState {
                     }
                     model::BindingTarget::Unset => None,
                     model::BindingTarget::MediaControl => None,
+                    model::BindingTarget::Hotkey => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             } else {
@@ -1345,6 +1376,7 @@ impl AppState {
                     }
                     model::BindingTarget::Unset => None,
                     model::BindingTarget::MediaControl => None,
+                    model::BindingTarget::Hotkey => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             };

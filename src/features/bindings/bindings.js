@@ -144,6 +144,10 @@ export function createBindingsFeature({
     return binding?.control?.msg_type === "Note";
   }
 
+  function isHotkeyTarget(target) {
+    return target === "Hotkey";
+  }
+
   function getTargets(binding) {
     if (!binding || typeof binding !== "object") return [];
     if (Array.isArray(binding.targets) && binding.targets.length > 0) {
@@ -210,6 +214,9 @@ export function createBindingsFeature({
   let configLearnField = null;
   let configLearnTimer = null;
   let transferPrompt = null;
+  let hotkeyLearnBindingId = null;
+  let hotkeyLearnCleanup = null;
+  const hotkeyModifiers = ["Ctrl", "Shift", "Alt", "Meta"];
   const nameDrafts = new Map();
   let pendingRerender = false;
   const defaultLearnPanelTitle = "Waiting for MIDI Input";
@@ -234,7 +241,11 @@ export function createBindingsFeature({
     if (d.learnPanelMessage) d.learnPanelMessage.textContent = defaultLearnPanelMessage;
     if (d.learnPanelSpinner) d.learnPanelSpinner.classList.remove("hidden");
     if (d.learnPanelActions) d.learnPanelActions.classList.add("hidden");
-    if (d.learnPanelConfirm) d.learnPanelConfirm.textContent = "Transfer";
+    if (d.learnPanelCancel) d.learnPanelCancel.textContent = "Cancel";
+    if (d.learnPanelConfirm) {
+      d.learnPanelConfirm.textContent = "Transfer";
+      d.learnPanelConfirm.classList.remove("hidden");
+    }
   }
 
   function showLearnPanel() {
@@ -263,8 +274,131 @@ export function createBindingsFeature({
     if (d.learnPanelMessage) d.learnPanelMessage.textContent = message || "";
     if (d.learnPanelSpinner) d.learnPanelSpinner.classList.add("hidden");
     if (d.learnPanelActions) d.learnPanelActions.classList.remove("hidden");
-    if (d.learnPanelConfirm) d.learnPanelConfirm.textContent = "Transfer";
+    if (d.learnPanelCancel) d.learnPanelCancel.textContent = "Cancel";
+    if (d.learnPanelConfirm) {
+      d.learnPanelConfirm.textContent = "Transfer";
+      d.learnPanelConfirm.classList.remove("hidden");
+    }
     showLearnPanel();
+  }
+
+  function normalizeHotkeyMapping(rawHotkey) {
+    if (!rawHotkey || typeof rawHotkey !== "object") return null;
+    const keys = Array.isArray(rawHotkey.keys)
+      ? rawHotkey.keys
+        .map((key) => String(key || "").trim())
+        .filter(Boolean)
+      : [];
+    if (keys.length === 0) return null;
+    const display = String(rawHotkey.display || "").trim() || keys.join("+");
+    return { keys, display };
+  }
+
+  function normalizeHotkeyKey(event) {
+    const key = String(event?.key || "").trim();
+    if (!key) return null;
+    const lower = key.toLowerCase();
+    if (lower === "control") return "Ctrl";
+    if (lower === "shift") return "Shift";
+    if (lower === "alt") return "Alt";
+    if (lower === "meta") return "Meta";
+    if (lower === " ") return "Space";
+    if (lower === "escape") return "Esc";
+    if (lower === "arrowup") return "Up";
+    if (lower === "arrowdown") return "Down";
+    if (lower === "arrowleft") return "Left";
+    if (lower === "arrowright") return "Right";
+    if (key.length === 1) return key.toUpperCase();
+    if (/^f\d{1,2}$/i.test(key)) return key.toUpperCase();
+    return key.length <= 16 ? key[0].toUpperCase() + key.slice(1) : null;
+  }
+
+  function isHotkeyModifier(key) {
+    return hotkeyModifiers.includes(key);
+  }
+
+  function buildHotkeyMappingFromEvent(event) {
+    const key = normalizeHotkeyKey(event);
+    if (!key || isHotkeyModifier(key)) return null;
+
+    const keys = [];
+    if (event.ctrlKey) keys.push("Ctrl");
+    if (event.shiftKey) keys.push("Shift");
+    if (event.altKey) keys.push("Alt");
+    if (event.metaKey) keys.push("Meta");
+    if (!keys.includes(key)) keys.push(key);
+
+    return {
+      keys,
+      display: keys.join("+"),
+    };
+  }
+
+  function stopHotkeyLearn(result = null) {
+    if (hotkeyLearnCleanup) {
+      hotkeyLearnCleanup();
+      hotkeyLearnCleanup = null;
+    }
+    hotkeyLearnBindingId = null;
+    hideLearnPanel();
+    return result;
+  }
+
+  async function startHotkeyLearn(binding) {
+    if (!binding || transferPrompt || configLearnField || hotkeyLearnBindingId) {
+      return null;
+    }
+
+    hotkeyLearnBindingId = binding.id;
+    if (d.learnPanelTitle) d.learnPanelTitle.textContent = "Press Hotkey";
+    if (d.learnPanelMessage) {
+      d.learnPanelMessage.textContent = "Press a key or combo (example: Ctrl+Shift+S).";
+    }
+    if (d.learnPanelSpinner) d.learnPanelSpinner.classList.add("hidden");
+    if (d.learnPanelActions) d.learnPanelActions.classList.remove("hidden");
+    if (d.learnPanelCancel) d.learnPanelCancel.textContent = "Cancel";
+    if (d.learnPanelConfirm) d.learnPanelConfirm.classList.add("hidden");
+    showLearnPanel();
+
+    return await new Promise((resolve) => {
+      let settled = false;
+      const finish = (mapping) => {
+        if (settled) return;
+        settled = true;
+        stopHotkeyLearn(mapping);
+        resolve(mapping);
+      };
+
+      const onCancel = () => finish(null);
+      const onOverlay = (event) => {
+        if (event.target === d.learnPanel) finish(null);
+      };
+      const onKeydown = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event.key === "Escape") {
+          finish(null);
+          return;
+        }
+
+        const mapping = buildHotkeyMappingFromEvent(event);
+        if (!mapping) return;
+        finish(mapping);
+      };
+
+      window.addEventListener("keydown", onKeydown, true);
+      d.learnPanelCancel?.addEventListener("click", onCancel);
+      d.learnPanelClose?.addEventListener("click", onCancel);
+      d.learnPanel?.addEventListener("click", onOverlay);
+
+      hotkeyLearnCleanup = () => {
+        window.removeEventListener("keydown", onKeydown, true);
+        d.learnPanelCancel?.removeEventListener("click", onCancel);
+        d.learnPanelClose?.removeEventListener("click", onCancel);
+        d.learnPanel?.removeEventListener("click", onOverlay);
+      };
+    });
   }
 
   function updateAuxLearnUi() {
@@ -355,6 +489,7 @@ export function createBindingsFeature({
   }
 
   function closeConfigModal() {
+    stopHotkeyLearn();
     stopAuxLearn();
     clearTransferPrompt();
     closeAssignModeMenu();
@@ -606,6 +741,7 @@ export function createBindingsFeature({
       try {
         ensureBindingShape(binding);
         setTargets(binding, getTargets(binding));
+        binding.hotkey = normalizeHotkeyMapping(binding.hotkey);
         const item = document.createElement("div");
         item.className = "list-item binding-item";
 
@@ -808,17 +944,52 @@ export function createBindingsFeature({
         modeDropdown.appendChild(modeButton);
         modeDropdown.appendChild(modeMenu);
 
-        const targetSelect = buildTarget(getTargets(binding), isButton, binding.action);
+        const targetSelect = buildTarget(
+          getTargets(binding),
+          isButton,
+          binding.action,
+          binding.hotkey?.display || "",
+        );
         targetSelect.addEventListener("change", async () => {
+          const previousTargets = getTargets(binding);
+          const previousHadHotkeyTarget = previousTargets.some(isHotkeyTarget);
           const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
             ? targetSelect.__selectedTargets
             : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
           setTargets(binding, selectedTargets);
+          const hasHotkeyTarget = selectedTargets.some(isHotkeyTarget);
+          const previousAction = binding.action;
+          const previousHotkey = normalizeHotkeyMapping(binding.hotkey);
 
           if (isButton) {
-            binding.action = targetSelect.dataset.action || binding.action || "ToggleMute";
+            binding.action = hasHotkeyTarget
+              ? "Hotkey"
+              : (targetSelect.dataset.action || binding.action || "ToggleMute");
           } else {
             binding.action = "Volume";
+          }
+
+          if (isButton && !hasHotkeyTarget && previousHadHotkeyTarget) {
+            binding.hotkey = null;
+            targetSelect?.setHotkeyDisplay?.("");
+            if (binding.action === "Hotkey") {
+              binding.action = targetSelect.dataset.action || "ToggleMute";
+            }
+          }
+
+          if (isButton && hasHotkeyTarget && !previousHadHotkeyTarget) {
+            const learnedHotkey = await startHotkeyLearn(binding);
+            if (!learnedHotkey) {
+              setTargets(binding, previousTargets);
+              binding.action = previousAction || "ToggleMute";
+              binding.hotkey = previousHotkey;
+              await invoke("add_binding", { binding });
+              await saveProfile();
+              renderBindings();
+              return;
+            }
+            binding.hotkey = learnedHotkey;
+            targetSelect?.setHotkeyDisplay?.(binding.hotkey?.display || "");
           }
 
           if (!isButton) {
@@ -854,6 +1025,12 @@ export function createBindingsFeature({
           try {
             getHost()?.setBindings?.(getB());
           } catch { }
+
+          // Hotkey target UX: force a fresh row render so the chip label updates
+          // immediately from "Not Set" to the learned combo.
+          if (isButton && hasHotkeyTarget) {
+            renderBindings();
+          }
         });
 
         const volumeSlider = document.createElement("input");
@@ -1255,18 +1432,21 @@ export function createBindingsFeature({
     if (d.learnPanel) {
       d.learnPanel.addEventListener("click", (event) => {
         if (event.target !== d.learnPanel) return;
+        if (hotkeyLearnBindingId) return;
         if (!configBindingId) return;
         cancelAuxLearnFlow();
       });
     }
     if (d.learnPanelClose) {
       d.learnPanelClose.addEventListener("click", () => {
+        if (hotkeyLearnBindingId) return;
         if (!configBindingId) return;
         cancelAuxLearnFlow();
       });
     }
     if (d.learnPanelCancel) {
       d.learnPanelCancel.addEventListener("click", () => {
+        if (hotkeyLearnBindingId) return;
         if (!configBindingId) return;
         cancelAuxLearnFlow();
       });

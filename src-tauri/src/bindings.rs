@@ -223,6 +223,7 @@ mod tests {
             mute_control: None,
             assign_control: None,
             assign_mode: crate::model::AssignMode::Add,
+            hotkey: None,
         }
     }
 

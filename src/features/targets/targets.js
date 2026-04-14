@@ -27,6 +27,7 @@ export function createTargetsFeature({
 
   let activeTargetPanelSelect = null;
   let activeTargetPanelBack = null;
+  const HOTKEY_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2' y='4' width='16' height='12' rx='3' fill='%231a2446' stroke='%2398a6cc' stroke-width='1.2'/><rect x='4' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='7' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='10' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='13' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='5.2' y='10.6' width='9.6' height='2.2' rx='0.8' fill='%23c7d2f3'/></svg>";
 
   function mediaIconForAction(action) {
     if (action === "MediaNextTrack") return mediaNextTrackIconData;
@@ -176,6 +177,7 @@ export function createTargetsFeature({
             : (currentTarget === "Master" || currentTarget?.Master != null) ? "master"
               : (currentTarget === "Focus" || currentTarget?.Focus != null) ? "focus"
                 : currentTarget === "MediaControl" ? "media-control"
+                  : currentTarget === "Hotkey" ? "hotkey-target"
                 : "placeholder"
       );
 
@@ -183,7 +185,7 @@ export function createTargetsFeature({
     if (selectedKind === "integration-target") selectedValue = targetKey(integration);
     else if (selectedKind === "session") selectedValue = selectedAppName || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
-    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control") selectedValue = selectedKind;
+    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "hotkey-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
     const options = [
@@ -207,6 +209,12 @@ export function createTargetsFeature({
         label: "Media Controls",
         icon_data: mediaPlayPauseIconData,
         kind: "media-control",
+      });
+      options.push({
+        value: "hotkey-target",
+        label: "Hotkey",
+        icon_data: HOTKEY_ICON_DATA,
+        kind: "hotkey-target",
       });
     }
 
@@ -345,7 +353,7 @@ export function createTargetsFeature({
     return { options, selectedValue, selectedKind, activeIntegrationOption };
   }
 
-  function buildTargetSelect(currentTarget, isBindingButton = false, currentAction = "Volume") {
+  function buildTargetSelect(currentTarget, isBindingButton = false, currentAction = "Volume", currentHotkeyDisplay = "") {
     const container = document.createElement("div");
     container.className = "target-dropdown binding-target-dropdown";
 
@@ -378,6 +386,7 @@ export function createTargetsFeature({
       if (target === "Master" || target?.Master != null) return "master";
       if (target === "Focus" || target?.Focus != null) return "focus";
       if (target === "MediaControl") return "media-control";
+      if (target === "Hotkey") return "hotkey-target";
       const integration = target?.Integration || target?.integration;
       if (integration) {
         return `integration:${targetKey(integration)}`;
@@ -396,6 +405,7 @@ export function createTargetsFeature({
     };
 
     let selectedTargets = normalizeTargets(currentTarget);
+    let hotkeyDisplay = String(currentHotkeyDisplay || "");
     const targetDisplayCache = new Map();
     let selectedAction = isBindingButton ? (currentAction || "ToggleMute") : "Volume";
 
@@ -429,6 +439,7 @@ export function createTargetsFeature({
       if (action === "MediaNextTrack") return "Media Next Track";
       if (action === "MediaPrevTrack") return "Media Previous Track";
       if (action === "MediaStop") return "Media Stop";
+      if (action === "Hotkey") return "Hotkey";
       if (action === "ToggleMute") return "Toggle Mute";
       if (action === "Volume" && isBindingButton) return "Trigger";
       return action;
@@ -437,6 +448,12 @@ export function createTargetsFeature({
     const cachedDisplayForTarget = (target) => {
       const key = targetIdentity(target);
       const cached = targetDisplayCache.get(key);
+      if (target === "Hotkey") {
+        return {
+          label: hotkeyDisplay ? `Hotkey (${hotkeyDisplay})` : "Hotkey (Not Set)",
+          icon_data: cached?.icon_data ?? HOTKEY_ICON_DATA,
+        };
+      }
       const resolved = resolveDisplay(target);
       const merged = {
         label: (resolved?.label || cached?.label || "Target"),
@@ -540,6 +557,9 @@ export function createTargetsFeature({
       if (option.kind === "media-control") {
         return "MediaControl";
       }
+      if (option.kind === "hotkey-target") {
+        return "Hotkey";
+      }
       if (option.kind === "device") {
         return { Device: { device_id: option.value } };
       }
@@ -582,6 +602,9 @@ export function createTargetsFeature({
       }
 
       const mapped = mapOptionToTarget(option);
+      if (mapped === "Hotkey") {
+        selectedAction = "Hotkey";
+      }
       const key = targetIdentity(mapped);
       const cachedLabel = String(option?.label || "").trim();
       if (cachedLabel || option?.icon_data) {
@@ -678,7 +701,7 @@ export function createTargetsFeature({
               return false;
             }
 
-            if (isBindingButton) {
+            if (isBindingButton && targetOption.kind !== "hotkey-target") {
               const actionOptions = buildButtonActionOptions(targetOption);
               setTimeout(() => {
                 openTargetPanel(actionOptions, selectedAction, "action", (actionOption) => {
@@ -792,6 +815,10 @@ export function createTargetsFeature({
     });
 
     container.appendChild(button);
+    container.setHotkeyDisplay = (nextDisplay = "") => {
+      hotkeyDisplay = String(nextDisplay || "");
+      setDisplay();
+    };
     return container;
   }
 
