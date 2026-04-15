@@ -512,6 +512,24 @@ body.dark-mode .settings-inline-status.success {
   color: #9ce7be;
 }
 
+body.dark-mode .settings-update-meta {
+  color: #b9c8ea;
+}
+
+body.dark-mode .settings-updates-section {
+  border-color: rgba(110, 146, 230, 0.45);
+  background: rgba(77, 110, 190, 0.15);
+}
+
+body.dark-mode .settings-maintenance-section {
+  border-color: rgba(110, 146, 230, 0.45);
+  background: rgba(77, 110, 190, 0.15);
+}
+
+body.dark-mode .settings-update-meta-label {
+  color: #b9c8ea;
+}
+
 /* Legacy support for old class name */
 .settings-button {
   width: 36px;

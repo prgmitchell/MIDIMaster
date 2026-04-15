@@ -83,11 +83,30 @@ cargo tauri dev
 
 Releases are created from git tags.
 
+One-time updater key setup (required for built-in updates):
+
+1. Generate a signing keypair locally:
+   ```powershell
+   cargo tauri signer generate -w "$HOME/.tauri/midimaster.key"
+   ```
+2. Copy the generated public key into `src-tauri/tauri.conf.json` at `plugins.updater.pubkey`.
+3. Add these GitHub repo secrets for the release workflow:
+   - `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key file, or a secure path)
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (empty string if no password)
+
+Release flow:
+
 1. Update `src-tauri/Cargo.toml` version.
 2. Create and push a tag in the form `v<version>` (example: `v0.1.0`).
 
 Pushing the tag triggers the GitHub Actions release workflow, which builds the Windows bundle and
-attaches the installer artifacts to a GitHub Release.
+publishes NSIS installer artifacts, signatures, and `latest.json` to GitHub Releases.
+
+Built-in updater behavior:
+
+- Update checks use GitHub Releases only (`releases/latest/download/latest.json`).
+- Stable releases only are offered.
+- If in-app update fails, users can still install manually from the GitHub release page.
 
 Documentation
 

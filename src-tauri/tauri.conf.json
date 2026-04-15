@@ -25,6 +25,18 @@
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "icon": ["icons/MIDIMaster.png", "icons/icon.ico"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDMjhDRTRENDZFOTRDMEIKUldRTFRPbEdUYzRvek5vSHVhaTR1d3ZRTytoM3pwNjhnbUs5bHVDZVhua2JNTFZRdHV1dDUvOUgK",
+      "endpoints": [
+        "https://github.com/prgmitchell/MIDIMaster/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

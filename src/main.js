@@ -369,6 +369,11 @@ const minimizeToTraySelect = document.getElementById("minimize-to-tray");
 const exitToTraySelect = document.getElementById("exit-to-tray");
 const openLogsFolderButton = document.getElementById("open-logs-folder");
 const resetAppDataButton = document.getElementById("reset-app-data");
+const checkForUpdatesButton = document.getElementById("check-for-updates");
+const installUpdateButton = document.getElementById("install-update");
+const settingsUpdateStatus = document.getElementById("settings-update-status");
+const updateCurrentVersion = document.getElementById("update-current-version");
+const updateLatestVersion = document.getElementById("update-latest-version");
 const osd = document.getElementById("volume-osd");
 // OSD elements are now dynamic
 const alertOverlay = document.getElementById("alert-overlay");
@@ -842,6 +847,7 @@ let appStarted = false;
 // Feature modules
 settingsFeature = createSettingsFeature({
   invoke,
+  listen,
   dom: {
     settingsButton,
     settingsPanel,
@@ -854,6 +860,11 @@ settingsFeature = createSettingsFeature({
     minimizeToTraySelect,
     exitToTraySelect,
     openLogsFolderButton,
+    checkForUpdatesButton,
+    installUpdateButton,
+    settingsUpdateStatus,
+    updateCurrentVersion,
+    updateLatestVersion,
   },
   getOsdSettings: () => osdSettings,
   setOsdSettings: (next) => { osdSettings = next; },
@@ -1945,6 +1956,23 @@ async function init() {
   await hydrateClientPreferences();
   mainScreen?.classList?.remove?.("hidden");
   await startMainApp();
+  settingsFeature?.checkForUpdates?.({ silent: true }).then((info) => {
+    if (!info || !info.available) return;
+    const latest = String(info.latestVersion || "").trim();
+    const current = String(info.currentVersion || "").trim();
+    if (!latest) return;
+    const key = `updaterPromptedVersion:${latest}`;
+    try {
+      if (localStorage.getItem(key) === "1") return;
+      localStorage.setItem(key, "1");
+    } catch {
+      // ignore storage failures
+    }
+    showAlert(
+      "Update Available",
+      `MIDIMaster ${latest} is available (current: ${current || "unknown"}). Open Settings to install.`,
+    );
+  }).catch(() => { });
 }
 
 window.addEventListener("load", () => {

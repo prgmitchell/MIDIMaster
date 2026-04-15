@@ -9,6 +9,7 @@ import {
 
 export function createSettingsFeature({
   invoke,
+  listen,
   dom,
   getOsdSettings,
   setOsdSettings,
@@ -27,6 +28,158 @@ export function createSettingsFeature({
   let monitorDocClickBound = false;
   let settingsDocClickBound = false;
   const settingsSelectDropdowns = new Map();
+  let updaterUnlisten = null;
+  const updateState = {
+    currentVersion: "-",
+    latestVersion: "-",
+    available: false,
+    checking: false,
+    downloading: false,
+  };
+
+  function formatUpdaterError(error) {
+    const message = String(error || "Update check failed.");
+    const normalized = message.toLowerCase();
+    if (
+      normalized.includes("valid release json")
+      || normalized.includes("latest.json")
+      || normalized.includes("404")
+    ) {
+      return "Updater metadata is not published yet for this release. Use GitHub Releases for manual install.";
+    }
+    if (normalized.includes("network") || normalized.includes("timeout")) {
+      return "Unable to reach update server right now. Try again in a moment.";
+    }
+    return message;
+  }
+
+  function setUpdateStatus(message, kind = "") {
+    if (!d.settingsUpdateStatus) return;
+    d.settingsUpdateStatus.textContent = String(message || "");
+    d.settingsUpdateStatus.classList.remove("error", "success");
+    if (kind === "error" || kind === "success") {
+      d.settingsUpdateStatus.classList.add(kind);
+    }
+  }
+
+  function renderUpdateUi() {
+    if (d.updateCurrentVersion) {
+      d.updateCurrentVersion.textContent = updateState.currentVersion || "-";
+    }
+    if (d.updateLatestVersion) {
+      d.updateLatestVersion.textContent = updateState.latestVersion || "-";
+    }
+    if (d.checkForUpdatesButton) {
+      d.checkForUpdatesButton.disabled = updateState.checking || updateState.downloading;
+    }
+    if (d.installUpdateButton) {
+      d.installUpdateButton.classList.toggle("hidden", !updateState.available);
+      d.installUpdateButton.disabled = !updateState.available || updateState.checking || updateState.downloading;
+    }
+  }
+
+  function normalizeUpdateInfo(updateInfo) {
+    const info = (updateInfo && typeof updateInfo === "object") ? updateInfo : {};
+    const available = Boolean(info.available);
+    const currentVersion = String(info.current_version ?? info.currentVersion ?? updateState.currentVersion ?? "-");
+    const latestVersionRaw = info.version ?? null;
+    const latestVersion = latestVersionRaw ? String(latestVersionRaw) : "-";
+    const body = info.body ? String(info.body) : "";
+    return { available, currentVersion, latestVersion, body };
+  }
+
+  async function checkForUpdates({ silent = false } = {}) {
+    updateState.checking = true;
+    renderUpdateUi();
+    if (!silent) {
+      setUpdateStatus("Checking for updates...");
+    }
+    try {
+      const updateInfo = await invoke("check_for_updates");
+      const normalized = normalizeUpdateInfo(updateInfo);
+      updateState.currentVersion = normalized.currentVersion;
+      updateState.latestVersion = normalized.latestVersion;
+      updateState.available = normalized.available;
+      if (normalized.available) {
+        const suffix = normalized.body ? " (release notes available)" : "";
+        setUpdateStatus(`Update available: ${normalized.latestVersion}${suffix}`, "success");
+      } else {
+        setUpdateStatus("You are up to date.", "success");
+      }
+      return normalized;
+    } catch (error) {
+      if (!silent) {
+        setUpdateStatus(formatUpdaterError(error), "error");
+      }
+      return null;
+    } finally {
+      updateState.checking = false;
+      renderUpdateUi();
+    }
+  }
+
+  async function installAvailableUpdate() {
+    updateState.downloading = true;
+    renderUpdateUi();
+    setUpdateStatus("Downloading update...");
+    try {
+      await invoke("download_and_install_update");
+    } catch (error) {
+      setUpdateStatus(String(error || "Update install failed."), "error");
+    } finally {
+      updateState.downloading = false;
+      renderUpdateUi();
+    }
+  }
+
+  async function bindUpdaterEvents() {
+    if (updaterUnlisten || typeof listen !== "function") return;
+    updaterUnlisten = await listen("updater_status", (event) => {
+      const payload = (event && typeof event.payload === "object") ? event.payload : {};
+      const phase = String(payload.phase || "").trim();
+      if (payload.current_version) {
+        updateState.currentVersion = String(payload.current_version);
+      }
+      if (payload.version) {
+        updateState.latestVersion = String(payload.version);
+      }
+      if (phase === "checking") {
+        updateState.checking = true;
+        setUpdateStatus("Checking for updates...");
+      } else if (phase === "available") {
+        updateState.available = true;
+        setUpdateStatus(`Update available: ${updateState.latestVersion}`, "success");
+      } else if (phase === "no_update") {
+        updateState.available = false;
+        setUpdateStatus("You are up to date.", "success");
+      } else if (phase === "downloading") {
+        updateState.downloading = true;
+        const downloaded = Number(payload.downloaded || 0);
+        const total = Number(payload.content_length || 0);
+        if (total > 0) {
+          const pct = Math.min(100, Math.round((downloaded / total) * 100));
+          setUpdateStatus(`Downloading update... ${pct}%`);
+        } else {
+          setUpdateStatus("Downloading update...");
+        }
+      } else if (phase === "downloaded") {
+        setUpdateStatus("Update downloaded. Installing...");
+      } else if (phase === "installed") {
+        setUpdateStatus("Update installed. Restarting app...", "success");
+      } else if (phase === "failed") {
+        updateState.checking = false;
+        updateState.downloading = false;
+        setUpdateStatus(formatUpdaterError(payload.message || "Update failed."), "error");
+      }
+      if (phase === "available" || phase === "no_update" || phase === "installed") {
+        updateState.checking = false;
+      }
+      if (phase === "installed") {
+        updateState.downloading = false;
+      }
+      renderUpdateUi();
+    });
+  }
 
   function closeSettingsPanel() {
     if (!d.settingsPanel) return;
@@ -349,6 +502,7 @@ export function createSettingsFeature({
   }
 
   function bindUi() {
+    bindUpdaterEvents().catch(() => {});
     if (d.settingsPanel) {
       d.settingsPanel.addEventListener("click", (event) => {
         if (event.target === d.settingsPanel) {
@@ -432,7 +586,19 @@ export function createSettingsFeature({
         persistAppSettings();
       });
     }
+    if (d.checkForUpdatesButton) {
+      d.checkForUpdatesButton.addEventListener("click", () => {
+        checkForUpdates();
+      });
+    }
+    if (d.installUpdateButton) {
+      d.installUpdateButton.addEventListener("click", () => {
+        installAvailableUpdate();
+      });
+    }
 
+    setUpdateStatus("No update check yet.");
+    renderUpdateUi();
     renderAllSettingsSelectDropdowns();
   }
 
@@ -446,5 +612,7 @@ export function createSettingsFeature({
     loadAppSettings,
     syncAppSettingsUI,
     persistAppSettings,
+    checkForUpdates,
+    installAvailableUpdate,
   };
 }
