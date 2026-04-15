@@ -3,28 +3,64 @@ export function createAlertsController({
   alertTitle,
   alertMessage,
   alertClose,
+  alertSecondary,
   alertCancel,
   alertOk,
 }) {
-  let pendingConfirmResolve = null;
+  let pendingChoiceResolve = null;
+  let pendingMode = "alert";
 
-  function resolveConfirm(value) {
-    if (!pendingConfirmResolve) return;
-    const resolve = pendingConfirmResolve;
-    pendingConfirmResolve = null;
-    resolve(Boolean(value));
+  function resolveChoice(value) {
+    if (!pendingChoiceResolve) return;
+    const resolve = pendingChoiceResolve;
+    pendingChoiceResolve = null;
+    pendingMode = "alert";
+    resolve(value);
   }
 
-  function setActionsMode({
-    confirm = false,
-    confirmLabel = "OK",
-    cancelLabel = "Cancel",
-  } = {}) {
+  function setButtonConfig(button, config = null) {
+    if (!button) return;
+    if (!config) {
+      button.classList.add("hidden");
+      button.classList.remove("primary-button", "secondary-button", "secondary");
+      delete button.dataset.choiceId;
+      return;
+    }
+    button.textContent = config.label || "";
+    button.dataset.choiceId = config.id || "";
+    button.classList.remove("hidden");
+    const isPrimary = config.variant === "primary";
+    button.classList.toggle("secondary", !isPrimary);
+    button.classList.toggle("secondary-button", !isPrimary);
+    button.classList.toggle("primary-button", isPrimary);
+  }
+
+  function setActionsMode(mode = "alert", config = {}) {
+    pendingMode = mode;
     if (!alertOk) return;
-    alertOk.textContent = confirmLabel;
-    if (alertCancel) {
-      alertCancel.textContent = cancelLabel;
-      alertCancel.classList.toggle("hidden", !confirm);
+    if (mode === "alert") {
+      setButtonConfig(alertSecondary, null);
+      setButtonConfig(alertCancel, null);
+      setButtonConfig(alertOk, { label: "OK", variant: "primary" });
+      return;
+    }
+    if (mode === "confirm") {
+      setButtonConfig(alertSecondary, null);
+      setButtonConfig(alertCancel, { label: config.cancelLabel || "Cancel", variant: "secondary" });
+      setButtonConfig(alertOk, { label: config.confirmLabel || "Confirm", variant: "primary" });
+      return;
+    }
+    if (mode === "choice") {
+      const options = Array.isArray(config.options) ? config.options : [];
+      if (options.length === 2) {
+        setButtonConfig(alertSecondary, options[0] || null);
+        setButtonConfig(alertCancel, null);
+        setButtonConfig(alertOk, options[1] || null);
+        return;
+      }
+      setButtonConfig(alertSecondary, options[0] || null);
+      setButtonConfig(alertCancel, options[1] || null);
+      setButtonConfig(alertOk, options[2] || null);
     }
   }
 
@@ -32,11 +68,11 @@ export function createAlertsController({
     if (!alertOverlay || !alertMessage) {
       return;
     }
-    resolveConfirm(false);
+    resolveChoice("close");
     if (alertTitle) {
       alertTitle.textContent = title;
     }
-    setActionsMode({ confirm: false, confirmLabel: "OK" });
+    setActionsMode("alert");
     alertMessage.textContent = message;
     alertOverlay.classList.remove("hidden");
   }
@@ -50,24 +86,50 @@ export function createAlertsController({
     if (!alertOverlay || !alertMessage) {
       return Promise.resolve(false);
     }
-    resolveConfirm(false);
+    resolveChoice("cancel");
     if (alertTitle) {
       alertTitle.textContent = title;
     }
-    setActionsMode({ confirm: true, confirmLabel, cancelLabel });
+    setActionsMode("confirm", { confirmLabel, cancelLabel });
     alertMessage.textContent = message;
     alertOverlay.classList.remove("hidden");
     return new Promise((resolve) => {
-      pendingConfirmResolve = resolve;
+      pendingChoiceResolve = (value) => resolve(value === "confirm");
+    });
+  }
+
+  function showChoices({
+    title = "Choose",
+    message = "",
+    options = [],
+  } = {}) {
+    if (!alertOverlay || !alertMessage) {
+      return Promise.resolve("close");
+    }
+    const safeOptions = Array.isArray(options)
+      ? options.filter((option) => option && typeof option.id === "string")
+      : [];
+    if (safeOptions.length < 2 || safeOptions.length > 3) {
+      return Promise.resolve("close");
+    }
+    resolveChoice("close");
+    if (alertTitle) {
+      alertTitle.textContent = title;
+    }
+    setActionsMode("choice", { options: safeOptions });
+    alertMessage.textContent = message;
+    alertOverlay.classList.remove("hidden");
+    return new Promise((resolve) => {
+      pendingChoiceResolve = resolve;
     });
   }
 
   function closeAlert() {
-    resolveConfirm(false);
+    resolveChoice("close");
     if (alertOverlay) {
       alertOverlay.classList.add("hidden");
     }
-    setActionsMode({ confirm: false, confirmLabel: "OK" });
+    setActionsMode("alert");
   }
 
   function bindUi() {
@@ -75,18 +137,54 @@ export function createAlertsController({
       alertClose.addEventListener("click", closeAlert);
     }
 
-    if (alertCancel) {
-      alertCancel.addEventListener("click", closeAlert);
-    }
-
     if (alertOk) {
       alertOk.addEventListener("click", () => {
-        if (pendingConfirmResolve) {
-          resolveConfirm(true);
+        if (pendingChoiceResolve) {
+          if (pendingMode === "confirm") {
+            resolveChoice("confirm");
+          } else if (pendingMode === "choice") {
+            resolveChoice(alertOk.dataset.choiceId || "close");
+          } else {
+            resolveChoice("close");
+          }
           if (alertOverlay) {
             alertOverlay.classList.add("hidden");
           }
-          setActionsMode({ confirm: false, confirmLabel: "OK" });
+          setActionsMode("alert");
+          return;
+        }
+        closeAlert();
+      });
+    }
+
+    if (alertSecondary) {
+      alertSecondary.addEventListener("click", () => {
+        if (pendingChoiceResolve && pendingMode === "choice") {
+          resolveChoice(alertSecondary.dataset.choiceId || "close");
+          if (alertOverlay) {
+            alertOverlay.classList.add("hidden");
+          }
+          setActionsMode("alert");
+          return;
+        }
+        closeAlert();
+      });
+    }
+
+    if (alertCancel) {
+      alertCancel.addEventListener("click", () => {
+        if (pendingChoiceResolve) {
+          if (pendingMode === "confirm") {
+            resolveChoice("cancel");
+          } else if (pendingMode === "choice") {
+            resolveChoice(alertCancel.dataset.choiceId || "close");
+          } else {
+            resolveChoice("close");
+          }
+          if (alertOverlay) {
+            alertOverlay.classList.add("hidden");
+          }
+          setActionsMode("alert");
           return;
         }
         closeAlert();
@@ -105,6 +203,7 @@ export function createAlertsController({
   return {
     showAlert,
     showConfirm,
+    showChoices,
     closeAlert,
     bindUi,
   };

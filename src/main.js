@@ -367,10 +367,10 @@ const startWithWindowsSelect = document.getElementById("start-with-windows");
 const startInTraySelect = document.getElementById("start-in-tray");
 const minimizeToTraySelect = document.getElementById("minimize-to-tray");
 const exitToTraySelect = document.getElementById("exit-to-tray");
+const autoCheckUpdatesButton = document.getElementById("auto-check-updates-button");
 const openLogsFolderButton = document.getElementById("open-logs-folder");
 const resetAppDataButton = document.getElementById("reset-app-data");
 const checkForUpdatesButton = document.getElementById("check-for-updates");
-const installUpdateButton = document.getElementById("install-update");
 const settingsUpdateStatus = document.getElementById("settings-update-status");
 const updateCurrentVersion = document.getElementById("update-current-version");
 const updateLatestVersion = document.getElementById("update-latest-version");
@@ -380,6 +380,7 @@ const alertOverlay = document.getElementById("alert-overlay");
 const alertTitle = document.getElementById("alert-title");
 const alertMessage = document.getElementById("alert-message");
 const alertClose = document.getElementById("alert-close");
+const alertSecondary = document.getElementById("alert-secondary");
 const alertCancel = document.getElementById("alert-cancel");
 const alertOk = document.getElementById("alert-ok");
 
@@ -841,6 +842,7 @@ let appSettings = {
   startInTray: false,
   minimizeToTray: false,
   exitToTray: false,
+  autoCheckUpdates: true,
 };
 let appStarted = false;
 
@@ -859,9 +861,9 @@ settingsFeature = createSettingsFeature({
     startInTraySelect,
     minimizeToTraySelect,
     exitToTraySelect,
+    autoCheckUpdatesButton,
     openLogsFolderButton,
     checkForUpdatesButton,
-    installUpdateButton,
     settingsUpdateStatus,
     updateCurrentVersion,
     updateLatestVersion,
@@ -1352,10 +1354,12 @@ const alertsController = createAlertsController({
   alertTitle,
   alertMessage,
   alertClose,
+  alertSecondary,
   alertCancel,
   alertOk,
 });
 const showAlert = (title, message = "") => alertsController.showAlert(message, title);
+const showChoices = (options = {}) => alertsController.showChoices(options);
 const closeAlert = (...args) => alertsController.closeAlert(...args);
 
 connectionsController?.bindUi?.();
@@ -1956,23 +1960,49 @@ async function init() {
   await hydrateClientPreferences();
   mainScreen?.classList?.remove?.("hidden");
   await startMainApp();
-  settingsFeature?.checkForUpdates?.({ silent: true }).then((info) => {
-    if (!info || !info.available) return;
-    const latest = String(info.latestVersion || "").trim();
-    const current = String(info.currentVersion || "").trim();
-    if (!latest) return;
-    const key = `updaterPromptedVersion:${latest}`;
-    try {
-      if (localStorage.getItem(key) === "1") return;
-      localStorage.setItem(key, "1");
-    } catch {
-      // ignore storage failures
+  try {
+    const resetSkipOnceKey = "updaterResetSkipOnce";
+    if (localStorage.getItem(resetSkipOnceKey) !== "1") {
+      localStorage.removeItem("updaterSkippedVersion");
+      localStorage.setItem(resetSkipOnceKey, "1");
     }
-    showAlert(
-      "Update Available",
-      `MIDIMaster ${latest} is available (current: ${current || "unknown"}). Open Settings to install.`,
-    );
-  }).catch(() => { });
+  } catch {
+    // ignore storage failures
+  }
+  if (appSettings.autoCheckUpdates !== false) {
+    settingsFeature?.checkForUpdates?.({ silent: true }).then((info) => {
+      if (!info || !info.available) return;
+      const latest = String(info.latestVersion || "").trim();
+      const current = String(info.currentVersion || "").trim();
+      if (!latest) return;
+      const skippedVersionKey = "updaterSkippedVersion";
+      try {
+        if (localStorage.getItem(skippedVersionKey) === latest) return;
+      } catch {
+        // ignore storage failures
+      }
+      showChoices({
+        title: "Update Available",
+        message: `MIDIMaster ${latest} is available (current: ${current || "unknown"})`,
+        options: [
+          { id: "skip", label: "Skip Update", variant: "secondary" },
+          { id: "install", label: "Download and Install", variant: "primary" },
+        ],
+      }).then((choice) => {
+        if (choice === "skip") {
+          try {
+            localStorage.setItem(skippedVersionKey, latest);
+          } catch {
+            // ignore storage failures
+          }
+          return;
+        }
+        if (choice === "install") {
+          settingsFeature?.installAvailableUpdate?.();
+        }
+      });
+    }).catch(() => { });
+  }
 }
 
 window.addEventListener("load", () => {

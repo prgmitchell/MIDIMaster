@@ -37,6 +37,15 @@ export function createSettingsFeature({
     downloading: false,
   };
 
+  function renderAutoCheckButton() {
+    if (!d.autoCheckUpdatesButton) return;
+    const enabled = (typeof getAppSettings === "function")
+      ? ((getAppSettings() || {}).autoCheckUpdates !== false)
+      : true;
+    d.autoCheckUpdatesButton.dataset.enabled = enabled ? "true" : "false";
+    d.autoCheckUpdatesButton.textContent = enabled ? "Auto-check: On" : "Auto-check: Off";
+  }
+
   function formatUpdaterError(error) {
     const message = String(error || "Update check failed.");
     const normalized = message.toLowerCase();
@@ -70,12 +79,18 @@ export function createSettingsFeature({
       d.updateLatestVersion.textContent = updateState.latestVersion || "-";
     }
     if (d.checkForUpdatesButton) {
+      if (updateState.downloading) {
+        d.checkForUpdatesButton.textContent = "Downloading...";
+      } else if (updateState.checking) {
+        d.checkForUpdatesButton.textContent = "Checking...";
+      } else if (updateState.available) {
+        d.checkForUpdatesButton.textContent = "Download and install";
+      } else {
+        d.checkForUpdatesButton.textContent = "Check for updates";
+      }
       d.checkForUpdatesButton.disabled = updateState.checking || updateState.downloading;
     }
-    if (d.installUpdateButton) {
-      d.installUpdateButton.classList.toggle("hidden", !updateState.available);
-      d.installUpdateButton.disabled = !updateState.available || updateState.checking || updateState.downloading;
-    }
+    renderAutoCheckButton();
   }
 
   function normalizeUpdateInfo(updateInfo) {
@@ -83,7 +98,7 @@ export function createSettingsFeature({
     const available = Boolean(info.available);
     const currentVersion = String(info.current_version ?? info.currentVersion ?? updateState.currentVersion ?? "-");
     const latestVersionRaw = info.version ?? null;
-    const latestVersion = latestVersionRaw ? String(latestVersionRaw) : "-";
+    const latestVersion = latestVersionRaw ? String(latestVersionRaw) : currentVersion;
     const body = info.body ? String(info.body) : "";
     return { available, currentVersion, latestVersion, body };
   }
@@ -468,6 +483,7 @@ export function createSettingsFeature({
       d.exitToTraySelect.value = merged.exitToTray ? "enabled" : "disabled";
       renderSettingsSelectDropdown(d.exitToTraySelect);
     }
+    renderAutoCheckButton();
   }
 
   function persistAppSettings() {
@@ -477,6 +493,7 @@ export function createSettingsFeature({
       startInTray: Boolean(s.startInTray),
       minimizeToTray: Boolean(s.minimizeToTray),
       exitToTray: Boolean(s.exitToTray),
+      autoCheckUpdates: s.autoCheckUpdates !== false,
     }).catch((error) => {
       console.error("Failed to update app settings", error);
     });
@@ -491,6 +508,7 @@ export function createSettingsFeature({
           startInTray: Boolean(settings.start_in_tray ?? settings.startInTray),
           minimizeToTray: Boolean(settings.minimize_to_tray ?? settings.minimizeToTray),
           exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
+          autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
         };
         if (typeof setAppSettings === "function") {
           setAppSettings(next);
@@ -519,8 +537,12 @@ export function createSettingsFeature({
         await loadOsdSettings();
         await loadMonitorOptions();
         await loadAppSettings();
+        await loadCurrentAppVersion();
         syncAppSettingsUI((typeof getAppSettings === "function") ? (getAppSettings() || {}) : {});
         renderAllSettingsSelectDropdowns();
+        if ((getAppSettings?.() || {}).autoCheckUpdates !== false) {
+          await checkForUpdates({ silent: true });
+        }
         openSettingsPanel();
       });
     }
@@ -586,20 +608,42 @@ export function createSettingsFeature({
         persistAppSettings();
       });
     }
-    if (d.checkForUpdatesButton) {
-      d.checkForUpdatesButton.addEventListener("click", () => {
-        checkForUpdates();
+    if (d.autoCheckUpdatesButton) {
+      d.autoCheckUpdatesButton.addEventListener("click", () => {
+        const enabled = (getAppSettings?.() || {}).autoCheckUpdates !== false;
+        syncAppSettingsUI({ autoCheckUpdates: !enabled });
+        persistAppSettings();
+        renderUpdateUi();
       });
     }
-    if (d.installUpdateButton) {
-      d.installUpdateButton.addEventListener("click", () => {
-        installAvailableUpdate();
+    if (d.checkForUpdatesButton) {
+      d.checkForUpdatesButton.addEventListener("click", () => {
+        if (updateState.available) {
+          installAvailableUpdate();
+          return;
+        }
+        checkForUpdates();
       });
     }
 
     setUpdateStatus("No update check yet.");
     renderUpdateUi();
     renderAllSettingsSelectDropdowns();
+  }
+
+  async function loadCurrentAppVersion() {
+    try {
+      const version = await invoke("get_app_version");
+      if (version) {
+        updateState.currentVersion = String(version);
+        if (!updateState.latestVersion || updateState.latestVersion === "-") {
+          updateState.latestVersion = updateState.currentVersion;
+        }
+        renderUpdateUi();
+      }
+    } catch {
+      // ignore version fetch failures
+    }
   }
 
   return {
@@ -610,6 +654,7 @@ export function createSettingsFeature({
     loadOsdSettings,
     applyOsdSettings,
     loadAppSettings,
+    loadCurrentAppVersion,
     syncAppSettingsUI,
     persistAppSettings,
     checkForUpdates,

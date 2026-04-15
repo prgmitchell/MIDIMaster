@@ -40,6 +40,7 @@
         <div class="alert-panel-body">
           <p id="alert-message"></p>
           <div class="alert-panel-actions">
+            <button id="alert-secondary" type="button" class="secondary hidden">Skip</button>
             <button id="alert-cancel" type="button" class="secondary hidden">Cancel</button>
             <button id="alert-ok" type="button">OK</button>
           </div>
@@ -254,12 +255,14 @@
               <button id="reset-app-data" type="button" class="settings-reset">Reset app data</button>
             </div>
             <div class="settings-section settings-updates-section">
-              <div class="settings-title">App Updates</div>
+              <div class="settings-update-header">
+                <div class="settings-title">App Updates</div>
+                <button id="auto-check-updates-button" type="button" class="settings-mini-toggle">Auto-check: On</button>
+              </div>
               <div class="settings-update-meta-row"><span class="settings-update-meta-label">Current</span><span id="update-current-version">-</span></div>
               <div class="settings-update-meta-row"><span class="settings-update-meta-label">Latest</span><span id="update-latest-version">-</span></div>
               <div id="settings-update-status" class="settings-inline-status">No update check yet.</div>
               <button id="check-for-updates" type="button" class="settings-action">Check for updates</button>
-              <button id="install-update" type="button" class="settings-action" disabled>Download and install</button>
             </div>
           </div>
         </div>

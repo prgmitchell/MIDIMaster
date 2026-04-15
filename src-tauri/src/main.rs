@@ -1999,6 +1999,7 @@ fn main() {
             get_osd_settings,
             update_osd_settings,
             get_app_settings,
+            get_app_version,
             update_app_settings,
             set_theme_preference,
             set_midi_device_preferences,

@@ -15,6 +15,7 @@ pub struct AppSettings {
     pub midi_input_device_name: Option<String>,
     pub midi_output_device_name: Option<String>,
     pub active_profile_name: Option<String>,
+    pub auto_check_updates: bool,
 }
 
 impl Default for AppSettings {
@@ -30,6 +31,7 @@ impl Default for AppSettings {
             midi_input_device_name: None,
             midi_output_device_name: None,
             active_profile_name: None,
+            auto_check_updates: true,
         }
     }
 }

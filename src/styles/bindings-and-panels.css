@@ -693,6 +693,31 @@ body.dark-mode .target-tag--count {
   font-weight: 600;
 }
 
+.settings-update-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-mini-toggle {
+  border-radius: 999px;
+  border: 1px solid #4a5f8a;
+  background: #22304a;
+  color: #e8eefc;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.settings-mini-toggle[data-enabled="false"] {
+  border-color: #627093;
+  background: #1f2840;
+  color: #bfc9de;
+}
+
 .settings-update-meta {
   font-size: 12px;
   color: #55607a;
@@ -1301,17 +1326,19 @@ body.dragging-binding {
 }
 
 .alert-panel-content {
-  width: min(460px, 92vw);
+  width: fit-content;
+  max-width: 92vw;
   border-radius: 12px;
 }
 
 .alert-panel-body {
   padding: 20px 22px 24px;
+  max-width: min(520px, calc(92vw - 2px));
 }
 
 .alert-panel-body p {
   margin: 0;
-  text-align: left;
+  text-align: center;
   font-size: 15px;
   line-height: 1.5;
   color: #2b2d42;
@@ -1319,13 +1346,25 @@ body.dragging-binding {
 
 .alert-panel-actions {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
+  width: 100%;
+  align-items: center;
   gap: 10px;
   margin-top: 18px;
 }
 
 .alert-panel-actions button {
-  min-width: 100px;
+  flex: 0 0 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+#alert-secondary {
+  min-width: 128px;
+}
+
+#alert-ok {
+  min-width: 170px;
 }
 
 .alert-panel-actions .secondary {

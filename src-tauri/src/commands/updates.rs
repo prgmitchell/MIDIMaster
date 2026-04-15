@@ -71,7 +71,7 @@ pub async fn check_for_updates(app: AppHandle) -> Result<UpdateInfo, String> {
                 phase: "no_update".to_string(),
                 message: Some("No update available.".to_string()),
                 current_version: Some(current_version.clone()),
-                version: None,
+                version: Some(current_version.clone()),
                 downloaded: None,
                 content_length: None,
             },
@@ -79,7 +79,7 @@ pub async fn check_for_updates(app: AppHandle) -> Result<UpdateInfo, String> {
         return Ok(UpdateInfo {
             available: false,
             current_version,
-            version: None,
+            version: Some(app.package_info().version.to_string()),
             body: None,
             date: None,
         });

@@ -102,6 +102,11 @@ pub fn get_app_settings(state: State<AppState>) -> Result<AppSettings, String> {
 }
 
 #[tauri::command]
+pub fn get_app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+#[tauri::command]
 pub fn update_app_settings(
     app: AppHandle,
     state: State<AppState>,
@@ -109,13 +114,14 @@ pub fn update_app_settings(
     start_in_tray: bool,
     minimize_to_tray: bool,
     exit_to_tray: bool,
+    auto_check_updates: bool,
 ) -> Result<(), String> {
     run_logger::info(
         "settings",
         "update_app_settings",
         &format!(
-            "start_with_windows={} start_in_tray={} minimize_to_tray={} exit_to_tray={}",
-            start_with_windows, start_in_tray, minimize_to_tray, exit_to_tray
+            "start_with_windows={} start_in_tray={} minimize_to_tray={} exit_to_tray={} auto_check_updates={}",
+            start_with_windows, start_in_tray, minimize_to_tray, exit_to_tray, auto_check_updates
         ),
     );
     let mut settings = state
@@ -126,6 +132,7 @@ pub fn update_app_settings(
     settings.start_in_tray = start_in_tray;
     settings.minimize_to_tray = minimize_to_tray;
     settings.exit_to_tray = exit_to_tray;
+    settings.auto_check_updates = auto_check_updates;
     let updated = settings.clone();
     drop(settings);
 

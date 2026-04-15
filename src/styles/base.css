@@ -530,6 +530,18 @@ body.dark-mode .settings-update-meta-label {
   color: #b9c8ea;
 }
 
+body.dark-mode .settings-mini-toggle {
+  border-color: #5570a7;
+  background: #25365a;
+  color: #e6eeff;
+}
+
+body.dark-mode .settings-mini-toggle[data-enabled="false"] {
+  border-color: #4c5f89;
+  background: #1f2c47;
+  color: #b2c2e3;
+}
+
 /* Legacy support for old class name */
 .settings-button {
   width: 36px;
