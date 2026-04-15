@@ -1,6 +1,7 @@
 import { closeOpenDropdowns, renderLabelFromRawWithTags } from "../ui/dropdown_badges.js";
 
 export function createTargetsFeature({
+  invoke,
   dom,
   masterIconData,
   focusIconData,
@@ -24,12 +25,88 @@ export function createTargetsFeature({
   const normalizeKey = (typeof normalizeSessionKey === "function") ? normalizeSessionKey : (() => "");
   const targetKey = (typeof integrationTargetKey === "function") ? integrationTargetKey : (() => "");
   const resolveDisplay = (typeof resolveOsdTarget === "function") ? resolveOsdTarget : (() => null);
+  const callInvoke = (typeof invoke === "function") ? invoke : null;
 
   let activeTargetPanelSelect = null;
   let activeTargetPanelBack = null;
   const HOTKEY_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2' y='4' width='16' height='12' rx='3' fill='%231a2446' stroke='%2398a6cc' stroke-width='1.2'/><rect x='4' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='7' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='10' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='13' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='5.2' y='10.6' width='9.6' height='2.2' rx='0.8' fill='%23c7d2f3'/></svg>";
+  const OPEN_APPLICATION_TARGET_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='3.6' width='15.6' height='12.8' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6.2 7.3h4.9M6.2 10h7.6M6.2 12.7h5.7' stroke='%23c7d2f3' stroke-width='1.3' stroke-linecap='round'/><path d='M12.3 5.2l2.9 2.9-2.9 2.9' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const TOGGLE_MUTE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M3 8.2v3.6h2.6l3.3 2.8V5.4L5.6 8.2H3z' fill='%23c7d2f3'/><path d='M12.4 7.1l4.5 5.8M16.9 7.1l-4.5 5.8' stroke='%23f7a7a7' stroke-width='1.5' stroke-linecap='round'/></svg>";
   const SET_DEFAULT_DEVICE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='5' width='15.6' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6 10h4.6M8.6 7.4L11.2 10l-2.6 2.6' stroke='%23c7d2f3' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/><path d='M13.7 8.1v3.8M15.6 10l-1.9 1.9M11.8 10l1.9 1.9' stroke='%2386d6a7' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+
+  function normalizeOpenApplication(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const path = String(raw.path || "").trim();
+    const display = String(raw.display || "").trim();
+    const iconData = typeof raw.icon_data === "string" && raw.icon_data.trim()
+      ? raw.icon_data.trim()
+      : null;
+    if (!path) return null;
+    return {
+      path,
+      display: friendlyAppName(display || path) || display || path,
+      icon_data: iconData,
+    };
+  }
+
+  function displayNameFromPath(path) {
+    const value = String(path || "").trim();
+    if (!value) return "";
+    const parts = value.split(/[\\/]/);
+    return parts[parts.length - 1] || value;
+  }
+
+  function friendlyAppName(rawNameOrPath) {
+    const base = displayNameFromPath(rawNameOrPath);
+    if (!base) return "";
+    return base.replace(/\.exe$/i, "").trim() || base;
+  }
+
+  function normalizeCompareName(raw) {
+    return String(raw || "")
+      .toLowerCase()
+      .replace(/\.exe$/i, "")
+      .replace(/[^a-z0-9]+/g, "");
+  }
+
+  function resolveOpenApplicationIcon(openApplication) {
+    if (!openApplication?.display && !openApplication?.path) return null;
+    const needle = normalizeCompareName(openApplication.display || openApplication.path);
+    if (!needle) return null;
+    const sessions = getSess();
+    if (!Array.isArray(sessions) || sessions.length === 0) return null;
+    for (const session of sessions) {
+      const icon = session?.icon_data || null;
+      if (!icon) continue;
+      const candidates = [
+        session?.display_name,
+        session?.name,
+        session?.process_name,
+        session?.process,
+        session?.exe,
+      ];
+      const matched = candidates.some((candidate) => normalizeCompareName(candidate) === needle);
+      if (matched) return icon;
+    }
+    return null;
+  }
+
+  async function pickOpenApplication() {
+    if (!callInvoke) return null;
+    const picked = await callInvoke("pick_executable_path");
+    if (!picked) return null;
+    const path = String(picked.path || "").trim();
+    if (!path) return null;
+    const display = String(picked.display || "").trim();
+    const iconData = typeof picked.icon_data === "string" && picked.icon_data.trim()
+      ? picked.icon_data.trim()
+      : null;
+    return {
+      path,
+      display: friendlyAppName(display || path),
+      icon_data: iconData,
+    };
+  }
 
   function mediaIconForAction(action) {
     if (action === "MediaNextTrack") return mediaNextTrackIconData;
@@ -180,6 +257,7 @@ export function createTargetsFeature({
               : (currentTarget === "Focus" || currentTarget?.Focus != null) ? "focus"
                 : currentTarget === "MediaControl" ? "media-control"
                   : currentTarget === "Hotkey" ? "hotkey-target"
+                    : currentTarget === "OpenApplication" ? "open-application-target"
                 : "placeholder"
       );
 
@@ -187,7 +265,7 @@ export function createTargetsFeature({
     if (selectedKind === "integration-target") selectedValue = targetKey(integration);
     else if (selectedKind === "session") selectedValue = selectedAppName || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
-    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "hotkey-target") selectedValue = selectedKind;
+    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "hotkey-target" || selectedKind === "open-application-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
     const options = [
@@ -217,6 +295,12 @@ export function createTargetsFeature({
         label: "Hotkey",
         icon_data: HOTKEY_ICON_DATA,
         kind: "hotkey-target",
+      });
+      options.push({
+        value: "open-application-target",
+        label: "Open Application",
+        icon_data: OPEN_APPLICATION_TARGET_ICON_DATA,
+        kind: "open-application-target",
       });
     }
 
@@ -355,7 +439,13 @@ export function createTargetsFeature({
     return { options, selectedValue, selectedKind, activeIntegrationOption };
   }
 
-  function buildTargetSelect(currentTarget, isBindingButton = false, currentAction = "Volume", currentHotkeyDisplay = "") {
+  function buildTargetSelect(
+    currentTarget,
+    isBindingButton = false,
+    currentAction = "Volume",
+    currentHotkeyDisplay = "",
+    currentOpenApplication = null,
+  ) {
     const container = document.createElement("div");
     container.className = "target-dropdown binding-target-dropdown";
 
@@ -389,6 +479,7 @@ export function createTargetsFeature({
       if (target === "Focus" || target?.Focus != null) return "focus";
       if (target === "MediaControl") return "media-control";
       if (target === "Hotkey") return "hotkey-target";
+      if (target === "OpenApplication") return "open-application-target";
       const integration = target?.Integration || target?.integration;
       if (integration) {
         return `integration:${targetKey(integration)}`;
@@ -410,6 +501,9 @@ export function createTargetsFeature({
     let hotkeyDisplay = String(currentHotkeyDisplay || "");
     const targetDisplayCache = new Map();
     let selectedAction = isBindingButton ? (currentAction || "ToggleMute") : "Volume";
+    let selectedOpenApplication = isBindingButton
+      ? normalizeOpenApplication(currentOpenApplication)
+      : null;
 
     const { options, selectedValue, selectedKind, activeIntegrationOption } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
     const placeholderOption = {
@@ -444,6 +538,7 @@ export function createTargetsFeature({
       if (action === "Hotkey") return "Hotkey";
       if (action === "ToggleMute") return "Toggle Mute";
       if (action === "SetDefaultDevice") return "Set Default";
+      if (action === "OpenApplication") return "Open Application";
       if (action === "Volume" && isBindingButton) return "Trigger";
       return action;
     };
@@ -455,6 +550,16 @@ export function createTargetsFeature({
         return {
           label: hotkeyDisplay ? `Hotkey (${hotkeyDisplay})` : "Hotkey (Not Set)",
           icon_data: cached?.icon_data ?? HOTKEY_ICON_DATA,
+        };
+      }
+      if (target === "OpenApplication") {
+        const openAppLabel = friendlyAppName(selectedOpenApplication?.display || selectedOpenApplication?.path || "") || "Open Application";
+        return {
+          label: openAppLabel,
+          icon_data: selectedOpenApplication?.icon_data
+            || resolveOpenApplicationIcon(selectedOpenApplication)
+            || cached?.icon_data
+            || OPEN_APPLICATION_TARGET_ICON_DATA,
         };
       }
       const resolved = resolveDisplay(target);
@@ -564,6 +669,9 @@ export function createTargetsFeature({
       if (option.kind === "hotkey-target") {
         return "Hotkey";
       }
+      if (option.kind === "open-application-target") {
+        return "OpenApplication";
+      }
       if (option.kind === "device") {
         return { Device: { device_id: option.value } };
       }
@@ -579,6 +687,7 @@ export function createTargetsFeature({
     const syncContainerValue = (markUnavailable = false) => {
       container.__selectedTargets = [...selectedTargets];
       container.__selectedTarget = selectedTargets[0] || "Unset";
+      container.__openApplication = selectedOpenApplication;
       container.value = selectedTargets.length ? targetIdentity(selectedTargets[0]) : "";
       container.dataset.kind = selectedTargets.length ? "multi" : "placeholder";
       container.classList.toggle("target-unavailable", Boolean(markUnavailable));
@@ -598,6 +707,15 @@ export function createTargetsFeature({
       if (nextActionValue) {
         selectedAction = nextActionValue;
       }
+      if (nextActionValue !== "OpenApplication") {
+        selectedOpenApplication = null;
+      }
+      const chosenOpenApplication = normalizeOpenApplication(
+        actionChoice?.openApplication || actionChoice?.open_application,
+      );
+      if (chosenOpenApplication) {
+        selectedOpenApplication = chosenOpenApplication;
+      }
       if (nextActionLabel && option && typeof option === "object") {
         option.__selectedActionLabel = nextActionLabel;
       }
@@ -608,6 +726,9 @@ export function createTargetsFeature({
       const mapped = mapOptionToTarget(option);
       if (mapped === "Hotkey") {
         selectedAction = "Hotkey";
+      }
+      if (mapped === "OpenApplication") {
+        selectedAction = "OpenApplication";
       }
       const key = targetIdentity(mapped);
       const cachedLabel = String(option?.label || "").trim();
@@ -723,6 +844,22 @@ export function createTargetsFeature({
           (targetOption) => {
             if (targetOption.kind === "integration-root") {
               showIntegrationSubmenu(targetOption.value, [], null).catch(() => { });
+              return false;
+            }
+
+            if (isBindingButton && targetOption.kind === "open-application-target") {
+              (async () => {
+                try {
+                  const openApplication = await pickOpenApplication();
+                  if (!openApplication) return;
+                  selectOption(targetOption, {
+                    value: "OpenApplication",
+                    label: "Open Application",
+                    openApplication,
+                  });
+                  closeTargetPanel();
+                } catch { }
+              })();
               return false;
             }
 
@@ -844,6 +981,7 @@ export function createTargetsFeature({
       hotkeyDisplay = String(nextDisplay || "");
       setDisplay();
     };
+    container.getOpenApplication = () => selectedOpenApplication;
     return container;
   }
 

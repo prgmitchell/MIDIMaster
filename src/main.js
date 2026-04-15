@@ -219,6 +219,16 @@ function normalizeBinding(binding) {
   out.relative_format = "Auto";
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
+  if (!out.open_application || typeof out.open_application !== "object") {
+    out.open_application = null;
+  } else {
+    const path = String(out.open_application.path || "").trim();
+    const display = String(out.open_application.display || "").trim();
+    const icon_data = typeof out.open_application.icon_data === "string" && out.open_application.icon_data.trim()
+      ? out.open_application.icon_data.trim()
+      : null;
+    out.open_application = path ? { path, display: display || path, icon_data } : null;
+  }
   return out;
 }
 
@@ -892,6 +902,7 @@ profilesFeature = createProfilesFeature({
 profilesFeature.bindUi();
 
 targetsFeature = createTargetsFeature({
+  invoke,
   dom: {
     targetPanel,
     targetPanelList,
@@ -1380,8 +1391,20 @@ function buildTargetOptions(currentTarget, isButton = false) {
   return targetsFeature?.buildTargetOptions?.(currentTarget, isButton);
 }
 
-function buildTargetSelect(currentTarget, isBindingButton = false, currentAction = "Volume", currentHotkeyDisplay = "") {
-  return targetsFeature?.buildTargetSelect?.(currentTarget, isBindingButton, currentAction, currentHotkeyDisplay);
+function buildTargetSelect(
+  currentTarget,
+  isBindingButton = false,
+  currentAction = "Volume",
+  currentHotkeyDisplay = "",
+  currentOpenApplication = null,
+) {
+  return targetsFeature?.buildTargetSelect?.(
+    currentTarget,
+    isBindingButton,
+    currentAction,
+    currentHotkeyDisplay,
+    currentOpenApplication,
+  );
 }
 
 const LEARN_PANEL_DEFAULT_TITLE = "Waiting for MIDI Input";
@@ -1509,6 +1532,7 @@ function createBindingFromLearn(payload) {
     assign_control: null,
     assign_mode: "Add",
     hotkey: null,
+    open_application: null,
   };
 }
 
@@ -1599,6 +1623,21 @@ async function setupListeners() {
     if (payload.reason === "focused_app_unavailable") {
       showAlert("Assign Failed", "Could not resolve the focused application. Click the app window and try again.");
     }
+  });
+
+  await listen("binding_action_error", (event) => {
+    let payload = event.payload;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        payload = null;
+      }
+    }
+    if (!payload || typeof payload !== "object") return;
+    const title = String(payload.title || "Action Failed").trim() || "Action Failed";
+    const message = String(payload.message || "").trim() || "MIDIMaster could not complete this action.";
+    showAlert(title, message);
   });
 
   await listen("binding_aux_assign_update", (event) => {

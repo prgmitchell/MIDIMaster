@@ -224,6 +224,7 @@ mod tests {
             assign_control: None,
             assign_mode: crate::model::AssignMode::Add,
             hotkey: None,
+            open_application: None,
         }
     }
 

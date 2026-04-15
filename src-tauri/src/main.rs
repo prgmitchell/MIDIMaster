@@ -33,6 +33,7 @@ use windows_autostart::set_windows_autostart;
 use profile_store::ProfileStore;
 use std::collections::HashMap;
 use std::path::Path;
+use std::process::Command as ProcessCommand;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -813,6 +814,87 @@ impl AppState {
             return Ok(());
         }
 
+        if binding.action == model::BindingAction::OpenApplication {
+            if event.value == 0 {
+                run_logger::debug(
+                    "bindings",
+                    "open_application_ignored_release",
+                    &format!("binding_id={} action={:?}", binding.id, binding.action),
+                );
+                return Ok(());
+            }
+
+            let Some(open_app) = binding.open_application.as_ref() else {
+                run_logger::warn(
+                    "bindings",
+                    "open_application_missing_config",
+                    &format!("binding_id={}", binding.id),
+                );
+                let _ = app.emit(
+                    "binding_action_error",
+                    serde_json::json!({
+                        "reason": "open_application_missing_config",
+                        "binding_id": binding.id,
+                        "title": "Open Application Not Configured",
+                        "message": "Choose an executable for this binding's Open Application action.",
+                    }),
+                );
+                return Ok(());
+            };
+
+            let app_path = open_app.path.trim();
+            if app_path.is_empty() || !Path::new(app_path).is_file() {
+                run_logger::warn(
+                    "bindings",
+                    "open_application_path_missing",
+                    &format!("binding_id={} path={}", binding.id, app_path),
+                );
+                let app_name = open_app.display.trim();
+                let display = if app_name.is_empty() {
+                    app_path
+                } else {
+                    app_name
+                };
+                let _ = app.emit(
+                    "binding_action_error",
+                    serde_json::json!({
+                        "reason": "open_application_path_missing",
+                        "binding_id": binding.id,
+                        "title": "Application Not Found",
+                        "message": format!("MIDIMaster couldn't find \"{}\". Re-select the .exe path in this binding.", display),
+                    }),
+                );
+                return Ok(());
+            }
+
+            match ProcessCommand::new(app_path).spawn() {
+                Ok(_) => {
+                    run_logger::info(
+                        "bindings",
+                        "open_application_launched",
+                        &format!("binding_id={} path={}", binding.id, app_path),
+                    );
+                }
+                Err(err) => {
+                    run_logger::error(
+                        "bindings",
+                        "open_application_launch_failed",
+                        &format!("binding_id={} path={} error={}", binding.id, app_path, err),
+                    );
+                    let _ = app.emit(
+                        "binding_action_error",
+                        serde_json::json!({
+                            "reason": "open_application_launch_failed",
+                            "binding_id": binding.id,
+                            "title": "Launch Failed",
+                            "message": format!("MIDIMaster couldn't open this application: {}", err),
+                        }),
+                    );
+                }
+            }
+            return Ok(());
+        }
+
         if binding.action == model::BindingAction::SetDefaultDevice {
             if event.value == 0 {
                 run_logger::debug(
@@ -996,7 +1078,8 @@ impl AppState {
                     }
                     model::BindingTarget::Unset
                     | model::BindingTarget::MediaControl
-                    | model::BindingTarget::Hotkey => {}
+                    | model::BindingTarget::Hotkey
+                    | model::BindingTarget::OpenApplication => {}
                 }
             }
 
@@ -1167,7 +1250,8 @@ impl AppState {
                 }
                 model::BindingTarget::Unset
                 | model::BindingTarget::MediaControl
-                | model::BindingTarget::Hotkey => {}
+                | model::BindingTarget::Hotkey
+                | model::BindingTarget::OpenApplication => {}
             }
         }
 
@@ -1285,6 +1369,7 @@ impl AppState {
                     | model::BindingAction::MediaPrevTrack
                     | model::BindingAction::MediaStop
                     | model::BindingAction::Hotkey
+                    | model::BindingAction::OpenApplication
                     | model::BindingAction::SetDefaultDevice
             ) {
                 continue;
@@ -1348,6 +1433,7 @@ impl AppState {
                     model::BindingTarget::Unset => None,
                     model::BindingTarget::MediaControl => None,
                     model::BindingTarget::Hotkey => None,
+                    model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             } else {
@@ -1417,6 +1503,7 @@ impl AppState {
                     model::BindingTarget::Unset => None,
                     model::BindingTarget::MediaControl => None,
                     model::BindingTarget::Hotkey => None,
+                    model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             };
@@ -1918,6 +2005,7 @@ fn main() {
             set_active_profile_preference,
             reset_app_data,
             open_logs_folder,
+            pick_executable_path,
             list_playback_devices,
             list_recording_devices,
             set_master_volume,

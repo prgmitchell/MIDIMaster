@@ -14,6 +14,13 @@ pub struct MonitorInfo {
     pub is_primary: bool,
 }
 
+#[derive(Clone, Serialize)]
+pub struct PickExecutableResult {
+    pub path: String,
+    pub display: String,
+    pub icon_data: Option<String>,
+}
+
 #[tauri::command]
 pub fn list_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
     let monitors = collect_monitor_descriptors(&app)?;
@@ -296,4 +303,51 @@ pub fn open_logs_folder(app: AppHandle) -> Result<String, String> {
     let path = logs_dir.display().to_string();
     run_logger::info("settings", "open_logs_folder", &format!("path={}", path));
     Ok(path)
+}
+
+#[tauri::command]
+pub fn pick_executable_path() -> Result<Option<PickExecutableResult>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let picked = rfd::FileDialog::new()
+            .add_filter("Applications", &["exe"])
+            .pick_file();
+        let Some(path) = picked else {
+            return Ok(None);
+        };
+
+        if !path.is_file() {
+            return Err("Selected path is not a file".to_string());
+        }
+
+        let ext_ok = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("exe"))
+            .unwrap_or(false);
+        if !ext_ok {
+            return Err("Selected file must be a .exe".to_string());
+        }
+
+        let path_string = path.to_string_lossy().to_string();
+        let display = path
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| path_string.clone());
+
+        let icon_data = crate::audio::windows::extract_executable_icon_base64(&path_string);
+
+        return Ok(Some(PickExecutableResult {
+            path: path_string,
+            display,
+            icon_data,
+        }));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Open Application is currently supported only on Windows".to_string())
+    }
 }

@@ -795,6 +795,10 @@ fn extract_icon_data(path: &str, index: i32) -> Option<String> {
     icon_data
 }
 
+pub fn extract_executable_icon_base64(path: &str) -> Option<String> {
+    extract_icon_data(path, 0)
+}
+
 fn icon_to_png_base64(icon: HICON) -> Option<String> {
     let mut icon_info = ICONINFO::default();
     unsafe { GetIconInfo(icon, &mut icon_info).ok()? };

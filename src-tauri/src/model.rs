@@ -111,6 +111,7 @@ pub enum BindingAction {
     Volume,
     ToggleMute,
     SetDefaultDevice,
+    OpenApplication,
     MediaPlayPause,
     MediaNextTrack,
     MediaPrevTrack,
@@ -130,6 +131,16 @@ pub struct HotkeyMapping {
     pub keys: Vec<String>,
     #[serde(default)]
     pub display: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OpenApplicationMapping {
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub display: String,
+    #[serde(default)]
+    pub icon_data: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -173,6 +184,7 @@ pub enum BindingTarget {
     },
     MediaControl,
     Hotkey,
+    OpenApplication,
     Unset,
 }
 
@@ -205,6 +217,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
             "Focus" => Ok(BindingTarget::Focus),
             "MediaControl" => Ok(BindingTarget::MediaControl),
             "Hotkey" => Ok(BindingTarget::Hotkey),
+            "OpenApplication" => Ok(BindingTarget::OpenApplication),
             "Unset" => Ok(BindingTarget::Unset),
             other => Err(format!("Unknown BindingTarget string: {}", other)),
         };
@@ -273,6 +286,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
         "Unset" => Ok(BindingTarget::Unset),
         "MediaControl" => Ok(BindingTarget::MediaControl),
         "Hotkey" => Ok(BindingTarget::Hotkey),
+        "OpenApplication" => Ok(BindingTarget::OpenApplication),
 
         // New generic integration target
         "Integration" => {
@@ -417,6 +431,8 @@ pub struct Binding {
     pub assign_mode: AssignMode,
     #[serde(default)]
     pub hotkey: Option<HotkeyMapping>,
+    #[serde(default)]
+    pub open_application: Option<OpenApplicationMapping>,
 }
 
 impl Binding {
@@ -611,6 +627,7 @@ mod tests {
             assign_control: None,
             assign_mode: AssignMode::Add,
             hotkey: None,
+            open_application: None,
         };
 
         let json = serde_json::to_value(binding).expect("binding should serialize");
@@ -627,5 +644,16 @@ mod tests {
 
         let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
         assert_eq!(binding.action, BindingAction::SetDefaultDevice);
+    }
+
+    #[test]
+    fn deserialize_open_application_action() {
+        let mut json = binding_base_json();
+        json.as_object_mut()
+            .unwrap()
+            .insert("action".to_string(), serde_json::json!("OpenApplication"));
+
+        let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+        assert_eq!(binding.action, BindingAction::OpenApplication);
     }
 }

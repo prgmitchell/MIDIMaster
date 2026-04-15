@@ -148,6 +148,10 @@ export function createBindingsFeature({
     return target === "Hotkey";
   }
 
+  function isOpenApplicationTarget(target) {
+    return target === "OpenApplication";
+  }
+
   function getTargets(binding) {
     if (!binding || typeof binding !== "object") return [];
     if (Array.isArray(binding.targets) && binding.targets.length > 0) {
@@ -292,6 +296,21 @@ export function createBindingsFeature({
     if (keys.length === 0) return null;
     const display = String(rawHotkey.display || "").trim() || keys.join("+");
     return { keys, display };
+  }
+
+  function normalizeOpenApplicationMapping(rawOpenApplication) {
+    if (!rawOpenApplication || typeof rawOpenApplication !== "object") return null;
+    const path = String(rawOpenApplication.path || "").trim();
+    const display = String(rawOpenApplication.display || "").trim();
+    const icon_data = typeof rawOpenApplication.icon_data === "string" && rawOpenApplication.icon_data.trim()
+      ? rawOpenApplication.icon_data.trim()
+      : null;
+    if (!path) return null;
+    return {
+      path,
+      display: display || path,
+      icon_data,
+    };
   }
 
   function normalizeHotkeyKey(event) {
@@ -742,6 +761,7 @@ export function createBindingsFeature({
         ensureBindingShape(binding);
         setTargets(binding, getTargets(binding));
         binding.hotkey = normalizeHotkeyMapping(binding.hotkey);
+        binding.open_application = normalizeOpenApplicationMapping(binding.open_application);
         const item = document.createElement("div");
         item.className = "list-item binding-item";
 
@@ -949,21 +969,27 @@ export function createBindingsFeature({
           isButton,
           binding.action,
           binding.hotkey?.display || "",
+          binding.open_application,
         );
         targetSelect.addEventListener("change", async () => {
           const previousTargets = getTargets(binding);
           const previousHadHotkeyTarget = previousTargets.some(isHotkeyTarget);
+          const previousHadOpenApplicationTarget = previousTargets.some(isOpenApplicationTarget);
           const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
             ? targetSelect.__selectedTargets
             : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
           setTargets(binding, selectedTargets);
           const hasHotkeyTarget = selectedTargets.some(isHotkeyTarget);
+          const hasOpenApplicationTarget = selectedTargets.some(isOpenApplicationTarget);
           const previousAction = binding.action;
           const previousHotkey = normalizeHotkeyMapping(binding.hotkey);
+          const previousOpenApplication = normalizeOpenApplicationMapping(binding.open_application);
 
           if (isButton) {
             binding.action = hasHotkeyTarget
               ? "Hotkey"
+              : hasOpenApplicationTarget
+                ? "OpenApplication"
               : (targetSelect.dataset.action || binding.action || "ToggleMute");
           } else {
             binding.action = "Volume";
@@ -977,12 +1003,20 @@ export function createBindingsFeature({
             }
           }
 
+          if (isButton && !hasOpenApplicationTarget && previousHadOpenApplicationTarget) {
+            binding.open_application = null;
+            if (binding.action === "OpenApplication") {
+              binding.action = targetSelect.dataset.action || "ToggleMute";
+            }
+          }
+
           if (isButton && hasHotkeyTarget && !previousHadHotkeyTarget) {
             const learnedHotkey = await startHotkeyLearn(binding);
             if (!learnedHotkey) {
               setTargets(binding, previousTargets);
               binding.action = previousAction || "ToggleMute";
               binding.hotkey = previousHotkey;
+              binding.open_application = previousOpenApplication;
               await invoke("add_binding", { binding });
               await saveProfile();
               renderBindings();
@@ -990,6 +1024,25 @@ export function createBindingsFeature({
             }
             binding.hotkey = learnedHotkey;
             targetSelect?.setHotkeyDisplay?.(binding.hotkey?.display || "");
+          }
+
+          if (isButton && binding.action === "OpenApplication") {
+            binding.open_application = normalizeOpenApplicationMapping(
+              targetSelect?.getOpenApplication?.() || targetSelect?.__openApplication,
+            );
+          } else {
+            binding.open_application = null;
+          }
+
+          if (isButton && !hasHotkeyTarget && !hasOpenApplicationTarget && binding.action === "OpenApplication" && !binding.open_application) {
+            setTargets(binding, previousTargets);
+            binding.action = previousAction || "ToggleMute";
+            binding.hotkey = previousHotkey;
+            binding.open_application = previousOpenApplication;
+            await invoke("add_binding", { binding });
+            await saveProfile();
+            renderBindings();
+            return;
           }
 
           if (!isButton) {
