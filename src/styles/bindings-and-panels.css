@@ -580,6 +580,8 @@ body.dark-mode .target-tag--count {
 
 .settings-panel-body {
   padding: 18px 16px 24px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .settings-grid {
