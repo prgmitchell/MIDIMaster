@@ -116,7 +116,17 @@ impl AudioBackend for WindowsAudioBackend {
         let device = get_default_device()?;
         let endpoint = get_endpoint_volume(&device)?;
         let clamped = volume.clamp(0.0, 1.0);
+        let previous_volume = unsafe { endpoint.GetMasterVolumeLevelScalar() }?;
+        let previous_muted = unsafe { endpoint.GetMute() }?.as_bool();
         unsafe { endpoint.SetMasterVolumeLevelScalar(clamped, std::ptr::null()) }?;
+        // Keep mute and volume independent for master endpoint writes.
+        // Some Windows systems auto-mute at 0 volume; this ensures that:
+        // - writing 0% does not force a muted state
+        // - raising from a 0%+muted state restores audible output
+        let was_effectively_zero = previous_volume <= f32::EPSILON;
+        if clamped <= f32::EPSILON || (previous_muted && was_effectively_zero && clamped > 0.0) {
+            unsafe { endpoint.SetMute(false, std::ptr::null()) }?;
+        }
         Ok(())
     }
 
