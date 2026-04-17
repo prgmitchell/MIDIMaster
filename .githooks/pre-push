@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "[pre-push] Running Rust format check..."
+cd src-tauri
+cargo fmt --all -- --check
+
+echo "[pre-push] Format check passed."

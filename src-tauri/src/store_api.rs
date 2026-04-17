@@ -18,13 +18,16 @@ fn official_store_url() -> String {
 
 // Trusted public keys (hardcoded).
 // key_id -> base64(ed25519 public key bytes)
-pub const TRUSTED_KEYS: &[(&str, &str)] = &[(
-    "official-2026-01",
-    "/a99SbJ8PwG4zpPXkpCAAndQ7hZWmb2eSYIFE3lCLts=",
-), (
-    "official-2026-02",
-    "ugJkWqxrzUfjgFyzZWnQCbMhBSOSWJ+WwPF0MBgfh6U=",
-)];
+pub const TRUSTED_KEYS: &[(&str, &str)] = &[
+    (
+        "official-2026-01",
+        "/a99SbJ8PwG4zpPXkpCAAndQ7hZWmb2eSYIFE3lCLts=",
+    ),
+    (
+        "official-2026-02",
+        "ugJkWqxrzUfjgFyzZWnQCbMhBSOSWJ+WwPF0MBgfh6U=",
+    ),
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreCatalog {
