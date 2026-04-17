@@ -846,6 +846,10 @@ export function createBindingsFeature({
           const nameLabel = document.createElement("div");
           nameLabel.className = "binding-name";
           nameLabel.textContent = binding.name?.trim() || fallbackName;
+          nameLabel.title = "Double-click to rename";
+          nameLabel.addEventListener("dblclick", () => {
+            beginBindingEdit(binding.id, true);
+          });
           nameField = nameLabel;
         }
 
