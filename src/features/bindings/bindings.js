@@ -769,6 +769,7 @@ export function createBindingsFeature({
         row.className = "binding-row";
 
         item.dataset.index = index;
+        item.dataset.bindingId = String(binding.id || "");
 
         const fallbackName = fallbackNameFor(binding, index);
         const isEditing = binding.id === getEditingId();

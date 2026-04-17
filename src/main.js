@@ -708,6 +708,16 @@ function updateSliderFill(slider) {
   bindingsFeature?.updateSliderFill?.(slider);
 }
 
+function flashBindingTrigger(bindingId) {
+  if (!bindingId) return;
+  const selector = `.binding-item[data-binding-id="${CSS.escape(String(bindingId))}"]`;
+  document.querySelectorAll(selector).forEach((el) => {
+    el.classList.add("triggered");
+    clearTimeout(el._triggerTimer);
+    el._triggerTimer = setTimeout(() => el.classList.remove("triggered"), 300);
+  });
+}
+
 function isBindingTargetMenuOpen() {
   return Boolean(document.querySelector(".target-dropdown.open"));
 }
@@ -1723,6 +1733,7 @@ async function setupListeners() {
     if (!binding || getBindingTargets(binding).length === 0) {
       return;
     }
+    flashBindingTrigger(binding.id);
     if (binding.action === "ToggleMute") {
       return;
     }
