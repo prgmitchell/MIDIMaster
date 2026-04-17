@@ -84,7 +84,7 @@ export function createOsdFeature({
     card.appendChild(header);
     card.appendChild(barDiv);
 
-    return { card, iconDiv, labelSpan, valueSpan, fillDiv };
+    return { card, iconDiv, labelSpan, valueSpan, fillDiv, barDiv };
   }
 
   function removeOsdCard(key) {
@@ -101,11 +101,14 @@ export function createOsdFeature({
     }, 250);
   }
 
-  function showVolumeOsd(target, volume, focusSession) {
+  function showVolumeOsd(target, volume, focusSession, opts = null) {
     if (!osd) return;
 
     const display = resolveDisplay(target, focusSession);
     if (!display) return;
+
+    const showBar = opts?.showBar !== false;
+    const showValue = opts?.showValue !== false;
 
     const key = getOsdKey(target);
     let item = activeOsdCards.get(key);
@@ -142,6 +145,9 @@ export function createOsdFeature({
     refs.fillDiv.style.width = `${percent}%`;
     refs.valueSpan.textContent = `${percent}%`;
 
+    refs.barDiv.style.display = showBar ? "" : "none";
+    refs.valueSpan.style.display = showValue ? "" : "none";
+
     if (!osdDebugAlways) {
       item.timer = setTimeout(() => {
         removeOsdCard(key);
@@ -149,11 +155,14 @@ export function createOsdFeature({
     }
   }
 
-  function showMuteOsd(target, muted, focusSession) {
+  function showMuteOsd(target, muted, focusSession, opts = null) {
     if (!osd) return;
 
     const display = resolveDisplay(target, focusSession);
     if (!display) return;
+
+    const showBar = opts?.showBar !== false;
+    const showValue = opts?.showValue !== false;
 
     const key = getOsdKey(target);
     let item = activeOsdCards.get(key);
@@ -185,6 +194,9 @@ export function createOsdFeature({
     refs.valueSpan.textContent = muted ? "\ud83d\udd07" : "\ud83d\udd0a";
     refs.valueSpan.style.fontSize = "24px";
 
+    refs.barDiv.style.display = showBar ? "" : "none";
+    refs.valueSpan.style.display = showValue ? "" : "none";
+
     if (!osdDebugAlways) {
       item.timer = setTimeout(() => {
         removeOsdCard(key);
@@ -214,10 +226,14 @@ export function createOsdFeature({
       return;
     }
 
+    const opts = {};
+    if (typeof payload.show_bar === "boolean") opts.showBar = payload.show_bar;
+    if (typeof payload.show_value === "boolean") opts.showValue = payload.show_value;
+
     if (payload.action === "toggle_mute") {
-      showMuteOsd(payload.target, payload.muted, payload.focus_session);
+      showMuteOsd(payload.target, payload.muted, payload.focus_session, opts);
     } else {
-      showVolumeOsd(payload.target, payload.volume, payload.focus_session);
+      showVolumeOsd(payload.target, payload.volume, payload.focus_session, opts);
     }
   }
 

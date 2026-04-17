@@ -212,6 +212,66 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
               });
             },
           },
+          osd: {
+            showVolume: (target, volume, opts = null) => {
+              const obj = (opts && typeof opts === "object") ? opts : {};
+              const focusSession = obj.focusSession ?? null;
+              const showBar = typeof obj.showBar === "boolean" ? obj.showBar : null;
+              const showValue = typeof obj.showValue === "boolean" ? obj.showValue : null;
+              return invoke("plugin_show_osd", {
+                target,
+                action: "Volume",
+                volume: Number(volume),
+                muted: null,
+                focusSession,
+                showBar,
+                showValue,
+                // Compatibility
+                focus_session: focusSession,
+                show_bar: showBar,
+                show_value: showValue,
+              });
+            },
+            showMute: (target, muted, opts = null) => {
+              const obj = (opts && typeof opts === "object") ? opts : {};
+              const focusSession = obj.focusSession ?? null;
+              const showBar = typeof obj.showBar === "boolean" ? obj.showBar : null;
+              const showValue = typeof obj.showValue === "boolean" ? obj.showValue : null;
+              return invoke("plugin_show_osd", {
+                target,
+                action: "ToggleMute",
+                volume: null,
+                muted: Boolean(muted),
+                focusSession,
+                showBar,
+                showValue,
+                // Compatibility
+                focus_session: focusSession,
+                show_bar: showBar,
+                show_value: showValue,
+              });
+            },
+            hide: () => invoke("plugin_hide_osd"),
+            getSettings: () => invoke("get_osd_settings"),
+            onSettingsChanged: (handler) => {
+              if (typeof handler !== "function") return () => { };
+              let active = true;
+              const unlistenPromise = listen("osd_settings_changed", (event) => {
+                if (!active) return;
+                let payload = event?.payload;
+                if (typeof payload === "string") {
+                  try { payload = JSON.parse(payload); } catch { payload = null; }
+                }
+                try { handler(payload); } catch (e) { }
+              });
+              return () => {
+                active = false;
+                Promise.resolve(unlistenPromise).then((off) => {
+                  try { if (typeof off === "function") off(); } catch { }
+                });
+              };
+            },
+          },
           ws: {
             open: (url, headers = {}, connectTimeoutMs = 500) => invoke("ws_open", {
               url,

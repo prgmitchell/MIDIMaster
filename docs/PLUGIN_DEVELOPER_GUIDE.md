@@ -384,7 +384,72 @@ Use `silent: true` for:
 - Reconnect sync
 - Motor fader alignment
 
-### 6.6 `ctx.ws` (WebSocket bridge)
+### 6.6 `ctx.osd` (On-screen display)
+
+Direct control of the OSD overlay for plugin-driven feedback that is not
+tied to a specific binding (e.g. a status update, an external event echo,
+a notification triggered from a connection tab).
+
+If the feedback *is* tied to a binding, prefer `ctx.feedback.set(...)` —
+it updates the UI, OSD, and motor faders in one call. Use `ctx.osd.*`
+only when you need to show an OSD card without touching binding state.
+
+API:
+
+- `await ctx.osd.showVolume(target, volume, opts?)`
+- `await ctx.osd.showMute(target, muted, opts?)`
+- `await ctx.osd.hide()`
+- `await ctx.osd.getSettings()` -> `{ enabled, monitor_index, monitor_name, monitor_id, anchor }`
+- `ctx.osd.onSettingsChanged(handler)` -> unsubscribe fn
+
+`target` is the same shape used in bindings — e.g. `"Master"`,
+`{ Session: { name: "Discord" } }`, or an integration target like
+`{ Integration: { integration_id: "my-plugin", target_id: "room/living" } }`.
+
+`opts`:
+
+- `focusSession` — override the label/icon used for `Focus` targets.
+- `showBar` (default `true`) — set `false` to hide the volume bar, e.g. for
+  text-only status messages where the bar is meaningless.
+- `showValue` (default `true`) — set `false` to hide the percent/icon on the
+  right side of the card.
+
+Integration targets bound to bindings skip the default OSD card, so a plugin
+owns the OSD for its own targets. Pair `ctx.osd.showVolume(...)` with
+`ctx.feedback.set(binding_id, value, action, { silent: true })` to update
+the controller/UI without emitting a duplicate OSD card.
+
+To keep repeated calls reusing the same card (rather than stacking a new
+card per message), put dynamic text in `data.label`. The OSD key-builder
+strips `label` when computing the target key, so calls with the same
+`integration_id` + `kind` + remaining `data` collapse onto one card.
+
+```js
+await ctx.osd.showVolume({ Integration: { integration_id: "my-plugin", target_id: "zone/a" } }, 0.65);
+await ctx.osd.showMute("Master", true);
+await ctx.osd.hide();
+
+// Text-only banner (no bar, no value) reusing a single card.
+const textTarget = (msg) => ({
+  Integration: { integration_id: "my-plugin", kind: "status", data: { label: msg } },
+});
+await ctx.osd.showVolume(textTarget("Connected"), 0, { showBar: false, showValue: false });
+
+const settings = await ctx.osd.getSettings();
+if (!settings.enabled) {
+  // OSD window is disabled — user-facing cues should use another channel
+}
+
+const off = ctx.osd.onSettingsChanged((next) => {
+  console.log("OSD anchor is now", next.anchor);
+});
+// off(); when the plugin unloads
+```
+
+OSD visibility still respects the user's global OSD toggle. Calls from a
+plugin while the OSD is disabled are silently dropped.
+
+### 6.7 `ctx.ws` (WebSocket bridge)
 
 Use this when you need custom headers or consistent backend-managed sockets.
 
@@ -406,7 +471,7 @@ Message handler receives:
 - `{ id, type: "text", data: string }`
 - `{ id, type: "binary", data: base64String }`
 
-### 6.7 `ctx.assets` (Read plugin assets)
+### 6.8 `ctx.assets` (Read plugin assets)
 
 - `await ctx.assets.readBase64(relPath)` -> base64 string
 - `await ctx.assets.readDataUrl(relPath, mime)` -> `data:<mime>;base64,...`
@@ -417,7 +482,7 @@ Example:
 const icon = await ctx.assets.readDataUrl("icon.svg", "image/svg+xml");
 ```
 
-### 6.8 `ctx.tauri` (Low-level)
+### 6.9 `ctx.tauri` (Low-level)
 
 Advanced escape hatch:
 
@@ -426,7 +491,7 @@ Advanced escape hatch:
 
 Prefer stable APIs (`ws`, `feedback`, etc.) when possible.
 
-### 6.9 `ctx.app.invalidateBindingsUI()`
+### 6.10 `ctx.app.invalidateBindingsUI()`
 
 If your plugin's connection/availability state changes, call:
 

@@ -3,8 +3,9 @@ use crate::{
     model::OsdSettings, run_logger, AppState,
 };
 use serde::Serialize;
+use serde_json::Value;
 use std::process::Command;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Clone, Serialize)]
 pub struct MonitorInfo {
@@ -89,6 +90,102 @@ pub fn update_osd_settings(
     }
 
     crate::AppState::apply_osd_settings(&app, &updated);
+    Ok(())
+}
+
+fn is_mute_action(action: &str) -> bool {
+    matches!(
+        action.to_ascii_lowercase().as_str(),
+        "togglemute" | "toggle_mute" | "mute" | "unmute"
+    )
+}
+
+#[tauri::command]
+pub fn plugin_show_osd(
+    app: AppHandle,
+    state: State<AppState>,
+    target: Value,
+    action: String,
+    volume: Option<f64>,
+    muted: Option<bool>,
+    focus_session: Option<Value>,
+    show_bar: Option<bool>,
+    show_value: Option<bool>,
+) -> Result<(), String> {
+    let mut payload = serde_json::json!({ "target": target });
+    if is_mute_action(&action) {
+        payload["action"] = Value::from("toggle_mute");
+        payload["muted"] = Value::from(muted.unwrap_or(false));
+    } else {
+        let clamped = volume.unwrap_or(0.0).clamp(0.0, 1.0);
+        payload["volume"] = Value::from(clamped);
+    }
+    if let Some(session) = focus_session {
+        payload["focus_session"] = session;
+    }
+    if let Some(flag) = show_bar {
+        payload["show_bar"] = Value::from(flag);
+    }
+    if let Some(flag) = show_value {
+        payload["show_value"] = Value::from(flag);
+    }
+
+    let settings_enabled = state
+        .osd_settings
+        .lock()
+        .map(|settings| settings.enabled)
+        .unwrap_or(true);
+
+    let _ = app.emit("plugin_osd", payload.clone());
+
+    if settings_enabled {
+        if let Some(osd_window) = app.get_webview_window("osd") {
+            let _ = osd_window.show();
+            let _ = osd_window.set_always_on_top(true);
+            #[cfg(target_os = "windows")]
+            if let Ok(hwnd) = osd_window.hwnd() {
+                use windows::Win32::Foundation::HWND;
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+                };
+                unsafe {
+                    let _ = SetWindowPos(
+                        HWND(hwnd.0 as _),
+                        Some(HWND_TOPMOST),
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE,
+                    );
+                }
+            }
+            let _ = osd_window.emit("plugin_osd", payload.clone());
+            if let Ok(payload_json) = serde_json::to_string(&payload) {
+                let script = format!(
+                    "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
+                    payload_json
+                );
+                let _ = osd_window.eval(&script);
+            }
+        }
+    }
+
+    run_logger::debug(
+        "plugins",
+        "plugin_show_osd",
+        &format!("action={} payload={}", action, payload),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn plugin_hide_osd(app: AppHandle) -> Result<(), String> {
+    let _ = app.emit("plugin_osd_hide", ());
+    if let Some(osd_window) = app.get_webview_window("osd") {
+        let _ = osd_window.emit("plugin_osd_hide", ());
+        let _ = osd_window.eval("window.__OSD_HIDE__ && window.__OSD_HIDE__();");
+    }
     Ok(())
 }
 

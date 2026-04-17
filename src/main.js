@@ -1255,6 +1255,10 @@ window.__OSD_UPDATE__ = (payload) => {
   osdFeature?.handleOsdUpdate?.(payload);
 };
 
+window.__OSD_HIDE__ = () => {
+  osdFeature?.hideVolumeOsd?.();
+};
+
 function closeTargetPanel() {
   targetsFeature?.closeTargetPanel?.();
 }
@@ -1599,6 +1603,23 @@ document.addEventListener("pointercancel", () => {
 
 
 async function setupListeners() {
+  await listen("plugin_osd", (event) => {
+    let payload = event?.payload;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        return;
+      }
+    }
+    if (!payload || typeof payload !== "object") return;
+    osdFeature?.handleOsdUpdate?.(payload);
+  });
+
+  await listen("plugin_osd_hide", () => {
+    osdFeature?.hideVolumeOsd?.();
+  });
+
   await listen("bindings_migrated", (event) => {
     let payload = event.payload;
     if (typeof payload === "string") {

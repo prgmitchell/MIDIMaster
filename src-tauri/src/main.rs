@@ -145,6 +145,8 @@ impl AppState {
     }
 
     fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
+        let _ = app.emit("osd_settings_changed", settings.clone());
+
         let Some(osd_window) = app.get_webview_window("osd") else {
             return;
         };
@@ -648,6 +650,10 @@ impl AppState {
                         .unwrap_or(true);
 
                     for target in &targets {
+                        // Integration targets delegate OSD entirely to the plugin.
+                        if matches!(target, model::BindingTarget::Integration { .. }) {
+                            continue;
+                        }
                         let focus_session = if matches!(target, model::BindingTarget::Focus) {
                             self.audio.focused_session().ok().flatten()
                         } else {
@@ -1118,6 +1124,10 @@ impl AppState {
                 .unwrap_or(true);
 
             for target in &targets {
+                // Integration targets delegate OSD entirely to the plugin via ctx.osd.
+                if matches!(target, model::BindingTarget::Integration { .. }) {
+                    continue;
+                }
                 let focus_session = if matches!(target, model::BindingTarget::Focus) {
                     self.audio.focused_session().ok().flatten()
                 } else {
@@ -1288,6 +1298,11 @@ impl AppState {
             .map(|settings| settings.enabled)
             .unwrap_or(true);
         for target in &targets {
+            // Integration targets delegate OSD entirely to the plugin via ctx.osd.
+            // Emitting a default volume_update here would spawn a duplicate card.
+            if matches!(target, model::BindingTarget::Integration { .. }) {
+                continue;
+            }
             let focus_session = if matches!(target, model::BindingTarget::Focus) {
                 self.audio.focused_session().ok().flatten()
             } else {
@@ -2015,6 +2030,8 @@ fn main() {
             list_monitors,
             get_osd_settings,
             update_osd_settings,
+            plugin_show_osd,
+            plugin_hide_osd,
             get_app_settings,
             get_app_version,
             update_app_settings,
