@@ -210,6 +210,8 @@
   flex-direction: column;
   padding: 10px 6px;
   gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .connections-nav-item {
