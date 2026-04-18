@@ -32,7 +32,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDMjhDRTRENDZFOTRDMEIKUldRTFRPbEdUYzRvek5vSHVhaTR1d3ZRTytoM3pwNjhnbUs5bHVDZVhua2JNTFZRdHV1dDUvOUgK",
       "endpoints": [
-        "https://github.com/prgmitchell/MIDIMaster/releases/latest/download/latest.json"
+        "https://midimaster.netlify.app/updates/latest.json"
       ],
       "windows": {
         "installMode": "passive"

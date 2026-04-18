@@ -93,6 +93,8 @@ One-time updater key setup (required for built-in updates):
 3. Add these GitHub repo secrets for the release workflow:
    - `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key file, or a secure path)
    - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (empty string if no password)
+   - `NETLIFY_AUTH_TOKEN` (token with access to your Netlify site)
+   - `NETLIFY_SITE_ID` (Netlify project/site ID)
 
 Release flow:
 
@@ -100,13 +102,24 @@ Release flow:
 2. Create and push a tag in the form `v<version>` (example: `v0.1.0`).
 
 Pushing the tag triggers the GitHub Actions release workflow, which builds the Windows bundle and
-publishes NSIS installer artifacts, signatures, and `latest.json` to GitHub Releases.
+publishes installer assets to GitHub Releases and updater metadata to Netlify.
 
 Built-in updater behavior:
 
-- Update checks use GitHub Releases only (`releases/latest/download/latest.json`).
+- Update checks use Netlify metadata (`https://midimaster.netlify.app/updates/latest.json`).
+- Metadata points to installer binaries hosted on GitHub Releases.
 - Stable releases only are offered.
 - If in-app update fails, users can still install manually from the GitHub release page.
+
+Bridge migration (one release):
+
+- Existing app installs that still check GitHub need one bridge release.
+- For the bridge release, upload `latest.json` to GitHub release assets as well.
+- After the bridge release, GitHub assets should be `.exe` files only.
+- Workflow toggles:
+  - `UPDATER_BRIDGE_RELEASE` (repo variable): defaults to `true` when unset.
+    Set to `false` after the bridge release to stop uploading `latest.json` to GitHub.
+  - `UPDATER_BRIDGE_INCLUDE_SIG` (repo variable): optional; set to `true` only if you also want `.sig` files uploaded during bridge mode.
 
 Documentation
 
