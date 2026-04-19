@@ -106,6 +106,18 @@ impl Default for RelativeFormat {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum FaderCurve {
+    Linear,
+    Logarithmic,
+}
+
+impl Default for FaderCurve {
+    fn default() -> Self {
+        FaderCurve::Linear
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BindingAction {
     Volume,
@@ -421,6 +433,8 @@ pub struct Binding {
     pub mode: MidiMode,
     #[serde(default)]
     pub relative_format: RelativeFormat,
+    #[serde(default)]
+    pub fader_curve: FaderCurve,
     pub deadzone: f32,
     pub debounce_ms: u64,
     #[serde(default)]
@@ -621,6 +635,7 @@ mod tests {
             action: BindingAction::Volume,
             mode: MidiMode::Absolute,
             relative_format: RelativeFormat::Auto,
+            fader_curve: FaderCurve::Linear,
             deadzone: 0.0,
             debounce_ms: 0,
             mute_control: None,

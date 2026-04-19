@@ -2,6 +2,10 @@ import {
   renderLabelWithBadges,
   wireDropdownToggle,
 } from "../ui/dropdown_badges.js";
+import {
+  createSelectDropdownShell,
+  renderNativeSelectDropdown,
+} from "../ui/dropdown_select.js";
 
 export function createBindingsFeature({
   invoke,
@@ -128,6 +132,10 @@ export function createBindingsFeature({
     return "Auto";
   }
 
+  function normalizeFaderCurve(raw) {
+    return raw === "Logarithmic" ? "Logarithmic" : "Linear";
+  }
+
   function ensureBindingShape(binding) {
     if (!binding || typeof binding !== "object") return;
     if (!binding.mode || (binding.mode !== "Absolute" && binding.mode !== "Relative")) {
@@ -135,6 +143,7 @@ export function createBindingsFeature({
     }
     // Backend auto-detect is always used for relative controls.
     binding.relative_format = "Auto";
+    binding.fader_curve = normalizeFaderCurve(binding.fader_curve);
   }
 
   function effectiveIsButton(binding) {
@@ -223,8 +232,31 @@ export function createBindingsFeature({
   const hotkeyModifiers = ["Ctrl", "Shift", "Alt", "Meta"];
   const nameDrafts = new Map();
   let pendingRerender = false;
+  let curveDropdownEntry = null;
   const defaultLearnPanelTitle = "Waiting for MIDI Input";
   const defaultLearnPanelMessage = "Move a control on your MIDI device to create a binding.";
+
+  function renderCurveDropdown() {
+    if (!d.bindingConfigCurve) return;
+    if (!curveDropdownEntry || !curveDropdownEntry.root?.isConnected) {
+      curveDropdownEntry = createSelectDropdownShell({
+        selectEl: d.bindingConfigCurve,
+        rootClass: "midi-device-dropdown",
+        title: "Fader curve",
+      });
+    }
+    if (!curveDropdownEntry) return;
+    renderNativeSelectDropdown({
+      entry: curveDropdownEntry,
+      selectEl: d.bindingConfigCurve,
+      fallbackText: "Linear",
+      truncateMenuLabels: false,
+      truncateDisplayLabel: false,
+      onOptionSelected: () => {
+        renderCurveDropdown();
+      },
+    });
+  }
 
   function clearTransferPrompt() {
     transferPrompt = null;
@@ -535,7 +567,12 @@ export function createBindingsFeature({
     }
     closeAssignModeMenu();
     ensureAuxShape(binding);
+    ensureBindingShape(binding);
     if (d.bindingConfigName) d.bindingConfigName.value = binding.name?.trim() || "";
+    if (d.bindingConfigCurve) {
+      d.bindingConfigCurve.value = binding.fader_curve;
+      renderCurveDropdown();
+    }
     if (d.bindingConfigMuteLabel) d.bindingConfigMuteLabel.textContent = formatMidiControlLabel(binding.mute_control);
     renderAssignMappingLabel(binding);
     syncAssignModeUi(binding.assign_mode || "Add");
@@ -1422,6 +1459,16 @@ export function createBindingsFeature({
         binding.name = d.bindingConfigName.value.trim() || binding.name;
         await persistBinding(binding);
         renderBindings();
+      });
+    }
+    if (d.bindingConfigCurve) {
+      d.bindingConfigCurve.addEventListener("change", async () => {
+        const binding = getBindingById(configBindingId);
+        if (!binding) return;
+        binding.fader_curve = normalizeFaderCurve(d.bindingConfigCurve.value);
+        d.bindingConfigCurve.value = binding.fader_curve;
+        renderCurveDropdown();
+        await persistBinding(binding);
       });
     }
     if (d.bindingConfigMuteLearn) {

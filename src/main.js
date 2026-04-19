@@ -217,6 +217,7 @@ function normalizeBinding(binding) {
   setBindingTargets(out, getBindingTargets(out));
   out.mode = (out.mode === "Relative") ? "Relative" : "Absolute";
   out.relative_format = "Auto";
+  out.fader_curve = (out.fader_curve === "Logarithmic") ? "Logarithmic" : "Linear";
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
   if (!out.open_application || typeof out.open_application !== "object") {
@@ -312,6 +313,7 @@ const bindingConfigAssignModeButton = document.getElementById("binding-config-as
 const bindingConfigAssignModeMenu = document.getElementById("binding-config-assign-mode-menu");
 const bindingConfigAssignModeAdd = document.getElementById("binding-config-assign-mode-add");
 const bindingConfigAssignModeReplace = document.getElementById("binding-config-assign-mode-replace");
+const bindingConfigCurve = document.getElementById("binding-config-curve");
 
 // Defensive cleanup for older builds that injected extra back buttons.
 try {
@@ -977,6 +979,7 @@ bindingsFeature = createBindingsFeature({
     bindingConfigAssignModeMenu,
     bindingConfigAssignModeAdd,
     bindingConfigAssignModeReplace,
+    bindingConfigCurve,
     learnPanel,
     learnPanelTitle,
     learnPanelMessage,
@@ -1201,6 +1204,18 @@ function decodeRelativeDelta(binding, value) {
   return null;
 }
 
+function normalizeFaderCurve(raw) {
+  return raw === "Logarithmic" ? "Logarithmic" : "Linear";
+}
+
+function applyFaderCurve(curve, normalized) {
+  const clamped = Math.min(1, Math.max(0, Number(normalized) || 0));
+  if (normalizeFaderCurve(curve) === "Logarithmic") {
+    return Math.pow(clamped, 2.2);
+  }
+  return clamped;
+}
+
 function findBindingForEvent(payload) {
   if (!payload || !bindings.length) {
     return null;
@@ -1244,9 +1259,9 @@ function resolveOsdVolume(binding, payload) {
     return next;
   }
   if (binding.control?.controller === 224 && payload.value_14 != null) {
-    return payload.value_14 / 16383;
+    return applyFaderCurve(binding.fader_curve, payload.value_14 / 16383);
   }
-  return payload.value / 127;
+  return applyFaderCurve(binding.fader_curve, payload.value / 127);
 }
 
 function showVolumeOsd(target, volume, focusSession) {
@@ -1551,6 +1566,7 @@ function createBindingFromLearn(payload) {
     action: isButton ? "ToggleMute" : "Volume",
     mode: "Absolute",
     relative_format: "Auto",
+    fader_curve: "Linear",
     deadzone: 0,
     debounce_ms: 0,
     mute_control: null,

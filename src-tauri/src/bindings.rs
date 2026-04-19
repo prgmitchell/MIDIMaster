@@ -1,4 +1,4 @@
-use crate::model::{Binding, MidiEvent, MidiMode, Profile, RelativeFormat};
+use crate::model::{Binding, FaderCurve, MidiEvent, MidiMode, Profile, RelativeFormat};
 use std::time::{Duration, Instant};
 
 const RELATIVE_STEP: f32 = 0.02;
@@ -99,11 +99,19 @@ pub fn apply_midi_event(
 }
 
 fn absolute_value(binding: &Binding, event: &MidiEvent) -> Option<f32> {
+    let apply_curve = |normalized: f32| -> f32 {
+        match binding.fader_curve {
+            FaderCurve::Linear => normalized,
+            // Audio taper-style response for finer low-end control.
+            FaderCurve::Logarithmic => normalized.powf(2.2),
+        }
+    };
+
     if binding.control.controller == 0xE0 {
         let value_14 = event.value_14?;
-        return Some((value_14 as f32) / 16383.0);
+        return Some(apply_curve((value_14 as f32) / 16383.0));
     }
-    Some((event.value as f32) / 127.0)
+    Some(apply_curve((event.value as f32) / 127.0))
 }
 
 fn relative_delta(binding: &Binding, value: u8, state: &mut BindingState) -> Option<i8> {
@@ -218,6 +226,7 @@ mod tests {
             action: BindingAction::Volume,
             mode,
             relative_format,
+            fader_curve: crate::model::FaderCurve::Linear,
             deadzone: 0.0,
             debounce_ms: 0,
             mute_control: None,
@@ -287,5 +296,23 @@ mod tests {
             state.relative_auto_format,
             Some(RelativeFormat::TwosComplement)
         );
+    }
+
+    #[test]
+    fn absolute_linear_curve_preserves_raw_normalized_value() {
+        let mut binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
+        binding.fader_curve = crate::model::FaderCurve::Linear;
+        let mut state = sample_state(0.0);
+        let next = apply_midi_event(&binding, &sample_event(64), &mut state).expect("value");
+        assert!((next - (64.0 / 127.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn absolute_log_curve_compresses_lower_range_for_finer_control() {
+        let mut binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
+        binding.fader_curve = crate::model::FaderCurve::Logarithmic;
+        let mut state = sample_state(0.0);
+        let next = apply_midi_event(&binding, &sample_event(25), &mut state).expect("value");
+        assert!(next < (25.0 / 127.0));
     }
 }

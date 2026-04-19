@@ -1017,6 +1017,12 @@ body.dark-mode .osd-position-dot.selected {
   border-radius: 10px;
 }
 
+.binding-config-row select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
 .binding-config-actions {
   min-width: 0;
   display: flex;
@@ -1429,9 +1435,10 @@ body.dark-mode .binding-config-row input[type="text"] {
 }
 
 body.dark-mode .binding-config-label {
-  background: #223152;
-  color: #dfe9ff;
-  border-color: #46679e;
+  background: #172542;
+  color: #e6eeff;
+  border-color: #4f73ad;
+  box-shadow: inset 0 0 0 1px rgba(126, 161, 222, 0.22);
 }
 
 body.dark-mode .binding-config-inline-badge {
@@ -1487,6 +1494,32 @@ body.dark-mode .binding-config-mode-option:hover {
 }
 
 body.dark-mode .binding-config-mode-option.is-selected {
+  background: #29426f;
+  border-color: #6b8ecf;
+}
+
+body.dark-mode .binding-config-row .midi-device-dropdown .target-button {
+  background: #1f2c49;
+  color: #e8f0ff;
+  border-color: #436196;
+}
+
+body.dark-mode .binding-config-row .midi-device-dropdown .target-menu {
+  background: #1f2f4f;
+  border-color: #46679e;
+}
+
+body.dark-mode .binding-config-row .midi-device-dropdown .target-option {
+  background: #1f2c49;
+  color: #e8f0ff;
+  border-color: #436196;
+}
+
+body.dark-mode .binding-config-row .midi-device-dropdown .target-option:hover {
+  background: #2a3f67;
+}
+
+body.dark-mode .binding-config-row .midi-device-dropdown .target-option.selected {
   background: #29426f;
   border-color: #6b8ecf;
 }
@@ -1594,6 +1627,18 @@ body.dark-mode .alert-panel-actions .secondary:hover {
 .midi-device-dropdown .target-button {
   height: 38px;
   min-height: 38px;
+}
+
+.binding-config-row .midi-device-dropdown {
+  width: 100%;
+}
+
+.binding-config-row .midi-device-dropdown .target-button {
+  height: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  background: #fff;
+  border-color: #ccd1e0;
 }
 
 .dropdown {
