@@ -41,6 +41,7 @@
   margin-bottom: 0;
   width: 100%;
   margin-top: 30px;
+  flex-wrap: nowrap;
 }
 
 .main-top h2 {
@@ -1677,9 +1678,35 @@ body.dark-mode .alert-panel-actions .secondary:hover {
   color: #2b2d42;
 }
 
+.dropdown-item button.icon-action {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ccd1e0;
+  border-radius: 6px;
+  background: #fff;
+  color: #2b2d42;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.dropdown-item button.icon-action:hover {
+  background: #e9edf8;
+}
+
 .dropdown-item button:first-child {
   flex: 1;
   text-align: left;
+}
+
+.dropdown-item.create button:first-child {
+  flex: 0;
+  text-align: center;
 }
 
 .dropdown-item.confirming {

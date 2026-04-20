@@ -44,6 +44,27 @@ fn normalize_profile_bindings(profile: &mut Profile) -> bool {
     changed
 }
 
+fn safe_export_file_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|ch| match ch {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string();
+
+    let base = if cleaned.is_empty() {
+        "profile".to_string()
+    } else {
+        cleaned
+    };
+
+    format!("{}.json", base)
+}
+
 fn set_active_profile_state(
     state: &AppState,
     app: &AppHandle,
@@ -135,4 +156,58 @@ pub fn get_active_profile(state: State<AppState>) -> Result<Option<Profile>, Str
         normalize_profile_bindings(profile);
     }
     Ok(active.clone())
+}
+
+#[tauri::command]
+pub fn export_current_profile(
+    state: State<AppState>,
+    profile_name: String,
+) -> Result<Option<String>, String> {
+    let trimmed_name = profile_name.trim();
+    if trimmed_name.is_empty() {
+        return Err("Profile name is required".to_string());
+    }
+
+    let mut profile = state
+        .profile_store
+        .load_profile(trimmed_name)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| "Profile not found".to_string())?;
+    normalize_profile_bindings(&mut profile);
+
+    let suggested_file_name = safe_export_file_name(&profile.name);
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .set_file_name(&suggested_file_name)
+        .save_file()
+    else {
+        return Ok(None);
+    };
+
+    let json = serde_json::to_string_pretty(&profile).map_err(|err| err.to_string())?;
+    std::fs::write(&path, json).map_err(|err| err.to_string())?;
+
+    Ok(Some(path.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+pub fn import_profile_from_file() -> Result<Option<Profile>, String> {
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+
+    let data = std::fs::read_to_string(&path).map_err(|err| err.to_string())?;
+    let mut profile: Profile =
+        serde_json::from_str(&data).map_err(|err| format!("Invalid profile JSON: {}", err))?;
+
+    profile.name = profile.name.trim().to_string();
+    if profile.name.is_empty() {
+        return Err("Imported profile is missing a name".to_string());
+    }
+
+    normalize_profile_bindings(&mut profile);
+    Ok(Some(profile))
 }

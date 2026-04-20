@@ -19,6 +19,8 @@ export function createProfilesFeature({
   getActiveProfileMidiPreference,
   setActiveProfileMidiPreference,
   onProfileLoaded,
+  showAlert,
+  showChoices,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createProfilesFeature: invoke is required");
@@ -32,6 +34,27 @@ export function createProfilesFeature({
 
   let pendingProfileDeleteName = null;
   let saveProfileTimer = null;
+
+  function normalizeProfileName(name) {
+    return String(name || "").trim();
+  }
+
+  function buildImportedProfileName(baseName, existingNamesSet) {
+    const cleanBase = normalizeProfileName(baseName) || "Imported Profile";
+    const firstCandidate = `${cleanBase} (Imported)`;
+    if (!existingNamesSet.has(firstCandidate)) {
+      return firstCandidate;
+    }
+    let i = 2;
+    while (i < 1000) {
+      const candidate = `${cleanBase} (Imported ${i})`;
+      if (!existingNamesSet.has(candidate)) {
+        return candidate;
+      }
+      i += 1;
+    }
+    return `${cleanBase} (Imported ${Date.now()})`;
+  }
 
   function buildPersistedOsdSettings(source) {
     const current = (source && typeof source === "object") ? source : {};
@@ -157,17 +180,44 @@ export function createProfilesFeature({
 
     const current = (typeof getActiveProfileName === "function") ? (getActiveProfileName() || "") : "";
     if (n === current) {
-      if (typeof setActiveProfileName === "function") {
-        setActiveProfileName("Default");
+      let profiles = [];
+      try {
+        profiles = await invoke("list_profiles");
+      } catch {
+        profiles = [];
       }
-      try { localStorage.setItem("activeProfileName", "Default"); } catch { }
-      await invoke("set_active_profile_preference", { profileName: "Default" }).catch(() => { });
-      if (typeof setBindings === "function") {
-        setBindings([]);
+
+      const hasDefault = profiles.some((p) => p && p.name === "Default");
+      if (!hasDefault) {
+        await invoke("save_profile", {
+          profile: {
+            name: "Default",
+            bindings: [],
+            osd_settings: buildPersistedOsdSettings(
+              (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
+            ),
+            plugin_settings: {},
+            midi_device_preference: buildPersistedMidiDevicePreference(
+              (typeof getCurrentMidiPreference === "function") ? getCurrentMidiPreference() : null
+            ),
+          },
+        });
+        try {
+          profiles = await invoke("list_profiles");
+        } catch {
+          profiles = [{ name: "Default" }];
+        }
       }
-      if (typeof renderBindings === "function") {
-        renderBindings();
-      }
+
+      const fallbackName = (
+        profiles.find((p) => p && p.name === "Default")?.name
+        || profiles[0]?.name
+        || "Default"
+      );
+
+      await loadProfileByName(fallbackName);
+      await refreshProfiles(fallbackName);
+      return;
     }
     await refreshProfiles((typeof getActiveProfileName === "function") ? (getActiveProfileName() || "Default") : "Default");
   }
@@ -216,6 +266,17 @@ export function createProfilesFeature({
     createButton.type = "button";
     createButton.textContent = "Create";
 
+    const importButton = document.createElement("button");
+    importButton.type = "button";
+    importButton.className = "icon-action";
+    importButton.innerHTML = "&#10514;";
+    importButton.title = "Import profile from JSON";
+    importButton.setAttribute("aria-label", "Import profile");
+    importButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await importProfileFromFile();
+    });
+
     const createProfile = async () => {
       const name = createInput.value.trim();
       if (!name) return;
@@ -248,6 +309,7 @@ export function createProfilesFeature({
 
     createItem.appendChild(createInput);
     createItem.appendChild(createButton);
+    createItem.appendChild(importButton);
     d.profileList.appendChild(createItem);
 
     profiles.forEach((profile) => {
@@ -281,6 +343,17 @@ export function createProfilesFeature({
         refreshProfiles(currentSelection || "Default");
       });
 
+      const exportButton = document.createElement("button");
+      exportButton.type = "button";
+      exportButton.className = "icon-action";
+      exportButton.innerHTML = "&#10515;";
+      exportButton.title = `Export "${profile.name}"`;
+      exportButton.setAttribute("aria-label", `Export profile ${profile.name}`);
+      exportButton.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await exportProfileByName(profile.name);
+      });
+
       item.appendChild(selectButton);
 
       if (pendingProfileDeleteName === profile.name && profile.name !== "Default") {
@@ -307,6 +380,7 @@ export function createProfilesFeature({
         item.appendChild(cancelButton);
         item.appendChild(confirmButton);
       } else {
+        item.appendChild(exportButton);
         item.appendChild(deleteButton);
       }
 
@@ -392,6 +466,97 @@ export function createProfilesFeature({
     await saveBindingsForProfile();
   }
 
+  async function exportProfileByName(name) {
+    const profileName = normalizeProfileName(name);
+    if (!profileName) return;
+
+    try {
+      const savedPath = await invoke("export_current_profile", { profileName });
+      if (savedPath && typeof showAlert === "function") {
+        showAlert("Profile Exported", `Saved to:\n${savedPath}`);
+      }
+    } catch (error) {
+      if (typeof showAlert === "function") {
+        showAlert("Export Failed", String(error));
+      }
+    }
+  }
+
+  async function importProfileFromFile() {
+    try {
+      const importedProfile = await invoke("import_profile_from_file");
+      if (!importedProfile) return;
+
+      const baseName = normalizeProfileName(importedProfile.name) || "Imported Profile";
+      let nextName = baseName;
+
+      let profiles = [];
+      try {
+        profiles = await invoke("list_profiles");
+      } catch {
+        profiles = [];
+      }
+      const existingNames = new Set(
+        (profiles || [])
+          .map((profile) => normalizeProfileName(profile?.name))
+          .filter(Boolean)
+      );
+
+      if (existingNames.has(baseName)) {
+        let choice = "replace";
+        if (typeof showChoices === "function") {
+          choice = await showChoices({
+            title: "Profile Already Exists",
+            message: `A profile named "${baseName}" already exists.`,
+            options: [
+              { id: "replace", label: "Replace", variant: "primary" },
+              { id: "keep_both", label: "Keep Both", variant: "secondary" },
+              { id: "cancel", label: "Cancel", variant: "secondary" },
+            ],
+          });
+        } else if (typeof window !== "undefined" && typeof window.confirm === "function") {
+          const replace = window.confirm(`A profile named "${baseName}" already exists. Replace it?`);
+          choice = replace ? "replace" : "keep_both";
+        }
+
+        if (choice === "cancel" || choice === "close") return;
+        if (choice === "keep_both") {
+          nextName = buildImportedProfileName(baseName, existingNames);
+        }
+      }
+
+      const profileToSave = {
+        ...importedProfile,
+        name: nextName,
+      };
+
+      await invoke("save_profile", { profile: profileToSave });
+      await loadProfileByName(nextName);
+      await refreshProfiles(nextName);
+      closeProfileDropdown();
+
+      if (typeof showAlert === "function") {
+        if (nextName !== baseName) {
+          showAlert("Profile Imported", `Imported as "${nextName}".`);
+        } else {
+          showAlert("Profile Imported", `Imported "${nextName}".`);
+        }
+      }
+    } catch (error) {
+      if (typeof showAlert === "function") {
+        showAlert("Import Failed", String(error));
+      }
+    }
+  }
+
+  async function exportCurrentProfile() {
+    const name = (typeof getActiveProfileName === "function")
+      ? (getActiveProfileName() || localStorage.getItem("activeProfileName") || "Default")
+      : (localStorage.getItem("activeProfileName") || "Default");
+    const profileName = String(name || "").trim() || "Default";
+    await exportProfileByName(profileName);
+  }
+
   function bindUi() {
     if (d.profileToggle) {
       d.profileToggle.addEventListener("click", async () => {
@@ -422,5 +587,8 @@ export function createProfilesFeature({
     saveBindingsForProfile,
     updateProfilePluginSettings,
     updateProfileMidiPreference,
+    exportProfileByName,
+    importProfileFromFile,
+    exportCurrentProfile,
   };
 }

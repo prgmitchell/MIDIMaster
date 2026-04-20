@@ -2040,6 +2040,8 @@ fn main() {
             save_profile,
             delete_profile,
             get_active_profile,
+            export_current_profile,
+            import_profile_from_file,
             start_midi_learn,
             consume_learned_control,
             add_binding,

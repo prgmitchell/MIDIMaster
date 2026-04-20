@@ -923,6 +923,8 @@ profilesFeature = createProfilesFeature({
     activeProfileMidiPreference = normalizeProfileMidiPreference(midiDevicePreference);
     await midiFeature?.syncToProfileDevice?.(activeProfileMidiPreference);
   },
+  showAlert: (title, message = "") => showAlert(title, message),
+  showChoices: (options = {}) => alertsController?.showChoices?.(options) || Promise.resolve("close"),
 });
 profilesFeature.bindUi();
 

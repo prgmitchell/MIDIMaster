@@ -275,6 +275,11 @@ body.dark-mode .profile-select .dropdown-item button {
   color: #e8eefc;
 }
 
+body.dark-mode .profile-select .dropdown-item button.icon-action {
+  background: #1c2437;
+  border-color: #4a5f8a;
+}
+
 body.dark-mode .profile-select .dropdown-item button:hover,
 body.dark-mode .profile-select .dropdown-item .delete:hover {
   background: #2a3551;
