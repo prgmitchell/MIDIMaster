@@ -15,7 +15,7 @@
         "title": "MIDIMaster",
         "width": 1480,
         "height": 740,
-        "minWidth": 1480,
+        "minWidth": 1280,
         "minHeight": 740,
         "visible": false
       }

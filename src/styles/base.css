@@ -704,6 +704,8 @@ body.dark-mode:not([data-theme="light"]) {
   --chip-border: #33445b;
   --chip-text: #e8f1ff;
   --slider-track: #2b3948;
+  --slider-fill: var(--accent);
+  --slider-thumb: var(--text-primary);
   --overlay-bg: rgba(7, 10, 14, 0.72);
 
   /* Compatibility aliases while legacy selectors are retired. */
@@ -747,6 +749,8 @@ body[data-theme="light"] {
   --chip-border: #c7d8eb;
   --chip-text: #17385c;
   --slider-track: #d1dbe7;
+  --slider-fill: #55b7ec;
+  --slider-thumb: #f8fbfe;
   --overlay-bg: rgba(23, 34, 48, 0.36);
 
   /* Compatibility aliases while legacy selectors are retired. */

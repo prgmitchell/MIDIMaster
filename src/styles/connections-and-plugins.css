@@ -1173,7 +1173,6 @@ body.dark-mode:not([data-theme]) .binding-row .target-button {
   background: #111820;
 }
 
-.binding-row .target-chip .target-tag,
 .mode-chip .target-tag,
 .mode-chip .mode-chip-icon {
   display: none;
@@ -1301,8 +1300,8 @@ body.dark-mode:not([data-theme]) .binding-action.delete:hover {
 
 /* Requested table/nav simplification pass */
 :root {
-  --bindings-grid-cols: 52px minmax(170px, 1fr) minmax(140px, 160px) minmax(220px, 1fr) minmax(250px, 0.72fr) minmax(148px, 164px);
-  --bindings-grid-gap: 24px;
+  --bindings-grid-cols: 32px minmax(160px, 1fr) minmax(120px, 144px) minmax(200px, 1fr) minmax(220px, 0.68fr) 76px;
+  --bindings-grid-gap: 16px;
 }
 
 body.osd-only,
@@ -1421,15 +1420,15 @@ body.dark-mode:not([data-theme]) .profile-select .dropdown-item .delete:hover {
 }
 
 .binding-headers {
-  min-width: 1080px;
+  min-width: 960px;
 }
 
 .binding-row {
-  min-width: 1080px;
+  min-width: 960px;
 }
 
 .list-item.binding-item {
-  min-width: 1080px;
+  min-width: 960px;
 }
 
 .binding-index {
@@ -1491,8 +1490,8 @@ body.dark-mode:not([data-theme]) .binding-row .target-button:hover {
 }
 
 :root {
-  --bindings-grid-cols: 36px minmax(170px, 1fr) minmax(140px, 160px) minmax(220px, 1fr) minmax(250px, 0.72fr) minmax(148px, 164px);
-  --bindings-grid-gap: 24px;
+  --bindings-grid-cols: 32px minmax(160px, 1fr) minmax(120px, 144px) minmax(200px, 1fr) minmax(220px, 0.68fr) 76px;
+  --bindings-grid-gap: 16px;
 }
 
 body[data-theme] {
@@ -1772,6 +1771,18 @@ body[data-theme] .target-chip {
   color: var(--chip-text);
 }
 
+body[data-theme] .binding-row .target-chip .target-tag {
+  background: var(--surface-raised);
+  border-color: var(--control-border-strong);
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-row .target-chip .target-tag--mix {
+  background: color-mix(in srgb, var(--slider-fill) 16%, var(--surface-raised));
+  border-color: color-mix(in srgb, var(--slider-fill) 42%, var(--control-border));
+  color: color-mix(in srgb, var(--slider-fill) 68%, var(--text-primary));
+}
+
 body[data-theme] .target-chip-remove {
   color: var(--text-muted);
 }
@@ -1781,14 +1792,22 @@ body[data-theme] .target-chip-remove:hover {
 }
 
 body[data-theme] .binding-add-button {
+  height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
   background: var(--control-bg);
-  border-color: var(--control-border);
   color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
 body[data-theme] .binding-add-button:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
   color: var(--accent);
 }
 
@@ -1797,13 +1816,24 @@ body[data-theme] .binding-filter-button {
 }
 
 body[data-theme] .binding-value-cell {
-  gap: 10px;
+  gap: 8px;
   justify-content: start;
+}
+
+body[data-theme] .binding-value-cell--button {
+  justify-content: flex-start;
+}
+
+body[data-theme] .binding-value-cell--button .binding-toggle-value {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 112px;
+  max-width: none;
 }
 
 body[data-theme] .binding-slider-wrap {
   flex: 1 1 180px;
-  min-width: 128px;
+  min-width: 112px;
 }
 
 body[data-theme] .binding-volume-percent {
@@ -1817,16 +1847,32 @@ body[data-theme] .binding-volume-slider {
   min-width: 0;
   max-width: none;
   background-color: var(--slider-track);
-  accent-color: var(--accent);
+  background-image: linear-gradient(var(--slider-fill), var(--slider-fill));
+  background-repeat: no-repeat;
+  accent-color: var(--slider-fill);
 }
 
 body[data-theme] .binding-volume-slider::-webkit-slider-runnable-track {
-  background-color: transparent;
+  height: 6px;
+  border-radius: inherit;
+  background: transparent;
 }
 
 body[data-theme] .binding-volume-slider::-webkit-slider-thumb {
-  background: var(--text-primary);
-  border-color: var(--accent);
+  background: var(--slider-thumb);
+  border: 2px solid var(--surface-raised);
+  margin-top: -4px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--slider-fill) 58%, var(--control-border)),
+    0 1px 3px rgba(23, 34, 48, 0.22);
+}
+
+body[data-theme] .binding-volume-slider::-moz-range-thumb {
+  background: var(--slider-thumb);
+  border: 2px solid var(--surface-raised);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--slider-fill) 58%, var(--control-border)),
+    0 1px 3px rgba(23, 34, 48, 0.22);
 }
 
 body[data-theme] .binding-mute-button {
@@ -1884,15 +1930,44 @@ body[data-theme] .delete {
 }
 
 body[data-theme] .binding-toggle-value {
-  background: var(--control-bg);
-  border-color: var(--control-border);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  min-width: 62px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--control-border);
+  background: var(--slider-track);
   color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: transparent;
+}
+
+body[data-theme] .binding-toggle-value::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
 }
 
 body[data-theme] .binding-toggle-value.on {
-  background: var(--accent-soft);
+  background: var(--slider-track);
   border-color: var(--accent);
-  color: var(--accent);
+  color: transparent;
+}
+
+body[data-theme] .binding-toggle-value.on::before {
+  right: 5px;
+  left: auto;
+  background: var(--accent);
 }
 
 body[data-theme] .topbar-icon-button {
@@ -2193,6 +2268,21 @@ body[data-theme] .alert-panel-actions .secondary:hover {
   border-color: var(--control-border-strong);
 }
 
+body[data-theme] .learn-panel-actions,
+body[data-theme] .alert-panel-actions {
+  justify-content: center;
+}
+
+body[data-theme] .learn-panel-actions button,
+body[data-theme] .alert-panel-actions button {
+  min-width: 160px;
+}
+
+body[data-theme] .learn-panel-actions .secondary,
+body[data-theme] .alert-panel-actions .secondary {
+  min-width: 128px;
+}
+
 body[data-theme] .binding-config-inline-badge,
 body[data-theme] .binding-config-mode-option.is-selected,
 body[data-theme] .binding-config-row .midi-device-dropdown .target-option.selected {
@@ -2372,6 +2462,11 @@ body[data-theme] .binding-add-button {
   color: var(--accent);
 }
 
+body[data-theme] .binding-add-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 2px;
+}
+
 body[data-theme] .binding-add-button:hover,
 body[data-theme] .binding-filter-button:hover,
 body[data-theme] .binding-search-field:focus-within,
@@ -2384,14 +2479,15 @@ body[data-theme] .profile-select .select-button:hover {
 body[data-theme] .topbar {
   display: grid;
   grid-template-columns:
-    minmax(280px, 1fr)
+    minmax(240px, 1fr)
     1px
-    minmax(320px, 1.15fr)
-    minmax(320px, 1.15fr)
+    minmax(280px, 1.15fr)
+    minmax(280px, 1.15fr)
     1px
     auto;
   align-items: center;
-  gap: 26px;
+  gap: 20px;
+  padding-left: 64px;
 }
 
 body[data-theme] .topbar-field {
@@ -2493,14 +2589,14 @@ body[data-theme] .profile-select .dropdown {
 @media (max-width: 1280px) {
   body[data-theme] .topbar {
     grid-template-columns:
-      minmax(240px, 1fr)
+      minmax(220px, 1fr)
       1px
-      minmax(270px, 1fr)
-      minmax(270px, 1fr)
+      minmax(250px, 1fr)
+      minmax(250px, 1fr)
       1px
       auto;
-    gap: 18px;
-    padding-left: 56px;
+    gap: 14px;
+    padding-left: 40px;
   }
 }
 
@@ -2538,13 +2634,14 @@ body[data-theme] .profile-select .dropdown-item.selected {
 
 body[data-theme] .profile-select .dropdown-item button:first-child {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 body[data-theme] .profile-select .dropdown-item.selected button:first-child {
   background: transparent;
   border-color: transparent;
   color: var(--accent);
+  font-weight: 500;
 }
 
 body[data-theme] .profile-select .dropdown-item.selected button:first-child:hover {
@@ -2582,7 +2679,7 @@ body[data-theme] .profile-select .dropdown-item button.secondary {
   background: var(--control-bg);
   border: 1px solid var(--control-border);
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 body[data-theme] .profile-select .dropdown-item.create button:hover,
@@ -2666,23 +2763,26 @@ body[data-theme] .profile-select .dropdown-item.confirming button.delete.confirm
 }
 
 body[data-theme] .binding-actions {
-  justify-content: flex-start;
-  gap: 14px;
-  padding-left: 48px;
+  width: 100%;
+  justify-self: stretch;
+  justify-content: flex-end;
+  gap: 0;
+  padding-left: 0;
   box-sizing: border-box;
+  transform: translateX(4px);
 }
 
 body[data-theme] .binding-actions-header {
-  padding-left: 48px;
+  padding-left: 0;
   box-sizing: border-box;
-  text-align: left;
+  text-align: right;
 }
 
 body[data-theme] .binding-action,
 body[data-theme] .binding-action.delete {
-  width: 32px;
+  width: 28px;
   height: 32px;
-  min-width: 32px;
+  min-width: 28px;
   min-height: 32px;
   display: inline-flex;
   align-items: center;
@@ -3183,8 +3283,8 @@ body[data-theme] .topbar.has-update {
   grid-template-columns:
     minmax(220px, 0.82fr)
     1px
-    minmax(320px, 1.2fr)
-    minmax(320px, 1.2fr)
+    minmax(280px, 1.2fr)
+    minmax(280px, 1.2fr)
     1px
     auto;
 }
@@ -3229,9 +3329,11 @@ body[data-theme] .target-panel-back:hover {
     grid-template-columns:
       minmax(190px, 0.82fr)
       1px
-      minmax(270px, 1fr)
-      minmax(270px, 1fr)
+      minmax(250px, 1fr)
+      minmax(250px, 1fr)
       1px
       auto;
+    gap: 14px;
+    padding-left: 40px;
   }
 }

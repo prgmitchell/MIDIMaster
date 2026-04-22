@@ -480,11 +480,27 @@ function muteIconSvg(muted) {
 
 function setInlineMuteButtonState(button, muted) {
   if (!button) return;
+  if (bindingsFeature?.setMuteButtonState) {
+    bindingsFeature.setMuteButtonState(button, muted);
+    return;
+  }
   button.innerHTML = muteIconSvg(Boolean(muted));
   button.classList.toggle("muted", Boolean(muted));
   const label = muted ? "Unmute binding target" : "Mute binding target";
   button.title = label;
   button.setAttribute("aria-label", label);
+  const toggle = button.closest(".binding-row")?.querySelector(".binding-toggle-value");
+  if (toggle) {
+    toggle.classList.toggle("on", Boolean(muted));
+    toggle.title = label;
+    toggle.setAttribute("aria-label", label);
+  }
+}
+
+function findInlineMuteButton(bindingId) {
+  if (bindingId == null) return null;
+  return Array.from(document.querySelectorAll(".binding-mute-button"))
+    .find((btn) => btn.dataset.bindingId === String(bindingId)) || null;
 }
 
 function loadStoredTheme() {
@@ -1917,6 +1933,10 @@ async function setupListeners() {
     }
     if (!payload || !payload.binding_id) return;
     bindingMuteValues[payload.binding_id] = Boolean(payload.muted);
+    const muteButton = findInlineMuteButton(payload.binding_id);
+    if (muteButton) {
+      setInlineMuteButtonState(muteButton, Boolean(payload.muted));
+    }
     const binding = bindings.find((b) => b && b.id === payload.binding_id);
     if (!binding) return;
     const primaryTarget = getPrimaryBindingTarget(binding);
@@ -1946,6 +1966,17 @@ async function setupListeners() {
     }
     flashBindingTrigger(binding.id);
     if (binding.action === "ToggleMute") {
+      if ((Number(payload.value) || 0) > 0) {
+        const muteButton = findInlineMuteButton(binding.id);
+        if (muteButton) {
+          const currentlyMuted = bindingMuteValues[binding.id] != null
+            ? Boolean(bindingMuteValues[binding.id])
+            : muteButton.classList.contains("muted");
+          const nextMuted = !currentlyMuted;
+          bindingMuteValues[binding.id] = nextMuted;
+          setInlineMuteButtonState(muteButton, nextMuted);
+        }
+      }
       return;
     }
     if (bindingHasIntegrationTarget(binding)) {

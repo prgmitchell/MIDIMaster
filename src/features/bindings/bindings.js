@@ -122,11 +122,20 @@ export function createBindingsFeature({
 
   function setMuteButtonState(button, muted) {
     if (!button) return;
-    button.innerHTML = muteIconSvg(Boolean(muted));
-    button.classList.toggle("muted", Boolean(muted));
-    const label = muted ? "Unmute binding target" : "Mute binding target";
+    const nextMuted = Boolean(muted);
+    button.innerHTML = muteIconSvg(nextMuted);
+    button.classList.toggle("muted", nextMuted);
+    const label = nextMuted ? "Unmute binding target" : "Mute binding target";
     button.title = label;
     button.setAttribute("aria-label", label);
+
+    const row = button.closest(".binding-row");
+    const toggle = row?.querySelector(".binding-toggle-value");
+    if (toggle) {
+      toggle.classList.toggle("on", nextMuted);
+      toggle.title = label;
+      toggle.setAttribute("aria-label", label);
+    }
   }
 
   function updateSliderFill(slider) {
@@ -287,8 +296,12 @@ export function createBindingsFeature({
 
       const muted = Boolean(getMuted(target));
       const currentlyMuted = btn.classList.contains("muted");
-      if (muted !== currentlyMuted) {
-        setMuteButtonState(btn, muted);
+      const bindingId = btn.dataset.bindingId;
+      const nextMuted = bindingId != null && bindingMuteValues[bindingId] != null
+        ? Boolean(bindingMuteValues[bindingId])
+        : muted;
+      if (nextMuted !== currentlyMuted) {
+        setMuteButtonState(btn, nextMuted);
       }
     });
   }
@@ -1283,7 +1296,9 @@ export function createBindingsFeature({
         muteButton.dataset.bindingId = binding.id;
 
         if (isButton) {
-          muteButton.style.visibility = "hidden";
+          muteButton.classList.add("visually-hidden");
+          muteButton.tabIndex = -1;
+          muteButton.setAttribute("aria-hidden", "true");
         }
 
         muteButton.addEventListener("click", async () => {
@@ -1341,18 +1356,18 @@ export function createBindingsFeature({
         const valueGroup = document.createElement("div");
         valueGroup.className = "binding-value-cell";
         if (isButton) {
+          valueGroup.classList.add("binding-value-cell--button");
           const toggle = document.createElement("button");
           toggle.type = "button";
           toggle.className = "binding-toggle-value";
-          toggle.textContent = isMuted ? "On" : "Off";
           toggle.classList.toggle("on", isMuted);
+          toggle.title = isMuted ? "Unmute binding target" : "Mute binding target";
+          toggle.setAttribute("aria-label", toggle.title);
           toggle.addEventListener("click", async () => {
             muteButton.click();
-            const nextMuted = !toggle.classList.contains("on");
-            toggle.classList.toggle("on", nextMuted);
-            toggle.textContent = nextMuted ? "On" : "Off";
           });
           valueGroup.appendChild(toggle);
+          valueGroup.appendChild(muteButton);
         } else {
           const sliderWrap = document.createElement("div");
           sliderWrap.className = "binding-slider-wrap";
@@ -1712,6 +1727,7 @@ export function createBindingsFeature({
     requestSafeRerender,
     flushPendingRerender,
     updateBindingValues,
+    setMuteButtonState,
     beginBindingEdit,
     renderBindings,
     startBindingDrag,
