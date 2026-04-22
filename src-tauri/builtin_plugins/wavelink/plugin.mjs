@@ -11,7 +11,6 @@ const VOLUME_WRITE_EPSILON = 0.002;
 const STATE_REFRESH_DEBOUNCE_MS = 120;
 const LOCAL_WRITE_QUIET_MS = 1200;
 const FEEDBACK_INTENT_HOLD_MS = 1200;
-const UI_FEEDBACK_FLUSH_MS = 24;
 const FEEDBACK_INTENT_MATCH_EPSILON = 0.02;
 let rpcSequence = 10;
 
@@ -170,16 +169,58 @@ export async function activate(ctx) {
   let volumeFlushInFlight = false;
   let channelsRefreshTimer = null;
   let mixesRefreshTimer = null;
+  let postLocalWriteRefreshTimer = null;
   let lastLocalVolumeWriteAt = 0;
   const primaryFeedbackIntentByBinding = new Map(); // binding_id -> { value, at, source, endpoint_key }
-  const latestUiSliderSequenceByBinding = new Map();
-  const pendingUiFeedbackByBinding = new Map();
-  let uiFeedbackFlushTimer = null;
+  const localVolumeIntentByEndpoint = new Map(); // endpoint_key -> { value, at, source, endpoint_key }
   const pendingAppInfoByWsId = new Map();
 
   function endpointKey(endpoint) {
     if (!endpoint) return "";
     return `${String(endpoint.identifier || "")}::${String(endpoint.mixer_id || "")}`;
+  }
+
+  function rememberLocalVolumeIntent(endpoint, level, source) {
+    const key = endpointKey(endpoint);
+    if (!key) return;
+    localVolumeIntentByEndpoint.set(key, {
+      value: level,
+      at: Date.now(),
+      source: source || "local",
+      endpoint_key: key,
+    });
+  }
+
+  function getFreshLocalVolumeIntent(endpoint) {
+    const key = endpointKey(endpoint);
+    if (!key) return null;
+    const intent = localVolumeIntentByEndpoint.get(key);
+    if (!intent) return null;
+    if (Date.now() - intent.at >= FEEDBACK_INTENT_HOLD_MS) {
+      localVolumeIntentByEndpoint.delete(key);
+      return null;
+    }
+    return intent;
+  }
+
+  function shouldIgnoreStaleLocalVolume(endpoint, confirmedValue) {
+    const intent = getFreshLocalVolumeIntent(endpoint);
+    if (!intent) return false;
+    const delta = Math.abs(Number(confirmedValue) - Number(intent.value));
+    if (delta <= FEEDBACK_INTENT_MATCH_EPSILON) {
+      localVolumeIntentByEndpoint.delete(endpointKey(endpoint));
+      return false;
+    }
+    return true;
+  }
+
+  function schedulePostLocalWriteRefresh() {
+    if (postLocalWriteRefreshTimer) return;
+    postLocalWriteRefreshTimer = setTimeout(() => {
+      postLocalWriteRefreshTimer = null;
+      if (!wsId) return;
+      requestFullState().catch(() => {});
+    }, LOCAL_WRITE_QUIET_MS + STATE_REFRESH_DEBOUNCE_MS);
   }
 
   function scheduleVolumeFlush() {
@@ -218,6 +259,7 @@ export async function activate(ctx) {
         }
         lastLocalVolumeWriteAt = Date.now();
         lastSentVolumeByEndpoint.set(endpointKey(endpoint), level);
+        schedulePostLocalWriteRefresh();
       }
     } catch {
       // If send failed, force reconnect.
@@ -225,6 +267,7 @@ export async function activate(ctx) {
       connectedPort = null;
       mixes = [];
       channels = [];
+      localVolumeIntentByEndpoint.clear();
       offlineFeedbackSent = false;
       syncOfflineFeedback().catch(() => {});
       wasConnected = false;
@@ -261,39 +304,6 @@ export async function activate(ctx) {
     const key = endpointKey(endpoint);
     const sameEndpoint = !intent.endpoint_key || intent.endpoint_key === key;
     return sameEndpoint && age < FEEDBACK_INTENT_HOLD_MS;
-  }
-
-  function isStaleUiSliderIntent(bindingId, source, sourceSequence) {
-    if (source !== "ui_slider" || !bindingId) return false;
-    const sequence = Number(sourceSequence);
-    if (!Number.isFinite(sequence) || sequence <= 0) return false;
-
-    const prev = latestUiSliderSequenceByBinding.get(bindingId) || 0;
-    if (sequence < prev) return true;
-    latestUiSliderSequenceByBinding.set(bindingId, sequence);
-    return false;
-  }
-
-  function scheduleUiFeedbackFlush() {
-    if (uiFeedbackFlushTimer) return;
-    uiFeedbackFlushTimer = setTimeout(() => {
-      uiFeedbackFlushTimer = null;
-      flushUiFeedback().catch(() => {});
-    }, UI_FEEDBACK_FLUSH_MS);
-  }
-
-  async function flushUiFeedback() {
-    const pending = Array.from(pendingUiFeedbackByBinding.values());
-    pendingUiFeedbackByBinding.clear();
-    for (const item of pending) {
-      await ctx.feedback.set(item.bindingId, item.level, "Volume", { silent: false });
-    }
-  }
-
-  function queueUiFeedback(bindingId, level, sourceSequence) {
-    if (!bindingId) return;
-    pendingUiFeedbackByBinding.set(bindingId, { bindingId, level, sourceSequence });
-    scheduleUiFeedbackFlush();
   }
 
   function scheduleChannelsRefresh() {
@@ -452,7 +462,10 @@ export async function activate(ctx) {
           if (value != null) {
             const intent = primaryFeedbackIntentByBinding.get(b.id);
             const endpoint = normalizeEndpoint({ Integration: t });
-            if (shouldIgnoreStaleFeedbackIntent(intent, endpoint, value)) {
+            if (
+              shouldIgnoreStaleLocalVolume(endpoint, value)
+              || shouldIgnoreStaleFeedbackIntent(intent, endpoint, value)
+            ) {
               // Ignore stale echo while local intent settles.
               continue;
             }
@@ -733,6 +746,7 @@ export async function activate(ctx) {
       pendingVolumeWrites.clear();
       mixes = [];
       channels = [];
+      localVolumeIntentByEndpoint.clear();
       offlineFeedbackSent = false;
       syncOfflineFeedback().catch(() => {});
       wasConnected = false;
@@ -804,6 +818,7 @@ export async function activate(ctx) {
             pendingVolumeWrites.clear();
             mixes = [];
             channels = [];
+            localVolumeIntentByEndpoint.clear();
             offlineFeedbackSent = false;
             syncOfflineFeedback().catch(() => {});
             wasConnected = false;
@@ -965,7 +980,6 @@ export async function activate(ctx) {
       const action = payload?.action;
       const value = payload?.value;
       const source = String(payload?.source || "");
-      const sourceSequence = payload?.source_sequence ?? payload?.sourceSequence;
       const isPrimaryTarget = payload?.is_primary_target !== false;
       const targetIndex = Number(payload?.target_index ?? 0);
       const targetCount = Number(payload?.target_count ?? 1);
@@ -975,14 +989,11 @@ export async function activate(ctx) {
       const level = clamp01(value);
       try {
         if (action === "Volume") {
-          if (isStaleUiSliderIntent(bindingId, source, sourceSequence)) {
-            return;
-          }
-
           // Update UI/OSD and internal state immediately (optimistic), then coalesce
           // websocket writes to keep rapid fader motion smooth.
           // Latch user intent so background sync doesn't snap the motorized fader
           // back to stale levels right after release.
+          rememberLocalVolumeIntent(endpoint, level, source);
           if (bindingId && isPrimaryTarget) {
             primaryFeedbackIntentByBinding.set(bindingId, {
               value: level,
@@ -990,9 +1001,6 @@ export async function activate(ctx) {
               source,
               endpoint_key: endpointKey(endpoint),
             });
-            if (source === "ui_slider") {
-              queueUiFeedback(bindingId, level, sourceSequence);
-            }
           }
 
           if (!wsId) {
@@ -1039,6 +1047,7 @@ export async function activate(ctx) {
         pendingVolumeWrites.clear();
         mixes = [];
         channels = [];
+        localVolumeIntentByEndpoint.clear();
         offlineFeedbackSent = false;
         syncOfflineFeedback().catch(() => {});
         wasConnected = false;

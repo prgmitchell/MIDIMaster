@@ -772,16 +772,6 @@ pub fn apply_binding_action(
         return Ok(());
     }
 
-    let is_ui_slider_integration_volume = source.as_deref() == Some("ui_slider")
-        && matches!(effective_action, model::BindingAction::Volume)
-        && binding
-            .normalized_targets()
-            .iter()
-            .any(|target| matches!(target, model::BindingTarget::Integration { .. }));
-    if is_ui_slider_integration_volume {
-        return Ok(());
-    }
-
     set_binding_feedback(
         app,
         state,

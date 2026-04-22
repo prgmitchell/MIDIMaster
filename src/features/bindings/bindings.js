@@ -39,7 +39,9 @@ export function createBindingsFeature({
     throw new Error("createBindingsFeature: invoke is required");
   }
 
+  const SLIDER_ACTION_FLUSH_MS = 16;
   const sliderIntentSequenceByBinding = {};
+  const pendingSliderActionsByBinding = new Map();
   const d = (dom && typeof dom === "object") ? dom : {};
   if (!d.bindingsContainer) {
     throw new Error("createBindingsFeature: dom.bindingsContainer is required");
@@ -167,6 +169,66 @@ export function createBindingsFeature({
     if (markMidiUpdate) {
       slider.dataset.lastMidiUpdate = Date.now().toString();
     }
+  }
+
+  function scheduleSliderActionFlush(bindingId) {
+    const entry = pendingSliderActionsByBinding.get(bindingId);
+    if (!entry || entry.timer || entry.inFlight) return;
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      flushSliderAction(bindingId).catch((err) => {
+        console.error("Failed to set volume:", err);
+      });
+    }, SLIDER_ACTION_FLUSH_MS);
+  }
+
+  async function flushSliderAction(bindingId) {
+    const entry = pendingSliderActionsByBinding.get(bindingId);
+    if (!entry || entry.inFlight) return;
+
+    entry.inFlight = true;
+    entry.dirty = false;
+    const value = entry.value;
+    const sourceSequence = entry.sourceSequence;
+
+    try {
+      await invoke("apply_binding_action", {
+        bindingId,
+        action: "Volume",
+        value,
+        silent: false,
+        source: "ui_slider",
+        sourceSequence,
+      });
+    } finally {
+      entry.inFlight = false;
+      if (entry.dirty || entry.value !== value || entry.sourceSequence !== sourceSequence) {
+        entry.dirty = false;
+        scheduleSliderActionFlush(bindingId);
+      } else {
+        pendingSliderActionsByBinding.delete(bindingId);
+      }
+    }
+  }
+
+  function queueSliderAction(bindingId, value, sourceSequence) {
+    if (!bindingId) return;
+    let entry = pendingSliderActionsByBinding.get(bindingId);
+    if (!entry) {
+      entry = {
+        value,
+        sourceSequence,
+        timer: null,
+        inFlight: false,
+        dirty: false,
+      };
+      pendingSliderActionsByBinding.set(bindingId, entry);
+    } else {
+      entry.value = value;
+      entry.sourceSequence = sourceSequence;
+      entry.dirty = true;
+    }
+    scheduleSliderActionFlush(bindingId);
   }
 
   function isBindingTargetMenuOpen() {
@@ -1269,18 +1331,7 @@ export function createBindingsFeature({
             const sourceSequence = (sliderIntentSequenceByBinding[binding.id] || 0) + 1;
             sliderIntentSequenceByBinding[binding.id] = sourceSequence;
             setSliderVolume(e.target, vol, { bindingId: binding.id, markMidiUpdate: true });
-            try {
-              await invoke("apply_binding_action", {
-                bindingId: binding.id,
-                action: "Volume",
-                value: vol,
-                silent: false,
-                source: "ui_slider",
-                sourceSequence,
-              });
-            } catch (err) {
-              console.error("Failed to set volume:", err);
-            }
+            queueSliderAction(binding.id, vol, sourceSequence);
           });
         }
 
