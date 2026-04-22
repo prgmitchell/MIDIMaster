@@ -2479,15 +2479,15 @@ body[data-theme] .profile-select .select-button:hover {
 body[data-theme] .topbar {
   display: grid;
   grid-template-columns:
-    minmax(240px, 1fr)
+    minmax(220px, 1fr)
     1px
-    minmax(280px, 1.15fr)
-    minmax(280px, 1.15fr)
+    minmax(250px, 1fr)
+    minmax(250px, 1fr)
     1px
     auto;
   align-items: center;
-  gap: 20px;
-  padding-left: 64px;
+  gap: 14px;
+  padding-left: 40px;
 }
 
 body[data-theme] .topbar-field {
@@ -2584,20 +2584,6 @@ body[data-theme] .profile-select .dropdown {
   padding: 8px;
   gap: 6px;
   border-radius: 4px;
-}
-
-@media (max-width: 1280px) {
-  body[data-theme] .topbar {
-    grid-template-columns:
-      minmax(220px, 1fr)
-      1px
-      minmax(250px, 1fr)
-      minmax(250px, 1fr)
-      1px
-      auto;
-    gap: 14px;
-    padding-left: 40px;
-  }
 }
 
 body[data-theme] .profile-menu-tools {
@@ -2805,6 +2791,7 @@ body[data-theme] .binding-action.delete:hover {
 }
 
 body[data-theme] .settings-panel-body {
+  width: 100%;
   border-color: var(--control-border);
   background: var(--surface);
 }
@@ -2814,6 +2801,10 @@ body[data-theme] .settings-grid {
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
   gap: 18px 22px;
   align-items: start;
+}
+
+body[data-theme] .app-page.hidden {
+  display: none !important;
 }
 
 body[data-theme] .settings-column {
@@ -2828,6 +2819,15 @@ body[data-theme] .settings-section {
   background: var(--surface-raised);
   border: 1px solid var(--control-border);
   box-shadow: none;
+}
+
+body[data-theme] .settings-general-section {
+  min-height: 272px;
+}
+
+body[data-theme] .settings-osd-section {
+  min-height: 314px;
+  grid-template-rows: 28px 40px 1fr;
 }
 
 body[data-theme] .settings-section-header {
@@ -2934,7 +2934,10 @@ body[data-theme] .settings-field-row--position {
 }
 
 body[data-theme] .settings-field-row--position .osd-position-picker {
-  width: min(330px, 100%);
+  width: 100%;
+  max-width: none;
+  height: 192px;
+  aspect-ratio: auto;
 }
 
 body[data-theme] .settings-bottom-grid {
@@ -2943,12 +2946,17 @@ body[data-theme] .settings-bottom-grid {
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
   gap: 22px;
   align-items: end;
-  margin-top: -42px;
+  margin-top: -16px;
 }
 
 body[data-theme] .settings-maintenance-section,
 body[data-theme] .settings-updates-section {
   margin-top: 0 !important;
+}
+
+body[data-theme] #settings-update-status {
+  min-height: 22px;
+  max-height: 22px;
 }
 
 body[data-theme] .settings-maintenance-section .settings-action,
@@ -3281,10 +3289,10 @@ body[data-theme] .connection-button.disabled {
 
 body[data-theme] .topbar.has-update {
   grid-template-columns:
-    minmax(220px, 0.82fr)
+    minmax(190px, 0.82fr)
     1px
-    minmax(280px, 1.2fr)
-    minmax(280px, 1.2fr)
+    minmax(250px, 1fr)
+    minmax(250px, 1fr)
     1px
     auto;
 }
@@ -3322,18 +3330,4 @@ body[data-theme] .target-panel-back:hover {
   background: var(--control-bg-hover);
   border-color: var(--control-border);
   color: var(--text-primary);
-}
-
-@media (max-width: 1280px) {
-  body[data-theme] .topbar.has-update {
-    grid-template-columns:
-      minmax(190px, 0.82fr)
-      1px
-      minmax(250px, 1fr)
-      minmax(250px, 1fr)
-      1px
-      auto;
-    gap: 14px;
-    padding-left: 40px;
-  }
 }
