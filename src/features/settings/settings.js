@@ -17,6 +17,7 @@ export function createSettingsFeature({
   setMonitorOptions,
   getAppSettings,
   setAppSettings,
+  onUpdateAvailableClick,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createSettingsFeature: invoke is required");
@@ -35,6 +36,7 @@ export function createSettingsFeature({
     available: false,
     checking: false,
     downloading: false,
+    body: "",
   };
 
   function renderAutoCheckButton() {
@@ -90,6 +92,20 @@ export function createSettingsFeature({
       }
       d.checkForUpdatesButton.disabled = updateState.checking || updateState.downloading;
     }
+    if (d.topbarUpdateButton) {
+      const showTopbarUpdate = updateState.available && !updateState.downloading;
+      d.topbarUpdateButton.classList.toggle("hidden", !showTopbarUpdate);
+      d.topbarUpdateButton.closest(".topbar")?.classList.toggle("has-update", showTopbarUpdate);
+      d.topbarUpdateButton.disabled = updateState.checking || updateState.downloading;
+      d.topbarUpdateButton.setAttribute("aria-hidden", showTopbarUpdate ? "false" : "true");
+      const versionSuffix = updateState.latestVersion && updateState.latestVersion !== "-"
+        ? `: ${updateState.latestVersion}`
+        : "";
+      const label = `Update available${versionSuffix}`;
+      d.topbarUpdateButton.setAttribute("aria-label", label);
+      d.topbarUpdateButton.setAttribute("title", label);
+      d.topbarUpdateButton.title = label;
+    }
     renderAutoCheckButton();
   }
 
@@ -115,6 +131,7 @@ export function createSettingsFeature({
       updateState.currentVersion = normalized.currentVersion;
       updateState.latestVersion = normalized.latestVersion;
       updateState.available = normalized.available;
+      updateState.body = normalized.body;
       if (normalized.available) {
         const suffix = normalized.body ? " (release notes available)" : "";
         setUpdateStatus(`Update available: ${normalized.latestVersion}${suffix}`, "success");
@@ -123,6 +140,8 @@ export function createSettingsFeature({
       }
       return normalized;
     } catch (error) {
+      updateState.available = false;
+      updateState.body = "";
       if (!silent) {
         setUpdateStatus(formatUpdaterError(error), "error");
       }
@@ -140,6 +159,8 @@ export function createSettingsFeature({
     try {
       await invoke("download_and_install_update");
     } catch (error) {
+      updateState.available = false;
+      updateState.body = "";
       setUpdateStatus(String(error || "Update install failed."), "error");
     } finally {
       updateState.downloading = false;
@@ -166,6 +187,7 @@ export function createSettingsFeature({
         setUpdateStatus(`Update available: ${updateState.latestVersion}`, "success");
       } else if (phase === "no_update") {
         updateState.available = false;
+        updateState.body = "";
         setUpdateStatus("You are up to date.", "success");
       } else if (phase === "downloading") {
         updateState.downloading = true;
@@ -180,8 +202,11 @@ export function createSettingsFeature({
       } else if (phase === "downloaded") {
         setUpdateStatus("Update downloaded. Installing...");
       } else if (phase === "installed") {
+        updateState.available = false;
+        updateState.body = "";
         setUpdateStatus("Update installed. Restarting app...", "success");
       } else if (phase === "failed") {
+        updateState.available = false;
         updateState.checking = false;
         updateState.downloading = false;
         setUpdateStatus(formatUpdaterError(payload.message || "Update failed."), "error");
@@ -215,14 +240,26 @@ export function createSettingsFeature({
 
   async function applyOsdSettings(nextSettings) {
     const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
+    const requestedEnabledChange = Boolean(
+      nextSettings
+      && Object.prototype.hasOwnProperty.call(nextSettings, "enabled")
+    );
+    const shouldPreviewAfterSave = requestedEnabledChange
+      && !Boolean(current.enabled)
+      && Boolean(nextSettings.enabled);
     const merged = { ...current, ...(nextSettings || {}) };
     if (typeof setOsdSettings === "function") {
       setOsdSettings(merged);
     }
 
     if (d.osdEnabledToggle) {
-      d.osdEnabledToggle.value = merged.enabled ? "enabled" : "disabled";
-      renderSettingsSelectDropdown(d.osdEnabledToggle);
+      if (d.osdEnabledToggle.type === "checkbox") {
+        d.osdEnabledToggle.checked = Boolean(merged.enabled);
+        d.osdEnabledToggle.classList.remove("hidden");
+      } else {
+        d.osdEnabledToggle.value = merged.enabled ? "enabled" : "disabled";
+        renderSettingsSelectDropdown(d.osdEnabledToggle);
+      }
     }
     if (d.osdMonitorSelect) {
       d.osdMonitorSelect.value = String(merged.monitorIndex ?? 0);
@@ -238,6 +275,9 @@ export function createSettingsFeature({
         monitorId: merged.monitorId || null,
         anchor: merged.anchor,
       });
+      if (shouldPreviewAfterSave) {
+        await invoke("preview_osd");
+      }
     } catch (error) {
       console.error("Failed to update OSD settings", error);
     }
@@ -337,7 +377,6 @@ export function createSettingsFeature({
   }
 
   function renderAllSettingsSelectDropdowns() {
-    renderSettingsSelectDropdown(d.osdEnabledToggle);
     renderSettingsSelectDropdown(d.startWithWindowsSelect);
     renderSettingsSelectDropdown(d.startInTraySelect);
     renderSettingsSelectDropdown(d.minimizeToTraySelect);
@@ -523,7 +562,7 @@ export function createSettingsFeature({
     bindUpdaterEvents().catch(() => {});
     if (d.settingsPanel) {
       d.settingsPanel.addEventListener("click", (event) => {
-        if (event.target === d.settingsPanel) {
+        if (d.settingsPanel.classList.contains("target-panel") && event.target === d.settingsPanel) {
           closeSettingsPanel();
         }
       });
@@ -559,7 +598,10 @@ export function createSettingsFeature({
 
     if (d.osdEnabledToggle) {
       d.osdEnabledToggle.addEventListener("change", () => {
-        applyOsdSettings({ enabled: d.osdEnabledToggle.value === "enabled" });
+        const enabled = d.osdEnabledToggle.type === "checkbox"
+          ? d.osdEnabledToggle.checked
+          : d.osdEnabledToggle.value === "enabled";
+        applyOsdSettings({ enabled });
       });
     }
 
@@ -623,6 +665,18 @@ export function createSettingsFeature({
           return;
         }
         checkForUpdates();
+      });
+    }
+    if (d.topbarUpdateButton) {
+      d.topbarUpdateButton.addEventListener("click", () => {
+        if (!updateState.available || updateState.downloading) return;
+        if (typeof onUpdateAvailableClick === "function") {
+          onUpdateAvailableClick({
+            currentVersion: updateState.currentVersion,
+            latestVersion: updateState.latestVersion,
+            body: updateState.body,
+          });
+        }
       });
     }
 

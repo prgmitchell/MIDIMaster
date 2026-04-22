@@ -139,12 +139,18 @@ export function renderLabelFromRawWithTags(
   });
 }
 
-export function closeOpenDropdowns({ except = null } = {}) {
-  document.querySelectorAll(".target-dropdown.open").forEach((dropdown) => {
+export function closeAllDropdowns({ except = null } = {}) {
+  document.querySelectorAll(".target-dropdown.open, .profile-select.open").forEach((dropdown) => {
     if (except && dropdown === except) return;
     dropdown.classList.remove("open");
     dropdown.querySelector(".target-menu")?.classList.add("hidden");
+    dropdown.querySelector(".dropdown")?.classList.add("hidden");
+    dropdown.querySelector(".target-button, .select-button")?.setAttribute("aria-expanded", "false");
   });
+}
+
+export function closeOpenDropdowns(options = {}) {
+  closeAllDropdowns(options);
 }
 
 export function wireDropdownToggle({ root, menu, trigger }) {
@@ -154,13 +160,15 @@ export function wireDropdownToggle({ root, menu, trigger }) {
     event.preventDefault();
     event.stopPropagation();
     const opening = menu.classList.contains("hidden");
-    closeOpenDropdowns({ except: root });
+    closeAllDropdowns({ except: root });
     if (opening) {
       root.classList.add("open");
       menu.classList.remove("hidden");
+      trigger.setAttribute("aria-expanded", "true");
     } else {
       root.classList.remove("open");
       menu.classList.add("hidden");
+      trigger.setAttribute("aria-expanded", "false");
     }
   };
 

@@ -1,3 +1,5 @@
+import { closeAllDropdowns } from "../ui/dropdown_badges.js";
+
 export function createProfilesFeature({
   invoke,
   dom,
@@ -97,9 +99,33 @@ export function createProfilesFeature({
     d.profileCurrent.textContent = name ? String(name) : "Select profile";
   }
 
+  function currentProfileSelection(fallback = "Default") {
+    return (
+      (typeof getActiveProfileName === "function" ? (getActiveProfileName() || "") : "")
+      || localStorage.getItem("activeProfileName")
+      || fallback
+      || "Default"
+    );
+  }
+
+  function updateProfileMenuSelection(name) {
+    if (!d.profileList) return;
+    const selectedName = normalizeProfileName(name) || "Default";
+    d.profileList.querySelectorAll(".dropdown-item:not(.create)").forEach((item) => {
+      const profileName = item.dataset.profileName || item.querySelector("button")?.textContent || "";
+      item.classList.toggle("selected", normalizeProfileName(profileName) === selectedName);
+    });
+  }
+
   function closeProfileDropdown() {
     if (d.profileList) {
       d.profileList.classList.add("hidden");
+    }
+    if (d.profileDropdown) {
+      d.profileDropdown.classList.remove("open");
+    }
+    if (d.profileToggle) {
+      d.profileToggle.setAttribute("aria-expanded", "false");
     }
     pendingProfileDeleteName = null;
   }
@@ -222,6 +248,120 @@ export function createProfilesFeature({
     await refreshProfiles((typeof getActiveProfileName === "function") ? (getActiveProfileName() || "Default") : "Default");
   }
 
+  async function createProfileByName(rawName) {
+    const name = normalizeProfileName(rawName);
+    if (!name) return;
+    const inheritedMidi = (typeof getCurrentMidiPreference === "function")
+      ? getCurrentMidiPreference()
+      : null;
+    await invoke("save_profile", {
+      profile: {
+        name,
+        bindings: [],
+        osd_settings: buildPersistedOsdSettings(
+          (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
+        ),
+        plugin_settings: {},
+        midi_device_preference: buildPersistedMidiDevicePreference(inheritedMidi),
+      },
+    });
+    await loadProfileByName(name);
+    await refreshProfiles(name);
+    closeProfileDropdown();
+  }
+
+  function renderProfilePage(profiles, currentSelection) {
+    if (!d.profilePageList) return;
+    d.profilePageList.innerHTML = "";
+
+    const safeProfiles = Array.isArray(profiles) ? profiles : [];
+    if (!safeProfiles.length) {
+      const empty = document.createElement("div");
+      empty.className = "profile-page-empty";
+      empty.textContent = "No profiles found.";
+      d.profilePageList.appendChild(empty);
+      return;
+    }
+
+    safeProfiles.forEach((profile) => {
+      if (!profile || !profile.name) return;
+      const row = document.createElement("div");
+      row.className = "profile-page-row";
+      row.classList.toggle("active", profile.name === currentSelection);
+      if (pendingProfileDeleteName === profile.name) row.classList.add("confirming");
+
+      const details = document.createElement("button");
+      details.type = "button";
+      details.className = "profile-page-select";
+      details.innerHTML = `
+        <span class="profile-page-name"></span>
+        <span class="profile-page-meta">${profile.name === currentSelection ? "Active profile" : "Saved profile"}</span>
+      `;
+      details.querySelector(".profile-page-name").textContent = profile.name;
+      details.addEventListener("click", async () => {
+        pendingProfileDeleteName = null;
+        await loadProfileByName(profile.name);
+        await refreshProfiles(profile.name);
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "profile-page-row-actions";
+
+      const exportButton = document.createElement("button");
+      exportButton.type = "button";
+      exportButton.className = "secondary-action";
+      exportButton.textContent = "Export";
+      exportButton.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await exportProfileByName(profile.name);
+      });
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "danger-action";
+      deleteButton.textContent = profile.name === "Default" ? "Locked" : "Delete";
+      deleteButton.disabled = profile.name === "Default";
+      deleteButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (profile.name === "Default") return;
+        pendingProfileDeleteName = profile.name;
+        refreshProfiles(currentSelection || "Default");
+      });
+
+      if (pendingProfileDeleteName === profile.name && profile.name !== "Default") {
+        const cancelButton = document.createElement("button");
+        cancelButton.type = "button";
+        cancelButton.className = "secondary-action";
+        cancelButton.textContent = "Cancel";
+        cancelButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          pendingProfileDeleteName = null;
+          refreshProfiles(currentSelection || "Default");
+        });
+
+        const confirmButton = document.createElement("button");
+        confirmButton.type = "button";
+        confirmButton.className = "danger-action";
+        confirmButton.textContent = "Confirm";
+        confirmButton.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          pendingProfileDeleteName = null;
+          await deleteProfileByName(profile.name);
+        });
+
+        actions.appendChild(cancelButton);
+        actions.appendChild(confirmButton);
+      } else {
+        actions.appendChild(exportButton);
+        actions.appendChild(deleteButton);
+      }
+
+      row.appendChild(details);
+      row.appendChild(actions);
+      d.profilePageList.appendChild(row);
+    });
+  }
+
   async function refreshProfiles(preferredName = "") {
     let profiles = [];
     try {
@@ -256,47 +396,62 @@ export function createProfilesFeature({
     d.profileList.innerHTML = "";
 
     const createItem = document.createElement("div");
-    createItem.className = "dropdown-item create";
+    createItem.className = "dropdown-item create profile-menu-tools";
 
     const createInput = document.createElement("input");
     createInput.type = "text";
     createInput.placeholder = "New profile name";
+    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
+      createInput.addEventListener(eventName, (event) => {
+        event.stopPropagation();
+      });
+    });
 
     const createButton = document.createElement("button");
     createButton.type = "button";
     createButton.textContent = "Create";
+    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
+      createButton.addEventListener(eventName, (event) => {
+        event.stopPropagation();
+      });
+    });
 
     const importButton = document.createElement("button");
     importButton.type = "button";
     importButton.className = "icon-action";
-    importButton.innerHTML = "&#10514;";
+    importButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
     importButton.title = "Import profile from JSON";
     importButton.setAttribute("aria-label", "Import profile");
+    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
+      importButton.addEventListener(eventName, (event) => {
+        event.stopPropagation();
+      });
+    });
     importButton.addEventListener("click", async (event) => {
       event.stopPropagation();
       await importProfileFromFile();
     });
 
-    const createProfile = async () => {
-      const name = createInput.value.trim();
-      if (!name) return;
-      const inheritedMidi = (typeof getCurrentMidiPreference === "function")
-        ? getCurrentMidiPreference()
-        : null;
-      await invoke("save_profile", {
-        profile: {
-          name,
-          bindings: [],
-          osd_settings: buildPersistedOsdSettings(
-            (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
-          ),
-          plugin_settings: {},
-          midi_device_preference: buildPersistedMidiDevicePreference(inheritedMidi),
-        },
+    const exportCurrentButton = document.createElement("button");
+    exportCurrentButton.type = "button";
+    exportCurrentButton.className = "icon-action";
+    exportCurrentButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg>';
+    exportCurrentButton.title = `Export "${currentSelection || "Default"}"`;
+    exportCurrentButton.setAttribute("aria-label", `Export current profile ${currentSelection || "Default"}`);
+    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
+      exportCurrentButton.addEventListener(eventName, (event) => {
+        event.stopPropagation();
       });
-      await loadProfileByName(name);
-      await refreshProfiles(name);
-      closeProfileDropdown();
+    });
+    exportCurrentButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await exportProfileByName(currentSelection || "Default");
+    });
+
+    const createProfile = async () => {
+      await createProfileByName(createInput.value);
+      createInput.value = "";
+      if (d.profilePageCreateInput) d.profilePageCreateInput.value = "";
     };
 
     createInput.addEventListener("keydown", (event) => {
@@ -307,14 +462,28 @@ export function createProfilesFeature({
     });
     createButton.addEventListener("click", createProfile);
 
-    createItem.appendChild(createInput);
-    createItem.appendChild(createButton);
-    createItem.appendChild(importButton);
+    const createRow = document.createElement("div");
+    createRow.className = "profile-menu-create-row";
+    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
+      createRow.addEventListener(eventName, (event) => {
+        event.stopPropagation();
+      });
+    });
+    createRow.appendChild(createInput);
+    createRow.appendChild(createButton);
+    createRow.appendChild(importButton);
+    createRow.appendChild(exportCurrentButton);
+
+    createItem.appendChild(createRow);
     d.profileList.appendChild(createItem);
 
     profiles.forEach((profile) => {
       const item = document.createElement("div");
       item.className = "dropdown-item";
+      item.dataset.profileName = profile.name;
+      if (profile.name === currentSelection) {
+        item.classList.add("selected");
+      }
 
       if (pendingProfileDeleteName === profile.name) {
         item.classList.add("confirming");
@@ -332,7 +501,7 @@ export function createProfilesFeature({
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
       deleteButton.className = "delete";
-      deleteButton.textContent = "×";
+      deleteButton.textContent = "x";
       if (profile.name === "Default") {
         deleteButton.disabled = true;
       }
@@ -341,17 +510,6 @@ export function createProfilesFeature({
         if (profile.name === "Default") return;
         pendingProfileDeleteName = profile.name;
         refreshProfiles(currentSelection || "Default");
-      });
-
-      const exportButton = document.createElement("button");
-      exportButton.type = "button";
-      exportButton.className = "icon-action";
-      exportButton.innerHTML = "&#10515;";
-      exportButton.title = `Export "${profile.name}"`;
-      exportButton.setAttribute("aria-label", `Export profile ${profile.name}`);
-      exportButton.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        await exportProfileByName(profile.name);
       });
 
       item.appendChild(selectButton);
@@ -380,7 +538,6 @@ export function createProfilesFeature({
         item.appendChild(cancelButton);
         item.appendChild(confirmButton);
       } else {
-        item.appendChild(exportButton);
         item.appendChild(deleteButton);
       }
 
@@ -388,6 +545,8 @@ export function createProfilesFeature({
     });
 
     setProfileSelection(currentSelection || "Default");
+    updateProfileMenuSelection(currentSelection || "Default");
+    renderProfilePage(profiles, currentSelection || "Default");
   }
 
   function getProfileNameForSave() {
@@ -559,12 +718,22 @@ export function createProfilesFeature({
 
   function bindUi() {
     if (d.profileToggle) {
-      d.profileToggle.addEventListener("click", async () => {
-        if (d.profileList && d.profileList.childElementCount === 0) {
-          await refreshProfiles((typeof getActiveProfileName === "function") ? (getActiveProfileName() || "") : "");
-        }
+      d.profileToggle.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         if (d.profileList) {
-          d.profileList.classList.toggle("hidden");
+          const opening = d.profileList.classList.contains("hidden");
+          if (opening) {
+            await refreshProfiles(currentProfileSelection());
+          } else {
+            updateProfileMenuSelection(currentProfileSelection());
+          }
+          closeAllDropdowns({ except: opening ? d.profileDropdown : null });
+          d.profileList.classList.toggle("hidden", !opening);
+          if (d.profileDropdown) {
+            d.profileDropdown.classList.toggle("open", opening);
+          }
+          d.profileToggle.setAttribute("aria-expanded", String(opening));
         }
       });
     }
@@ -575,6 +744,34 @@ export function createProfilesFeature({
         closeProfileDropdown();
       }
     });
+
+    if (d.profilePageCreateInput) {
+      d.profilePageCreateInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          createProfileByName(d.profilePageCreateInput.value).then(() => {
+            d.profilePageCreateInput.value = "";
+          });
+        }
+      });
+    }
+    if (d.profilePageCreateButton) {
+      d.profilePageCreateButton.addEventListener("click", () => {
+        createProfileByName(d.profilePageCreateInput?.value || "").then(() => {
+          if (d.profilePageCreateInput) d.profilePageCreateInput.value = "";
+        });
+      });
+    }
+    if (d.profilePageImportButton) {
+      d.profilePageImportButton.addEventListener("click", () => {
+        importProfileFromFile();
+      });
+    }
+    if (d.profilePageExportCurrentButton) {
+      d.profilePageExportCurrentButton.addEventListener("click", () => {
+        exportCurrentProfile();
+      });
+    }
   }
 
   return {

@@ -38,6 +38,8 @@ export function createBindingsFeature({
   if (typeof invoke !== "function") {
     throw new Error("createBindingsFeature: invoke is required");
   }
+
+  const sliderIntentSequenceByBinding = {};
   const d = (dom && typeof dom === "object") ? dom : {};
   if (!d.bindingsContainer) {
     throw new Error("createBindingsFeature: dom.bindingsContainer is required");
@@ -79,6 +81,53 @@ export function createBindingsFeature({
 
   const getDrag = (typeof getDragState === "function") ? getDragState : (() => null);
   const setDrag = (typeof setDragState === "function") ? setDragState : (() => { });
+  const getSearchQuery = () => String(d.bindingSearchInput?.value || "").trim().toLowerCase();
+
+  function displayModeName(binding) {
+    if (effectiveIsButton(binding)) return "Toggle";
+    return binding?.mode === "Relative" ? "Relative" : "Absolute";
+  }
+
+  function bindingSearchText(binding, index) {
+    return [
+      binding?.name || "",
+      fallbackNameFor(binding, index),
+      labelForControl(binding?.control || {}),
+      displayModeName(binding),
+      JSON.stringify(getTargets(binding)),
+      binding?.action || "",
+    ].join(" ").toLowerCase();
+  }
+
+  function actionIconSvg(name) {
+    const icons = {
+      edit: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m14 6 4 4"/></svg>',
+      delete: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="M8 7l1 13h6l1-13"/><path d="M10.5 11v5M13.5 11v5"/></svg>',
+    };
+    return icons[name] || "";
+  }
+
+  function setActionIcon(button, name, label) {
+    button.innerHTML = actionIconSvg(name);
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  }
+
+  function muteIconSvg(muted) {
+    if (muted) {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m18 9-4 6M14 9l4 6"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
+  }
+
+  function setMuteButtonState(button, muted) {
+    if (!button) return;
+    button.innerHTML = muteIconSvg(Boolean(muted));
+    button.classList.toggle("muted", Boolean(muted));
+    const label = muted ? "Unmute binding target" : "Mute binding target";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  }
 
   function updateSliderFill(slider) {
     const min = parseFloat(slider.min) || 0;
@@ -86,6 +135,29 @@ export function createBindingsFeature({
     const val = parseFloat(slider.value) || 0;
     const percent = ((val - min) / (max - min)) * 100;
     slider.style.backgroundSize = `${percent}% 100%`;
+  }
+
+  function updateVolumePercentForSlider(slider) {
+    if (!slider) return;
+    const percent = slider.closest(".binding-value-cell")?.querySelector(".binding-volume-percent");
+    if (!percent) return;
+    percent.textContent = `${Math.round((Number(slider.value) || 0) * 100)}%`;
+  }
+
+  function setSliderVolume(slider, volume, { bindingId = null, markMidiUpdate = false } = {}) {
+    if (!slider) return;
+    const next = Number(volume);
+    if (!Number.isFinite(next)) return;
+    slider.value = String(next);
+    updateSliderFill(slider);
+    updateVolumePercentForSlider(slider);
+    const resolvedBindingId = bindingId || slider.dataset.bindingId;
+    if (resolvedBindingId) {
+      bindingLastValues[resolvedBindingId] = next;
+    }
+    if (markMidiUpdate) {
+      slider.dataset.lastMidiUpdate = Date.now().toString();
+    }
   }
 
   function isBindingTargetMenuOpen() {
@@ -199,8 +271,7 @@ export function createBindingsFeature({
 
       const vol = getVol(target);
       if (vol !== null && Math.abs(Number(slider.value) - vol) > 0.01) {
-        slider.value = vol;
-        updateSliderFill(slider);
+        setSliderVolume(slider, vol);
         invoke("update_midi_feedback", { target, value: vol, action: "Volume" });
       }
     });
@@ -217,8 +288,7 @@ export function createBindingsFeature({
       const muted = Boolean(getMuted(target));
       const currentlyMuted = btn.classList.contains("muted");
       if (muted !== currentlyMuted) {
-        btn.innerHTML = muted ? "\ud83d\udd07" : "\ud83d\udd0a";
-        btn.classList.toggle("muted", muted);
+        setMuteButtonState(btn, muted);
       }
     });
   }
@@ -232,6 +302,7 @@ export function createBindingsFeature({
   const hotkeyModifiers = ["Ctrl", "Shift", "Alt", "Meta"];
   const nameDrafts = new Map();
   let pendingRerender = false;
+  let suppressPendingFocusClearUntil = 0;
   let curveDropdownEntry = null;
   const defaultLearnPanelTitle = "Waiting for MIDI Input";
   const defaultLearnPanelMessage = "Move a control on your MIDI device to create a binding.";
@@ -730,9 +801,30 @@ export function createBindingsFeature({
       openConfigModal(bindingId);
       return;
     }
+    suppressPendingFocusClearUntil = Date.now() + 250;
     setEditingId(bindingId);
     setPendingFocusId(bindingId);
     renderBindings();
+  }
+
+  function focusBindingNameInput(nameInput, bindingId, { select = false } = {}) {
+    if (!nameInput) return;
+    const applyFocus = () => {
+      if (bindingId !== getEditingId()) return;
+      if (!nameInput.isConnected) return;
+      if (typeof window.focus === "function") {
+        window.focus();
+      }
+      nameInput.focus({ preventScroll: true });
+      if (select) {
+        nameInput.select();
+      }
+    };
+    applyFocus();
+    requestAnimationFrame(applyFocus);
+    requestAnimationFrame(() => requestAnimationFrame(applyFocus));
+    setTimeout(applyFocus, 0);
+    setTimeout(applyFocus, 32);
   }
 
   function isInlineNameEditingActive() {
@@ -784,6 +876,8 @@ export function createBindingsFeature({
 
     const bindings = getB();
     d.bindingsContainer.innerHTML = "";
+    const searchQuery = getSearchQuery();
+    let renderedCount = 0;
 
     if (!Array.isArray(bindings) || bindings.length === 0) {
       const empty = document.createElement("div");
@@ -799,6 +893,10 @@ export function createBindingsFeature({
         setTargets(binding, getTargets(binding));
         binding.hotkey = normalizeHotkeyMapping(binding.hotkey);
         binding.open_application = normalizeOpenApplicationMapping(binding.open_application);
+        if (searchQuery && !bindingSearchText(binding, index).includes(searchQuery)) {
+          return;
+        }
+        renderedCount += 1;
         const item = document.createElement("div");
         item.className = "list-item binding-item";
 
@@ -824,6 +922,11 @@ export function createBindingsFeature({
           nameInput.spellcheck = false;
           nameInput.setAttribute("data-lpignore", "true");
           nameInput.value = (nameDrafts.get(binding.id) ?? binding.name?.trim()) || fallbackName;
+          ["pointerdown", "mousedown", "click"].forEach((eventName) => {
+            nameInput.addEventListener(eventName, (event) => {
+              event.stopPropagation();
+            });
+          });
           nameInput.addEventListener("input", () => {
             nameDrafts.set(binding.id, nameInput.value);
             if (binding.id === getPendingFocusId()) {
@@ -885,29 +988,36 @@ export function createBindingsFeature({
           nameLabel.className = "binding-name";
           nameLabel.textContent = binding.name?.trim() || fallbackName;
           nameLabel.title = "Double-click to rename";
-          nameLabel.addEventListener("dblclick", () => {
+          nameLabel.addEventListener("mousedown", (event) => {
+            event.stopPropagation();
+          });
+          nameLabel.addEventListener("dblclick", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
             beginBindingEdit(binding.id, true);
           });
           nameField = nameLabel;
         }
 
-        const controlInfo = document.createElement("div");
-        controlInfo.textContent = labelForControl(binding.control);
+        const rowNumber = document.createElement("button");
+        rowNumber.type = "button";
+        rowNumber.className = "binding-index binding-drag";
+        rowNumber.title = "Drag to reorder binding";
+        rowNumber.setAttribute("aria-label", "Drag to reorder binding");
+        const dragGrip = document.createElement("span");
+        dragGrip.className = "drag-grip";
+        dragGrip.setAttribute("aria-hidden", "true");
+        rowNumber.appendChild(dragGrip);
+        rowNumber.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          rowNumber.setPointerCapture(event.pointerId);
+          startBindingDrag(item, index, event);
+        });
+        rowNumber.addEventListener("pointerup", (event) => {
+          rowNumber.releasePointerCapture(event.pointerId);
+        });
 
-        const controlKind = normalizeControlKind(binding.control_kind);
         const isButton = effectiveIsButton(binding);
-        console.log(
-          "renderBindings binding:",
-          binding.id,
-          "action:",
-          binding.action,
-          "msg_type:",
-          binding.control?.msg_type,
-          "control_kind:",
-          controlKind,
-          "isButton:",
-          isButton,
-        );
 
         const modeDropdown = document.createElement("div");
         modeDropdown.className = "target-dropdown mode-dropdown";
@@ -926,9 +1036,9 @@ export function createBindingsFeature({
         modeMenu.className = "target-menu hidden";
 
         const modeOptions = [
-          { value: "button", label: "Button", badge: null },
-          { value: "fader_abs", label: "Fader", badge: "Absolute" },
-          { value: "fader_rel", label: "Fader", badge: "Relative" },
+          { value: "button", label: "Toggle", badge: null },
+          { value: "fader_abs", label: "Absolute", badge: null },
+          { value: "fader_rel", label: "Relative", badge: null },
         ];
 
         let modeValue = "fader_abs";
@@ -939,21 +1049,11 @@ export function createBindingsFeature({
         }
 
         const renderModeLabel = (container, option) => {
-          renderLabelWithBadges(container, {
-            text: option?.label || "",
-            badges: option?.badge ? [{ text: option.badge, kind: "neutral" }] : [],
-            truncate: false,
-          });
-
-          const chip = container.querySelector(".target-label");
-          if (chip) {
-            chip.classList.add("target-chip", "mode-chip");
-            const icon = document.createElement("span");
-            icon.className = "target-icon mode-chip-icon";
-            icon.setAttribute("aria-hidden", "true");
-            icon.textContent = option?.label?.[0]?.toUpperCase() || "M";
-            chip.prepend(icon);
-          }
+          container.innerHTML = "";
+          const label = document.createElement("span");
+          label.className = "mode-label";
+          label.textContent = option?.label || "";
+          container.appendChild(label);
         };
 
         const applyModeSelection = async (nextModeValue) => {
@@ -1097,9 +1197,7 @@ export function createBindingsFeature({
               // a concrete volume (common for some integration targets).
               // This prevents motorized faders from jumping when removing targets.
               if (typeof newVolume === "number" && Number.isFinite(newVolume)) {
-                volumeSlider.value = newVolume;
-                bindingLastValues[binding.id] = newVolume;
-                updateSliderFill(volumeSlider);
+                setSliderVolume(volumeSlider, newVolume, { bindingId: binding.id });
               }
               volumeSlider.dataset.targetJson = JSON.stringify(primaryTarget);
             }
@@ -1108,8 +1206,7 @@ export function createBindingsFeature({
               ? Boolean(bindingMuteValues[binding.id])
               : getMuted(primaryTarget);
             if (muteButton) {
-              muteButton.innerHTML = newMuted ? "\ud83d\udd07" : "\ud83d\udd0a";
-              muteButton.classList.toggle("muted", newMuted);
+              setMuteButtonState(muteButton, newMuted);
               muteButton.dataset.targetJson = JSON.stringify(primaryTarget);
             }
           }
@@ -1156,15 +1253,17 @@ export function createBindingsFeature({
           volumeSlider.addEventListener("input", async (e) => {
             bindingInteractionTimes[binding.id] = Date.now();
             const vol = parseFloat(e.target.value);
-            bindingLastValues[binding.id] = vol;
-            updateSliderFill(e.target);
+            const sourceSequence = (sliderIntentSequenceByBinding[binding.id] || 0) + 1;
+            sliderIntentSequenceByBinding[binding.id] = sourceSequence;
+            setSliderVolume(e.target, vol, { bindingId: binding.id, markMidiUpdate: true });
             try {
-              volumeSlider.dataset.lastMidiUpdate = Date.now();
               await invoke("apply_binding_action", {
                 bindingId: binding.id,
                 action: "Volume",
                 value: vol,
                 silent: false,
+                source: "ui_slider",
+                sourceSequence,
               });
             } catch (err) {
               console.error("Failed to set volume:", err);
@@ -1175,18 +1274,15 @@ export function createBindingsFeature({
         const muteButton = document.createElement("button");
         muteButton.type = "button";
         muteButton.className = "binding-mute-button";
-        muteButton.title = "Toggle Mute";
         const primaryTarget = getPrimaryTarget(binding);
         const isMuted = (bindingMuteValues[binding.id] != null)
           ? Boolean(bindingMuteValues[binding.id])
           : Boolean(getMuted(primaryTarget));
-        muteButton.innerHTML = isMuted ? "\ud83d\udd07" : "\ud83d\udd0a";
-        muteButton.classList.toggle("muted", isMuted);
+        setMuteButtonState(muteButton, isMuted);
         muteButton.dataset.targetJson = JSON.stringify(primaryTarget);
         muteButton.dataset.bindingId = binding.id;
 
         if (isButton) {
-          muteButton.disabled = true;
           muteButton.style.visibility = "hidden";
         }
 
@@ -1194,8 +1290,7 @@ export function createBindingsFeature({
           bindingInteractionTimes[binding.id] = Date.now();
           const currentlyMuted = muteButton.classList.contains("muted");
           const newMuted = !currentlyMuted;
-          muteButton.innerHTML = newMuted ? "\ud83d\udd07" : "\ud83d\udd0a";
-          muteButton.classList.toggle("muted", newMuted);
+          setMuteButtonState(muteButton, newMuted);
           bindingMuteValues[binding.id] = newMuted;
 
           try {
@@ -1206,40 +1301,19 @@ export function createBindingsFeature({
               silent: false,
             });
           } catch (err) {
-            muteButton.innerHTML = currentlyMuted ? "\ud83d\udd07" : "\ud83d\udd0a";
-            muteButton.classList.toggle("muted", currentlyMuted);
+            setMuteButtonState(muteButton, currentlyMuted);
             bindingMuteValues[binding.id] = currentlyMuted;
             console.error("Failed to toggle mute:", err);
           }
         });
 
-        const volumeGroup = document.createElement("div");
-        volumeGroup.className = "binding-volume-group";
-        volumeGroup.appendChild(volumeSlider);
-        volumeGroup.appendChild(muteButton);
-
         const actions = document.createElement("div");
         actions.className = "binding-actions";
-
-        const dragButton = document.createElement("button");
-        dragButton.type = "button";
-        dragButton.className = "binding-action binding-drag";
-        dragButton.textContent = "\u2195";
-        dragButton.title = "Drag to reorder";
-        dragButton.addEventListener("pointerdown", (event) => {
-          event.preventDefault();
-          dragButton.setPointerCapture(event.pointerId);
-          startBindingDrag(item, index, event);
-        });
-        dragButton.addEventListener("pointerup", (event) => {
-          dragButton.releasePointerCapture(event.pointerId);
-        });
 
         const editButton = document.createElement("button");
         editButton.type = "button";
         editButton.className = "binding-action";
-        editButton.textContent = "\u270e";
-        editButton.title = isButton ? "Edit name" : "Configure fader";
+        setActionIcon(editButton, "edit", isButton ? "Edit name" : "Configure fader");
         editButton.addEventListener("click", () => {
           beginBindingEdit(binding.id);
         });
@@ -1247,34 +1321,66 @@ export function createBindingsFeature({
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
         deleteButton.className = "binding-action delete";
-        deleteButton.textContent = "\u00d7";
-        deleteButton.title = "Delete binding";
+        setActionIcon(deleteButton, "delete", "Delete binding");
         deleteButton.addEventListener("click", async () => {
           try {
             await invoke("remove_binding", { binding });
             const next = getB();
             next.splice(index, 1);
             setB(next);
+            await saveProfile();
             renderBindings();
           } catch (err) {
             console.error("Failed to remove binding:", err);
           }
         });
 
-        actions.appendChild(dragButton);
         actions.appendChild(editButton);
         actions.appendChild(deleteButton);
 
+        const valueGroup = document.createElement("div");
+        valueGroup.className = "binding-value-cell";
+        if (isButton) {
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = "binding-toggle-value";
+          toggle.textContent = isMuted ? "On" : "Off";
+          toggle.classList.toggle("on", isMuted);
+          toggle.addEventListener("click", async () => {
+            muteButton.click();
+            const nextMuted = !toggle.classList.contains("on");
+            toggle.classList.toggle("on", nextMuted);
+            toggle.textContent = nextMuted ? "On" : "Off";
+          });
+          valueGroup.appendChild(toggle);
+        } else {
+          const sliderWrap = document.createElement("div");
+          sliderWrap.className = "binding-slider-wrap";
+
+          const percent = document.createElement("span");
+          percent.className = "binding-volume-percent";
+          const updatePercent = () => {
+            percent.textContent = `${Math.round((Number(volumeSlider.value) || 0) * 100)}%`;
+          };
+          updatePercent();
+          volumeSlider.addEventListener("input", updatePercent);
+          sliderWrap.appendChild(volumeSlider);
+          valueGroup.appendChild(sliderWrap);
+          valueGroup.appendChild(percent);
+          valueGroup.appendChild(muteButton);
+        }
+
+        row.appendChild(rowNumber);
         row.appendChild(nameField);
-        row.appendChild(volumeGroup);
         row.appendChild(modeDropdown);
         row.appendChild(targetSelect);
+        row.appendChild(valueGroup);
         row.appendChild(actions);
         item.appendChild(row);
         d.bindingsContainer.appendChild(item);
 
         if (nameInput && shouldRestoreEditingFocus && String(binding.id) === String(editingIdAtRenderStart)) {
-          nameInput.focus({ preventScroll: true });
+          focusBindingNameInput(nameInput, binding.id);
           if (Number.isInteger(selectionStart) && Number.isInteger(selectionEnd)) {
             const max = nameInput.value.length;
             const safeStart = Math.max(0, Math.min(selectionStart, max));
@@ -1283,8 +1389,7 @@ export function createBindingsFeature({
           }
         } else if (binding.id === getPendingFocusId() && nameInput) {
           setEditingId(binding.id);
-          nameInput.focus();
-          nameInput.select();
+          focusBindingNameInput(nameInput, binding.id, { select: true });
         }
       } catch (err) {
         const errorItem = document.createElement("div");
@@ -1311,6 +1416,13 @@ export function createBindingsFeature({
         d.bindingsContainer.appendChild(errorItem);
       }
     });
+
+    if (renderedCount === 0) {
+      const empty = document.createElement("div");
+      empty.className = "bindings-empty";
+      empty.textContent = "No bindings match your search.";
+      d.bindingsContainer.appendChild(empty);
+    }
   }
 
   function startBindingDrag(item, index, event) {
@@ -1574,6 +1686,9 @@ export function createBindingsFeature({
   document.addEventListener("pointerdown", (event) => {
     const pendingId = getPendingFocusId();
     if (!pendingId) return;
+    if (Date.now() < suppressPendingFocusClearUntil) {
+      return;
+    }
     const target = event.target;
     if (target && target.classList?.contains("binding-name-input")) {
       return;
@@ -1582,10 +1697,16 @@ export function createBindingsFeature({
   }, true);
 
   bindConfigModalUi();
+  if (d.bindingSearchInput) {
+    d.bindingSearchInput.addEventListener("input", () => {
+      renderBindings();
+    });
+  }
   updateAuxLearnUi();
 
   return {
     updateSliderFill,
+    setSliderVolume,
     isBindingInteractionActive,
     isInlineNameEditingActive,
     requestSafeRerender,

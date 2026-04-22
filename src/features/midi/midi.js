@@ -204,9 +204,18 @@ export function createMidiFeature({
       getOptionBadges: (opt) => (opt.dataset.unavailable === "true"
         ? [{ text: "Unavailable", kind: "state" }]
         : []),
+      getDisplayBadges: () => [],
       truncateMenuLabels: false,
       truncateDisplayLabel: true,
     });
+
+    const root = menuEl.closest(".midi-device-dropdown");
+    const selected = selectEl.selectedOptions?.[0] || null;
+    const hasValue = Boolean(String(selectEl.value || "").trim());
+    const unavailable = hasValue && selected?.dataset?.unavailable === "true";
+    root?.classList.toggle("device-connected", hasValue && !unavailable);
+    root?.classList.toggle("device-unavailable", unavailable);
+    root?.classList.toggle("device-empty", !hasValue);
   }
 
   function renderDeviceDropdowns() {
@@ -412,19 +421,16 @@ export function createMidiFeature({
         if (!activeInputAlive || !activeOutputAlive) {
           stopSessionRefresh();
           await invoke("stop_midi_device").catch(() => { });
+          const displayInputName = connectedInputName || pref.inputDeviceName || connectedInputId;
+          const displayOutputName = connectedOutputName || pref.outputDeviceName || connectedOutputId;
           setConnectedState("", "", "", "");
-          const unavailable = prefAvailable
-            ? getPreferredUnavailableLabels()
-            : {
-              input: unavailableDeviceLabel(connectedInputName, connectedInputId, "Input"),
-              output: unavailableDeviceLabel(connectedOutputName, connectedOutputId, "Output"),
-            };
           if (typeof showMain === "function") {
-            showMain(unavailable.input, unavailable.output);
+            showMain(displayInputName, displayOutputName, { connected: false });
           }
           if (d.midiStatus) {
-            d.midiStatus.textContent = "Current profile MIDI device became unavailable.";
+            d.midiStatus.textContent = "MIDI device disconnected.";
           }
+          await refreshMidiDevices();
           return;
         }
       }
@@ -462,7 +468,10 @@ export function createMidiFeature({
     }
     autoRefreshTimer = setInterval(async () => {
       const devices = await refreshFn();
-      if (devices.inputs.length > 0) {
+      if (devices.inputs.length > 0 && devices.outputs.length > 0) {
+        await checkAvailabilityLoop().catch(() => { });
+      }
+      if (connectedInputId && connectedOutputId) {
         stopAutoRefresh();
       }
     }, 1500);
@@ -567,9 +576,28 @@ export function createMidiFeature({
       }
 
       if ((!devices || devices.length === 0) && (!outputDevices || outputDevices.length === 0)) {
+        if (pref.inputDeviceId) {
+          ensureOption(
+            d.midiSelect,
+            pref.inputDeviceId,
+            unavailableDeviceLabel(pref.inputDeviceName, pref.inputDeviceId, "Input"),
+            true,
+          );
+        }
+        if (pref.outputDeviceId) {
+          ensureOption(
+            d.midiOutputSelect,
+            pref.outputDeviceId,
+            unavailableDeviceLabel(pref.outputDeviceName, pref.outputDeviceId, "Output"),
+            true,
+          );
+        }
+        if (d.midiSelect && pref.inputDeviceId) d.midiSelect.value = pref.inputDeviceId;
+        if (d.midiOutputSelect && pref.outputDeviceId) d.midiOutputSelect.value = pref.outputDeviceId;
         if (d.midiStatus) {
           d.midiStatus.textContent = "Searching for devices...";
         }
+        renderDeviceDropdowns();
         startAutoRefresh(refreshMidiDevices);
         return { inputs: [], outputs: [] };
       }
@@ -630,11 +658,15 @@ export function createMidiFeature({
         d.midiOutputSelect.value = previousOutputSelection;
       }
 
-      stopAutoRefresh();
       if (d.midiStatus && !connectedInputId && !connectedOutputId) {
         d.midiStatus.textContent = `Found ${(devices || []).length} inputs, ${(outputDevices || []).length} outputs`;
       }
       renderDeviceDropdowns();
+      if (pref.inputDeviceId && pref.outputDeviceId && !connectedInputId && !connectedOutputId) {
+        startAutoRefresh(refreshMidiDevices);
+      } else {
+        stopAutoRefresh();
+      }
       return { inputs: Array.isArray(devices) ? devices : [], outputs: Array.isArray(outputDevices) ? outputDevices : [] };
     } catch (error) {
       if (d.midiStatus) {
@@ -663,8 +695,13 @@ export function createMidiFeature({
     stopSessionRefresh();
     stopAutoRefresh();
     cancelLearnPanel();
+    const displayInputName = connectedInputName;
+    const displayOutputName = connectedOutputName;
     await invoke("stop_midi_device").catch(() => { });
     setConnectedState("", "", "", "");
+    if (typeof showMain === "function") {
+      showMain(displayInputName, displayOutputName, { connected: false });
+    }
     // User intentionally entered manual selection flow; do not auto-reconnect
     // to the profile's preferred device until they explicitly connect or a profile sync occurs.
     suspendProfileAutoReconnect = true;

@@ -892,35 +892,35 @@
   color: #2f4367;
 }
 
-body.dark-mode .hue-setup-card {
+body.dark-mode:not([data-theme]) .hue-setup-card {
   border-color: #324564;
   background: #1f2a40;
 }
 
-body.dark-mode .hue-tab-strip {
+body.dark-mode:not([data-theme]) .hue-tab-strip {
   background: #22304a;
   border-color: #3b5275;
 }
 
-body.dark-mode .hue-mode-btn {
+body.dark-mode:not([data-theme]) .hue-mode-btn {
   background: #2a3958;
   border-color: #456089;
   color: #d9e5ff;
 }
 
-body.dark-mode .hue-mode-btn.active {
+body.dark-mode:not([data-theme]) .hue-mode-btn.active {
   background: #4f70a7;
   border-color: #4f70a7;
   color: #f5f8ff;
 }
 
-body.dark-mode .hue-refresh-btn {
+body.dark-mode:not([data-theme]) .hue-refresh-btn {
   background: #2b3a57;
   border-color: #496796;
   color: #dbe8ff;
 }
 
-body.dark-mode .hue-summary-text {
+body.dark-mode:not([data-theme]) .hue-summary-text {
   color: #d8e4fb;
 }
 
@@ -954,4 +954,2284 @@ body.dark-mode .hue-summary-text {
   color: #5c6280;
   max-width: 400px;
   margin: 0 0 16px;
+}
+
+/* Final inline plugins page overrides after legacy plugin styles */
+.app-page .connections-panel-content {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-bg-2);
+  box-shadow: none;
+}
+
+.app-page .connections-panel-body {
+  height: 100%;
+  min-height: 0;
+}
+
+.app-page .connections-sidebar {
+  width: 220px;
+  padding: 14px 10px;
+  background: #121820;
+  border-right-color: var(--line);
+}
+
+.app-page .connections-content {
+  background: var(--panel-bg-2);
+  padding: 18px 22px;
+}
+
+body.dark-mode:not([data-theme]) .app-page .connection-item-header,
+body.dark-mode:not([data-theme]) .app-page .plugins-manager-row,
+body.dark-mode:not([data-theme]) .app-page .plugins-store-row,
+body.dark-mode:not([data-theme]) .app-page .connection-description {
+  background: #121820;
+  border-color: var(--line);
+}
+
+body.dark-mode:not([data-theme]) .app-page .connections-nav-item.active {
+  background: #1b2430;
+  border-color: rgba(90, 167, 255, 0.44);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Final redesign polish: keep this after legacy component rules. */
+body.dark-mode:not([data-theme]) .topbar {
+  background: #11161d;
+  border-bottom-color: #252c35;
+}
+
+body.dark-mode:not([data-theme]) .app-sidebar {
+  background: #0f151c;
+  border-right-color: #252c35;
+}
+
+body.dark-mode:not([data-theme]) main {
+  background: #0b1017;
+}
+
+.sidebar-nav-item .nav-icon,
+.topbar-icon-button,
+.binding-add-button,
+.binding-search-field,
+.binding-filter-button,
+.binding-action {
+  color: inherit;
+}
+
+.sidebar-nav-item .nav-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+}
+
+.sidebar-nav-item svg,
+.topbar-icon-button svg,
+.binding-add-button svg,
+.binding-search-field svg,
+.binding-filter-button svg,
+.binding-action svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+
+body.dark-mode:not([data-theme]) .sidebar-nav-item {
+  color: #c7d0dc;
+}
+
+body.dark-mode:not([data-theme]) .sidebar-nav-item .nav-icon {
+  color: #aeb8c5;
+}
+
+body.dark-mode:not([data-theme]) .sidebar-nav-item.active {
+  background: #1a212a;
+  border-color: transparent;
+  box-shadow: inset 4px 0 0 var(--accent);
+  color: #ffffff;
+}
+
+body.dark-mode:not([data-theme]) .sidebar-nav-item.active .nav-icon {
+  color: var(--accent-strong);
+}
+
+body.dark-mode:not([data-theme]) .topbar-icon-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #aeb8c5;
+}
+
+body.dark-mode:not([data-theme]) .topbar-icon-button:hover {
+  background: #151c25;
+  border-color: #303945;
+  color: #edf3fa;
+}
+
+.page-heading-row {
+  align-items: center;
+  gap: 18px;
+}
+
+.bindings-toolbar {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 16px;
+}
+
+body.dark-mode:not([data-theme]) .binding-add-button,
+body.dark-mode:not([data-theme]) .binding-filter-button,
+body.dark-mode:not([data-theme]) .binding-search-field {
+  height: 42px;
+  border: 1px solid #303945;
+  border-radius: 4px;
+  background: #111820;
+  box-shadow: none;
+}
+
+body.dark-mode:not([data-theme]) .binding-add-button {
+  width: auto;
+  min-width: 154px;
+  justify-content: center;
+  color: var(--accent-strong);
+  font-size: 16px;
+  font-weight: 500;
+  padding: 0 18px;
+}
+
+body.dark-mode:not([data-theme]) .binding-add-button:hover {
+  background: #162130;
+  border-color: #3b4756;
+  color: #8fc6ff;
+}
+
+body.dark-mode:not([data-theme]) .binding-search-field {
+  width: 276px;
+  min-width: 276px;
+  color: #8a94a1;
+  padding: 0 14px;
+}
+
+body.dark-mode:not([data-theme]) .binding-search-field input {
+  background: transparent;
+  color: #dce4ed;
+  font-size: 16px;
+  padding: 0;
+}
+
+body.dark-mode:not([data-theme]) .binding-search-field input::placeholder {
+  color: #8d96a3;
+}
+
+body.dark-mode:not([data-theme]) .binding-filter-button {
+  min-width: 150px;
+  justify-content: center;
+  color: #d3dbe5;
+  padding: 0 16px;
+}
+
+body.dark-mode:not([data-theme]) .binding-filter-button:disabled {
+  opacity: 1;
+  color: #d3dbe5;
+  background: #111820;
+}
+
+body.dark-mode:not([data-theme]) .bindings-card {
+  background: #151b23;
+  border-color: #2b333d;
+}
+
+body.dark-mode:not([data-theme]) .binding-headers,
+body.dark-mode:not([data-theme]) .binding-row {
+  border-color: #2b333d;
+}
+
+body.dark-mode:not([data-theme]) .binding-row {
+  background: #171e26;
+}
+
+body.dark-mode:not([data-theme]) .binding-row:hover {
+  background: #1b232d;
+}
+
+body.dark-mode:not([data-theme]) .binding-row .target-button {
+  border-color: #323d49;
+  background: #111820;
+}
+
+.binding-row .target-chip .target-tag,
+.mode-chip .target-tag,
+.mode-chip .mode-chip-icon {
+  display: none;
+}
+
+.mode-chip {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+}
+
+.mode-chip .target-label-content {
+  gap: 0;
+}
+
+body.dark-mode:not([data-theme]) .binding-action {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #aeb8c5;
+}
+
+body.dark-mode:not([data-theme]) .binding-action:hover {
+  background: #202a35;
+  color: #edf3fa;
+}
+
+body.dark-mode:not([data-theme]) .binding-action.delete {
+  color: #ff5a5f;
+}
+
+body.dark-mode:not([data-theme]) .binding-action.delete:hover {
+  background: rgba(255, 90, 95, 0.12);
+  color: #ff787c;
+}
+
+.binding-action svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.9;
+}
+
+.binding-volume-slider {
+  accent-color: var(--accent);
+}
+
+.binding-volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #dbe2ea;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.binding-volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #dbe2ea;
+}
+
+.topbar .midi-device-dropdown .target-button .target-display::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-muted);
+  box-shadow: none;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.topbar .midi-device-dropdown.device-connected .target-button .target-display::after {
+  background: var(--success);
+  box-shadow: 0 0 0 2px rgba(82, 211, 128, 0.08);
+}
+
+.topbar .midi-device-dropdown.device-unavailable .target-button .target-display::after {
+  background: var(--danger);
+  box-shadow: 0 0 0 2px rgba(244, 90, 112, 0.1);
+}
+
+.topbar .midi-device-dropdown .target-button .target-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.topbar .midi-device-dropdown .target-button .target-label,
+.topbar .midi-device-dropdown .target-button .target-label-content,
+.topbar .midi-device-dropdown .target-button .target-label-main,
+.profile-select .select-button #profile-current {
+  min-width: 0;
+}
+
+.topbar .midi-device-dropdown .target-button .target-label-content,
+.profile-select .select-button #profile-current {
+  overflow: hidden;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar .midi-device-dropdown .target-button .target-label-content::-webkit-scrollbar,
+.profile-select .select-button #profile-current::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar .midi-device-dropdown .target-button .target-label-main,
+.profile-select .select-button #profile-current {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar .midi-device-dropdown .target-button {
+  background: #111820;
+  border-color: #303945;
+}
+
+/* Requested table/nav simplification pass */
+:root {
+  --bindings-grid-cols: 52px minmax(170px, 1fr) minmax(140px, 160px) minmax(220px, 1fr) minmax(250px, 0.72fr) minmax(148px, 164px);
+  --bindings-grid-gap: 24px;
+}
+
+body.osd-only,
+body.osd-only.dark-mode {
+  background: transparent !important;
+}
+
+body.osd-only .app-shell {
+  display: none !important;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .select-button,
+body.dark-mode:not([data-theme]) .topbar .midi-device-dropdown .target-button {
+  min-height: 40px;
+  height: 40px;
+  border: 1px solid #303945;
+  border-radius: 4px;
+  background: #111820;
+  color: var(--text);
+  box-shadow: none;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .select-button:hover,
+body.dark-mode:not([data-theme]) .topbar .midi-device-dropdown .target-button:hover {
+  background: #151d27;
+  border-color: #3a4654;
+}
+
+.profile-select .dropdown,
+.target-dropdown .target-menu {
+  border-radius: 4px;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown,
+body.dark-mode:not([data-theme]) .target-dropdown .target-menu {
+  background: #0f151c;
+  border: 1px solid #303945;
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.46);
+  padding: 6px;
+  gap: 4px;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown {
+  min-width: 328px;
+  right: auto;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item,
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item.create,
+body.dark-mode:not([data-theme]) .target-dropdown .target-option {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #121922;
+  color: var(--text);
+  outline: none;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item:hover,
+body.dark-mode:not([data-theme]) .target-dropdown .target-option:hover {
+  background: #1a232e;
+  border-color: #2d3846;
+}
+
+body.dark-mode:not([data-theme]) .target-dropdown .target-option.selected {
+  background: #1b2633;
+  border-color: #4f7fb7;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item.create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 8px;
+  background: #101722;
+  border-color: #293445;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item.create input {
+  height: 34px;
+  border-radius: 4px;
+  border-color: #303945;
+  background: #111820;
+  color: var(--text);
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item button,
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item button:first-child,
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item button.icon-action {
+  height: 34px;
+  min-height: 34px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: #121922;
+  color: var(--text);
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item button:hover,
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item button:first-child:hover,
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item button.icon-action:hover {
+  background: #1c2530;
+  border-color: #2f3a48;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item .delete {
+  color: #9aa6b5;
+}
+
+body.dark-mode:not([data-theme]) .profile-select .dropdown-item .delete:hover {
+  color: var(--danger);
+}
+
+.binding-headers,
+.binding-row {
+  grid-template-columns: var(--bindings-grid-cols);
+}
+
+.binding-headers {
+  min-width: 1080px;
+}
+
+.binding-row {
+  min-width: 1080px;
+}
+
+.list-item.binding-item {
+  min-width: 1080px;
+}
+
+.binding-index {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: auto 12px;
+  align-items: center;
+  column-gap: 8px;
+  width: 44px;
+  color: #d2dae5;
+  cursor: grab;
+}
+
+.binding-index::after {
+  content: "";
+  width: 10px;
+  height: 16px;
+  opacity: 0.55;
+  background:
+    radial-gradient(circle, currentColor 1.2px, transparent 1.4px) 0 0 / 5px 5px,
+    radial-gradient(circle, currentColor 1.2px, transparent 1.4px) 5px 0 / 5px 5px;
+}
+
+.binding-index:hover::after {
+  opacity: 0.95;
+}
+
+.binding-index:active {
+  cursor: grabbing;
+}
+
+.mode-dropdown .target-display {
+  color: var(--text);
+}
+
+.mode-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+body.dark-mode:not([data-theme]) .mode-dropdown .target-button,
+body.dark-mode:not([data-theme]) .binding-row .target-button {
+  background: #111820;
+  border-color: #303945;
+}
+
+body.dark-mode:not([data-theme]) .mode-dropdown .target-button:hover,
+body.dark-mode:not([data-theme]) .binding-row .target-button:hover {
+  background: #151d27;
+  border-color: #3a4654;
+}
+
+.binding-actions {
+  gap: 16px;
+}
+
+:root {
+  --bindings-grid-cols: 36px minmax(170px, 1fr) minmax(140px, 160px) minmax(220px, 1fr) minmax(250px, 0.72fr) minmax(148px, 164px);
+  --bindings-grid-gap: 24px;
+}
+
+body[data-theme] {
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+body[data-theme] .app-shell {
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+body[data-theme] .app-sidebar {
+  background: var(--sidebar-bg);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .topbar {
+  background: var(--topbar-bg);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .topbar-divider {
+  background: var(--control-border);
+}
+
+body[data-theme] .topbar-label,
+body[data-theme] .sidebar-device-meta,
+body[data-theme] .connection-description,
+body[data-theme] .plugins-manager-meta,
+body[data-theme] .plugins-store-meta,
+body[data-theme] .settings-description,
+body[data-theme] .option-help,
+body[data-theme] .empty-state,
+body[data-theme] .midi-inline-status {
+  color: var(--text-muted);
+}
+
+body[data-theme] .main-screen,
+body[data-theme] .page-section,
+body[data-theme] main {
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+body[data-theme] .nav-item {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .nav-item:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+body[data-theme] .nav-item.active {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+body[data-theme] .bindings-card,
+body[data-theme] .connections-panel-content,
+body[data-theme] .target-panel-content,
+body[data-theme] .settings-section,
+body[data-theme] .plugins-manager-row,
+body[data-theme] .plugins-store-row,
+body[data-theme] .inline-panel,
+body[data-theme] .modal-content,
+body[data-theme] .learn-panel-content {
+  background: var(--surface);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .bindings-card,
+body[data-theme] .settings-section,
+body[data-theme] .plugins-manager-row,
+body[data-theme] .plugins-store-row {
+  box-shadow: none;
+}
+
+body[data-theme] .binding-headers {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-row {
+  background: var(--surface);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-row:hover {
+  background: var(--surface-muted);
+}
+
+body[data-theme] .binding-index {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  grid-template-columns: none;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: grab;
+}
+
+body[data-theme] .binding-index::after {
+  display: none;
+}
+
+body[data-theme] .binding-index:hover,
+body[data-theme] .binding-index:focus-visible {
+  color: var(--text-primary);
+  outline: none;
+}
+
+body[data-theme] .binding-index:active {
+  cursor: grabbing;
+}
+
+body[data-theme] .drag-grip {
+  width: 12px;
+  height: 18px;
+  opacity: 0.72;
+  background:
+    radial-gradient(circle, currentColor 1.25px, transparent 1.45px) 0 1px / 6px 6px,
+    radial-gradient(circle, currentColor 1.25px, transparent 1.45px) 6px 1px / 6px 6px;
+}
+
+body[data-theme] .binding-index:hover .drag-grip,
+body[data-theme] .binding-index:focus-visible .drag-grip {
+  opacity: 1;
+}
+
+body[data-theme] input,
+body[data-theme] select,
+body[data-theme] textarea,
+body[data-theme] .binding-name,
+body[data-theme] .binding-name-input,
+body[data-theme] .binding-search-field,
+body[data-theme] .target-button,
+body[data-theme] .select-button,
+body[data-theme] .profile-select .select-button,
+body[data-theme] .topbar .midi-device-dropdown .target-button,
+body[data-theme] .settings-input,
+body[data-theme] .secondary-action,
+body[data-theme] .danger-action {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+body[data-theme] input::placeholder,
+body[data-theme] textarea::placeholder {
+  color: var(--text-muted);
+}
+
+body[data-theme] .binding-name:hover,
+body[data-theme] .binding-name-input:focus,
+body[data-theme] .binding-search-field:focus-within,
+body[data-theme] .target-button:hover,
+body[data-theme] .select-button:hover,
+body[data-theme] .profile-select .select-button:hover,
+body[data-theme] .topbar .midi-device-dropdown .target-button:hover,
+body[data-theme] .secondary-action:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .profile-select .dropdown,
+body[data-theme] .target-dropdown .target-menu {
+  background: var(--surface-raised);
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  box-shadow: var(--shadow-raised);
+  color: var(--text-primary);
+  padding: 6px;
+  gap: 4px;
+  z-index: 120;
+}
+
+body[data-theme] .topbar .midi-device-dropdown .target-menu {
+  min-width: 100%;
+  width: 100%;
+}
+
+body[data-theme] .profile-select .dropdown {
+  min-width: 100%;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 48px));
+}
+
+body[data-theme] .profile-select .dropdown-item,
+body[data-theme] .profile-select .dropdown-item.create,
+body[data-theme] .target-dropdown .target-option {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--control-bg);
+  color: var(--text-primary);
+  outline: none;
+}
+
+body[data-theme] .profile-select .dropdown-item:hover,
+body[data-theme] .target-dropdown .target-option:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .target-dropdown .target-option.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+body[data-theme] .profile-select .dropdown-item.create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-subtle);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .profile-select .dropdown-item.create input {
+  height: 34px;
+  border-radius: 4px;
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .profile-select .dropdown-item button,
+body[data-theme] .profile-select .dropdown-item button:first-child,
+body[data-theme] .profile-select .dropdown-item button.icon-action {
+  height: 34px;
+  min-height: 34px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: var(--control-bg);
+  color: var(--text-primary);
+}
+
+body[data-theme] .profile-select .dropdown-item button:hover,
+body[data-theme] .profile-select .dropdown-item button:first-child:hover,
+body[data-theme] .profile-select .dropdown-item button.icon-action:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .profile-select .dropdown-item .delete,
+body[data-theme] .profile-select .dropdown-item .delete:disabled {
+  color: var(--text-muted);
+}
+
+body[data-theme] .profile-select .dropdown-item .delete:hover {
+  color: var(--danger);
+}
+
+body[data-theme] .mode-label,
+body[data-theme] .target-label-main,
+body[data-theme] .target-display,
+body[data-theme] .target-label-content {
+  color: var(--text-primary);
+}
+
+body[data-theme] .target-tag,
+body[data-theme] .target-chip {
+  background: var(--chip-bg);
+  border-color: var(--chip-border);
+  color: var(--chip-text);
+}
+
+body[data-theme] .target-chip-remove {
+  color: var(--text-muted);
+}
+
+body[data-theme] .target-chip-remove:hover {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-add-button {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--accent);
+}
+
+body[data-theme] .binding-add-button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-theme] .binding-filter-button {
+  display: none !important;
+}
+
+body[data-theme] .binding-value-cell {
+  gap: 10px;
+  justify-content: start;
+}
+
+body[data-theme] .binding-slider-wrap {
+  flex: 1 1 180px;
+  min-width: 128px;
+}
+
+body[data-theme] .binding-volume-percent {
+  background: var(--surface-muted);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+  text-shadow: none;
+}
+
+body[data-theme] .binding-volume-slider {
+  min-width: 0;
+  max-width: none;
+  background-color: var(--slider-track);
+  accent-color: var(--accent);
+}
+
+body[data-theme] .binding-volume-slider::-webkit-slider-runnable-track {
+  background-color: transparent;
+}
+
+body[data-theme] .binding-volume-slider::-webkit-slider-thumb {
+  background: var(--text-primary);
+  border-color: var(--accent);
+}
+
+body[data-theme] .binding-mute-button {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  padding: 0;
+}
+
+body[data-theme] .binding-mute-button:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-mute-button.muted {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+body[data-theme] .binding-mute-button svg,
+body[data-theme] .binding-action svg,
+body[data-theme] .binding-add-button svg,
+body[data-theme] .binding-search-field svg,
+body[data-theme] .topbar-icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body[data-theme] .binding-action {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-action:hover {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-action.delete,
+body[data-theme] .danger-action,
+body[data-theme] .delete {
+  color: var(--danger);
+}
+
+body[data-theme] .binding-toggle-value {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-toggle-value.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-theme] .topbar-icon-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+body[data-theme] .topbar-icon-button:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .status-dot.connected,
+body[data-theme] .midi-status-dot.connected {
+  background: var(--success);
+}
+
+body[data-theme] .status-dot.disconnected {
+  background: var(--danger);
+}
+
+body[data-theme] .device-card,
+body[data-theme] .plugin-card,
+body[data-theme] .connection-card,
+body[data-theme] .setting-card {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .device-card:hover,
+body[data-theme] .plugin-card:hover,
+body[data-theme] .connection-card:hover {
+  background: var(--surface-muted);
+  border-color: var(--control-border-strong);
+}
+
+/* Final token-driven app UI layer. Keep OSD styling in osd-and-controls.css. */
+body[data-theme] .sidebar-nav-item {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .sidebar-nav-item .nav-icon {
+  color: var(--text-muted);
+}
+
+body[data-theme] .sidebar-nav-item:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+body[data-theme] .sidebar-nav-item.active {
+  background: var(--surface-muted);
+  border-color: transparent;
+  box-shadow: inset 4px 0 0 var(--accent);
+  color: var(--text-primary);
+}
+
+body[data-theme] .sidebar-nav-item.active .nav-icon {
+  color: var(--accent);
+}
+
+body[data-theme] .app-page .connections-sidebar {
+  background: var(--surface-raised);
+  border-right-color: var(--control-border);
+}
+
+body[data-theme] .app-page .connections-content {
+  background: var(--surface);
+}
+
+body[data-theme] .connections-nav-item {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .connections-nav-item:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+body[data-theme] .connections-nav-item.active {
+  background: var(--surface-muted);
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--text-primary);
+}
+
+body[data-theme] .connection-item-header,
+body[data-theme] .plugins-manager-row,
+body[data-theme] .plugins-store-row,
+body[data-theme] .connection-description,
+body[data-theme] .connection-status {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .connection-name,
+body[data-theme] .plugins-manager-row-name,
+body[data-theme] .plugins-store-row-name {
+  color: var(--text-primary);
+}
+
+body[data-theme] .plugins-manager-row-meta,
+body[data-theme] .plugins-store-row-meta,
+body[data-theme] .plugins-store-row-desc,
+body[data-theme] .connection-description p,
+body[data-theme] .plugins-manager-status,
+body[data-theme] .plugins-store-status,
+body[data-theme] .plugins-manager-loading,
+body[data-theme] .plugins-store-empty,
+body[data-theme] .connection-placeholder p {
+  color: var(--text-muted);
+}
+
+body[data-theme] .plugins-store-search,
+body[data-theme] .connection-button,
+body[data-theme] .plugins-manager-add,
+body[data-theme] .plugins-manager-uninstall,
+body[data-theme] .settings-action,
+body[data-theme] .settings-reset,
+body[data-theme] .settings-mini-toggle {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .connection-button:hover,
+body[data-theme] .plugins-manager-add:hover,
+body[data-theme] .plugins-manager-uninstall:hover,
+body[data-theme] .settings-action:hover,
+body[data-theme] .settings-mini-toggle:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .settings-reset,
+body[data-theme] .connection-button.danger,
+body[data-theme] .plugins-manager-uninstall {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+body[data-theme] .settings-reset:hover,
+body[data-theme] .connection-button.danger:hover,
+body[data-theme] .plugins-manager-uninstall:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+body[data-theme] .plugins-toggle-ui {
+  background: var(--slider-track);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .plugins-toggle input:checked + .plugins-toggle-ui {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+body[data-theme] .plugins-toggle input:checked + .plugins-toggle-ui::after {
+  background: var(--accent);
+}
+
+body[data-theme] .settings-maintenance-section,
+body[data-theme] .settings-updates-section {
+  background: var(--surface);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .settings-title,
+body[data-theme] .settings-update-meta-label,
+body[data-theme] .settings-update-meta {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .settings-inline-status.error {
+  color: var(--danger);
+}
+
+body[data-theme] .settings-inline-status.success,
+body[data-theme] .settings-update-status.success {
+  color: var(--success);
+}
+
+body[data-theme] .target-panel {
+  background: var(--overlay-bg);
+}
+
+body[data-theme] .target-panel-content,
+body[data-theme] .alert-panel-content,
+body[data-theme] .learn-panel-content {
+  background: var(--surface);
+  border-color: var(--control-border);
+  box-shadow: var(--shadow-raised);
+  color: var(--text-primary);
+}
+
+body[data-theme] .target-panel-header {
+  border-bottom-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .target-panel-close,
+body[data-theme] .target-panel-back {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .target-panel-close:hover,
+body[data-theme] .target-panel-back:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+body[data-theme] .target-divider,
+body[data-theme] .binding-config-title,
+body[data-theme] .alert-panel-body p,
+body[data-theme] .learn-panel-body {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .target-panel .target-option {
+  background: var(--control-bg);
+  border-color: transparent;
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+body[data-theme] .target-panel .target-option:hover:not(:disabled) {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .target-panel .target-option.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+body[data-theme] .target-panel .target-option.selected:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+}
+
+body[data-theme] .target-panel .target-option:disabled,
+body[data-theme] .target-panel .target-option.unavailable {
+  background: var(--surface-muted);
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+body[data-theme] .target-panel .target-label,
+body[data-theme] .target-panel .target-label-main {
+  color: inherit;
+}
+
+body[data-theme] .target-panel .target-tag,
+body[data-theme] .target-panel .target-badge {
+  background: var(--chip-bg);
+  border-color: var(--chip-border);
+  color: var(--chip-text);
+}
+
+body[data-theme] .target-panel .target-option.selected .target-tag,
+body[data-theme] .target-panel .target-option.selected .target-badge {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-theme] .binding-config-row input[type="text"],
+body[data-theme] .binding-config-label,
+body[data-theme] .binding-config-mode-trigger,
+body[data-theme] .binding-config-mode-option,
+body[data-theme] .binding-config-row .midi-device-dropdown .target-button,
+body[data-theme] .binding-config-actions button,
+body[data-theme] .learn-panel-actions button,
+body[data-theme] .alert-panel-actions button,
+body[data-theme] .alert-panel-actions .secondary {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-row input[type="text"]:focus,
+body[data-theme] .binding-config-mode-trigger:hover,
+body[data-theme] .binding-config-mode-option:hover,
+body[data-theme] .binding-config-row .midi-device-dropdown .target-button:hover,
+body[data-theme] .binding-config-actions button:hover,
+body[data-theme] .learn-panel-actions button:hover,
+body[data-theme] .alert-panel-actions button:hover,
+body[data-theme] .alert-panel-actions .secondary:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .binding-config-inline-badge,
+body[data-theme] .binding-config-mode-option.is-selected,
+body[data-theme] .binding-config-row .midi-device-dropdown .target-option.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-theme] .binding-config-mode-menu,
+body[data-theme] .binding-config-row .midi-device-dropdown .target-menu {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+  box-shadow: var(--shadow-raised);
+}
+
+body[data-theme] .binding-row,
+body[data-theme] .list-item.binding-item {
+  background: var(--surface);
+  border-color: var(--control-border);
+  box-shadow: none;
+}
+
+body[data-theme] .binding-row:hover,
+body[data-theme] .list-item.binding-item:hover {
+  background: var(--surface-muted);
+}
+
+body[data-theme] .binding-name,
+body[data-theme] .binding-name-input,
+body[data-theme] .binding-control-cell,
+body[data-theme] .mode-dropdown .target-button,
+body[data-theme] .binding-row .target-button,
+body[data-theme] .dropdown-item,
+body[data-theme] .dropdown-item button,
+body[data-theme] .dropdown-item button:first-child {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .dropdown-item:hover,
+body[data-theme] .dropdown-item button:hover,
+body[data-theme] .dropdown-item button:first-child:hover,
+body[data-theme] .mode-dropdown .target-button:hover,
+body[data-theme] .binding-row .target-button:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+  color: var(--text-primary);
+}
+
+body[data-theme] .dropdown-item.confirming,
+body[data-theme] .dropdown-item button.delete.confirm {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+body[data-theme] * {
+  scrollbar-color: var(--control-border-strong) var(--surface-raised);
+}
+
+body[data-theme] *::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+body[data-theme] *::-webkit-scrollbar-track {
+  background: var(--surface-raised);
+  border-radius: 10px;
+}
+
+body[data-theme] *::-webkit-scrollbar-thumb {
+  background: var(--control-border-strong);
+  border: 2px solid var(--surface-raised);
+  border-radius: 10px;
+}
+
+body[data-theme] *::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+body[data-theme] *::-webkit-scrollbar-corner {
+  background: var(--surface-raised);
+}
+
+body[data-theme] .osd-position-picker {
+  background: var(--surface-subtle);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+body[data-theme] .osd-position-dot {
+  background: var(--surface-muted);
+  border-color: var(--control-border-strong);
+  box-shadow: none;
+}
+
+body[data-theme] .osd-position-dot.selected {
+  background: var(--text-primary);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+body[data-theme] .bindings-empty,
+body[data-theme] .profile-page-empty,
+body[data-theme] .plugins-store-empty,
+body[data-theme] .plugins-manager-loading {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+  color: var(--text-muted);
+}
+
+body[data-theme] .binding-placeholder,
+body[data-theme] .binding-ghost {
+  background: var(--surface-muted);
+  border-color: var(--control-border-strong);
+  box-shadow: var(--shadow-raised);
+}
+
+body[data-theme] .profile-page-row {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .profile-page-row.active {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+body[data-theme] .profile-page-name {
+  color: var(--text-primary);
+}
+
+body[data-theme] .profile-page-meta {
+  color: var(--text-muted);
+}
+
+body[data-theme] .profile-select .dropdown,
+body[data-theme] .target-dropdown .target-menu,
+body[data-theme] .dropdown {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+  box-shadow: var(--shadow-raised);
+}
+
+body[data-theme] .profile-select .dropdown-item.create input {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .dropdown-item button.icon-action,
+body[data-theme] .profile-select .dropdown-item button.icon-action {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-secondary);
+}
+
+body[data-theme] .dropdown-item button.icon-action:hover,
+body[data-theme] .profile-select .dropdown-item button.icon-action:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-add-button,
+body[data-theme] .binding-filter-button,
+body[data-theme] .binding-search-field,
+body[data-theme] .topbar .midi-device-dropdown .target-button,
+body[data-theme] .profile-select .select-button {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-add-button {
+  color: var(--accent);
+}
+
+body[data-theme] .binding-add-button:hover,
+body[data-theme] .binding-filter-button:hover,
+body[data-theme] .binding-search-field:focus-within,
+body[data-theme] .topbar .midi-device-dropdown .target-button:hover,
+body[data-theme] .profile-select .select-button:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .topbar {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 1fr)
+    1px
+    minmax(320px, 1.15fr)
+    minmax(320px, 1.15fr)
+    1px
+    auto;
+  align-items: center;
+  gap: 26px;
+}
+
+body[data-theme] .topbar-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+body[data-theme] .profile-select,
+body[data-theme] .topbar .midi-device-dropdown {
+  width: 100%;
+  min-width: 0;
+}
+
+body[data-theme] .topbar-icon-button {
+  margin-left: 0;
+}
+
+/* Focused UI cleanup: page chrome, profile menu, binding actions, settings groups. */
+body[data-theme] .page-heading-row {
+  min-height: 56px;
+  margin: 0 0 8px;
+  padding: 0;
+  border-bottom: 0;
+  justify-content: flex-end;
+}
+
+body[data-theme] .page-heading-row h1 {
+  display: none;
+}
+
+body[data-theme] #plugins-page > .page-heading-row,
+body[data-theme] #settings-panel > .page-heading-row {
+  display: none;
+}
+
+body[data-theme] .bindings-toolbar {
+  width: 100%;
+  margin-left: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+body[data-theme] #main-screen {
+  gap: 12px;
+}
+
+body[data-theme] #main-screen > .page-heading-row {
+  min-height: 40px;
+  margin: 0;
+  justify-content: stretch;
+}
+
+body[data-theme] .binding-search-field {
+  grid-column: 1;
+  width: 100%;
+  min-width: 0;
+}
+
+body[data-theme] .binding-add-button {
+  grid-column: 2;
+  justify-self: end;
+}
+
+body[data-theme] .profile-select .select-button,
+body[data-theme] .topbar .midi-device-dropdown .target-button {
+  height: var(--control-h);
+  min-height: var(--control-h);
+  border-radius: 4px;
+  padding: 0 12px;
+  box-shadow: none;
+  width: 100%;
+  min-width: 0;
+}
+
+body[data-theme] .profile-select .select-button {
+  min-width: 0;
+}
+
+body[data-theme] .profile-select .select-button .caret,
+body[data-theme] .topbar .midi-device-dropdown .target-button .caret {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+}
+
+body[data-theme] .profile-select .dropdown {
+  width: 360px;
+  min-width: 360px;
+  padding: 8px;
+  gap: 6px;
+  border-radius: 4px;
+}
+
+@media (max-width: 1280px) {
+  body[data-theme] .topbar {
+    grid-template-columns:
+      minmax(240px, 1fr)
+      1px
+      minmax(270px, 1fr)
+      minmax(270px, 1fr)
+      1px
+      auto;
+    gap: 18px;
+    padding-left: 56px;
+  }
+}
+
+body[data-theme] .profile-menu-tools {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--control-border);
+}
+
+body[data-theme] .profile-menu-create-row,
+body[data-theme] .profile-menu-action-row {
+  display: grid;
+  gap: 8px;
+}
+
+body[data-theme] .profile-menu-create-row {
+  grid-template-columns: minmax(170px, 1fr) auto 34px 34px;
+}
+
+body[data-theme] .profile-select .dropdown-item {
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+
+body[data-theme] .profile-select .dropdown-item:not(.create):hover,
+body[data-theme] .profile-select .dropdown-item.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+body[data-theme] .profile-select .dropdown-item button:first-child {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+body[data-theme] .profile-select .dropdown-item.selected button:first-child {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}
+
+body[data-theme] .profile-select .dropdown-item.selected button:first-child:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}
+
+body[data-theme] .profile-select .dropdown-item.create input,
+body[data-theme] .profile-select .dropdown-item.create button,
+body[data-theme] .profile-select .dropdown-item button.secondary {
+  height: 34px;
+  min-height: 34px;
+  border-radius: 4px;
+}
+
+body[data-theme] .profile-select .dropdown-item.create .icon-action {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+body[data-theme] .profile-select .dropdown-item.create .icon-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body[data-theme] .profile-select .dropdown-item.create button,
+body[data-theme] .profile-select .dropdown-item button.secondary {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+body[data-theme] .profile-select .dropdown-item.create button:hover,
+body[data-theme] .profile-select .dropdown-item button.secondary:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .profile-select .dropdown-item .delete {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+body[data-theme] .profile-select .dropdown-item .delete:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+body[data-theme] .profile-select .dropdown-item.confirming {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px 76px;
+  gap: 8px;
+  align-items: center;
+  background: var(--surface-subtle);
+  border-color: var(--danger);
+}
+
+body[data-theme] .profile-select .dropdown-item.selected.confirming {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+body[data-theme] .profile-select .dropdown-item.confirming button:first-child {
+  min-width: 0;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  background: var(--control-bg);
+  color: var(--text-primary);
+  pointer-events: none;
+}
+
+body[data-theme] .profile-select .dropdown-item.selected.confirming button:first-child {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}
+
+body[data-theme] .profile-select .dropdown-item.confirming button.secondary,
+body[data-theme] .profile-select .dropdown-item.confirming button.delete.confirm {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 10px;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body[data-theme] .profile-select .dropdown-item.confirming button.delete.confirm {
+  border: 1px solid var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+body[data-theme] .profile-select .dropdown-item.confirming button.delete.confirm:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+}
+
+body[data-theme] .binding-actions {
+  justify-content: flex-start;
+  gap: 14px;
+  padding-left: 48px;
+  box-sizing: border-box;
+}
+
+body[data-theme] .binding-actions-header {
+  padding-left: 48px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+body[data-theme] .binding-action,
+body[data-theme] .binding-action.delete {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+}
+
+body[data-theme] .binding-action:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+body[data-theme] .binding-action.delete:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+body[data-theme] .settings-panel-body {
+  border-color: var(--control-border);
+  background: var(--surface);
+}
+
+body[data-theme] .settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
+  gap: 18px 22px;
+  align-items: start;
+}
+
+body[data-theme] .settings-column {
+  display: contents;
+}
+
+body[data-theme] .settings-section {
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--control-border);
+  box-shadow: none;
+}
+
+body[data-theme] .settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 28px;
+}
+
+body[data-theme] .settings-title {
+  margin: 0 0 2px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+body[data-theme] .settings-section-header .settings-title {
+  margin: 0;
+}
+
+body[data-theme] .settings-toggle {
+  width: 44px;
+  min-width: 44px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+body[data-theme] .settings-toggle input {
+  position: absolute;
+  inset: 0;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  appearance: none;
+}
+
+body[data-theme] .settings-toggle .plugins-toggle-ui {
+  width: 44px;
+  height: 24px;
+  flex: 0 0 44px;
+  margin: 0;
+}
+
+body[data-theme] .settings-toggle .plugins-toggle-ui::after {
+  width: 18px;
+  height: 18px;
+}
+
+body[data-theme] .settings-toggle input:checked + .plugins-toggle-ui {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+body[data-theme] .settings-toggle input:checked + .plugins-toggle-ui::after {
+  background: var(--accent);
+  transform: translate(20px, -50%);
+}
+
+body[data-theme] .settings-toggle input:focus-visible + .plugins-toggle-ui {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+body[data-theme] .settings-field-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 340px);
+  gap: 18px;
+  align-items: center;
+}
+
+body[data-theme] .settings-general-section .settings-field-row {
+  grid-template-columns: 150px minmax(0, 1fr);
+}
+
+body[data-theme] .settings-field-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body[data-theme] .settings-field-row .target-dropdown,
+body[data-theme] .settings-field-row select {
+  width: 100%;
+  max-width: 340px;
+}
+
+body[data-theme] .settings-general-section .settings-field-row .target-dropdown,
+body[data-theme] .settings-general-section .settings-field-row select {
+  max-width: none;
+}
+
+body[data-theme] .settings-field-row--position {
+  align-items: start;
+}
+
+body[data-theme] .settings-field-row--position .osd-position-picker {
+  width: min(330px, 100%);
+}
+
+body[data-theme] .settings-bottom-grid {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
+  gap: 22px;
+  align-items: end;
+  margin-top: -42px;
+}
+
+body[data-theme] .settings-maintenance-section,
+body[data-theme] .settings-updates-section {
+  margin-top: 0 !important;
+}
+
+body[data-theme] .settings-maintenance-section .settings-action,
+body[data-theme] .settings-maintenance-section .settings-reset,
+body[data-theme] .settings-updates-section .settings-action {
+  width: 100%;
+  max-width: none;
+  display: block;
+}
+
+body[data-theme] .hue-actions .connection-button[data-role="pair-action"] {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+@media (max-width: 980px) {
+  body[data-theme] .settings-grid,
+  body[data-theme] .settings-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-theme] .settings-bottom-grid {
+    margin-top: 0;
+  }
+
+  body[data-theme] .settings-field-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* Plugin content safety net: plugin UIs should inherit app theme tokens. */
+body[data-theme] .connection-tab,
+body[data-theme] .connection-content-wrapper,
+body[data-theme] .connection-settings,
+body[data-theme] .connection-grid {
+  color: var(--text-primary);
+}
+
+body[data-theme] .connection-content-wrapper,
+body[data-theme] .connection-settings,
+body[data-theme] .connection-placeholder,
+body[data-theme] .hue-setup-card {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .connection-icon {
+  background: var(--surface-muted);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  padding: 4px;
+  object-fit: contain;
+}
+
+body[data-theme] .connections-nav-item .nav-icon {
+  background: var(--surface-muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px;
+  object-fit: contain;
+}
+
+body[data-theme] .connections-nav-item.active .nav-icon {
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .connection-row,
+body[data-theme] .connection-row label,
+body[data-theme] .connection-footer .checkbox-row,
+body[data-theme] .connection-footer .checkbox-row label,
+body[data-theme] .hue-summary-text {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .connection-row input,
+body[data-theme] .hue-mode-btn,
+body[data-theme] .hue-refresh-btn {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .connection-row input:focus,
+body[data-theme] .hue-mode-btn:hover,
+body[data-theme] .hue-refresh-btn:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .hue-tab-strip {
+  background: var(--surface-subtle);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .hue-mode-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-theme] .hue-setup-card .connection-row,
+body[data-theme] .hue-setup-card [role="listbox"],
+body[data-theme] .hue-setup-card [role="option"] {
+  background: var(--surface-subtle);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .hue-setup-card .plugins-manager-row {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .hue-setup-card .plugins-manager-row:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .hue-setup-card .plugins-manager-row input[type="radio"],
+body[data-theme] .hue-actions input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+body[data-theme] .hue-actions,
+body[data-theme] .hue-actions .checkbox-row {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .hue-paired-summary [style*="color"] {
+  color: var(--text-secondary) !important;
+}
+
+body[data-theme] .hue-setup-card [role="option"]:hover,
+body[data-theme] .hue-setup-card [role="option"][aria-selected="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+body[data-theme] .connection-button.connected,
+body[data-theme] .connection-button:disabled,
+body[data-theme] .connection-button.disabled {
+  background: var(--surface-muted);
+  border-color: var(--control-border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Shell refinements: collapsible sidebar, topbar update action, target back icon. */
+.app-shell,
+.app-sidebar,
+.app-name,
+.nav-label,
+.sidebar-nav-item,
+.sidebar-collapse-toggle svg {
+  transition:
+    grid-template-columns 160ms ease,
+    width 160ms ease,
+    opacity 120ms ease,
+    transform 160ms ease,
+    padding 160ms ease;
+}
+
+.sidebar-brand {
+  position: static;
+}
+
+.sidebar-collapse-toggle {
+  position: absolute;
+  right: 0;
+  top: 51px;
+  z-index: 5;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.sidebar-collapse-toggle:hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--accent);
+}
+
+.sidebar-collapse-toggle:active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--accent);
+}
+
+.sidebar-collapse-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 2px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.sidebar-collapse-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 78px minmax(0, 1fr);
+}
+
+.app-shell.sidebar-collapsed .app-sidebar {
+  padding: 14px 10px 20px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-brand {
+  width: 58px;
+  height: 74px;
+  justify-content: center;
+  padding: 0;
+}
+
+.app-shell.sidebar-collapsed .app-name,
+.app-shell.sidebar-collapsed .nav-label {
+  display: none;
+  width: auto;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar-collapse-toggle {
+  right: 0;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar-collapse-toggle:hover {
+  color: var(--accent);
+}
+
+.app-shell.sidebar-collapsed .sidebar-collapse-toggle svg {
+  transform: translateX(32px) rotate(180deg);
+}
+
+.app-shell.sidebar-collapsed .sidebar-nav {
+  align-items: stretch;
+  padding-top: 12px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-nav-item {
+  width: 100%;
+  min-height: 62px;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0 0 0 14px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-nav-item.active {
+  border-left-color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.app-shell.sidebar-collapsed .nav-icon {
+  width: 28px;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbar-update-button {
+  position: relative;
+  color: var(--accent);
+}
+
+.topbar-update-button.hidden {
+  display: none !important;
+}
+
+.topbar-update-button svg,
+.target-panel-back svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.topbar-update-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.topbar-update-button .update-dot {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--control-bg), 0 0 12px rgba(91, 210, 138, 0.55);
+}
+
+body[data-theme] .topbar.has-update {
+  grid-template-columns:
+    minmax(220px, 0.82fr)
+    1px
+    minmax(320px, 1.2fr)
+    minmax(320px, 1.2fr)
+    1px
+    auto;
+}
+
+.target-panel-back {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.target-panel-back svg {
+  width: 18px;
+  height: 18px;
+}
+
+.target-panel-back:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .target-panel-back {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .target-panel-back:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+@media (max-width: 1280px) {
+  body[data-theme] .topbar.has-update {
+    grid-template-columns:
+      minmax(190px, 0.82fr)
+      1px
+      minmax(270px, 1fr)
+      minmax(270px, 1fr)
+      1px
+      auto;
+  }
 }

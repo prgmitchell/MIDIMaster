@@ -4,7 +4,7 @@ use crate::{
 };
 use serde::Serialize;
 use std::process::Command;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Clone, Serialize)]
 pub struct MonitorInfo {
@@ -89,6 +89,29 @@ pub fn update_osd_settings(
     }
 
     crate::AppState::apply_osd_settings(&app, &updated);
+    let _ = app.emit(
+        "osd_settings_update",
+        serde_json::json!({
+            "enabled": updated.enabled,
+            "monitor_index": updated.monitor_index,
+            "monitor_name": updated.monitor_name,
+            "monitor_id": updated.monitor_id,
+            "anchor": updated.anchor,
+        }),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn preview_osd(app: AppHandle, state: State<AppState>) -> Result<(), String> {
+    let payload = serde_json::json!({
+        "target": "Master",
+        "volume": 0.5,
+        "focus_session": null,
+        "binding_id": null,
+        "preview": true
+    });
+    crate::AppState::emit_osd_update(&app, state.inner(), &payload, false);
     Ok(())
 }
 

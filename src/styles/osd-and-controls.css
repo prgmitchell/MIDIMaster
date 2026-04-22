@@ -46,6 +46,32 @@ body.osd-only .osd {
   bottom: 16px;
 }
 
+body.osd-only[data-anchor$="-left"] .osd {
+  align-items: flex-start;
+}
+
+body.osd-only[data-anchor$="-center"] .osd,
+body.osd-only[data-anchor="center"] .osd {
+  align-items: center;
+}
+
+body.osd-only[data-anchor$="-right"] .osd {
+  align-items: flex-end;
+}
+
+body.osd-only[data-anchor^="top"] .osd {
+  justify-content: flex-start;
+}
+
+body.osd-only[data-anchor^="center"] .osd,
+body.osd-only[data-anchor="center"] .osd {
+  justify-content: center;
+}
+
+body.osd-only[data-anchor^="bottom"] .osd {
+  justify-content: flex-end;
+}
+
 .osd-card {
   opacity: 0;
   transform: translateY(10px);
@@ -58,12 +84,13 @@ body.osd-only .osd {
 }
 
 .osd-card {
-  background: rgba(27, 30, 48, 0.94);
-  color: #fff;
+  background: rgba(13, 20, 28, 0.96);
+  color: #f4f8ff;
   padding: 12px 14px;
   border-radius: 12px;
+  border: 1px solid rgba(66, 86, 111, 0.82);
   min-width: 220px;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .osd-header {
@@ -147,7 +174,7 @@ body.osd-only .osd {
 
 .osd-value {
   font-size: 12px;
-  opacity: 0.75;
+  color: #98a8ba;
   min-width: 4.5ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -157,14 +184,14 @@ body.osd-only .osd {
   margin-top: 10px;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(39, 54, 70, 0.95);
   overflow: hidden;
 }
 
 .osd-bar-fill {
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, #7fd0ff, #5aa9ff);
+  background: linear-gradient(90deg, #4fa4ff, #75c3ff);
   transition: width 0.08s linear;
 }
 

@@ -125,7 +125,7 @@ export function createConnectionsPanelController({
   function bindUi() {
     if (d.connectionsPanel) {
       d.connectionsPanel.addEventListener("click", (event) => {
-        if (event.target === d.connectionsPanel) {
+        if (d.connectionsPanel.classList.contains("target-panel") && event.target === d.connectionsPanel) {
           d.closeConnectionsPanel?.();
         }
       });

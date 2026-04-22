@@ -2,7 +2,7 @@ use crate::run_logger;
 use crate::{bindings::BindingKey, model, model::Binding, AppState};
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 fn binding_user_active(state: &AppState, key: &BindingKey, is_note: bool) -> bool {
     if is_note {
@@ -127,8 +127,10 @@ fn emit_integration_binding_triggered(
     integration_id: &str,
     kind: &str,
     data: &serde_json::Value,
+    source: Option<&str>,
+    source_sequence: Option<u64>,
 ) {
-    let payload = serde_json::json!({
+    let mut payload = serde_json::json!({
       "binding_id": binding_id,
       "action": format!("{:?}", action),
       "value": value,
@@ -141,6 +143,12 @@ fn emit_integration_binding_triggered(
         "data": data,
       }
     });
+    if let Some(source) = source {
+        payload["source"] = serde_json::Value::String(source.to_string());
+    }
+    if let Some(source_sequence) = source_sequence {
+        payload["source_sequence"] = serde_json::Value::Number(source_sequence.into());
+    }
     let _ = app.emit("integration_binding_triggered", payload);
 }
 
@@ -150,6 +158,8 @@ fn apply_binding_action_internal(
     binding: &Binding,
     action: model::BindingAction,
     value: f32,
+    source: Option<&str>,
+    source_sequence: Option<u64>,
 ) -> Result<bool, String> {
     let targets = binding.normalized_targets();
     if targets.is_empty() {
@@ -232,6 +242,8 @@ fn apply_binding_action_internal(
                     integration_id,
                     kind,
                     data,
+                    source,
+                    source_sequence,
                 );
                 any_applied = true;
             }
@@ -316,6 +328,8 @@ fn apply_binding_action_internal(
                     integration_id,
                     kind,
                     data,
+                    source,
+                    source_sequence,
                 );
                 any_applied = true;
             }
@@ -674,37 +688,8 @@ pub fn set_binding_feedback(
               "silent": silent
             });
             let _ = app.emit("mute_update", payload.clone());
-            if settings_enabled && !silent {
-                if let Some(osd_window) = app.get_webview_window("osd") {
-                    let _ = osd_window.show();
-                    let _ = osd_window.set_always_on_top(true);
-                    #[cfg(target_os = "windows")]
-                    if let Ok(hwnd) = osd_window.hwnd() {
-                        use windows::Win32::Foundation::HWND;
-                        use windows::Win32::UI::WindowsAndMessaging::{
-                            SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                        };
-                        unsafe {
-                            let _ = SetWindowPos(
-                                HWND(hwnd.0 as _),
-                                Some(HWND_TOPMOST),
-                                0,
-                                0,
-                                0,
-                                0,
-                                SWP_NOMOVE | SWP_NOSIZE,
-                            );
-                        }
-                    }
-                    let _ = osd_window.emit("mute_update", payload.clone());
-                    if let Ok(payload_json) = serde_json::to_string(&payload) {
-                        let script = format!(
-                            "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-                            payload_json
-                        );
-                        let _ = osd_window.eval(&script);
-                    }
-                }
+            if settings_enabled {
+                crate::AppState::emit_osd_update(&app, state.inner(), &payload, silent);
             }
         }
         model::BindingAction::Volume => {
@@ -721,37 +706,8 @@ pub fn set_binding_feedback(
               "silent": silent
             });
             let _ = app.emit("volume_update", payload.clone());
-            if settings_enabled && !silent {
-                if let Some(osd_window) = app.get_webview_window("osd") {
-                    let _ = osd_window.show();
-                    let _ = osd_window.set_always_on_top(true);
-                    #[cfg(target_os = "windows")]
-                    if let Ok(hwnd) = osd_window.hwnd() {
-                        use windows::Win32::Foundation::HWND;
-                        use windows::Win32::UI::WindowsAndMessaging::{
-                            SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                        };
-                        unsafe {
-                            let _ = SetWindowPos(
-                                HWND(hwnd.0 as _),
-                                Some(HWND_TOPMOST),
-                                0,
-                                0,
-                                0,
-                                0,
-                                SWP_NOMOVE | SWP_NOSIZE,
-                            );
-                        }
-                    }
-                    let _ = osd_window.emit("volume_update", payload.clone());
-                    if let Ok(payload_json) = serde_json::to_string(&payload) {
-                        let script = format!(
-                            "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-                            payload_json
-                        );
-                        let _ = osd_window.eval(&script);
-                    }
-                }
+            if settings_enabled {
+                crate::AppState::emit_osd_update(&app, state.inner(), &payload, silent);
             }
         }
         _ => {}
@@ -768,6 +724,8 @@ pub fn apply_binding_action(
     action: Option<model::BindingAction>,
     value: f32,
     silent: Option<bool>,
+    source: Option<String>,
+    source_sequence: Option<u64>,
 ) -> Result<(), String> {
     let binding = {
         let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
@@ -796,14 +754,31 @@ pub fn apply_binding_action(
         return Ok(());
     }
 
-    let any_applied =
-        apply_binding_action_internal(&app, &state, &binding, effective_action.clone(), value)?;
+    let any_applied = apply_binding_action_internal(
+        &app,
+        &state,
+        &binding,
+        effective_action.clone(),
+        value,
+        source.as_deref(),
+        source_sequence,
+    )?;
     if !any_applied {
         run_logger::warn(
             "bindings_cmd",
             "apply_binding_action_no_target_applied",
             &format!("binding_id={} action={:?}", binding.id, effective_action),
         );
+        return Ok(());
+    }
+
+    let is_ui_slider_integration_volume = source.as_deref() == Some("ui_slider")
+        && matches!(effective_action, model::BindingAction::Volume)
+        && binding
+            .normalized_targets()
+            .iter()
+            .any(|target| matches!(target, model::BindingTarget::Integration { .. }));
+    if is_ui_slider_integration_volume {
         return Ok(());
     }
 

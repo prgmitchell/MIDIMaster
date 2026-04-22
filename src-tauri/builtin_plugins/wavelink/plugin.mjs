@@ -11,6 +11,7 @@ const VOLUME_WRITE_EPSILON = 0.002;
 const STATE_REFRESH_DEBOUNCE_MS = 120;
 const LOCAL_WRITE_QUIET_MS = 1200;
 const FEEDBACK_INTENT_HOLD_MS = 1200;
+const UI_FEEDBACK_FLUSH_MS = 24;
 const FEEDBACK_INTENT_MATCH_EPSILON = 0.02;
 let rpcSequence = 10;
 
@@ -170,7 +171,10 @@ export async function activate(ctx) {
   let channelsRefreshTimer = null;
   let mixesRefreshTimer = null;
   let lastLocalVolumeWriteAt = 0;
-  const primaryFeedbackIntentByBinding = new Map(); // binding_id -> { value, at }
+  const primaryFeedbackIntentByBinding = new Map(); // binding_id -> { value, at, source, endpoint_key }
+  const latestUiSliderSequenceByBinding = new Map();
+  const pendingUiFeedbackByBinding = new Map();
+  let uiFeedbackFlushTimer = null;
   const pendingAppInfoByWsId = new Map();
 
   function endpointKey(endpoint) {
@@ -246,6 +250,50 @@ export async function activate(ctx) {
     }
     pendingVolumeWrites.set(key, { endpoint, level });
     scheduleVolumeFlush();
+  }
+
+  function shouldIgnoreStaleFeedbackIntent(intent, endpoint, confirmedValue) {
+    if (!intent) return false;
+    const age = Date.now() - intent.at;
+    const delta = Math.abs(Number(confirmedValue) - Number(intent.value));
+    if (delta <= FEEDBACK_INTENT_MATCH_EPSILON) return false;
+
+    const key = endpointKey(endpoint);
+    const sameEndpoint = !intent.endpoint_key || intent.endpoint_key === key;
+    return sameEndpoint && age < FEEDBACK_INTENT_HOLD_MS;
+  }
+
+  function isStaleUiSliderIntent(bindingId, source, sourceSequence) {
+    if (source !== "ui_slider" || !bindingId) return false;
+    const sequence = Number(sourceSequence);
+    if (!Number.isFinite(sequence) || sequence <= 0) return false;
+
+    const prev = latestUiSliderSequenceByBinding.get(bindingId) || 0;
+    if (sequence < prev) return true;
+    latestUiSliderSequenceByBinding.set(bindingId, sequence);
+    return false;
+  }
+
+  function scheduleUiFeedbackFlush() {
+    if (uiFeedbackFlushTimer) return;
+    uiFeedbackFlushTimer = setTimeout(() => {
+      uiFeedbackFlushTimer = null;
+      flushUiFeedback().catch(() => {});
+    }, UI_FEEDBACK_FLUSH_MS);
+  }
+
+  async function flushUiFeedback() {
+    const pending = Array.from(pendingUiFeedbackByBinding.values());
+    pendingUiFeedbackByBinding.clear();
+    for (const item of pending) {
+      await ctx.feedback.set(item.bindingId, item.level, "Volume", { silent: false });
+    }
+  }
+
+  function queueUiFeedback(bindingId, level, sourceSequence) {
+    if (!bindingId) return;
+    pendingUiFeedbackByBinding.set(bindingId, { bindingId, level, sourceSequence });
+    scheduleUiFeedbackFlush();
   }
 
   function scheduleChannelsRefresh() {
@@ -403,13 +451,12 @@ export async function activate(ctx) {
           }
           if (value != null) {
             const intent = primaryFeedbackIntentByBinding.get(b.id);
-            const now = Date.now();
-            if (intent && (now - intent.at) < FEEDBACK_INTENT_HOLD_MS) {
-              const delta = Math.abs(Number(value) - Number(intent.value));
-              if (delta > FEEDBACK_INTENT_MATCH_EPSILON) {
-                // Ignore stale echo while local write settles.
-                continue;
-              }
+            const endpoint = normalizeEndpoint({ Integration: t });
+            if (shouldIgnoreStaleFeedbackIntent(intent, endpoint, value)) {
+              // Ignore stale echo while local intent settles.
+              continue;
+            }
+            if (intent) {
               primaryFeedbackIntentByBinding.delete(b.id);
             }
             await ctx.feedback.set(b.id, value, "Volume", { silent: true });
@@ -817,6 +864,14 @@ export async function activate(ctx) {
       if (label.endsWith(" (Connecting...)")) label = label.slice(0, -" (Connecting...)".length);
       if (label.endsWith(" (Disconnected)")) label = label.slice(0, -" (Disconnected)".length);
 
+      if (t.kind === "channel_mix") {
+        const channelName = String(data.channel_name || data.name || data.identifier || "").trim();
+        const mixName = String(data.mix_name || data.mixer_name || data.mixer_id || "").trim();
+        if (channelName && mixName && (!label || !label.includes("("))) {
+          label = `${channelName} (${mixName})`;
+        }
+      }
+
       // Back-compat: reconstruct label if older targets didn't store it.
       if (!label) {
         if (t.kind === "mix") {
@@ -909,6 +964,8 @@ export async function activate(ctx) {
       const bindingId = payload?.binding_id;
       const action = payload?.action;
       const value = payload?.value;
+      const source = String(payload?.source || "");
+      const sourceSequence = payload?.source_sequence ?? payload?.sourceSequence;
       const isPrimaryTarget = payload?.is_primary_target !== false;
       const targetIndex = Number(payload?.target_index ?? 0);
       const targetCount = Number(payload?.target_count ?? 1);
@@ -918,12 +975,24 @@ export async function activate(ctx) {
       const level = clamp01(value);
       try {
         if (action === "Volume") {
+          if (isStaleUiSliderIntent(bindingId, source, sourceSequence)) {
+            return;
+          }
+
           // Update UI/OSD and internal state immediately (optimistic), then coalesce
           // websocket writes to keep rapid fader motion smooth.
           // Latch user intent so background sync doesn't snap the motorized fader
           // back to stale levels right after release.
           if (bindingId && isPrimaryTarget) {
-            primaryFeedbackIntentByBinding.set(bindingId, { value: level, at: Date.now() });
+            primaryFeedbackIntentByBinding.set(bindingId, {
+              value: level,
+              at: Date.now(),
+              source,
+              endpoint_key: endpointKey(endpoint),
+            });
+            if (source === "ui_slider") {
+              queueUiFeedback(bindingId, level, sourceSequence);
+            }
           }
 
           if (!wsId) {

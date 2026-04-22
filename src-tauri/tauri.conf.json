@@ -13,9 +13,9 @@
       {
         "label": "main",
         "title": "MIDIMaster",
-        "width": 1040,
+        "width": 1480,
         "height": 740,
-        "minWidth": 1040,
+        "minWidth": 1480,
         "minHeight": 740,
         "visible": false
       }

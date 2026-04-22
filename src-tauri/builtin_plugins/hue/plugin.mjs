@@ -903,7 +903,7 @@ export async function activate(ctx) {
           </div>
         </div>
         <div class="hue-actions" style="display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:8px;align-items:center;margin-top:10px;">
-          <button type="button" class="connection-button" data-role="pair-action" style="min-width:0;width:100%;max-width:320px;margin-top:0;padding:10px 12px;">Start pairing</button>
+          <button type="button" class="connection-button" data-role="pair-action" style="min-width:0;width:100%;margin-top:0;padding:10px 12px;">Start pairing</button>
           <div class="connection-row checkbox-row" style="justify-content:flex-end;margin-top:0;">
             <input type="checkbox" data-role="auto" id="hue-auto-connect" />
             <label for="hue-auto-connect">Auto connect</label>

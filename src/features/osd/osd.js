@@ -210,7 +210,7 @@ export function createOsdFeature({
     if (typeof payload !== "object") return;
 
     const settings = getSettings() || {};
-    if (!settings.enabled && isOsdWindow) {
+    if (!settings.enabled && isOsdWindow && payload.osd_enabled !== true) {
       return;
     }
 

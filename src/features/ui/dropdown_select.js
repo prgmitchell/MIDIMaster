@@ -20,6 +20,8 @@ export function createSelectDropdownShell({
   button.type = "button";
   button.className = "target-button";
   button.title = title;
+  button.setAttribute("aria-haspopup", "listbox");
+  button.setAttribute("aria-expanded", "false");
 
   const display = document.createElement("span");
   display.className = "target-display";
@@ -49,6 +51,7 @@ export function renderNativeSelectDropdown({
   closeDropdowns = () => closeOpenDropdowns({ except: null }),
   formatOptionText = (opt) => opt.textContent || "",
   getOptionBadges = () => [],
+  getDisplayBadges = getOptionBadges,
   onOptionSelected = null,
   truncateMenuLabels = false,
   truncateDisplayLabel = true,
@@ -92,7 +95,7 @@ export function renderNativeSelectDropdown({
 
   renderLabelWithBadges(entry.display, {
     text: activeOption ? formatOptionText(activeOption) : fallbackText,
-    badges: activeOption ? getOptionBadges(activeOption) : [],
+    badges: activeOption ? getDisplayBadges(activeOption) : [],
     truncate: truncateDisplayLabel,
   });
 }

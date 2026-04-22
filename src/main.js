@@ -292,8 +292,18 @@ const profileDropdown = document.getElementById("profiles-dropdown");
 const profileToggle = document.getElementById("profile-toggle");
 const profileCurrent = document.getElementById("profile-current");
 const profileList = document.getElementById("profile-list");
+const profilePageList = document.getElementById("profile-page-list");
+const profilePageCreateInput = document.getElementById("profile-page-create-input");
+const profilePageCreateButton = document.getElementById("profile-page-create-button");
+const profilePageImportButton = document.getElementById("profile-page-import");
+const profilePageExportCurrentButton = document.getElementById("profile-page-export-current");
 const bindingsContainer = document.getElementById("bindings");
+const bindingSearchInput = document.getElementById("binding-search");
 const mainScreen = document.getElementById("main-screen");
+const appShell = document.querySelector(".app-shell");
+const sidebarCollapseToggle = document.getElementById("sidebar-collapse-toggle");
+const appPages = Array.from(document.querySelectorAll("[data-page-panel]"));
+const appNavItems = Array.from(document.querySelectorAll("[data-page]"));
 const targetPanel = document.getElementById("target-panel");
 const targetPanelList = document.getElementById("target-panel-list");
 const targetPanelTitle = document.getElementById("target-panel-title");
@@ -355,6 +365,7 @@ const learnPanelConfirm = document.getElementById("learn-panel-confirm");
 const learnPanelClose = document.getElementById("learn-panel-close");
 const settingsButton = document.getElementById("settings-button");
 const themeToggleButton = document.getElementById("theme-toggle-button");
+const topbarUpdateButton = document.getElementById("topbar-update-button");
 const settingsPanel = document.getElementById("settings-panel");
 const settingsPanelClose = document.getElementById("settings-panel-close");
 const connectionsButton = document.getElementById("connections-button");
@@ -417,7 +428,9 @@ const mediaStopIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org
 const osdDebugAlways = false;
 const isOsdWindow = new URLSearchParams(window.location.search).has("osd");
 const themeStorageKey = "uiTheme";
+const sidebarCollapsedStorageKey = "sidebarCollapsed";
 const midiInputStorageKey = "midiDeviceId";
+const BACKEND_ECHO_SUPPRESSION_MS = 220;
 const midiOutputStorageKey = "midiOutputDeviceId";
 const midiInputNameStorageKey = "midiDeviceName";
 const midiOutputNameStorageKey = "midiOutputDeviceName";
@@ -453,20 +466,35 @@ function updateThemeToggleMeta(isDark) {
 
 function applyTheme(nextTheme) {
   const isDark = nextTheme === "dark";
+  document.body.dataset.theme = isDark ? "dark" : "light";
   document.body.classList.toggle("dark-mode", isDark);
   updateThemeToggleMeta(isDark);
+}
+
+function muteIconSvg(muted) {
+  if (muted) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m18 9-4 6M14 9l4 6"/></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
+}
+
+function setInlineMuteButtonState(button, muted) {
+  if (!button) return;
+  button.innerHTML = muteIconSvg(Boolean(muted));
+  button.classList.toggle("muted", Boolean(muted));
+  const label = muted ? "Unmute binding target" : "Mute binding target";
+  button.title = label;
+  button.setAttribute("aria-label", label);
 }
 
 function loadStoredTheme() {
   try {
     const stored = localStorage.getItem(themeStorageKey);
-    if (stored === "light" || stored === "dark") {
-      return stored;
-    }
+    if (stored === "light" || stored === "dark") return stored;
   } catch {
     // ignore storage failures
   }
-  return "light";
+  return "dark";
 }
 
 function toggleTheme() {
@@ -478,6 +506,35 @@ function toggleTheme() {
     // ignore storage failures
   }
   invoke("set_theme_preference", { theme: nextTheme }).catch(() => { });
+}
+
+function loadSidebarCollapsed() {
+  try {
+    return localStorage.getItem(sidebarCollapsedStorageKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function applySidebarCollapsed(collapsed) {
+  const isCollapsed = Boolean(collapsed);
+  appShell?.classList?.toggle?.("sidebar-collapsed", isCollapsed);
+  if (!sidebarCollapseToggle) return;
+  const label = isCollapsed ? "Expand sidebar" : "Collapse sidebar";
+  sidebarCollapseToggle.setAttribute("aria-label", label);
+  sidebarCollapseToggle.setAttribute("aria-pressed", String(isCollapsed));
+  sidebarCollapseToggle.setAttribute("title", label);
+  sidebarCollapseToggle.title = label;
+}
+
+function toggleSidebarCollapsed() {
+  const next = !appShell?.classList?.contains?.("sidebar-collapsed");
+  applySidebarCollapsed(next);
+  try {
+    localStorage.setItem(sidebarCollapsedStorageKey, String(next));
+  } catch {
+    // ignore storage failures
+  }
 }
 
 function getSavedMidiDeviceIds() {
@@ -557,7 +614,7 @@ async function hydrateClientPreferences() {
     }
 
     const savedTheme = settings.ui_theme ?? settings.uiTheme;
-    if (savedTheme === "light" || savedTheme === "dark") {
+    if (savedTheme === "dark" || savedTheme === "light") {
       applyTheme(savedTheme);
       try {
         localStorage.setItem(themeStorageKey, savedTheme);
@@ -685,13 +742,57 @@ if (isOsdWindow) {
   document.body.classList.add("osd-only");
 } else {
   applyTheme(loadStoredTheme());
+  applySidebarCollapsed(loadSidebarCollapsed());
 }
 
-function showMain(inputName, outputName) {
+function stripDeviceStateSuffix(label) {
+  return String(label || "")
+    .replace(/\s*\((?:Unavailable|Disconnected)\)\s*$/i, "")
+    .trim();
+}
+
+function showMain(inputName, outputName, options = {}) {
   mainScreen?.classList?.remove?.("hidden");
-  const input = String(inputName || "").trim() || "Not selected";
-  const output = String(outputName || "").trim() || "Not selected";
+  const input = stripDeviceStateSuffix(inputName) || "Not selected";
+  const output = stripDeviceStateSuffix(outputName) || "Not selected";
   midiStatus.textContent = `Input: ${input} | Output: ${output}`;
+}
+
+async function preparePage(page) {
+  if (page === "plugins") {
+    await openConnectionsPanel();
+    return;
+  }
+  if (page === "profiles") {
+    await profilesFeature?.refreshProfiles?.(activeProfileName || "Default");
+    return;
+  }
+  if (page === "settings") {
+    await loadOsdSettings();
+    await loadMonitorOptions();
+    await loadAppSettings();
+    await settingsFeature?.loadCurrentAppVersion?.();
+    syncAppSettingsUI(appSettings);
+  }
+}
+
+async function switchAppPage(page) {
+  const nextPage = String(page || "bindings");
+  appPages.forEach((panel) => {
+    const active = panel.dataset.pagePanel === nextPage;
+    panel.classList.toggle("active", active);
+    panel.classList.toggle("hidden", !active);
+  });
+  appNavItems.forEach((item) => {
+    const active = item.dataset.page === nextPage;
+    item.classList.toggle("active", active);
+    if (active) {
+      item.setAttribute("aria-current", "page");
+    } else {
+      item.removeAttribute("aria-current");
+    }
+  });
+  await preparePage(nextPage);
 }
 
 function startSessionRefresh() {
@@ -708,6 +809,29 @@ async function refreshMidiDevices() {
 
 function updateSliderFill(slider) {
   bindingsFeature?.updateSliderFill?.(slider);
+}
+
+function setBindingSliderVolume(slider, volume, options = {}) {
+  if (!slider) return;
+  if (bindingsFeature?.setSliderVolume) {
+    bindingsFeature.setSliderVolume(slider, volume, options);
+    return;
+  }
+  const next = Number(volume);
+  if (!Number.isFinite(next)) return;
+  slider.value = String(next);
+  updateSliderFill(slider);
+  const percent = slider.closest(".binding-value-cell")?.querySelector(".binding-volume-percent");
+  if (percent) {
+    percent.textContent = `${Math.round(next * 100)}%`;
+  }
+  const bindingId = options.bindingId || slider.dataset.bindingId;
+  if (bindingId) {
+    bindingLastValues[bindingId] = next;
+  }
+  if (options.markMidiUpdate) {
+    slider.dataset.lastMidiUpdate = Date.now().toString();
+  }
 }
 
 function flashBindingTrigger(bindingId) {
@@ -879,6 +1003,7 @@ settingsFeature = createSettingsFeature({
     settingsUpdateStatus,
     updateCurrentVersion,
     updateLatestVersion,
+    topbarUpdateButton,
   },
   getOsdSettings: () => osdSettings,
   setOsdSettings: (next) => { osdSettings = next; },
@@ -886,6 +1011,7 @@ settingsFeature = createSettingsFeature({
   setMonitorOptions: (next) => { monitorOptions = next; },
   getAppSettings: () => appSettings,
   setAppSettings: (next) => { appSettings = next; },
+  onUpdateAvailableClick: showUpdateAvailableDialog,
 });
 settingsFeature.bindUi();
 
@@ -896,6 +1022,11 @@ profilesFeature = createProfilesFeature({
     profileToggle,
     profileCurrent,
     profileList,
+    profilePageList,
+    profilePageCreateInput,
+    profilePageCreateButton,
+    profilePageImportButton,
+    profilePageExportCurrentButton,
   },
   defaultOsdSettings,
   getActiveProfileName: () => activeProfileName,
@@ -967,6 +1098,7 @@ bindingsFeature = createBindingsFeature({
   invoke,
   dom: {
     bindingsContainer,
+    bindingSearchInput,
     bindingConfigPanel,
     bindingConfigClose,
     bindingConfigName,
@@ -1389,10 +1521,48 @@ const showAlert = (title, message = "") => alertsController.showAlert(message, t
 const showChoices = (options = {}) => alertsController.showChoices(options);
 const closeAlert = (...args) => alertsController.closeAlert(...args);
 
+function showUpdateAvailableDialog(info = {}) {
+  const latest = String(info.latestVersion || info.version || "").trim();
+  const current = String(info.currentVersion || info.current_version || "").trim();
+  if (!latest) return Promise.resolve("close");
+  return showChoices({
+    title: "Update Available",
+    message: `MIDIMaster ${latest} is available (current: ${current || "unknown"})`,
+    options: [
+      { id: "skip", label: "Skip Update", variant: "secondary" },
+      { id: "install", label: "Download and Install", variant: "primary" },
+    ],
+  }).then((choice) => {
+    if (choice === "skip") {
+      try {
+        localStorage.setItem("updaterSkippedVersion", latest);
+      } catch {
+        // ignore storage failures
+      }
+      return choice;
+    }
+    if (choice === "install") {
+      settingsFeature?.installAvailableUpdate?.();
+    }
+    return choice;
+  });
+}
+
 connectionsController?.bindUi?.();
+
+appNavItems.forEach((item) => {
+  item.addEventListener("click", async () => {
+    const page = item.dataset.page || "bindings";
+    await switchAppPage(page);
+  });
+});
 
 if (themeToggleButton) {
   themeToggleButton.addEventListener("click", toggleTheme);
+}
+
+if (sidebarCollapseToggle) {
+  sidebarCollapseToggle.addEventListener("click", toggleSidebarCollapsed);
 }
 
 alertsController.bindUi();
@@ -1627,6 +1797,29 @@ document.addEventListener("pointercancel", () => {
 
 
 async function setupListeners() {
+  await listen("osd_settings_update", (event) => {
+    let payload = event.payload;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        return;
+      }
+    }
+    if (!payload || typeof payload !== "object") return;
+    osdSettings = {
+      enabled: Boolean(payload.enabled),
+      monitorIndex: Number(payload.monitor_index ?? payload.monitorIndex ?? 0),
+      monitorName: payload.monitor_name ?? payload.monitorName ?? null,
+      monitorId: payload.monitor_id ?? payload.monitorId ?? null,
+      anchor: payload.anchor || "top-right",
+    };
+    document.body.setAttribute("data-anchor", osdSettings.anchor || "top-right");
+    if (!osdSettings.enabled && isOsdWindow) {
+      hideVolumeOsd();
+    }
+  });
+
   await listen("bindings_migrated", (event) => {
     let payload = event.payload;
     if (typeof payload === "string") {
@@ -1770,9 +1963,10 @@ async function setupListeners() {
     const directSlider = binding.id ? allSliders.find(s => s.dataset.bindingId === binding.id) : null;
 
     if (directSlider) {
-      directSlider.value = volume;
-      updateSliderFill(directSlider);
-      directSlider.dataset.lastMidiUpdate = Date.now().toString();
+      setBindingSliderVolume(directSlider, volume, {
+        bindingId: binding.id,
+        markMidiUpdate: true,
+      });
     }
 
     if (!bindingHasIntegrationTarget(binding)) {
@@ -1815,8 +2009,7 @@ async function setupListeners() {
         }
       }
       if (!shouldUpdate) return;
-      btn.innerHTML = payload.muted ? "\ud83d\udd07" : "\ud83d\udd0a";
-      btn.classList.toggle("muted", payload.muted);
+      setInlineMuteButtonState(btn, payload.muted);
     });
 
     if (!payload.silent) {
@@ -1856,10 +2049,10 @@ async function setupListeners() {
       const s = document.querySelector(`.binding-volume-slider[data-binding-id="${payload.binding_id}"]`);
       if (s) {
         const lastMidi = Number(s.dataset.lastMidiUpdate || 0);
-        // If user moved fader < 1s ago, ignore backend echo
-        if (Date.now() - lastMidi > 1000) {
-          s.value = payload.volume;
-          updateSliderFill(s);
+        // Ignore immediate backend echo briefly so hardware feedback does not
+        // fight the active user move, but release control quickly afterward.
+        if (Date.now() - lastMidi > BACKEND_ECHO_SUPPRESSION_MS) {
+          setBindingSliderVolume(s, payload.volume, { bindingId: payload.binding_id });
         }
       }
     }
@@ -1870,12 +2063,11 @@ async function setupListeners() {
       if (payload.binding_id && slider.dataset.bindingId === payload.binding_id) return;
 
       const lastMidi = Number(slider.dataset.lastMidiUpdate || 0);
-      if (Date.now() - lastMidi > 1000) {
+      if (Date.now() - lastMidi > BACKEND_ECHO_SUPPRESSION_MS) {
         try {
           const t = JSON.parse(slider.dataset.targetJson);
           if (targetsMatch(t, payload.target)) {
-            slider.value = payload.volume;
-            updateSliderFill(slider);
+            setBindingSliderVolume(slider, payload.volume);
           }
         } catch (e) { }
       }
@@ -1972,6 +2164,7 @@ async function init() {
   await setupListeners().catch(() => { });
   if (isOsdWindow) {
     await loadOsdSettings();
+    document.body.setAttribute("data-anchor", osdSettings.anchor || "top-right");
     await refreshSessions().catch(() => { });
     setInterval(() => {
       refreshSessions().catch(() => { });
@@ -2010,26 +2203,7 @@ async function init() {
       } catch {
         // ignore storage failures
       }
-      showChoices({
-        title: "Update Available",
-        message: `MIDIMaster ${latest} is available (current: ${current || "unknown"})`,
-        options: [
-          { id: "skip", label: "Skip Update", variant: "secondary" },
-          { id: "install", label: "Download and Install", variant: "primary" },
-        ],
-      }).then((choice) => {
-        if (choice === "skip") {
-          try {
-            localStorage.setItem(skippedVersionKey, latest);
-          } catch {
-            // ignore storage failures
-          }
-          return;
-        }
-        if (choice === "install") {
-          settingsFeature?.installAvailableUpdate?.();
-        }
-      });
+      showUpdateAvailableDialog({ latestVersion: latest, currentVersion: current });
     }).catch(() => { });
   }
 }

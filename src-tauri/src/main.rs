@@ -236,6 +236,80 @@ impl AppState {
         }
     }
 
+    pub(crate) fn emit_osd_update(
+        app: &AppHandle,
+        state: &AppState,
+        payload: &serde_json::Value,
+        silent: bool,
+    ) {
+        let settings = state
+            .osd_settings
+            .lock()
+            .map(|settings| settings.clone())
+            .unwrap_or_else(|_| OsdSettings::default());
+
+        if !settings.enabled || silent {
+            if !settings.enabled {
+                if let Some(osd_window) = app.get_webview_window("osd") {
+                    let _ = osd_window.hide();
+                }
+            }
+            return;
+        }
+
+        if let Ok(mut last_update) = state.osd_last_update.lock() {
+            *last_update = Some(Instant::now());
+        }
+
+        AppState::apply_osd_settings(app, &settings);
+
+        let Some(osd_window) = app.get_webview_window("osd") else {
+            return;
+        };
+
+        let _ = osd_window.show();
+        let _ = osd_window.set_always_on_top(true);
+
+        #[cfg(target_os = "windows")]
+        if let Ok(hwnd) = osd_window.hwnd() {
+            use windows::Win32::Foundation::HWND;
+            use windows::Win32::UI::WindowsAndMessaging::{
+                SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+            };
+            unsafe {
+                let _ = SetWindowPos(
+                    HWND(hwnd.0 as _),
+                    Some(HWND_TOPMOST),
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE,
+                );
+            }
+        }
+
+        let mut osd_payload = payload.clone();
+        if let Some(map) = osd_payload.as_object_mut() {
+            map.insert("osd_enabled".to_string(), serde_json::Value::Bool(true));
+        }
+
+        let event_name =
+            if osd_payload.get("action").and_then(|value| value.as_str()) == Some("toggle_mute") {
+                "mute_update"
+            } else {
+                "volume_update"
+            };
+        let _ = osd_window.emit(event_name, osd_payload.clone());
+        if let Ok(payload_json) = serde_json::to_string(&osd_payload) {
+            let script = format!(
+                "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
+                payload_json
+            );
+            let _ = osd_window.eval(&script);
+        }
+    }
+
     fn apply_app_settings(_app: &AppHandle, settings: &AppSettings) {
         #[cfg(target_os = "windows")]
         {
@@ -663,36 +737,7 @@ impl AppState {
                         let _ = app.emit("mute_update", payload.clone());
 
                         if settings_enabled {
-                            if let Some(osd_window) = app.get_webview_window("osd") {
-                                let _ = osd_window.show();
-                                let _ = osd_window.set_always_on_top(true);
-                                #[cfg(target_os = "windows")]
-                                if let Ok(hwnd) = osd_window.hwnd() {
-                                    use windows::Win32::Foundation::HWND;
-                                    use windows::Win32::UI::WindowsAndMessaging::{
-                                        SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                                    };
-                                    unsafe {
-                                        let _ = SetWindowPos(
-                                            HWND(hwnd.0 as _),
-                                            Some(HWND_TOPMOST),
-                                            0,
-                                            0,
-                                            0,
-                                            0,
-                                            SWP_NOMOVE | SWP_NOSIZE,
-                                        );
-                                    }
-                                }
-                                let _ = osd_window.emit("mute_update", payload.clone());
-                                if let Ok(payload_json) = serde_json::to_string(&payload) {
-                                    let script = format!(
-                                        "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-                                        payload_json
-                                    );
-                                    let _ = osd_window.eval(&script);
-                                }
-                            }
+                            AppState::emit_osd_update(app, self, &payload, false);
                         }
                     }
                     return Ok(());
@@ -1133,36 +1178,7 @@ impl AppState {
                 let _ = app.emit("mute_update", payload.clone());
 
                 if settings_enabled {
-                    if let Some(osd_window) = app.get_webview_window("osd") {
-                        let _ = osd_window.show();
-                        let _ = osd_window.set_always_on_top(true);
-                        #[cfg(target_os = "windows")]
-                        if let Ok(hwnd) = osd_window.hwnd() {
-                            use windows::Win32::Foundation::HWND;
-                            use windows::Win32::UI::WindowsAndMessaging::{
-                                SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                            };
-                            unsafe {
-                                let _ = SetWindowPos(
-                                    HWND(hwnd.0 as _),
-                                    Some(HWND_TOPMOST),
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    SWP_NOMOVE | SWP_NOSIZE,
-                                );
-                            }
-                        }
-                        let _ = osd_window.emit("mute_update", payload.clone());
-                        if let Ok(payload_json) = serde_json::to_string(&payload) {
-                            let script = format!(
-                                "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-                                payload_json
-                            );
-                            let _ = osd_window.eval(&script);
-                        }
-                    }
+                    AppState::emit_osd_update(app, self, &payload, false);
                 }
             }
 
@@ -1243,7 +1259,8 @@ impl AppState {
                         "integration_id": integration_id,
                         "kind": kind,
                         "data": data,
-                      }
+                      },
+                      "source": "midi_fader"
                     });
                     let _ = app.emit("integration_binding_triggered", payload);
                     any_applied = true;
@@ -1302,36 +1319,7 @@ impl AppState {
             let _ = app.emit("volume_update", payload.clone());
 
             if settings_enabled {
-                if let Some(osd_window) = app.get_webview_window("osd") {
-                    let _ = osd_window.show();
-                    let _ = osd_window.set_always_on_top(true);
-                    #[cfg(target_os = "windows")]
-                    if let Ok(hwnd) = osd_window.hwnd() {
-                        use windows::Win32::Foundation::HWND;
-                        use windows::Win32::UI::WindowsAndMessaging::{
-                            SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                        };
-                        unsafe {
-                            let _ = SetWindowPos(
-                                HWND(hwnd.0 as _),
-                                Some(HWND_TOPMOST),
-                                0,
-                                0,
-                                0,
-                                0,
-                                SWP_NOMOVE | SWP_NOSIZE,
-                            );
-                        }
-                    }
-                    let _ = osd_window.emit("volume_update", payload.clone());
-                    if let Ok(payload_json) = serde_json::to_string(&payload) {
-                        let script = format!(
-                            "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-                            payload_json
-                        );
-                        let _ = osd_window.eval(&script);
-                    }
-                }
+                AppState::emit_osd_update(app, self, &payload, false);
             }
         }
 
@@ -2015,6 +2003,7 @@ fn main() {
             list_monitors,
             get_osd_settings,
             update_osd_settings,
+            preview_osd,
             get_app_settings,
             get_app_version,
             update_app_settings,

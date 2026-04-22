@@ -8,169 +8,326 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body>
-  <header>
-    <div class="app-title">
-      <img class="app-logo" src="assets/MIDIMaster.png" alt="MIDIMaster logo" />
-      <span class="app-name"><span class="app-name-strong">MIDI</span><span class="app-name-light">Master</span></span>
-    </div>
-    <div class="header-buttons">
-      <button id="connections-button" class="header-icon-button" type="button" aria-label="Open plugins">
-        🔗
-      </button>
-      <button id="theme-toggle-button" class="header-icon-button" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" aria-pressed="false">
-        <svg class="theme-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path class="icon-stars" d="M8.6 6.1L9.3 7.7 10.9 8.4 9.3 9.1 8.6 10.7 7.9 9.1 6.3 8.4 7.9 7.7ZM5.2 10.9L5.7 12 6.8 12.5 5.7 13 5.2 14.1 4.7 13 3.6 12.5 4.7 12ZM8.1 14.5L8.7 15.8 10 16.4 8.7 17 8.1 18.3 7.5 17 6.2 16.4 7.5 15.8Z" />
-          <path class="icon-crescent" d="M15.9 2.2a.9.9 0 0 1 1.02 1.26A8.3 8.3 0 1 0 20.35 13.7a.9.9 0 0 1 1.33.97A10.2 10.2 0 1 1 15.9 2.2Z" />
-        </svg>
-      </button>
-      <button id="settings-button" class="header-icon-button" type="button" aria-label="Open settings">
-        ⚙
-      </button>
-    </div>
-  </header>
-
-  <main>
-    <div id="alert-overlay" class="target-panel hidden">
-      <div class="target-panel-content alert-panel-content">
-        <div class="target-panel-header">
-          <span id="alert-title">Alert</span>
-          <button id="alert-close" type="button" class="target-panel-close">×</button>
-        </div>
-        <div class="alert-panel-body">
-          <p id="alert-message"></p>
-          <div class="alert-panel-actions">
-            <button id="alert-secondary" type="button" class="secondary hidden">Skip</button>
-            <button id="alert-cancel" type="button" class="secondary hidden">Cancel</button>
-            <button id="alert-ok" type="button">OK</button>
-          </div>
-        </div>
+<body class="dark-mode" data-theme="dark">
+  <div class="app-shell">
+    <aside class="app-sidebar" aria-label="Primary navigation">
+      <div class="sidebar-brand">
+        <img class="app-logo app-logo--dark" src="assets/MIDIMaster.png" alt="MIDIMaster logo" />
+        <img class="app-logo app-logo--light" src="assets/MIDIMaster-light.png" alt="" aria-hidden="true" />
+        <span class="app-name">MIDIMaster</span>
+        <button id="sidebar-collapse-toggle" class="sidebar-collapse-toggle" type="button" aria-label="Collapse sidebar" title="Collapse sidebar" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M14.5 6.5 9 12l5.5 5.5" />
+          </svg>
+        </button>
       </div>
-    </div>
 
-    <section id="main-screen">
-      <div class="main-top">
-        <div class="card">
-          <h2>Connected Devices</h2>
-          <div class="device-picker-grid">
-            <div class="form-group">
-              <label for="midi-device">Input Device</label>
-              <select id="midi-device" title="Input Device"></select>
+      <nav class="sidebar-nav">
+        <button class="sidebar-nav-item active" type="button" data-page="bindings" aria-current="page" aria-label="Bindings" title="Bindings">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M6 4v16M12 4v16M18 4v16M4 8h4M10 15h4M16 11h4" />
+            </svg>
+          </span>
+          <span class="nav-label">Bindings</span>
+        </button>
+        <button id="connections-button" class="sidebar-nav-item" type="button" data-page="plugins" aria-label="Plugins" title="Plugins">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M8 4v5M16 4v5M7 9h10v4a5 5 0 0 1-10 0V9ZM12 18v2" />
+            </svg>
+          </span>
+          <span class="nav-label">Plugins</span>
+        </button>
+        <button class="sidebar-nav-item" type="button" data-page="settings" aria-label="Settings" title="Settings">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+              <path d="M15.5 5.5 17 4l3 3-1.5 1.5M8.5 5.5 7 4 4 7l1.5 1.5M15.5 18.5 17 20l3-3-1.5-1.5M8.5 18.5 7 20l-3-3 1.5-1.5M20 12h-2M6 12H4M12 4v2M12 18v2" />
+            </svg>
+          </span>
+          <span class="nav-label">Settings</span>
+        </button>
+      </nav>
+    </aside>
+
+    <div class="app-workspace">
+      <header class="topbar">
+        <div class="topbar-field profile-topbar-field">
+          <span class="topbar-label">Profile</span>
+          <div class="profile-select" id="profiles-dropdown">
+            <button id="profile-toggle" class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span id="profile-current">Default</span>
+              <span class="caret" aria-hidden="true">▾</span>
+            </button>
+            <div id="profile-list" class="dropdown hidden"></div>
+          </div>
+        </div>
+        <div class="topbar-divider" aria-hidden="true"></div>
+        <div class="topbar-field">
+          <label class="topbar-label" for="midi-device">Input Device</label>
+          <select id="midi-device" title="Input Device"></select>
+        </div>
+        <div class="topbar-field">
+          <label class="topbar-label" for="midi-output-device">Output Device</label>
+          <select id="midi-output-device" title="Output Device"></select>
+        </div>
+        <div class="topbar-divider" aria-hidden="true"></div>
+        <div class="topbar-actions">
+          <button id="topbar-update-button" class="topbar-icon-button topbar-update-button hidden" type="button" aria-label="Update available" title="Update available">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 4v10" />
+              <path d="M8 10l4 4 4-4" />
+              <path d="M5 19h14" />
+            </svg>
+            <span class="update-dot" aria-hidden="true"></span>
+          </button>
+          <button id="theme-toggle-button" class="topbar-icon-button" type="button" aria-label="Switch to light mode" title="Switch to light mode" aria-pressed="true">
+            <svg class="theme-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path class="icon-stars" d="M8.6 6.1L9.3 7.7 10.9 8.4 9.3 9.1 8.6 10.7 7.9 9.1 6.3 8.4 7.9 7.7ZM5.2 10.9L5.7 12 6.8 12.5 5.7 13 5.2 14.1 4.7 13 3.6 12.5 4.7 12ZM8.1 14.5L8.7 15.8 10 16.4 8.7 17 8.1 18.3 7.5 17 6.2 16.4 7.5 15.8Z" />
+              <path class="icon-crescent" d="M15.9 2.2a.9.9 0 0 1 1.02 1.26A8.3 8.3 0 1 0 20.35 13.7a.9.9 0 0 1 1.33.97A10.2 10.2 0 1 1 15.9 2.2Z" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <div id="alert-overlay" class="target-panel hidden">
+          <div class="target-panel-content alert-panel-content">
+            <div class="target-panel-header">
+              <span id="alert-title">Alert</span>
+              <button id="alert-close" type="button" class="target-panel-close">x</button>
             </div>
-            <div class="form-group">
-              <label for="midi-output-device">Output Device</label>
-              <select id="midi-output-device" title="Output Device"></select>
+            <div class="alert-panel-body">
+              <p id="alert-message"></p>
+              <div class="alert-panel-actions">
+                <button id="alert-secondary" type="button" class="secondary hidden">Skip</button>
+                <button id="alert-cancel" type="button" class="secondary hidden">Cancel</button>
+                <button id="alert-ok" type="button">OK</button>
+              </div>
             </div>
           </div>
-          <div id="midi-status" class="status hidden">Select input and output devices</div>
         </div>
 
-        <div class="card">
-          <h2>Profiles</h2>
-          <div class="row profile-row">
-            <div class="profile-select" id="profiles-dropdown">
-              <button id="profile-toggle" class="select-button" type="button">
-                <span id="profile-current">Select profile</span>
-                <span class="caret">▾</span>
+        <section id="main-screen" class="app-page active" data-page-panel="bindings">
+          <div class="page-heading-row">
+            <h1>Bindings</h1>
+            <div class="bindings-toolbar">
+              <button id="binding-add-footer-button" type="button" class="binding-add-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span>Add Binding</span>
               </button>
-              <div id="profile-list" class="dropdown hidden"></div>
+              <label class="binding-search-field">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="m21 21-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
+                </svg>
+                <input id="binding-search" type="search" placeholder="Search bindings..." autocomplete="off" />
+              </label>
             </div>
           </div>
-        </div>
-      </div>
 
+          <div class="midi-inline-status visually-hidden" id="midi-status">Select input and output devices</div>
 
-      <div class="card bindings-card">
-        <h2>Bindings</h2>
-        <div class="binding-headers">
-          <span>Name</span>
-          <span>Volume</span>
-          <span>Mode</span>
-          <span>Target</span>
-          <span class="binding-actions-header">Actions</span>
-        </div>
-        <div id="bindings" class="list"></div>
-        <div class="binding-add-footer">
-          <button id="binding-add-footer-button" type="button" class="binding-add-button">＋ Create binding</button>
-        </div>
-      </div>
-
-    </section>
-  </main>
-
-    <div id="target-panel" class="target-panel hidden">
-      <div class="target-panel-content">
-        <div class="target-panel-header">
-          <div class="target-panel-header-left">
-            <button id="target-panel-back" type="button" class="target-panel-back" title="Back" aria-label="Back">←</button>
-            <span id="target-panel-title">Select Target</span>
+          <div class="bindings-card">
+            <div class="binding-headers">
+              <span class="binding-drag-header" aria-label="Reorder"></span>
+              <span>Name</span>
+              <span>Mode</span>
+              <span>Target</span>
+              <span>Value</span>
+              <span class="binding-actions-header">Actions</span>
+            </div>
+            <div id="bindings" class="list"></div>
           </div>
-          <button id="target-panel-close" type="button" class="target-panel-close">×</button>
-        </div>
-        <div id="target-panel-list" class="target-panel-list"></div>
-      </div>
-    </div>
+        </section>
 
-    <div id="binding-config-panel" class="target-panel hidden">
-      <div class="target-panel-content binding-config-content">
-        <div class="target-panel-header">
-          <span>Fader Configuration</span>
-          <button id="binding-config-close" type="button" class="target-panel-close">×</button>
-        </div>
-        <div class="binding-config-body">
-          <label class="binding-config-row binding-config-name-row">
-            <span class="binding-config-title">Name</span>
-            <input id="binding-config-name" type="text" placeholder="Binding name" name="binding-config-name" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" />
-          </label>
-          <label class="binding-config-row binding-config-name-row">
-            <span class="binding-config-title">Curve</span>
-            <select id="binding-config-curve" name="binding-config-curve" title="Fader curve">
-              <option value="Linear">Linear</option>
-              <option value="Logarithmic">Logarithmic</option>
-            </select>
-          </label>
-          <div class="binding-config-row">
-            <span class="binding-config-title">Mute</span>
-            <div class="binding-config-actions">
-              <span id="binding-config-mute-label" class="binding-config-label">Not mapped</span>
-              <button id="binding-config-mute-learn" type="button">Learn</button>
-              <button id="binding-config-mute-clear" type="button" class="secondary">Clear</button>
+        <section id="plugins-page" class="app-page hidden" data-page-panel="plugins">
+          <div class="page-heading-row">
+            <h1>Plugins</h1>
+          </div>
+          <div id="connections-panel" class="inline-panel connections-panel-content">
+            <div class="connections-panel-body">
+              <div id="connections-sidebar" class="connections-sidebar"></div>
+              <div id="connections-content" class="connections-content"></div>
             </div>
           </div>
-          <div class="binding-config-row">
-            <span class="binding-config-title binding-config-title-with-action">
-              <span>Assign</span>
-              <div id="binding-config-assign-mode-root" class="binding-config-mode-root">
-                <button
-                  id="binding-config-assign-mode-button"
-                  type="button"
-                  class="binding-config-mode-trigger"
-                  title="Assign mode: Add"
-                  aria-label="Assign mode"
-                  aria-haspopup="true"
-                  aria-expanded="false"
-                >&#9881;</button>
-                <div id="binding-config-assign-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Assign mode options">
-                  <button id="binding-config-assign-mode-add" type="button" class="binding-config-mode-option" data-mode="Add" role="menuitem">Add</button>
-                  <button id="binding-config-assign-mode-replace" type="button" class="binding-config-mode-option" data-mode="Replace" role="menuitem">Replace</button>
+          <button id="connections-panel-close" type="button" class="visually-hidden" aria-hidden="true">Close</button>
+        </section>
+
+        <section id="settings-panel" class="app-page hidden" data-page-panel="settings">
+          <div class="page-heading-row">
+            <h1>Settings</h1>
+          </div>
+          <div class="settings-panel-body">
+            <div class="settings-grid">
+              <div class="settings-section settings-osd-section">
+                <div class="settings-section-header">
+                  <div class="settings-title">On-screen display</div>
+                  <label class="settings-toggle" title="Toggle on-screen display">
+                    <input id="osd-enabled" type="checkbox" />
+                    <span class="plugins-toggle-ui" aria-hidden="true"></span>
+                  </label>
+                </div>
+                <div class="settings-field-row">
+                  <div class="settings-field-label">Monitor</div>
+                  <select id="osd-monitor"></select>
+                </div>
+                <div class="settings-field-row settings-field-row--position">
+                  <div class="settings-field-label">Position</div>
+                  <div class="osd-position-picker" id="osd-position-picker">
+                    <div class="osd-position-screen"></div>
+                    <button type="button" class="osd-position-dot" data-anchor="top-left" aria-label="Top left"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="top-center" aria-label="Top center"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="top-right" aria-label="Top right"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="center-left" aria-label="Center left"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="center" aria-label="Center"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="center-right" aria-label="Center right"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="bottom-left" aria-label="Bottom left"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="bottom-center" aria-label="Bottom center"></button>
+                    <button type="button" class="osd-position-dot" data-anchor="bottom-right" aria-label="Bottom right"></button>
+                  </div>
                 </div>
               </div>
-            </span>
-            <div class="binding-config-actions">
-              <span id="binding-config-assign-label" class="binding-config-label">Not mapped</span>
-              <button id="binding-config-assign-learn" type="button">Learn</button>
-              <button id="binding-config-assign-clear" type="button" class="secondary">Clear</button>
+              <div class="settings-section settings-general-section">
+                <div class="settings-title">General</div>
+                <div class="settings-field-row">
+                  <div class="settings-field-label">Start with Windows</div>
+                  <select id="start-with-windows">
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </div>
+                <div class="settings-field-row">
+                  <div class="settings-field-label">Start in tray</div>
+                  <select id="start-in-tray">
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </div>
+                <div class="settings-field-row">
+                  <div class="settings-field-label">Minimize to tray</div>
+                  <select id="minimize-to-tray">
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </div>
+                <div class="settings-field-row">
+                  <div class="settings-field-label">Exit to tray</div>
+                  <select id="exit-to-tray">
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-bottom-grid">
+                <div class="settings-section settings-maintenance-section settings-reset-section">
+                  <div class="settings-title">Maintenance</div>
+                  <button id="open-logs-folder" type="button" class="settings-action">Open Logs Folder</button>
+                  <button id="reset-app-data" type="button" class="settings-reset">Reset app data</button>
+                </div>
+                <div class="settings-section settings-updates-section">
+                  <div class="settings-update-header">
+                    <div class="settings-title">App Updates</div>
+                    <button id="auto-check-updates-button" type="button" class="settings-mini-toggle">Auto-check: On</button>
+                  </div>
+                  <div class="settings-update-meta-row"><span class="settings-update-meta-label">Current</span><span id="update-current-version">-</span></div>
+                  <div class="settings-update-meta-row"><span class="settings-update-meta-label">Latest</span><span id="update-latest-version">-</span></div>
+                  <div id="settings-update-status" class="settings-inline-status">No update check yet.</div>
+                  <button id="check-for-updates" type="button" class="settings-action">Check for updates</button>
+                </div>
+              </div>
             </div>
+          </div>
+          <button id="settings-panel-close" type="button" class="visually-hidden" aria-hidden="true">Close</button>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="target-panel" class="target-panel hidden">
+    <div class="target-panel-content">
+      <div class="target-panel-header">
+        <div class="target-panel-header-left">
+          <button id="target-panel-back" type="button" class="target-panel-back" title="Back" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
+          <span id="target-panel-title">Select Target</span>
+        </div>
+        <button id="target-panel-close" type="button" class="target-panel-close">x</button>
+      </div>
+      <div id="target-panel-list" class="target-panel-list"></div>
+    </div>
+  </div>
+
+  <div id="binding-config-panel" class="target-panel hidden">
+    <div class="target-panel-content binding-config-content">
+      <div class="target-panel-header">
+        <span>Fader Configuration</span>
+        <button id="binding-config-close" type="button" class="target-panel-close">x</button>
+      </div>
+      <div class="binding-config-body">
+        <label class="binding-config-row binding-config-name-row">
+          <span class="binding-config-title">Name</span>
+          <input id="binding-config-name" type="text" placeholder="Binding name" name="binding-config-name" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" />
+        </label>
+        <label class="binding-config-row binding-config-name-row">
+          <span class="binding-config-title">Curve</span>
+          <select id="binding-config-curve" name="binding-config-curve" title="Fader curve">
+            <option value="Linear">Linear</option>
+            <option value="Logarithmic">Logarithmic</option>
+          </select>
+        </label>
+        <div class="binding-config-row">
+          <span class="binding-config-title">Mute</span>
+          <div class="binding-config-actions">
+            <span id="binding-config-mute-label" class="binding-config-label">Not mapped</span>
+            <button id="binding-config-mute-learn" type="button">Learn</button>
+            <button id="binding-config-mute-clear" type="button" class="secondary">Clear</button>
+          </div>
+        </div>
+        <div class="binding-config-row">
+          <span class="binding-config-title binding-config-title-with-action">
+            <span>Assign</span>
+            <div id="binding-config-assign-mode-root" class="binding-config-mode-root">
+              <button
+                id="binding-config-assign-mode-button"
+                type="button"
+                class="binding-config-mode-trigger"
+                title="Assign mode: Add"
+                aria-label="Assign mode"
+                aria-haspopup="true"
+                aria-expanded="false"
+              >
+                <svg class="binding-config-mode-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
+                </svg>
+              </button>
+              <div id="binding-config-assign-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Assign mode options">
+                <button id="binding-config-assign-mode-add" type="button" class="binding-config-mode-option" data-mode="Add" role="menuitem">Add</button>
+                <button id="binding-config-assign-mode-replace" type="button" class="binding-config-mode-option" data-mode="Replace" role="menuitem">Replace</button>
+              </div>
+            </div>
+          </span>
+          <div class="binding-config-actions">
+            <span id="binding-config-assign-label" class="binding-config-label">Not mapped</span>
+            <button id="binding-config-assign-learn" type="button">Learn</button>
+            <button id="binding-config-assign-clear" type="button" class="secondary">Clear</button>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
   <div id="learn-panel" class="target-panel hidden">
     <div class="target-panel-content learn-panel-content">
       <div class="target-panel-header">
         <span id="learn-panel-title">Waiting for MIDI Input</span>
-        <button id="learn-panel-close" type="button" class="target-panel-close">×</button>
+        <button id="learn-panel-close" type="button" class="target-panel-close">x</button>
       </div>
       <div class="learn-panel-body">
         <div id="learn-panel-spinner" class="learn-panel-spinner" aria-hidden="true"></div>
@@ -179,114 +336,6 @@
           <button id="learn-panel-cancel" type="button" class="secondary">Cancel</button>
           <button id="learn-panel-confirm" type="button">Transfer</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="settings-panel" class="target-panel hidden">
-    <div class="target-panel-content settings-panel-content">
-      <div class="target-panel-header">
-        <span>Settings</span>
-        <button id="settings-panel-close" type="button" class="target-panel-close">×</button>
-      </div>
-      <div class="settings-panel-body">
-        <div class="settings-grid">
-          <div class="settings-column">
-            <div class="settings-section">
-              <div class="settings-title">On-screen display</div>
-              <select id="osd-enabled">
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </div>
-            <div class="settings-section">
-              <div class="settings-title">Monitor</div>
-              <select id="osd-monitor"></select>
-            </div>
-            <div class="settings-section">
-              <div class="settings-title">Position</div>
-              <div class="osd-position-picker" id="osd-position-picker">
-                <div class="osd-position-screen"></div>
-                <button type="button" class="osd-position-dot" data-anchor="top-left" aria-label="Top left"></button>
-                <button type="button" class="osd-position-dot" data-anchor="top-center"
-                  aria-label="Top center"></button>
-                <button type="button" class="osd-position-dot" data-anchor="top-right" aria-label="Top right"></button>
-                <button type="button" class="osd-position-dot" data-anchor="center-left"
-                  aria-label="Center left"></button>
-                <button type="button" class="osd-position-dot" data-anchor="center" aria-label="Center"></button>
-                <button type="button" class="osd-position-dot" data-anchor="center-right"
-                  aria-label="Center right"></button>
-                <button type="button" class="osd-position-dot" data-anchor="bottom-left"
-                  aria-label="Bottom left"></button>
-                <button type="button" class="osd-position-dot" data-anchor="bottom-center"
-                  aria-label="Bottom center"></button>
-                <button type="button" class="osd-position-dot" data-anchor="bottom-right"
-                  aria-label="Bottom right"></button>
-              </div>
-            </div>
-          </div>
-          <div class="settings-column">
-            <div class="settings-section">
-              <div class="settings-title">Start with Windows</div>
-              <select id="start-with-windows">
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </div>
-            <div class="settings-section">
-              <div class="settings-title">Start in tray</div>
-              <select id="start-in-tray">
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </div>
-            <div class="settings-section">
-              <div class="settings-title">Minimize to tray</div>
-              <select id="minimize-to-tray">
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </div>
-            <div class="settings-section">
-              <div class="settings-title">Exit to tray</div>
-              <select id="exit-to-tray">
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </div>
-          </div>
-          <div class="settings-bottom-grid">
-            <div class="settings-section settings-maintenance-section settings-reset-section">
-              <div class="settings-title">Maintenance</div>
-              <button id="open-logs-folder" type="button" class="settings-action">Open Logs Folder</button>
-              <button id="reset-app-data" type="button" class="settings-reset">Reset app data</button>
-            </div>
-            <div class="settings-section settings-updates-section">
-              <div class="settings-update-header">
-                <div class="settings-title">App Updates</div>
-                <button id="auto-check-updates-button" type="button" class="settings-mini-toggle">Auto-check: On</button>
-              </div>
-              <div class="settings-update-meta-row"><span class="settings-update-meta-label">Current</span><span id="update-current-version">-</span></div>
-              <div class="settings-update-meta-row"><span class="settings-update-meta-label">Latest</span><span id="update-latest-version">-</span></div>
-              <div id="settings-update-status" class="settings-inline-status">No update check yet.</div>
-              <button id="check-for-updates" type="button" class="settings-action">Check for updates</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="connections-panel" class="target-panel hidden">
-    <div class="target-panel-content connections-panel-content">
-      <div class="target-panel-header">
-        <span>Plugins</span>
-        <button id="connections-panel-close" type="button" class="target-panel-close">×</button>
-      </div>
-      <div class="connections-panel-body">
-        <div id="connections-sidebar" class="connections-sidebar"></div>
-
-        <div id="connections-content" class="connections-content"></div>
       </div>
     </div>
   </div>
