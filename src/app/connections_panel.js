@@ -130,7 +130,10 @@ export function createConnectionsPanelController({
     const firstPane = d.connectionsContent.querySelector(".connection-tab");
     if (firstBtn) firstBtn.classList.add("active");
     if (firstPane) firstPane.classList.add("active");
-    scheduleConnectionsNavIndicatorSync();
+    syncConnectionsNavIndicator();
+    requestAnimationFrame(() => {
+      indicator.classList.add("is-ready");
+    });
   }
 
   async function reloadPlugins() {
