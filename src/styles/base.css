@@ -850,13 +850,36 @@ body[data-theme="light"] .app-logo--light {
 }
 
 .sidebar-nav {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding-top: 12px;
 }
 
+.sidebar-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 62px;
+  border-radius: 4px;
+  background: var(--surface-muted);
+  box-shadow: inset 4px 0 0 var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 120ms ease;
+  will-change: transform, height;
+}
+
 .sidebar-nav-item {
+  position: relative;
+  z-index: 1;
   width: 100%;
   min-height: 62px;
   display: flex;
@@ -877,10 +900,14 @@ body[data-theme="light"] .app-logo--light {
 }
 
 .sidebar-nav-item.active {
-  background: var(--surface-muted);
+  background: transparent;
   color: var(--text-primary);
-  border-left-color: var(--accent);
-  box-shadow: inset 4px 0 0 var(--accent);
+  border-left-color: transparent;
+  box-shadow: none;
+}
+
+.sidebar-nav-item.active:hover {
+  background: transparent;
 }
 
 .nav-icon {
@@ -979,8 +1006,22 @@ main {
   gap: 24px;
 }
 
+.app-page.active {
+  animation: appPageEnter 0.1s ease-out;
+}
+
 .app-page.hidden {
   display: none;
+}
+
+@keyframes appPageEnter {
+  from {
+    transform: translateY(1px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }
 
 .page-heading-row {

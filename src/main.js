@@ -301,6 +301,7 @@ const bindingsContainer = document.getElementById("bindings");
 const bindingSearchInput = document.getElementById("binding-search");
 const mainScreen = document.getElementById("main-screen");
 const appShell = document.querySelector(".app-shell");
+const sidebarNav = document.querySelector(".sidebar-nav");
 const sidebarCollapseToggle = document.getElementById("sidebar-collapse-toggle");
 const appPages = Array.from(document.querySelectorAll("[data-page-panel]"));
 const appNavItems = Array.from(document.querySelectorAll("[data-page]"));
@@ -532,6 +533,53 @@ function loadSidebarCollapsed() {
   }
 }
 
+let sidebarNavIndicatorRaf = 0;
+let sidebarNavIndicatorSettleTimeout = 0;
+
+function syncSidebarNavIndicator() {
+  if (!sidebarNav) {
+    return;
+  }
+  const indicator = sidebarNav.querySelector(".sidebar-nav-indicator");
+  if (!indicator) {
+    return;
+  }
+  const activeItem = appNavItems.find((item) => item.classList.contains("active"));
+  if (!activeItem) {
+    indicator.style.opacity = "0";
+    return;
+  }
+  indicator.style.height = `${activeItem.offsetHeight}px`;
+  indicator.style.transform = `translateY(${activeItem.offsetTop}px)`;
+  indicator.style.opacity = "1";
+}
+
+function scheduleSidebarNavIndicatorSync(options = {}) {
+  const settle = Boolean(options && options.settle);
+  if (sidebarNavIndicatorRaf) {
+    cancelAnimationFrame(sidebarNavIndicatorRaf);
+  }
+  sidebarNavIndicatorRaf = requestAnimationFrame(() => {
+    sidebarNavIndicatorRaf = 0;
+    syncSidebarNavIndicator();
+  });
+  if (settle) {
+    if (sidebarNavIndicatorSettleTimeout) {
+      clearTimeout(sidebarNavIndicatorSettleTimeout);
+    }
+    sidebarNavIndicatorSettleTimeout = window.setTimeout(() => {
+      sidebarNavIndicatorSettleTimeout = 0;
+      if (sidebarNavIndicatorRaf) {
+        cancelAnimationFrame(sidebarNavIndicatorRaf);
+      }
+      sidebarNavIndicatorRaf = requestAnimationFrame(() => {
+        sidebarNavIndicatorRaf = 0;
+        syncSidebarNavIndicator();
+      });
+    }, 220);
+  }
+}
+
 function applySidebarCollapsed(collapsed) {
   const isCollapsed = Boolean(collapsed);
   appShell?.classList?.toggle?.("sidebar-collapsed", isCollapsed);
@@ -541,6 +589,7 @@ function applySidebarCollapsed(collapsed) {
   sidebarCollapseToggle.setAttribute("aria-pressed", String(isCollapsed));
   sidebarCollapseToggle.setAttribute("title", label);
   sidebarCollapseToggle.title = label;
+  scheduleSidebarNavIndicatorSync({ settle: true });
 }
 
 function toggleSidebarCollapsed() {
@@ -794,6 +843,10 @@ async function preparePage(page) {
 
 async function switchAppPage(page) {
   const nextPage = String(page || "bindings");
+  const currentPage = appPages.find((panel) => panel.classList.contains("active"))?.dataset?.pagePanel || "bindings";
+  if (currentPage === nextPage) {
+    return;
+  }
   appPages.forEach((panel) => {
     const active = panel.dataset.pagePanel === nextPage;
     panel.classList.toggle("active", active);
@@ -808,6 +861,7 @@ async function switchAppPage(page) {
       item.removeAttribute("aria-current");
     }
   });
+  scheduleSidebarNavIndicatorSync();
   await preparePage(nextPage);
 }
 
@@ -1572,6 +1626,22 @@ appNavItems.forEach((item) => {
     await switchAppPage(page);
   });
 });
+
+window.addEventListener("resize", scheduleSidebarNavIndicatorSync);
+appShell?.addEventListener?.("transitionend", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  if (
+    target === appShell
+    || target.closest(".app-sidebar")
+    || target.classList.contains("sidebar-nav-item")
+  ) {
+    scheduleSidebarNavIndicatorSync();
+  }
+});
+scheduleSidebarNavIndicatorSync();
 
 if (themeToggleButton) {
   themeToggleButton.addEventListener("click", toggleTheme);

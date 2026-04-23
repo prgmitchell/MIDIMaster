@@ -215,6 +215,8 @@
 }
 
 .connections-nav-item {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -226,9 +228,28 @@
   text-align: left;
   font-weight: 500;
   font-size: 13px;
-  transition: all 0.2s ease;
   width: 100%;
   cursor: pointer;
+}
+
+.connections-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 44px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #ccd1e0;
+  box-shadow: none;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, width, height;
 }
 
 .connections-nav-item:hover {
@@ -237,10 +258,10 @@
 }
 
 .connections-nav-item.active {
-  background: #fff;
+  background: transparent;
   color: #2b2d42;
-  border-color: #ccd1e0;
-  box-shadow: 0 4px 12px rgba(26, 28, 44, 0.05);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .connections-nav-item .nav-icon {
@@ -260,25 +281,12 @@
 
 .connection-tab {
   display: none;
-  animation: fadeIn 0.3s ease-out;
 }
 
 .connection-tab.active {
   display: flex;
   flex-direction: column;
   width: 100%;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .connection-item-header {
@@ -974,6 +982,7 @@ body.dark-mode:not([data-theme]) .hue-summary-text {
 }
 
 .app-page .connections-sidebar {
+  position: relative;
   width: 220px;
   padding: 14px 10px;
   background: #121820;
@@ -994,9 +1003,9 @@ body.dark-mode:not([data-theme]) .app-page .connection-description {
 }
 
 body.dark-mode:not([data-theme]) .app-page .connections-nav-item.active {
-  background: #1b2430;
-  border-color: rgba(90, 167, 255, 0.44);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 /* Final redesign polish: keep this after legacy component rules. */
@@ -1057,9 +1066,9 @@ body.dark-mode:not([data-theme]) .sidebar-nav-item .nav-icon {
 }
 
 body.dark-mode:not([data-theme]) .sidebar-nav-item.active {
-  background: #1a212a;
+  background: transparent;
   border-color: transparent;
-  box-shadow: inset 4px 0 0 var(--accent);
+  box-shadow: none;
   color: #ffffff;
 }
 
@@ -2022,9 +2031,9 @@ body[data-theme] .sidebar-nav-item:hover {
 }
 
 body[data-theme] .sidebar-nav-item.active {
-  background: var(--surface-muted);
+  background: transparent;
   border-color: transparent;
-  box-shadow: inset 4px 0 0 var(--accent);
+  box-shadow: none;
   color: var(--text-primary);
 }
 
@@ -2051,10 +2060,16 @@ body[data-theme] .connections-nav-item:hover {
 }
 
 body[data-theme] .connections-nav-item.active {
-  background: var(--surface-muted);
-  border-color: var(--accent);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
   color: var(--text-primary);
+}
+
+body[data-theme] .connections-nav-indicator {
+  background: var(--surface-muted);
+  border: 1px solid var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 body[data-theme] .connection-item-header,
@@ -2791,16 +2806,23 @@ body[data-theme] .binding-action.delete:hover {
 }
 
 body[data-theme] .settings-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   border-color: var(--control-border);
   background: var(--surface);
 }
 
 body[data-theme] .settings-grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
   gap: 18px 22px;
   align-items: start;
+  align-content: start;
 }
 
 body[data-theme] .app-page.hidden {
@@ -3237,8 +3259,8 @@ body[data-theme] .connection-button.disabled {
 }
 
 .app-shell.sidebar-collapsed .sidebar-nav-item.active {
-  border-left-color: var(--accent);
-  box-shadow: inset 4px 0 0 var(--accent);
+  border-left-color: transparent;
+  box-shadow: none;
 }
 
 .app-shell.sidebar-collapsed .nav-icon {

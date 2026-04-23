@@ -8,6 +8,36 @@ export function createConnectionsPanelController({
   const d = (dom && typeof dom === "object") ? dom : {};
   let connectionsTabsSignature = "";
   let connectionsSidebarListenerBound = false;
+  let connectionsNavIndicatorRaf = 0;
+
+  function syncConnectionsNavIndicator() {
+    if (!d.connectionsSidebar) {
+      return;
+    }
+    const indicator = d.connectionsSidebar.querySelector(".connections-nav-indicator");
+    if (!indicator) {
+      return;
+    }
+    const activeItem = d.connectionsSidebar.querySelector(".connections-nav-item.active");
+    if (!activeItem) {
+      indicator.style.opacity = "0";
+      return;
+    }
+    indicator.style.width = `${activeItem.offsetWidth}px`;
+    indicator.style.height = `${activeItem.offsetHeight}px`;
+    indicator.style.transform = `translate(${activeItem.offsetLeft}px, ${activeItem.offsetTop}px)`;
+    indicator.style.opacity = "1";
+  }
+
+  function scheduleConnectionsNavIndicatorSync() {
+    if (connectionsNavIndicatorRaf) {
+      cancelAnimationFrame(connectionsNavIndicatorRaf);
+    }
+    connectionsNavIndicatorRaf = requestAnimationFrame(() => {
+      connectionsNavIndicatorRaf = 0;
+      syncConnectionsNavIndicator();
+    });
+  }
 
   function mountConnectionsTabs(opts = null) {
     const force = (opts && typeof opts === "object") ? Boolean(opts.force) : false;
@@ -29,6 +59,7 @@ export function createConnectionsPanelController({
         btn.classList.add("active");
         const pane = document.getElementById(`connection-tab-${tabId}`);
         if (pane) pane.classList.add("active");
+        scheduleConnectionsNavIndicatorSync();
       });
     }
 
@@ -63,6 +94,11 @@ export function createConnectionsPanelController({
       return;
     }
 
+    const indicator = document.createElement("div");
+    indicator.className = "connections-nav-indicator";
+    indicator.setAttribute("aria-hidden", "true");
+    d.connectionsSidebar.appendChild(indicator);
+
     for (const tab of tabs) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -94,6 +130,7 @@ export function createConnectionsPanelController({
     const firstPane = d.connectionsContent.querySelector(".connection-tab");
     if (firstBtn) firstBtn.classList.add("active");
     if (firstPane) firstPane.classList.add("active");
+    scheduleConnectionsNavIndicatorSync();
   }
 
   async function reloadPlugins() {
@@ -116,9 +153,9 @@ export function createConnectionsPanelController({
     await pluginsTabs.preloadInstalledPlugins().catch(() => { });
 
     d.connectionsPanel.classList.remove("hidden");
-    mountConnectionsTabs({ force: true });
+    mountConnectionsTabs();
     startPluginHostIfNeeded()
-      .then(() => mountConnectionsTabs({ force: true }))
+      .then(() => mountConnectionsTabs())
       .catch(() => { });
   }
 
@@ -137,9 +174,15 @@ export function createConnectionsPanelController({
 
     if (d.connectionsButton) {
       d.connectionsButton.addEventListener("click", () => {
+        const pluginsPageActive = document.querySelector('[data-page-panel="plugins"]')?.classList.contains("active");
+        if (pluginsPageActive) {
+          return;
+        }
         openConnectionsPanel();
       });
     }
+
+    window.addEventListener("resize", scheduleConnectionsNavIndicatorSync);
   }
 
   return {
