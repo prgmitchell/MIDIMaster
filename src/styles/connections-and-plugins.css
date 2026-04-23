@@ -2844,7 +2844,7 @@ body[data-theme] .settings-section {
   gap: 14px;
   height: 100%;
   padding: 20px 28px;
-  border-radius: 10px;
+  border-radius: 5px;
   background: var(--surface-raised);
   border: 1px solid var(--control-border);
   box-shadow: 0 10px 22px rgba(57, 78, 104, 0.10);
