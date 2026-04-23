@@ -50,6 +50,20 @@
           <span class="nav-label">Settings</span>
         </button>
       </nav>
+
+      <div class="sidebar-footer" aria-label="Application information">
+        <div class="sidebar-footer-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 10v6"></path>
+            <path d="M12 7.25h.01"></path>
+          </svg>
+        </div>
+        <div class="sidebar-footer-meta">
+          <span class="sidebar-footer-version-label">Version</span>
+          <span id="sidebar-app-version" class="sidebar-footer-version">v-</span>
+        </div>
+      </div>
     </aside>
 
     <div class="app-workspace">
@@ -158,14 +172,11 @@
         </section>
 
         <section id="settings-panel" class="app-page hidden" data-page-panel="settings">
-          <div class="page-heading-row">
-            <h1>Settings</h1>
-          </div>
           <div class="settings-panel-body">
             <div class="settings-grid">
               <div class="settings-section settings-osd-section">
                 <div class="settings-section-header">
-                  <div class="settings-title">On-screen display</div>
+                  <div class="settings-title">On-screen Display</div>
                   <label class="settings-toggle" title="Toggle on-screen display">
                     <input id="osd-enabled" type="checkbox" />
                     <span class="plugins-toggle-ui" aria-hidden="true"></span>
@@ -189,6 +200,7 @@
                     <button type="button" class="osd-position-dot" data-anchor="bottom-center" aria-label="Bottom center"></button>
                     <button type="button" class="osd-position-dot" data-anchor="bottom-right" aria-label="Bottom right"></button>
                   </div>
+                  <div class="settings-field-help">The display will appear in the selected corner of your screen.</div>
                 </div>
               </div>
               <div class="settings-section settings-general-section">
@@ -225,18 +237,57 @@
               <div class="settings-bottom-grid">
                 <div class="settings-section settings-maintenance-section settings-reset-section">
                   <div class="settings-title">Maintenance</div>
-                  <button id="open-logs-folder" type="button" class="settings-action">Open Logs Folder</button>
-                  <button id="reset-app-data" type="button" class="settings-reset">Reset app data</button>
+                  <button id="open-logs-folder" type="button" class="settings-action">
+                    <span class="settings-button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M3.75 7.75h5l1.75 2h9.75v8.5a2 2 0 0 1-2 2H5.75a2 2 0 0 1-2-2Z"></path>
+                        <path d="M3.75 7.75v-1a2 2 0 0 1 2-2h3.1l1.75 2H18.25a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </span>
+                    <span class="settings-button-label">Open Logs Folder</span>
+                  </button>
+                  <button id="reset-app-data" type="button" class="settings-reset">
+                    <span class="settings-button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M4.75 7.75h14.5"></path>
+                        <path d="M9.25 4.75h5.5"></path>
+                        <path d="M8 7.75v10.5a1.5 1.5 0 0 0 1.5 1.5h5a1.5 1.5 0 0 0 1.5-1.5V7.75"></path>
+                        <path d="M10 11v5"></path>
+                        <path d="M14 11v5"></path>
+                      </svg>
+                    </span>
+                    <span class="settings-button-label">Reset app data</span>
+                  </button>
+                  <div class="settings-field-help">Resetting app data will restore all settings to their default values.</div>
                 </div>
                 <div class="settings-section settings-updates-section">
                   <div class="settings-update-header">
                     <div class="settings-title">App Updates</div>
-                    <button id="auto-check-updates-button" type="button" class="settings-mini-toggle">Auto-check: On</button>
+                    <button id="auto-check-updates-button" type="button" class="settings-mini-toggle">
+                      <span class="settings-mini-toggle-label">Auto-check: On</span>
+                    </button>
                   </div>
-                  <div class="settings-update-meta-row"><span class="settings-update-meta-label">Current</span><span id="update-current-version">-</span></div>
-                  <div class="settings-update-meta-row"><span class="settings-update-meta-label">Latest</span><span id="update-latest-version">-</span></div>
-                  <div id="settings-update-status" class="settings-inline-status">No update check yet.</div>
-                  <button id="check-for-updates" type="button" class="settings-action">Check for updates</button>
+                  <div class="settings-update-meta-row"><span class="settings-update-meta-label">Current Version</span><span id="update-current-version">-</span></div>
+                  <div class="settings-update-meta-row"><span class="settings-update-meta-label">Latest Version</span><span id="update-latest-version">-</span></div>
+                  <div id="settings-update-status" class="settings-inline-status">
+                    <span class="settings-status-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M5 12.5 9.25 16.75 19 7"></path>
+                      </svg>
+                    </span>
+                    <span class="settings-status-text">No update check yet.</span>
+                  </div>
+                  <button id="check-for-updates" type="button" class="settings-action">
+                    <span class="settings-button-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M20 5v5h-5"></path>
+                        <path d="M4 19v-5h5"></path>
+                        <path d="M6.75 9A7 7 0 0 1 18 6.5L20 10"></path>
+                        <path d="M17.25 15A7 7 0 0 1 6 17.5L4 14"></path>
+                      </svg>
+                    </span>
+                    <span class="settings-button-label">Check for updates</span>
+                  </button>
                 </div>
               </div>
             </div>

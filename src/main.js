@@ -388,6 +388,7 @@ const checkForUpdatesButton = document.getElementById("check-for-updates");
 const settingsUpdateStatus = document.getElementById("settings-update-status");
 const updateCurrentVersion = document.getElementById("update-current-version");
 const updateLatestVersion = document.getElementById("update-latest-version");
+const sidebarAppVersion = document.getElementById("sidebar-app-version");
 const osd = document.getElementById("volume-osd");
 // OSD elements are now dynamic
 const alertOverlay = document.getElementById("alert-overlay");
@@ -1073,6 +1074,7 @@ settingsFeature = createSettingsFeature({
     settingsUpdateStatus,
     updateCurrentVersion,
     updateLatestVersion,
+    sidebarAppVersion,
     topbarUpdateButton,
   },
   getOsdSettings: () => osdSettings,

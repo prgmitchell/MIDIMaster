@@ -39,13 +39,30 @@ export function createSettingsFeature({
     body: "",
   };
 
+  function setTextContent(target, text, selector = null) {
+    const value = String(text ?? "");
+    if (!target) return;
+    const node = selector ? target.querySelector(selector) : null;
+    if (node) {
+      node.textContent = value;
+      return;
+    }
+    target.textContent = value;
+  }
+
+  function renderSidebarVersion() {
+    if (!d.sidebarAppVersion) return;
+    const currentVersion = String(updateState.currentVersion || "").trim();
+    d.sidebarAppVersion.textContent = currentVersion ? `v${currentVersion}` : "v-";
+  }
+
   function renderAutoCheckButton() {
     if (!d.autoCheckUpdatesButton) return;
     const enabled = (typeof getAppSettings === "function")
       ? ((getAppSettings() || {}).autoCheckUpdates !== false)
       : true;
     d.autoCheckUpdatesButton.dataset.enabled = enabled ? "true" : "false";
-    d.autoCheckUpdatesButton.textContent = enabled ? "Auto-check: On" : "Auto-check: Off";
+    setTextContent(d.autoCheckUpdatesButton, enabled ? "Auto-check: On" : "Auto-check: Off", ".settings-mini-toggle-label");
   }
 
   function formatUpdaterError(error) {
@@ -66,7 +83,7 @@ export function createSettingsFeature({
 
   function setUpdateStatus(message, kind = "") {
     if (!d.settingsUpdateStatus) return;
-    d.settingsUpdateStatus.textContent = String(message || "");
+    setTextContent(d.settingsUpdateStatus, String(message || ""), ".settings-status-text");
     d.settingsUpdateStatus.classList.remove("error", "success");
     if (kind === "error" || kind === "success") {
       d.settingsUpdateStatus.classList.add(kind);
@@ -82,16 +99,17 @@ export function createSettingsFeature({
     }
     if (d.checkForUpdatesButton) {
       if (updateState.downloading) {
-        d.checkForUpdatesButton.textContent = "Downloading...";
+        setTextContent(d.checkForUpdatesButton, "Downloading...", ".settings-button-label");
       } else if (updateState.checking) {
-        d.checkForUpdatesButton.textContent = "Checking...";
+        setTextContent(d.checkForUpdatesButton, "Checking...", ".settings-button-label");
       } else if (updateState.available) {
-        d.checkForUpdatesButton.textContent = "Download and install";
+        setTextContent(d.checkForUpdatesButton, "Download and install", ".settings-button-label");
       } else {
-        d.checkForUpdatesButton.textContent = "Check for updates";
+        setTextContent(d.checkForUpdatesButton, "Check for updates", ".settings-button-label");
       }
       d.checkForUpdatesButton.disabled = updateState.checking || updateState.downloading;
     }
+    renderSidebarVersion();
     if (d.topbarUpdateButton) {
       const showTopbarUpdate = updateState.available && !updateState.downloading;
       d.topbarUpdateButton.classList.toggle("hidden", !showTopbarUpdate);
@@ -683,6 +701,7 @@ export function createSettingsFeature({
     setUpdateStatus("No update check yet.");
     renderUpdateUi();
     renderAllSettingsSelectDropdowns();
+    loadCurrentAppVersion().catch(() => {});
   }
 
   async function loadCurrentAppVersion() {
@@ -694,6 +713,7 @@ export function createSettingsFeature({
           updateState.latestVersion = updateState.currentVersion;
         }
         renderUpdateUi();
+        renderSidebarVersion();
       }
     } catch {
       // ignore version fetch failures
