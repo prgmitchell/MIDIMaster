@@ -979,12 +979,12 @@ body.dark-mode:not([data-theme]) .osd-position-dot.selected {
 
 .binding-headers {
   min-width: 960px;
-  min-height: 58px;
+  min-height: 52px;
   align-items: center;
   padding: 0 16px;
   border-bottom: 1px solid var(--line);
   color: var(--text-soft);
-  font-size: 14px;
+  font-size: 13px;
   text-transform: none;
   letter-spacing: 0;
 }

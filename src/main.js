@@ -1514,6 +1514,7 @@ const pluginsTabs = createPluginsTabs({
   invoke,
   getPluginHost: () => pluginHost,
   reloadPlugins: () => connectionsController?.reloadPlugins?.(),
+  showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
 });
 
 connectionsController = createConnectionsPanelController({
@@ -1527,9 +1528,10 @@ connectionsController = createConnectionsPanelController({
   },
   pluginsTabs: {
     PLUGINS_ICON_DATA,
-    mountPluginsManagerTab: pluginsTabs.mountPluginsManagerTab,
-    mountPluginsStoreTab: pluginsTabs.mountPluginsStoreTab,
     preloadInstalledPlugins: () => pluginsTabs.preloadInstalledPlugins(),
+    preloadStoreCatalog: () => pluginsTabs.preloadStoreCatalog(),
+    getPluginsBrowserSections: () => pluginsTabs.getPluginsBrowserSections(),
+    mountPluginsBrowserTab: (...args) => pluginsTabs.mountPluginsBrowserTab(...args),
   },
   getPluginHost: () => pluginHost,
   setPluginHost: (next) => {
@@ -2280,6 +2282,7 @@ async function init() {
 
   // Warm plugin list early so the Connections->Plugins UI can render instantly.
   pluginsTabs.preloadInstalledPlugins().catch(() => { });
+  pluginsTabs.preloadStoreCatalog().catch(() => { });
 
   await loadAppSettings();
   await hydrateClientPreferences();

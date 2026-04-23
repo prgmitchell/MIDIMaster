@@ -22,7 +22,7 @@ export function createAlertsController({
     if (!button) return;
     if (!config) {
       button.classList.add("hidden");
-      button.classList.remove("primary-button", "secondary-button", "secondary");
+      button.classList.remove("primary-button", "secondary-button", "danger-button", "secondary");
       delete button.dataset.choiceId;
       return;
     }
@@ -30,9 +30,11 @@ export function createAlertsController({
     button.dataset.choiceId = config.id || "";
     button.classList.remove("hidden");
     const isPrimary = config.variant === "primary";
+    const isDanger = config.variant === "danger";
     button.classList.toggle("secondary", !isPrimary);
-    button.classList.toggle("secondary-button", !isPrimary);
+    button.classList.toggle("secondary-button", !isPrimary && !isDanger);
     button.classList.toggle("primary-button", isPrimary);
+    button.classList.toggle("danger-button", isDanger);
   }
 
   function setActionsMode(mode = "alert", config = {}) {
@@ -47,7 +49,10 @@ export function createAlertsController({
     if (mode === "confirm") {
       setButtonConfig(alertSecondary, null);
       setButtonConfig(alertCancel, { label: config.cancelLabel || "Cancel", variant: "secondary" });
-      setButtonConfig(alertOk, { label: config.confirmLabel || "Confirm", variant: "primary" });
+      setButtonConfig(alertOk, {
+        label: config.confirmLabel || "Confirm",
+        variant: config.confirmVariant || "primary",
+      });
       return;
     }
     if (mode === "choice") {
@@ -82,6 +87,7 @@ export function createAlertsController({
     message = "",
     confirmLabel = "Confirm",
     cancelLabel = "Cancel",
+    confirmVariant = "primary",
   } = {}) {
     if (!alertOverlay || !alertMessage) {
       return Promise.resolve(false);
@@ -90,7 +96,7 @@ export function createAlertsController({
     if (alertTitle) {
       alertTitle.textContent = title;
     }
-    setActionsMode("confirm", { confirmLabel, cancelLabel });
+    setActionsMode("confirm", { confirmLabel, cancelLabel, confirmVariant });
     alertMessage.textContent = message;
     alertOverlay.classList.remove("hidden");
     return new Promise((resolve) => {

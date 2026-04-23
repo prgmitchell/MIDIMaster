@@ -4,5 +4,7 @@
   "version": "0.1.0",
   "api_version": "1",
   "entry": "plugin.mjs",
-  "icon": "OBSLogo.png"
+  "icon": "OBSLogo.png",
+  "description": "Control OBS scenes, sources, and recording actions from MIDIMaster.",
+  "categories": ["Streaming", "Utilities"]
 }

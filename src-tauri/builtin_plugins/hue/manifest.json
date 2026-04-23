@@ -4,5 +4,7 @@
   "version": "0.1.0",
   "api_version": "1",
   "entry": "plugin.mjs",
-  "icon": "HueLogo.svg"
+  "icon": "HueLogo.svg",
+  "description": "Control Philips Hue lights, brightness, and color scenes directly from your controller.",
+  "categories": ["Lighting"]
 }

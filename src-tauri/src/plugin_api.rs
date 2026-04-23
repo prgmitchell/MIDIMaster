@@ -27,6 +27,10 @@ pub struct PluginManifest {
     pub entry: String,
     #[serde(default)]
     pub icon: Option<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub categories: Vec<String>,
 
     // Augmented fields computed by MIDIMaster.
     #[serde(default)]

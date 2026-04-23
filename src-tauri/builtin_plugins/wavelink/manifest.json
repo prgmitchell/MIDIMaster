@@ -4,5 +4,7 @@
   "version": "0.1.0",
   "api_version": "1",
   "entry": "plugin.mjs",
-  "icon": "WaveLinkLogo.png"
+  "icon": "WaveLinkLogo.png",
+  "description": "Adjust Wave Link channel levels and mute states without leaving your MIDI workflow.",
+  "categories": ["Audio"]
 }
