@@ -134,10 +134,6 @@ jobs:
             -SiteId "${env:NETLIFY_SITE_ID}" `
             -PreservePaths "/updates/latest.json"
 
-          if ($LASTEXITCODE -ne 0) {
-            throw "Netlify updater metadata deploy failed."
-          }
-
       - name: Prepare GitHub release asset list
         id: release_assets
         shell: pwsh
