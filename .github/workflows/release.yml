@@ -122,57 +122,20 @@ jobs:
             throw "Updater metadata file not found: $latestJsonPath"
           }
 
-          $token = "${env:NETLIFY_AUTH_TOKEN}"
-          $siteId = "${env:NETLIFY_SITE_ID}"
-          $apiBase = "https://api.netlify.com/api/v1"
-          $targetPath = "/updates/latest.json"
-
-          $latestBytes = [System.IO.File]::ReadAllBytes($latestJsonPath)
-          $sha1 = [System.BitConverter]::ToString(
-            ([System.Security.Cryptography.SHA1]::Create().ComputeHash($latestBytes))
-          ).Replace("-", "").ToLowerInvariant()
-
-          $authHeaders = @{ Authorization = "Bearer $token" }
-          $jsonHeaders = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
-
-          $currentFiles = Invoke-RestMethod -Method Get -Uri "$apiBase/sites/$siteId/files" -Headers $authHeaders
-          $filesMap = @{}
-          foreach ($file in $currentFiles) {
-            if ($null -ne $file.path -and $null -ne $file.sha) {
-              $filesMap[[string]$file.path] = [string]$file.sha
-            }
+          $publishDir = Join-Path $env:RUNNER_TEMP "netlify-updater"
+          if (Test-Path -LiteralPath $publishDir) {
+            Remove-Item -LiteralPath $publishDir -Recurse -Force
           }
-          $filesMap[$targetPath] = $sha1
+          New-Item -ItemType Directory -Force -Path (Join-Path $publishDir "updates") | Out-Null
+          Copy-Item -LiteralPath $latestJsonPath -Destination (Join-Path $publishDir "updates/latest.json") -Force
 
-          $deployRequest = @{ files = $filesMap } | ConvertTo-Json -Depth 50 -Compress
-          $deploy = Invoke-RestMethod -Method Post -Uri "$apiBase/sites/$siteId/deploys" -Headers $jsonHeaders -Body $deployRequest
-          if ($null -eq $deploy.id) {
-            throw "Netlify deploy creation failed: missing deploy id."
-          }
+          & "scripts/netlify/Invoke-NetlifyMergeDeploy.ps1" `
+            -SourceDir $publishDir `
+            -SiteId "${env:NETLIFY_SITE_ID}" `
+            -PreservePaths "/updates/latest.json"
 
-          $required = @($deploy.required)
-          $requiredOther = @($required | Where-Object { $_ -ne $sha1 })
-          if ($requiredOther.Count -gt 0) {
-            throw "Netlify requested upload of existing blobs not available in CI (sha: $($requiredOther -join ', ')). Run a full store redeploy once, then retry."
-          }
-
-          if ($required -contains $sha1) {
-            $uploadUri = "$apiBase/deploys/$($deploy.id)/files/updates/latest.json"
-            Invoke-RestMethod -Method Put -Uri $uploadUri -Headers @{ Authorization = "Bearer $token"; "Content-Type" = "application/octet-stream" } -Body $latestBytes | Out-Null
-          }
-
-          $maxAttempts = 20
-          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-            Start-Sleep -Seconds 2
-            $deployState = Invoke-RestMethod -Method Get -Uri "$apiBase/sites/$siteId/deploys/$($deploy.id)" -Headers $authHeaders
-            $state = [string]$deployState.state
-            if ($state -eq "ready") {
-              Write-Host "Netlify updater metadata deploy is ready (deploy id: $($deploy.id))."
-              break
-            }
-            if ($attempt -eq $maxAttempts) {
-              throw "Netlify updater metadata deploy did not reach 'ready' state. Last state: $state"
-            }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Netlify updater metadata deploy failed."
           }
 
       - name: Prepare GitHub release asset list

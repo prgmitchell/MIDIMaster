@@ -671,16 +671,15 @@ body.dark-mode:not([data-theme]) .target-tag--count {
 }
 
 #settings-update-status {
-  min-height: 34px;
-  max-height: 34px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  display: flex;
+  align-items: flex-start;
 }
 
 .settings-updates-section {
-  padding: 10px 12px 12px;
+  padding: 10px 12px 10px;
   border-radius: 10px;
   border: 1px solid rgba(90, 112, 165, 0.35);
   background: rgba(167, 188, 236, 0.08);
@@ -692,6 +691,10 @@ body.dark-mode:not([data-theme]) .target-tag--count {
   justify-content: space-between;
   gap: 10px;
   font-size: 12px;
+}
+
+.settings-updates-section .settings-action {
+  margin-top: auto;
 }
 
 .settings-update-meta-label {

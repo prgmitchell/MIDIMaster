@@ -73,7 +73,7 @@ export function createSettingsFeature({
       || normalized.includes("latest.json")
       || normalized.includes("404")
     ) {
-      return "Updater metadata is not published yet for this release. Use GitHub Releases for manual install.";
+      return "Updater metadata is missing from the update server for this release. A store deploy may have overwritten it. Use GitHub Releases for manual install.";
     }
     if (normalized.includes("network") || normalized.includes("timeout")) {
       return "Unable to reach update server right now. Try again in a moment.";
@@ -160,6 +160,7 @@ export function createSettingsFeature({
     } catch (error) {
       updateState.available = false;
       updateState.body = "";
+      console.error("Updater check failed:", error);
       if (!silent) {
         setUpdateStatus(formatUpdaterError(error), "error");
       }
@@ -179,6 +180,7 @@ export function createSettingsFeature({
     } catch (error) {
       updateState.available = false;
       updateState.body = "";
+      console.error("Updater install failed:", error);
       setUpdateStatus(String(error || "Update install failed."), "error");
     } finally {
       updateState.downloading = false;
@@ -227,6 +229,9 @@ export function createSettingsFeature({
         updateState.available = false;
         updateState.checking = false;
         updateState.downloading = false;
+        if (payload.message) {
+          console.error("Updater event failure:", payload.message);
+        }
         setUpdateStatus(formatUpdaterError(payload.message || "Update failed."), "error");
       }
       if (phase === "available" || phase === "no_update" || phase === "installed") {

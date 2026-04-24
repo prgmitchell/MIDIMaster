@@ -113,6 +113,12 @@ Built-in updater behavior:
 - Stable releases only are offered.
 - If in-app update fails, users can still install manually from the GitHub release page.
 
+Important Netlify publishing note:
+
+- The public store catalog (`/catalog.json`) and updater metadata (`/updates/latest.json`) share the same Netlify site.
+- Store publishes must preserve `/updates/latest.json`; a blind full-site deploy from the store directory can remove updater metadata and break in-app updates.
+- Use `scripts/local-store/deploy_store_netlify.ps1` for store publishes so the deploy merges store files while preserving the updater path.
+
 Bridge migration (one release):
 
 - Existing app installs that still check GitHub need one bridge release.

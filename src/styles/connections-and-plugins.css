@@ -3750,7 +3750,8 @@ body[data-theme] .settings-updates-section {
 }
 
 body[data-theme] #settings-update-status {
-  min-height: 28px;
+  min-height: 0;
+  align-items: flex-start;
 }
 
 body[data-theme] .settings-maintenance-section .settings-action,
@@ -3861,6 +3862,7 @@ body[data-theme] .settings-inline-status {
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 body[data-theme] .settings-status-icon {
@@ -3873,6 +3875,10 @@ body[data-theme] .settings-status-icon {
   width: 0;
   overflow: hidden;
   transition: opacity 120ms ease, width 120ms ease;
+}
+
+body[data-theme] .settings-status-text {
+  display: block;
 }
 
 body[data-theme] .settings-inline-status.success {
