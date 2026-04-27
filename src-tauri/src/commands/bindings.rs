@@ -404,7 +404,8 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
         midi_device_preference: model::MidiDevicePreference::default(),
     });
     profile.bindings.retain(|existing| {
-        !(existing.device_id == binding.device_id && existing.control == binding.control)
+        existing.id != binding.id
+            && !(existing.device_id == binding.device_id && existing.control == binding.control)
     });
     profile.bindings.push(binding);
     state.sync_feedback_values(profile);

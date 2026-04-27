@@ -2927,6 +2927,10 @@ body[data-theme] .binding-config-mode-trigger,
 body[data-theme] .binding-config-mode-option,
 body[data-theme] .binding-config-row .midi-device-dropdown .target-button,
 body[data-theme] .binding-config-actions button,
+body[data-theme] .binding-config-button,
+body[data-theme] .binding-config-custom-editor,
+body[data-theme] .binding-config-custom-surface,
+body[data-theme] .binding-config-preview-summary-value,
 body[data-theme] .learn-panel-actions button,
 body[data-theme] .alert-panel-actions button,
 body[data-theme] .alert-panel-actions .secondary {
@@ -2940,6 +2944,7 @@ body[data-theme] .binding-config-mode-trigger:hover,
 body[data-theme] .binding-config-mode-option:hover,
 body[data-theme] .binding-config-row .midi-device-dropdown .target-button:hover,
 body[data-theme] .binding-config-actions button:hover,
+body[data-theme] .binding-config-button:hover,
 body[data-theme] .learn-panel-actions button:hover,
 body[data-theme] .alert-panel-actions button:hover,
 body[data-theme] .alert-panel-actions .secondary:hover {
@@ -2976,7 +2981,8 @@ body[data-theme] .alert-panel-actions .secondary {
 
 body[data-theme] .binding-config-inline-badge,
 body[data-theme] .binding-config-mode-option.is-selected,
-body[data-theme] .binding-config-row .midi-device-dropdown .target-option.selected {
+body[data-theme] .binding-config-row .midi-device-dropdown .target-option.selected,
+body[data-theme] .binding-config-preview-tag {
   background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent);
@@ -2987,6 +2993,119 @@ body[data-theme] .binding-config-row .midi-device-dropdown .target-menu {
   background: var(--surface-raised);
   border-color: var(--control-border);
   box-shadow: var(--shadow-raised);
+}
+
+body[data-theme] .binding-config-section,
+body[data-theme] .binding-config-preview-shell,
+body[data-theme] .binding-config-preview-stage,
+body[data-theme] .binding-config-preview-track,
+body[data-theme] .binding-config-preview-learn-shell {
+  border-color: var(--control-border);
+}
+
+body[data-theme] .binding-config-curve-card {
+  border-color: var(--control-border);
+  color: var(--text-primary);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 70%, var(--surface-raised)) 0%, var(--surface) 100%);
+}
+
+body[data-theme] .binding-config-curve-card.is-selected {
+  border-color: var(--accent);
+}
+
+body[data-theme] .binding-config-content {
+  background: var(--surface-raised);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .binding-config-section,
+body[data-theme] .binding-config-preview-shell {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, var(--surface-raised)) 0%, var(--surface) 100%);
+}
+
+body[data-theme] .binding-config-preview-learn-shell,
+body[data-theme] .binding-config-preview-stage {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-subtle) 82%, var(--surface-raised)) 0%, var(--surface) 100%);
+}
+
+body[data-theme] .binding-config-preview-track,
+body[data-theme] .binding-config-preview-summary-value,
+body[data-theme] .binding-config-label {
+  background: var(--control-bg);
+}
+
+body[data-theme] .binding-config-preview-fill {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 76%, white) 0%, var(--accent) 100%);
+  box-shadow: none;
+}
+
+body[data-theme] .binding-config-preview-thumb {
+  background: linear-gradient(180deg, var(--surface-raised) 0%, var(--surface-muted) 100%);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--control-border));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+body[data-theme] .binding-config-button--primary {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--control-border));
+  color: var(--accent-strong);
+}
+
+body[data-theme] .binding-config-button--primary:hover {
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface-raised) 30%);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-theme] #binding-config-mute-learn,
+body[data-theme] #binding-config-assign-learn {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--control-border));
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-mute-learn:hover,
+body[data-theme] #binding-config-assign-learn:hover {
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface-raised) 30%);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-theme] .binding-config-button--secondary {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-button--secondary:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .binding-config-title,
+body[data-theme] .binding-config-custom-title,
+body[data-theme] .binding-config-preview-target-label,
+body[data-theme] .binding-config-preview-summary-value,
+body[data-theme] .binding-config-preview-value {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-curve-help,
+body[data-theme] .binding-config-preview-status,
+body[data-theme] .binding-config-preview-learn-indicator,
+body[data-theme] .binding-config-preview-summary-label,
+body[data-theme] .binding-config-info-pill {
+  color: var(--text-secondary);
+}
+
+body[data-theme="light"] .binding-config-preview-target-icon img {
+  filter: none;
+}
+
+body[data-theme="light"] .binding-config-preview-target-icon {
+  background: color-mix(in srgb, white 86%, var(--surface-raised) 14%);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--control-border));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 body[data-theme] .binding-row,

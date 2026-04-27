@@ -217,7 +217,11 @@ function normalizeBinding(binding) {
   setBindingTargets(out, getBindingTargets(out));
   out.mode = (out.mode === "Relative") ? "Relative" : "Absolute";
   out.relative_format = "Auto";
-  out.fader_curve = (out.fader_curve === "Logarithmic") ? "Logarithmic" : "Linear";
+  out.fader_curve = normalizeFaderCurve(out.fader_curve);
+  out.custom_curve = normalizeCustomCurvePoints(out.custom_curve);
+  if (out.custom_curve.length < 2) {
+    out.custom_curve = presetCurvePoints(out.fader_curve);
+  }
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
   if (!out.open_application || typeof out.open_application !== "object") {
@@ -312,6 +316,8 @@ const targetPanelClose = document.getElementById("target-panel-close");
 const targetPanelBack = document.getElementById("target-panel-back");
 const bindingConfigPanel = document.getElementById("binding-config-panel");
 const bindingConfigClose = document.getElementById("binding-config-close");
+const bindingConfigCancel = document.getElementById("binding-config-cancel");
+const bindingConfigSave = document.getElementById("binding-config-save");
 const bindingConfigName = document.getElementById("binding-config-name");
 const bindingConfigMuteLabel = document.getElementById("binding-config-mute-label");
 const bindingConfigMuteLearn = document.getElementById("binding-config-mute-learn");
@@ -324,7 +330,27 @@ const bindingConfigAssignModeButton = document.getElementById("binding-config-as
 const bindingConfigAssignModeMenu = document.getElementById("binding-config-assign-mode-menu");
 const bindingConfigAssignModeAdd = document.getElementById("binding-config-assign-mode-add");
 const bindingConfigAssignModeReplace = document.getElementById("binding-config-assign-mode-replace");
-const bindingConfigCurve = document.getElementById("binding-config-curve");
+const bindingConfigCurveCards = document.getElementById("binding-config-curve-cards");
+const bindingConfigCurveHelp = document.getElementById("binding-config-curve-help");
+const bindingConfigCustomEditor = document.getElementById("binding-config-custom-editor");
+const bindingConfigCustomSurface = document.getElementById("binding-config-custom-surface");
+const bindingConfigCustomReset = document.getElementById("binding-config-custom-reset");
+const bindingConfigAssignHelp = document.getElementById("binding-config-assign-help");
+const bindingConfigPreviewLearnButton = document.getElementById("binding-config-preview-learn-button");
+const bindingConfigPreviewLearnIndicator = document.getElementById("binding-config-preview-learn-indicator");
+const bindingConfigPreviewLearnStatus = document.getElementById("binding-config-preview-learn-status");
+const bindingConfigPreviewTargetIcon = document.getElementById("binding-config-preview-target-icon");
+const bindingConfigPreviewTargetLabel = document.getElementById("binding-config-preview-target-label");
+const bindingConfigPreviewTargetTags = document.getElementById("binding-config-preview-target-tags");
+const bindingConfigPreviewFill = document.getElementById("binding-config-preview-fill");
+const bindingConfigPreviewThumb = document.getElementById("binding-config-preview-thumb");
+const bindingConfigPreviewValue = document.getElementById("binding-config-preview-value");
+const bindingConfigPreviewStatus = document.getElementById("binding-config-preview-status");
+const bindingConfigPreviewMainMidi = document.getElementById("binding-config-preview-main-midi");
+const bindingConfigPreviewMute = document.getElementById("binding-config-preview-mute");
+const bindingConfigPreviewAssign = document.getElementById("binding-config-preview-assign");
+const bindingConfigPreviewCurve = document.getElementById("binding-config-preview-curve");
+const bindingConfigPreviewMidiValue = document.getElementById("binding-config-preview-midi-value");
 
 // Defensive cleanup for older builds that injected extra back buttons.
 try {
@@ -1038,6 +1064,23 @@ let dragState = null;
 const bindingInteractionTimes = {}; // Track last interaction time per binding ID
 const bindingLastValues = {}; // Track last valid volume per binding ID
 const bindingMuteValues = {}; // Track last known mute per binding ID (from feedback)
+const liveMidiValuesByControl = new Map();
+
+function midiControlSignature(deviceId, control) {
+  if (!control) return "";
+  return [
+    String(deviceId || ""),
+    Number(control.channel),
+    Number(control.controller),
+  ].join(":");
+}
+
+function getLiveMidiValueForControl(deviceId, control) {
+  const key = midiControlSignature(deviceId, control);
+  if (!key) return null;
+  const value = liveMidiValuesByControl.get(key);
+  return typeof value === "number" ? value : null;
+}
 
 let lastVolumeUpdateAt = 0;
 const osdBindingValues = new Map();
@@ -1173,6 +1216,8 @@ bindingsFeature = createBindingsFeature({
     bindingSearchInput,
     bindingConfigPanel,
     bindingConfigClose,
+    bindingConfigCancel,
+    bindingConfigSave,
     bindingConfigName,
     bindingConfigMuteLabel,
     bindingConfigMuteLearn,
@@ -1185,7 +1230,27 @@ bindingsFeature = createBindingsFeature({
     bindingConfigAssignModeMenu,
     bindingConfigAssignModeAdd,
     bindingConfigAssignModeReplace,
-    bindingConfigCurve,
+    bindingConfigCurveCards,
+    bindingConfigCurveHelp,
+    bindingConfigCustomEditor,
+    bindingConfigCustomSurface,
+    bindingConfigCustomReset,
+    bindingConfigAssignHelp,
+    bindingConfigPreviewLearnButton,
+    bindingConfigPreviewLearnIndicator,
+    bindingConfigPreviewLearnStatus,
+    bindingConfigPreviewTargetIcon,
+    bindingConfigPreviewTargetLabel,
+    bindingConfigPreviewTargetTags,
+    bindingConfigPreviewFill,
+    bindingConfigPreviewThumb,
+    bindingConfigPreviewValue,
+    bindingConfigPreviewStatus,
+    bindingConfigPreviewMainMidi,
+    bindingConfigPreviewMute,
+    bindingConfigPreviewAssign,
+    bindingConfigPreviewCurve,
+    bindingConfigPreviewMidiValue,
     learnPanel,
     learnPanelTitle,
     learnPanelMessage,
@@ -1219,6 +1284,10 @@ bindingsFeature = createBindingsFeature({
   bindingInteractionTimes,
   bindingLastValues,
   bindingMuteValues,
+  getLiveMidiValueForControl,
+  createTargetIcon,
+  resolveOsdTarget,
+  showChoices: (options = {}) => alertsController?.showChoices?.(options) || Promise.resolve("close"),
 });
 
 midiFeature = createMidiFeature({
@@ -1411,15 +1480,100 @@ function decodeRelativeDelta(binding, value) {
 }
 
 function normalizeFaderCurve(raw) {
-  return raw === "Logarithmic" ? "Logarithmic" : "Linear";
+  const value = String(raw || "Linear");
+  return ["Linear", "Exponential", "Logarithmic", "SCurve", "Custom"].includes(value)
+    ? value
+    : "Linear";
+}
+
+function presetCurvePoints(curve) {
+  switch (normalizeFaderCurve(curve)) {
+    case "Exponential":
+      return [
+        { x: 0, y: 0 },
+        { x: 0.18, y: 0.04 },
+        { x: 0.42, y: 0.16 },
+        { x: 0.72, y: 0.5 },
+        { x: 1, y: 1 },
+      ];
+    case "Logarithmic":
+      return [
+        { x: 0, y: 0 },
+        { x: 0.08, y: 0.34 },
+        { x: 0.24, y: 0.58 },
+        { x: 0.52, y: 0.8 },
+        { x: 1, y: 1 },
+      ];
+    case "SCurve":
+      return [
+        { x: 0, y: 0 },
+        { x: 0.18, y: 0.06 },
+        { x: 0.5, y: 0.5 },
+        { x: 0.82, y: 0.94 },
+        { x: 1, y: 1 },
+      ];
+    case "Custom":
+      return [
+        { x: 0, y: 0 },
+        { x: 0.22, y: 0.34 },
+        { x: 0.5, y: 0.82 },
+        { x: 0.78, y: 0.3 },
+        { x: 1, y: 1 },
+      ];
+    case "Linear":
+    default:
+      return [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ];
+  }
+}
+
+function normalizeCustomCurvePoints(points) {
+  const normalized = Array.isArray(points)
+    ? points
+        .map((point) => ({
+          x: Math.min(1, Math.max(0, Number(point?.x) || 0)),
+          y: Math.min(1, Math.max(0, Number(point?.y) || 0)),
+        }))
+        .sort((a, b) => a.x - b.x)
+    : [];
+  if (normalized.length >= 2) {
+    normalized[0].x = 0;
+    normalized[normalized.length - 1].x = 1;
+  }
+  return normalized;
+}
+
+function applyCustomFaderCurve(points, normalized) {
+  const clamped = Math.min(1, Math.max(0, Number(normalized) || 0));
+  const normalizedPoints = normalizeCustomCurvePoints(points);
+  if (normalizedPoints.length < 2) return clamped;
+  if (clamped <= normalizedPoints[0].x) return normalizedPoints[0].y;
+  for (let index = 0; index < normalizedPoints.length - 1; index += 1) {
+    const start = normalizedPoints[index];
+    const end = normalizedPoints[index + 1];
+    if (clamped > end.x) continue;
+    const span = end.x - start.x;
+    if (Math.abs(span) < 0.00001) return end.y;
+    const t = Math.min(1, Math.max(0, (clamped - start.x) / span));
+    return start.y + ((end.y - start.y) * t);
+  }
+  return normalizedPoints[normalizedPoints.length - 1].y;
 }
 
 function applyFaderCurve(curve, normalized) {
   const clamped = Math.min(1, Math.max(0, Number(normalized) || 0));
-  if (normalizeFaderCurve(curve) === "Logarithmic") {
-    return Math.pow(clamped, 2.2);
+  switch (normalizeFaderCurve(curve)) {
+    case "Exponential":
+      return Math.pow(clamped, 0.55);
+    case "Logarithmic":
+      return Math.pow(clamped, 2.2);
+    case "SCurve":
+      return clamped * clamped * (3 - (2 * clamped));
+    default:
+      return clamped;
   }
-  return clamped;
 }
 
 function findBindingForEvent(payload) {
@@ -1465,9 +1619,15 @@ function resolveOsdVolume(binding, payload) {
     return next;
   }
   if (binding.control?.controller === 224 && payload.value_14 != null) {
-    return applyFaderCurve(binding.fader_curve, payload.value_14 / 16383);
+    const normalized = payload.value_14 / 16383;
+    return normalizeFaderCurve(binding.fader_curve) === "Custom"
+      ? applyCustomFaderCurve(binding.custom_curve, normalized)
+      : applyFaderCurve(binding.fader_curve, normalized);
   }
-  return applyFaderCurve(binding.fader_curve, payload.value / 127);
+  const normalized = payload.value / 127;
+  return normalizeFaderCurve(binding.fader_curve) === "Custom"
+    ? applyCustomFaderCurve(binding.custom_curve, normalized)
+    : applyFaderCurve(binding.fader_curve, normalized);
 }
 
 function showVolumeOsd(target, volume, focusSession) {
@@ -1829,6 +1989,7 @@ function createBindingFromLearn(payload) {
     mode: "Absolute",
     relative_format: "Auto",
     fader_curve: "Linear",
+    custom_curve: normalizeCustomCurvePoints([]),
     deadzone: 0,
     debounce_ms: 0,
     mute_control: null,
@@ -2034,6 +2195,14 @@ async function setupListeners() {
     if (!payload || typeof payload !== "object") {
       return;
     }
+    const normalizedLiveValue = payload.controller === 224 && payload.value_14 != null
+      ? payload.value_14 / 16383
+      : ((Number(payload.value) || 0) / 127);
+    liveMidiValuesByControl.set(midiControlSignature(payload.device_id, {
+      channel: payload.channel,
+      controller: payload.controller,
+      msg_type: payload.msg_type || "ControlChange",
+    }), normalizedLiveValue);
     const binding = findBindingForEvent(payload);
     if (!binding || getBindingTargets(binding).length === 0) {
       return;

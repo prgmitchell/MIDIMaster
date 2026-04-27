@@ -109,13 +109,22 @@ impl Default for RelativeFormat {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum FaderCurve {
     Linear,
+    Exponential,
     Logarithmic,
+    SCurve,
+    Custom,
 }
 
 impl Default for FaderCurve {
     fn default() -> Self {
         FaderCurve::Linear
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FaderCurvePoint {
+    pub x: f32,
+    pub y: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -435,6 +444,8 @@ pub struct Binding {
     pub relative_format: RelativeFormat,
     #[serde(default)]
     pub fader_curve: FaderCurve,
+    #[serde(default)]
+    pub custom_curve: Vec<FaderCurvePoint>,
     pub deadzone: f32,
     pub debounce_ms: u64,
     #[serde(default)]
@@ -636,6 +647,7 @@ mod tests {
             mode: MidiMode::Absolute,
             relative_format: RelativeFormat::Auto,
             fader_curve: FaderCurve::Linear,
+            custom_curve: Vec::new(),
             deadzone: 0.0,
             debounce_ms: 0,
             mute_control: None,
@@ -670,5 +682,35 @@ mod tests {
 
         let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
         assert_eq!(binding.action, BindingAction::OpenApplication);
+    }
+
+    #[test]
+    fn deserialize_custom_curve_defaults_to_empty_points() {
+        let binding: Binding =
+            serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+        assert_eq!(binding.fader_curve, FaderCurve::Linear);
+        assert!(binding.custom_curve.is_empty());
+    }
+
+    #[test]
+    fn deserialize_custom_curve_points_when_present() {
+        let mut json = binding_base_json();
+        json.as_object_mut()
+            .unwrap()
+            .insert("fader_curve".to_string(), serde_json::json!("Custom"));
+        json.as_object_mut().unwrap().insert(
+            "custom_curve".to_string(),
+            serde_json::json!([
+                { "x": 0.0, "y": 0.0 },
+                { "x": 0.4, "y": 0.7 },
+                { "x": 1.0, "y": 1.0 }
+            ]),
+        );
+
+        let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+        assert_eq!(binding.fader_curve, FaderCurve::Custom);
+        assert_eq!(binding.custom_curve.len(), 3);
+        assert_eq!(binding.custom_curve[1].x, 0.4);
+        assert_eq!(binding.custom_curve[1].y, 0.7);
     }
 }

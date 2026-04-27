@@ -2,10 +2,6 @@ import {
   renderLabelWithBadges,
   wireDropdownToggle,
 } from "../ui/dropdown_badges.js";
-import {
-  createSelectDropdownShell,
-  renderNativeSelectDropdown,
-} from "../ui/dropdown_select.js";
 
 export function createBindingsFeature({
   invoke,
@@ -34,6 +30,10 @@ export function createBindingsFeature({
   bindingInteractionTimes,
   bindingLastValues,
   bindingMuteValues,
+  getLiveMidiValueForControl,
+  createTargetIcon,
+  resolveOsdTarget,
+  showChoices,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createBindingsFeature: invoke is required");
@@ -73,9 +73,11 @@ export function createBindingsFeature({
 
   const getVol = (typeof getVolumeForTarget === "function") ? getVolumeForTarget : (() => null);
   const getMuted = (typeof getMuteForTarget === "function") ? getMuteForTarget : (() => false);
+  const getLiveMidiValue = (typeof getLiveMidiValueForControl === "function") ? getLiveMidiValueForControl : (() => null);
   const saveProfile = (typeof saveBindingsForProfile === "function") ? saveBindingsForProfile : (async () => { });
   const getHost = (typeof getPluginHost === "function") ? getPluginHost : (() => null);
-
+  const iconForTarget = (typeof createTargetIcon === "function") ? createTargetIcon : (() => document.createElement("span"));
+  const resolveTargetDisplay = (typeof resolveOsdTarget === "function") ? resolveOsdTarget : (() => null);
   const getEditingId = (typeof getEditingBindingId === "function") ? getEditingBindingId : (() => null);
   const setEditingId = (typeof setEditingBindingId === "function") ? setEditingBindingId : (() => { });
   const getPendingFocusId = (typeof getPendingFocusBindingId === "function") ? getPendingFocusBindingId : (() => null);
@@ -84,6 +86,48 @@ export function createBindingsFeature({
   const getDrag = (typeof getDragState === "function") ? getDragState : (() => null);
   const setDrag = (typeof setDragState === "function") ? setDragState : (() => { });
   const getSearchQuery = () => String(d.bindingSearchInput?.value || "").trim().toLowerCase();
+  const bindingsCard = d.bindingsContainer.closest?.(".bindings-card") || null;
+  let bindingsScrollbarWidth = 0;
+  let bindingsLayoutSyncQueued = false;
+
+  function measureScrollbarWidth() {
+    const probe = document.createElement("div");
+    probe.style.cssText = [
+      "position:absolute",
+      "top:-9999px",
+      "left:-9999px",
+      "width:120px",
+      "height:120px",
+      "overflow:scroll",
+      "visibility:hidden",
+      "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(probe);
+    const width = probe.offsetWidth - probe.clientWidth;
+    probe.remove();
+    return Math.max(0, width || 0);
+  }
+
+  function syncBindingsScrollLayout() {
+    bindingsLayoutSyncQueued = false;
+    if (!bindingsCard || !d.bindingsContainer?.isConnected) return;
+
+    if (!bindingsScrollbarWidth) {
+      bindingsScrollbarWidth = measureScrollbarWidth();
+    }
+
+    const isScrollable = d.bindingsContainer.scrollHeight > d.bindingsContainer.clientHeight + 1;
+    bindingsCard.classList.toggle("is-scrollable", isScrollable);
+    bindingsCard.style.setProperty("--bindings-scrollbar-width", `${bindingsScrollbarWidth}px`);
+    bindingsCard.style.setProperty("--bindings-header-reserve", `${bindingsScrollbarWidth}px`);
+    bindingsCard.style.setProperty("--bindings-row-reserve", "0px");
+  }
+
+  function queueBindingsScrollLayoutSync() {
+    if (bindingsLayoutSyncQueued) return;
+    bindingsLayoutSyncQueued = true;
+    requestAnimationFrame(syncBindingsScrollLayout);
+  }
 
   function displayModeName(binding) {
     if (effectiveIsButton(binding)) return "Toggle";
@@ -276,7 +320,143 @@ export function createBindingsFeature({
   }
 
   function normalizeFaderCurve(raw) {
-    return raw === "Logarithmic" ? "Logarithmic" : "Linear";
+    const value = String(raw || "Linear");
+    return ["Linear", "Exponential", "Logarithmic", "SCurve", "Custom"].includes(value)
+      ? value
+      : "Linear";
+  }
+
+  function defaultCustomCurve() {
+    return [
+      { x: 0, y: 0 },
+      { x: 0.5, y: 0.5 },
+      { x: 1, y: 1 },
+    ];
+  }
+
+  function presetCurvePoints(curve) {
+    switch (normalizeFaderCurve(curve)) {
+      case "Exponential":
+        return [
+          { x: 0, y: 0 },
+          { x: 0.18, y: 0.04 },
+          { x: 0.42, y: 0.16 },
+          { x: 0.72, y: 0.5 },
+          { x: 1, y: 1 },
+        ];
+      case "Logarithmic":
+        return [
+          { x: 0, y: 0 },
+          { x: 0.08, y: 0.34 },
+          { x: 0.24, y: 0.58 },
+          { x: 0.52, y: 0.8 },
+          { x: 1, y: 1 },
+        ];
+      case "SCurve":
+        return [
+          { x: 0, y: 0 },
+          { x: 0.18, y: 0.06 },
+          { x: 0.5, y: 0.5 },
+          { x: 0.82, y: 0.94 },
+          { x: 1, y: 1 },
+        ];
+      case "Custom":
+        return defaultCustomCurve();
+      case "Linear":
+      default:
+        return [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+        ];
+    }
+  }
+
+  function normalizeCustomCurve(points) {
+    const normalized = Array.isArray(points)
+      ? points
+          .map((point, index) => ({
+            x: Math.min(1, Math.max(0, Number(point?.x) || 0)),
+            y: Math.min(1, Math.max(0, Number(point?.y) || 0)),
+            index,
+          }))
+          .sort((a, b) => a.x - b.x)
+          .map(({ x, y }) => ({ x, y }))
+      : [];
+    if (normalized.length < 2) {
+      return defaultCustomCurve();
+    }
+    normalized[0].x = 0;
+    normalized[normalized.length - 1].x = 1;
+    return normalized;
+  }
+
+  function customCurvePoints(binding) {
+    const points = normalizeCustomCurve(binding?.custom_curve);
+    if (Array.isArray(points) && points.length >= 3) {
+      return points;
+    }
+    return defaultCustomCurve();
+  }
+
+  function curveEditorPoints(binding) {
+    return customCurvePoints(binding);
+  }
+
+  function cloneBindingDraft(binding) {
+    if (!binding || typeof binding !== "object") return null;
+    const clone = JSON.parse(JSON.stringify(binding));
+    ensureBindingShape(clone);
+    ensureAuxShape(clone);
+    return clone;
+  }
+
+  function curveHelpText(curve) {
+    const current = normalizeFaderCurve(curve);
+    if (current === "Exponential") {
+      return "Exponential response. Small movements rise faster for more sensitivity near the bottom of the throw.";
+    }
+    if (current === "Logarithmic") {
+      return "Logarithmic response. Small movements stay gentler for finer low-end control.";
+    }
+    if (current === "SCurve") {
+      return "S-Curve response. Soft at the edges with a more assertive response through the center.";
+    }
+    if (current === "Custom") {
+      return "Custom response. Drag the control points to shape how MIDI movement maps to output.";
+    }
+    return "Linear response. Output value changes at the same rate as the fader movement.";
+  }
+
+  function curveDisplayName(curve) {
+    return normalizeFaderCurve(curve) === "SCurve" ? "S-Curve" : normalizeFaderCurve(curve);
+  }
+
+  function applyCurveToNormalized(binding, normalized) {
+    const clamped = Math.min(1, Math.max(0, Number(normalized) || 0));
+    switch (normalizeFaderCurve(binding?.fader_curve)) {
+      case "Exponential":
+        return Math.pow(clamped, 0.55);
+      case "Logarithmic":
+        return Math.pow(clamped, 2.2);
+      case "SCurve":
+        return clamped * clamped * (3 - (2 * clamped));
+      case "Custom": {
+        const points = normalizeCustomCurve(binding?.custom_curve);
+        if (clamped <= points[0].x) return points[0].y;
+        for (let index = 0; index < points.length - 1; index += 1) {
+          const start = points[index];
+          const end = points[index + 1];
+          if (clamped > end.x) continue;
+          const span = end.x - start.x;
+          if (Math.abs(span) < 0.00001) return end.y;
+          const t = Math.min(1, Math.max(0, (clamped - start.x) / span));
+          return start.y + ((end.y - start.y) * t);
+        }
+        return points[points.length - 1].y;
+      }
+      default:
+        return clamped;
+    }
   }
 
   function ensureBindingShape(binding) {
@@ -287,6 +467,7 @@ export function createBindingsFeature({
     // Backend auto-detect is always used for relative controls.
     binding.relative_format = "Auto";
     binding.fader_curve = normalizeFaderCurve(binding.fader_curve);
+    binding.custom_curve = customCurvePoints(binding);
   }
 
   function effectiveIsButton(binding) {
@@ -369,40 +550,21 @@ export function createBindingsFeature({
   }
 
   let configBindingId = null;
+  let configDraft = null;
   let configLearnField = null;
   let configLearnTimer = null;
   let transferPrompt = null;
+  const configAcceptedTransfers = new Map();
+  let configPreviewTimer = null;
+  let customCurvePointer = null;
   let hotkeyLearnBindingId = null;
   let hotkeyLearnCleanup = null;
   const hotkeyModifiers = ["Ctrl", "Shift", "Alt", "Meta"];
   const nameDrafts = new Map();
   let pendingRerender = false;
   let suppressPendingFocusClearUntil = 0;
-  let curveDropdownEntry = null;
   const defaultLearnPanelTitle = "Waiting for MIDI Input";
   const defaultLearnPanelMessage = "Move a control on your MIDI device to create a binding.";
-
-  function renderCurveDropdown() {
-    if (!d.bindingConfigCurve) return;
-    if (!curveDropdownEntry || !curveDropdownEntry.root?.isConnected) {
-      curveDropdownEntry = createSelectDropdownShell({
-        selectEl: d.bindingConfigCurve,
-        rootClass: "midi-device-dropdown",
-        title: "Fader curve",
-      });
-    }
-    if (!curveDropdownEntry) return;
-    renderNativeSelectDropdown({
-      entry: curveDropdownEntry,
-      selectEl: d.bindingConfigCurve,
-      fallbackText: "Linear",
-      truncateMenuLabels: false,
-      truncateDisplayLabel: false,
-      onOptionSelected: () => {
-        renderCurveDropdown();
-      },
-    });
-  }
 
   function clearTransferPrompt() {
     transferPrompt = null;
@@ -603,7 +765,9 @@ export function createBindingsFeature({
     const assignLearn = d.bindingConfigAssignLearn;
     const muteClear = d.bindingConfigMuteClear;
     const assignClear = d.bindingConfigAssignClear;
+    const previewLearnButton = d.bindingConfigPreviewLearnButton;
     const transferLocked = Boolean(transferPrompt);
+    const learningPrimary = configLearnField === "control";
 
     if (muteLearn) {
       const active = configLearnField === "mute_control";
@@ -622,6 +786,11 @@ export function createBindingsFeature({
     if (muteClear) muteClear.disabled = lockClear;
     if (assignClear) assignClear.disabled = lockClear;
     if (d.bindingConfigAssignModeButton) d.bindingConfigAssignModeButton.disabled = lockClear;
+    if (previewLearnButton) {
+      previewLearnButton.classList.toggle("is-learning", learningPrimary);
+      previewLearnButton.textContent = learningPrimary ? "Listening..." : "Learn Fader";
+      previewLearnButton.disabled = transferLocked || Boolean(configLearnField && !learningPrimary);
+    }
   }
 
   function stopAuxLearn(options = {}) {
@@ -632,6 +801,7 @@ export function createBindingsFeature({
     }
     configLearnField = null;
     updateAuxLearnUi();
+    renderConfigPreview();
     if (closePanel) {
       hideLearnPanel();
     }
@@ -643,6 +813,17 @@ export function createBindingsFeature({
       ? "PB"
       : (control.msg_type === "Note" ? "Note" : "CC");
     return `Ch ${control.channel} ${msg} ${control.controller}`;
+  }
+
+  function formatPreviewMidiValue(binding, normalizedValue) {
+    const clamped = Math.min(1, Math.max(0, Number(normalizedValue) || 0));
+    const msgType = String(binding?.control?.msg_type || "ControlChange");
+    if (msgType === "PitchBend") {
+      const raw = Math.round(clamped * 16383);
+      return `${raw} / 16383`;
+    }
+    const raw = Math.round(clamped * 127);
+    return `${raw} / 127`;
   }
 
   function renderAssignMappingLabel(binding) {
@@ -685,11 +866,238 @@ export function createBindingsFeature({
       && String(a.msg_type || "ControlChange") === String(b.msg_type || "ControlChange");
   }
 
+  function getConfigBinding() {
+    return configDraft;
+  }
+
+  function stopConfigPreviewTimer() {
+    if (!configPreviewTimer) return;
+    cancelAnimationFrame(configPreviewTimer);
+    configPreviewTimer = null;
+  }
+
+  function startConfigPreviewTimer() {
+    stopConfigPreviewTimer();
+    const tick = () => {
+      if (!configBindingId || !getConfigBinding()) {
+        stopConfigPreviewTimer();
+        return;
+      }
+      renderConfigPreview();
+      configPreviewTimer = requestAnimationFrame(tick);
+    };
+    configPreviewTimer = requestAnimationFrame(tick);
+  }
+
+  function parseDisplayTags(rawLabel) {
+    const label = String(rawLabel || "");
+    const tags = [];
+    const matchAll = label.match(/\(([^()]+)\)/g) || [];
+    matchAll.forEach((tag) => {
+      const text = tag.replace(/[()]/g, "").trim();
+      if (text) tags.push(text);
+    });
+    return tags;
+  }
+
+  function renderPreviewTarget(binding) {
+    const target = getPrimaryTarget(binding);
+    const display = resolveTargetDisplay(target) || { label: "Target", icon_data: null };
+    if (d.bindingConfigPreviewTargetLabel) {
+      const baseLabel = String(display.label || "Target").replace(/\s*\([^()]+\)/g, "").trim();
+      d.bindingConfigPreviewTargetLabel.textContent = baseLabel || "Target";
+    }
+    if (d.bindingConfigPreviewTargetTags) {
+      d.bindingConfigPreviewTargetTags.innerHTML = "";
+      parseDisplayTags(display.label).forEach((tag) => {
+        const badge = document.createElement("span");
+        badge.className = "binding-config-preview-tag";
+        badge.textContent = tag;
+        d.bindingConfigPreviewTargetTags.appendChild(badge);
+      });
+    }
+    if (d.bindingConfigPreviewTargetIcon) {
+      d.bindingConfigPreviewTargetIcon.innerHTML = "";
+      const icon = iconForTarget(display);
+      if (icon) d.bindingConfigPreviewTargetIcon.appendChild(icon);
+    }
+  }
+
+  function renderConfigPreview() {
+    const binding = getConfigBinding();
+    if (!binding) return;
+    const bindingId = configBindingId;
+    const target = getPrimaryTarget(binding);
+    const liveMidiValue = getLiveMidiValue(binding.device_id, binding.control);
+    const liveValue = liveMidiValue != null
+      ? applyCurveToNormalized(binding, liveMidiValue)
+      : (bindingId != null && bindingLastValues[bindingId] != null
+          ? Number(bindingLastValues[bindingId])
+          : (getVol(target) ?? 0));
+    const muted = bindingId != null && bindingMuteValues[bindingId] != null
+      ? Boolean(bindingMuteValues[bindingId])
+      : Boolean(getMuted(target));
+    const previewValue = Math.min(1, Math.max(0, Number(liveValue) || 0));
+    const fillPercent = Math.round(Math.min(1, Math.max(0, previewValue)) * 100);
+    const learningPrimary = configLearnField === "control";
+
+    renderPreviewTarget(binding);
+    if (d.bindingConfigPreviewValue) d.bindingConfigPreviewValue.textContent = `${fillPercent}%`;
+    if (d.bindingConfigPreviewFill) d.bindingConfigPreviewFill.style.height = `${fillPercent}%`;
+    if (d.bindingConfigPreviewThumb) d.bindingConfigPreviewThumb.style.bottom = `calc(${fillPercent}% - 18px)`;
+    if (d.bindingConfigPreviewMainMidi) d.bindingConfigPreviewMainMidi.textContent = labelForControl(binding.control || {});
+    if (d.bindingConfigPreviewMute) d.bindingConfigPreviewMute.textContent = formatMidiControlLabel(binding.mute_control);
+    if (d.bindingConfigPreviewAssign) d.bindingConfigPreviewAssign.textContent = formatMidiControlLabel(binding.assign_control);
+    if (d.bindingConfigPreviewCurve) d.bindingConfigPreviewCurve.textContent = curveDisplayName(binding.fader_curve);
+    if (d.bindingConfigPreviewMidiValue) d.bindingConfigPreviewMidiValue.textContent = formatPreviewMidiValue(binding, previewValue);
+    if (d.bindingConfigPreviewStatus) {
+      if (learningPrimary) {
+        d.bindingConfigPreviewStatus.textContent = "Waiting for new fader input";
+      } else if (muted) {
+        d.bindingConfigPreviewStatus.textContent = "Target currently muted";
+      } else if ((bindingId != null && bindingLastValues[bindingId] != null) || liveMidiValue != null) {
+        d.bindingConfigPreviewStatus.textContent = "Receiving live feedback";
+      } else {
+        d.bindingConfigPreviewStatus.textContent = "Waiting for live input";
+      }
+    }
+    if (d.bindingConfigPreviewLearnIndicator) {
+      d.bindingConfigPreviewLearnIndicator.classList.toggle("hidden", !learningPrimary);
+      d.bindingConfigPreviewLearnIndicator.classList.toggle("is-learning", learningPrimary);
+    }
+    if (d.bindingConfigPreviewLearnStatus) {
+      d.bindingConfigPreviewLearnStatus.textContent = "Waiting for MIDI input...";
+    }
+  }
+
+  function buildCurveCardSvg(binding, curve) {
+    const pathMap = {
+      Linear: "M10 110 L110 10",
+      Exponential: "M10 110 C35 110, 75 86, 110 10",
+      Logarithmic: "M10 110 C18 42, 64 16, 110 10",
+      SCurve: "M10 110 C42 110, 42 12, 110 10",
+      Custom: "M10 88 L34 76 L60 28 L86 88 L110 72",
+    };
+    if (curve === "Custom") {
+      const points = curveEditorPoints(binding);
+      const width = 120;
+      const height = 120;
+      const padding = 10;
+      const toX = (point) => padding + (point.x * (width - (padding * 2)));
+      const toY = (point) => height - padding - (point.y * (height - (padding * 2)));
+      const polyline = points.map((point) => `${toX(point)},${toY(point)}`).join(" ");
+      return `
+        <svg class="binding-config-curve-editor-svg" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+          <polyline points="${polyline}" />
+        </svg>
+      `;
+    }
+    return `<svg viewBox="0 0 120 120" aria-hidden="true" focusable="false"><path d="${pathMap[curve] || pathMap.Linear}" /></svg>`;
+  }
+
+  function setDraftCurve(curve) {
+    const binding = getConfigBinding();
+    if (!binding) return;
+    if (binding.fader_curve === normalizeFaderCurve(curve)) {
+      return;
+    }
+    binding.fader_curve = normalizeFaderCurve(curve);
+    binding.custom_curve = customCurvePoints(binding);
+    renderConfigModal();
+  }
+
+  function renderCurveCards() {
+    if (!d.bindingConfigCurveCards) return;
+    const binding = getConfigBinding();
+    if (!binding) return;
+    d.bindingConfigCurveCards.innerHTML = "";
+    ["Linear", "Exponential", "Logarithmic", "SCurve", "Custom"].forEach((curve) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "binding-config-curve-card";
+      button.dataset.curve = curve;
+      if (curve === "Custom") button.classList.add("binding-config-curve-card--custom");
+      if (binding.fader_curve === curve) button.classList.add("is-selected");
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", String(binding.fader_curve === curve));
+      button.innerHTML = `
+        <span class="binding-config-curve-card-title">${curveDisplayName(curve)}</span>
+        <span class="binding-config-curve-card-visual">${buildCurveCardSvg(binding, curve)}</span>
+      `;
+      button.addEventListener("click", () => setDraftCurve(curve));
+      if (curve === "Custom") {
+        const svg = button.querySelector("svg");
+        const visual = button.querySelector(".binding-config-curve-card-visual");
+        const points = curveEditorPoints(binding);
+        if (svg && visual) {
+          points.forEach((point, index) => {
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            const x = 10 + (point.x * 100);
+            const y = 110 - (point.y * 100);
+            circle.setAttribute("cx", String(x));
+            circle.setAttribute("cy", String(y));
+            circle.setAttribute("r", "5.5");
+            circle.dataset.pointIndex = String(index);
+            circle.classList.add("binding-config-curve-card-point");
+            circle.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            });
+            svg.appendChild(circle);
+          });
+          visual.dataset.curveEditorSurface = "custom";
+        }
+      }
+      d.bindingConfigCurveCards.appendChild(button);
+    });
+    if (d.bindingConfigCurveHelp) {
+      d.bindingConfigCurveHelp.textContent = curveHelpText(binding.fader_curve);
+    }
+  }
+
+  function renderCustomCurveEditor() {
+    // Editing now happens directly inside the Custom curve card.
+  }
+
+  function updateCustomCurveFromPointer(event) {
+    const binding = getConfigBinding();
+    if (!binding || !customCurvePointer?.surfaceEl) return;
+    const rect = customCurvePointer.surfaceEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const points = curveEditorPoints(binding);
+    const index = customCurvePointer.index;
+    const isEdge = index === 0 || index === points.length - 1;
+    const localX = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const localY = Math.min(1, Math.max(0, 1 - ((event.clientY - rect.top) / rect.height)));
+    const prevX = index > 0 ? points[index - 1].x + 0.04 : 0;
+    const nextX = index < points.length - 1 ? points[index + 1].x - 0.04 : 1;
+    points[index] = {
+      x: isEdge ? (index === 0 ? 0 : 1) : Math.min(nextX, Math.max(prevX, localX)),
+      y: localY,
+    };
+    if (binding.fader_curve !== "Custom") {
+      binding.fader_curve = "Custom";
+    }
+    binding.custom_curve = normalizeCustomCurve(points);
+    renderCurveCards();
+    if (customCurvePointer) {
+      const nextSurface = d.bindingConfigCurveCards?.querySelector('.binding-config-curve-card[data-curve="Custom"] .binding-config-curve-card-visual');
+      if (nextSurface) {
+        customCurvePointer.surfaceEl = nextSurface;
+      }
+    }
+    renderConfigPreview();
+  }
+
   function closeConfigModal() {
     stopHotkeyLearn();
     stopAuxLearn();
     clearTransferPrompt();
     closeAssignModeMenu();
+    stopConfigPreviewTimer();
+    customCurvePointer = null;
+    configAcceptedTransfers.clear();
+    configDraft = null;
     configBindingId = null;
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.add("hidden");
   }
@@ -706,7 +1114,7 @@ export function createBindingsFeature({
   }
 
   function renderConfigModal() {
-    const binding = getBindingById(configBindingId);
+    const binding = getConfigBinding();
     if (!binding) {
       closeConfigModal();
       return;
@@ -715,13 +1123,12 @@ export function createBindingsFeature({
     ensureAuxShape(binding);
     ensureBindingShape(binding);
     if (d.bindingConfigName) d.bindingConfigName.value = binding.name?.trim() || "";
-    if (d.bindingConfigCurve) {
-      d.bindingConfigCurve.value = binding.fader_curve;
-      renderCurveDropdown();
-    }
+    renderCurveCards();
+    renderCustomCurveEditor();
     if (d.bindingConfigMuteLabel) d.bindingConfigMuteLabel.textContent = formatMidiControlLabel(binding.mute_control);
     renderAssignMappingLabel(binding);
     syncAssignModeUi(binding.assign_mode || "Add");
+    renderConfigPreview();
     updateAuxLearnUi();
   }
 
@@ -786,29 +1193,28 @@ export function createBindingsFeature({
     if (!transferPrompt) return;
     const { field, mapping, conflict } = transferPrompt;
     clearTransferPrompt();
-    const binding = getBindingById(configBindingId);
+    const binding = getConfigBinding();
     if (!binding) return;
     if (!conflict || !conflict.binding) return;
-
-    if (conflict.field === "control") {
-      await invoke("remove_binding", { binding: conflict.binding });
-      const nextBindings = getB().filter((b) => b.id !== conflict.binding.id);
-      setB(nextBindings);
-      await saveProfile();
+    if (field === "control") {
+      binding.device_id = mapping.device_id;
+      binding.control = {
+        channel: mapping.channel,
+        controller: mapping.controller,
+        msg_type: mapping.msg_type || "ControlChange",
+      };
+      binding.control_kind = normalizeControlKind(mapping.control_kind);
+      binding.mode = mapping.mode || binding.mode || "Absolute";
     } else {
-      conflict.binding[conflict.field] = null;
-      await persistBinding(conflict.binding);
+      binding[field] = mapping;
     }
-
-    binding[field] = mapping;
-    await persistBinding(binding);
+    configAcceptedTransfers.set(field, { field, mapping, conflict });
     hideLearnPanel();
     renderConfigModal();
-    renderBindings();
   }
 
   async function applyAuxMapping(field, mapping) {
-    const binding = getBindingById(configBindingId);
+    const binding = getConfigBinding();
     if (!binding) return;
     ensureAuxShape(binding);
 
@@ -831,11 +1237,46 @@ export function createBindingsFeature({
       return;
     }
 
-    binding[field] = mapping;
-    await persistBinding(binding);
+    if (field === "control") {
+      binding.device_id = mapping.device_id;
+      binding.control = {
+        channel: mapping.channel,
+        controller: mapping.controller,
+        msg_type: mapping.msg_type || "ControlChange",
+      };
+      binding.control_kind = normalizeControlKind(mapping.control_kind);
+      binding.mode = mapping.mode || binding.mode || "Absolute";
+    } else {
+      binding[field] = mapping;
+    }
+    configAcceptedTransfers.delete(field);
     hideLearnPanel();
     renderConfigModal();
-    renderBindings();
+  }
+
+  async function startPrimaryLearn() {
+    const binding = getBindingById(configBindingId);
+    if (!binding) return;
+    if (transferPrompt || configLearnField) return;
+    configLearnField = "control";
+    renderConfigPreview();
+    updateAuxLearnUi();
+    await invoke("start_midi_learn");
+    if (configLearnTimer) clearInterval(configLearnTimer);
+    configLearnTimer = setInterval(async () => {
+      try {
+        const learned = await invoke("consume_learned_control");
+        if (!learned) return;
+        const targetField = configLearnField;
+        stopAuxLearn({ closePanel: false });
+        if (targetField !== "control") return;
+        const mapping = normalizeAuxControl(learned);
+        await applyAuxMapping("control", mapping);
+      } catch {
+        stopAuxLearn({ closePanel: false });
+        renderConfigModal();
+      }
+    }, 200);
   }
 
   async function startAuxLearn(field) {
@@ -864,9 +1305,48 @@ export function createBindingsFeature({
   }
 
   function openConfigModal(bindingId) {
+    const binding = getBindingById(bindingId);
+    if (!binding) return;
     configBindingId = bindingId;
+    configDraft = cloneBindingDraft(binding);
+    configAcceptedTransfers.clear();
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.remove("hidden");
+    startConfigPreviewTimer();
     renderConfigModal();
+  }
+
+  async function saveConfigModal() {
+    if (transferPrompt) return;
+    const original = getBindingById(configBindingId);
+    const draft = getConfigBinding();
+    if (!original || !draft) return;
+
+    let nextBindings = [...getB()];
+    for (const entry of configAcceptedTransfers.values()) {
+      const { conflict } = entry;
+      if (!conflict?.binding) continue;
+      const conflictIndex = nextBindings.findIndex((binding) => binding.id === conflict.binding.id);
+      if (conflictIndex < 0) continue;
+      if (conflict.field === "control") {
+        await invoke("remove_binding", { binding: nextBindings[conflictIndex] });
+        nextBindings.splice(conflictIndex, 1);
+        continue;
+      }
+      const nextConflictBinding = cloneBindingDraft(nextBindings[conflictIndex]);
+      nextConflictBinding[conflict.field] = null;
+      nextBindings[conflictIndex] = nextConflictBinding;
+      setB(nextBindings);
+      await persistBinding(nextConflictBinding);
+    }
+
+    const bindingIndex = nextBindings.findIndex((binding) => binding.id === configBindingId);
+    if (bindingIndex < 0) return;
+    const nextBinding = cloneBindingDraft(draft);
+    nextBindings[bindingIndex] = nextBinding;
+    setB(nextBindings);
+    await persistBinding(nextBinding);
+    renderBindings();
+    closeConfigModal();
   }
 
   function beginBindingEdit(bindingId, forceInline = false) {
@@ -959,6 +1439,7 @@ export function createBindingsFeature({
       empty.className = "bindings-empty";
       empty.textContent = "No bindings yet. Use the button below to add one.";
       d.bindingsContainer.appendChild(empty);
+      queueBindingsScrollLayoutSync();
       return;
     }
 
@@ -1489,6 +1970,8 @@ export function createBindingsFeature({
       empty.textContent = "No bindings match your search.";
       d.bindingsContainer.appendChild(empty);
     }
+
+    queueBindingsScrollLayoutSync();
   }
 
   function startBindingDrag(item, index, event) {
@@ -1630,23 +2113,38 @@ export function createBindingsFeature({
     if (d.bindingConfigClose) {
       d.bindingConfigClose.addEventListener("click", closeConfigModal);
     }
-    if (d.bindingConfigName) {
-      d.bindingConfigName.addEventListener("change", async () => {
-        const binding = getBindingById(configBindingId);
-        if (!binding) return;
-        binding.name = d.bindingConfigName.value.trim() || binding.name;
-        await persistBinding(binding);
-        renderBindings();
+    if (d.bindingConfigCancel) {
+      d.bindingConfigCancel.addEventListener("click", closeConfigModal);
+    }
+    if (d.bindingConfigSave) {
+      d.bindingConfigSave.addEventListener("click", async () => {
+        await saveConfigModal();
       });
     }
-    if (d.bindingConfigCurve) {
-      d.bindingConfigCurve.addEventListener("change", async () => {
-        const binding = getBindingById(configBindingId);
+    if (d.bindingConfigName) {
+      d.bindingConfigName.addEventListener("input", () => {
+        const binding = getConfigBinding();
         if (!binding) return;
-        binding.fader_curve = normalizeFaderCurve(d.bindingConfigCurve.value);
-        d.bindingConfigCurve.value = binding.fader_curve;
-        renderCurveDropdown();
-        await persistBinding(binding);
+        binding.name = d.bindingConfigName.value;
+        renderConfigPreview();
+      });
+    }
+    if (d.bindingConfigPreviewLearnButton) {
+      d.bindingConfigPreviewLearnButton.addEventListener("click", async () => {
+        await startPrimaryLearn();
+      });
+    }
+    document.addEventListener("keydown", (event) => {
+      if (!configBindingId || event.key !== "Escape") return;
+      if (transferPrompt || configLearnField || hotkeyLearnBindingId) return;
+      closeConfigModal();
+    });
+    if (d.bindingConfigCustomReset) {
+      d.bindingConfigCustomReset.addEventListener("click", () => {
+        const binding = getConfigBinding();
+        if (!binding) return;
+        binding.custom_curve = presetCurvePoints(binding.fader_curve);
+        renderConfigModal();
       });
     }
     if (d.bindingConfigMuteLearn) {
@@ -1660,22 +2158,22 @@ export function createBindingsFeature({
       });
     }
     if (d.bindingConfigMuteClear) {
-      d.bindingConfigMuteClear.addEventListener("click", async () => {
+      d.bindingConfigMuteClear.addEventListener("click", () => {
         if (transferPrompt) return;
-        const binding = getBindingById(configBindingId);
+        const binding = getConfigBinding();
         if (!binding) return;
         binding.mute_control = null;
-        await persistBinding(binding);
+        configAcceptedTransfers.delete("mute_control");
         renderConfigModal();
       });
     }
     if (d.bindingConfigAssignClear) {
-      d.bindingConfigAssignClear.addEventListener("click", async () => {
+      d.bindingConfigAssignClear.addEventListener("click", () => {
         if (transferPrompt) return;
-        const binding = getBindingById(configBindingId);
+        const binding = getConfigBinding();
         if (!binding) return;
         binding.assign_control = null;
-        await persistBinding(binding);
+        configAcceptedTransfers.delete("assign_control");
         renderConfigModal();
       });
     }
@@ -1697,13 +2195,13 @@ export function createBindingsFeature({
       event.stopPropagation();
       const button = event.currentTarget;
       const mode = button?.dataset?.mode === "Replace" ? "Replace" : "Add";
-      const binding = getBindingById(configBindingId);
+      const binding = getConfigBinding();
       if (!binding) return;
       binding.assign_mode = mode;
-      await persistBinding(binding);
       renderAssignMappingLabel(binding);
       syncAssignModeUi(binding.assign_mode);
       closeAssignModeMenu();
+      renderConfigPreview();
     };
     if (d.bindingConfigAssignModeAdd) {
       d.bindingConfigAssignModeAdd.addEventListener("click", onAssignModeOptionClick);
@@ -1741,11 +2239,44 @@ export function createBindingsFeature({
       });
     }
 
+    if (d.bindingConfigCurveCards) {
+      d.bindingConfigCurveCards.addEventListener("pointerdown", (event) => {
+        const target = event.target instanceof Element
+          ? event.target.closest("circle.binding-config-curve-card-point")
+          : null;
+        if (!target) return;
+        const card = target.closest(".binding-config-curve-card");
+        if (!card || card.dataset.curve !== "Custom") return;
+        const index = Number(target.dataset.pointIndex);
+        if (!Number.isFinite(index)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const surfaceEl = target.closest(".binding-config-curve-card-visual");
+        if (!surfaceEl) return;
+        customCurvePointer = { index, surfaceEl };
+        target.setPointerCapture?.(event.pointerId);
+        updateCustomCurveFromPointer(event);
+      });
+    }
+
     document.addEventListener("click", (event) => {
       if (!configBindingId) return;
       const root = d.bindingConfigAssignModeRoot;
       if (!root || root.contains(event.target)) return;
       closeAssignModeMenu();
+    });
+
+    document.addEventListener("pointermove", (event) => {
+      if (!customCurvePointer) return;
+      updateCustomCurveFromPointer(event);
+    });
+
+    document.addEventListener("pointerup", () => {
+      customCurvePointer = null;
+    });
+
+    document.addEventListener("pointercancel", () => {
+      customCurvePointer = null;
     });
   }
 
@@ -1768,6 +2299,11 @@ export function createBindingsFeature({
       renderBindings();
     });
   }
+  window.addEventListener("resize", () => {
+    bindingsScrollbarWidth = 0;
+    queueBindingsScrollLayoutSync();
+  });
+  queueBindingsScrollLayoutSync();
   updateAuxLearnUi();
 
   return {

@@ -319,54 +319,144 @@
         <button id="binding-config-close" type="button" class="target-panel-close">x</button>
       </div>
       <div class="binding-config-body">
-        <label class="binding-config-row binding-config-name-row">
-          <span class="binding-config-title">Name</span>
-          <input id="binding-config-name" type="text" placeholder="Binding name" name="binding-config-name" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" />
-        </label>
-        <label class="binding-config-row binding-config-name-row">
-          <span class="binding-config-title">Curve</span>
-          <select id="binding-config-curve" name="binding-config-curve" title="Fader curve">
-            <option value="Linear">Linear</option>
-            <option value="Logarithmic">Logarithmic</option>
-          </select>
-        </label>
-        <div class="binding-config-row">
-          <span class="binding-config-title">Mute</span>
-          <div class="binding-config-actions">
-            <span id="binding-config-mute-label" class="binding-config-label">Not mapped</span>
-            <button id="binding-config-mute-learn" type="button">Learn</button>
-            <button id="binding-config-mute-clear" type="button" class="secondary">Clear</button>
-          </div>
-        </div>
-        <div class="binding-config-row">
-          <span class="binding-config-title binding-config-title-with-action">
-            <span>Assign</span>
-            <div id="binding-config-assign-mode-root" class="binding-config-mode-root">
-              <button
-                id="binding-config-assign-mode-button"
-                type="button"
-                class="binding-config-mode-trigger"
-                title="Assign mode: Add"
-                aria-label="Assign mode"
-                aria-haspopup="true"
-                aria-expanded="false"
-              >
-                <svg class="binding-config-mode-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
-                </svg>
-              </button>
-              <div id="binding-config-assign-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Assign mode options">
-                <button id="binding-config-assign-mode-add" type="button" class="binding-config-mode-option" data-mode="Add" role="menuitem">Add</button>
-                <button id="binding-config-assign-mode-replace" type="button" class="binding-config-mode-option" data-mode="Replace" role="menuitem">Replace</button>
+        <div class="binding-config-layout">
+          <div class="binding-config-main-column">
+            <section class="binding-config-section binding-config-section--name">
+              <label class="binding-config-stack">
+                <span class="binding-config-title">Name</span>
+                <input id="binding-config-name" type="text" placeholder="Binding name" name="binding-config-name" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" />
+              </label>
+            </section>
+
+            <section class="binding-config-section binding-config-section--curve">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title">Curve</span>
+                <div class="binding-config-title-actions">
+                  <button id="binding-config-custom-reset" type="button" class="binding-config-button binding-config-button--secondary">Reset</button>
+                  <span class="binding-config-info-pill" title="Choose how raw MIDI movement maps to output volume.">i</span>
+                </div>
               </div>
-            </div>
-          </span>
-          <div class="binding-config-actions">
-            <span id="binding-config-assign-label" class="binding-config-label">Not mapped</span>
-            <button id="binding-config-assign-learn" type="button">Learn</button>
-            <button id="binding-config-assign-clear" type="button" class="secondary">Clear</button>
+              <div id="binding-config-curve-cards" class="binding-config-curve-cards" role="listbox" aria-label="Fader curve options"></div>
+              <p id="binding-config-curve-help" class="binding-config-curve-help">Linear response. Output value changes at the same rate as the fader movement.</p>
+            </section>
+
+            <section class="binding-config-section">
+              <span class="binding-config-title">Mute</span>
+              <div class="binding-config-actions">
+                <span id="binding-config-mute-label" class="binding-config-label">Not mapped</span>
+                <button id="binding-config-mute-learn" type="button" class="binding-config-button binding-config-button--primary">Learn</button>
+                <button id="binding-config-mute-clear" type="button" class="binding-config-button binding-config-button--secondary">Clear</button>
+              </div>
+            </section>
+
+            <section class="binding-config-section">
+              <span class="binding-config-title binding-config-title-with-action">
+                <span>Assign</span>
+                <div id="binding-config-assign-mode-root" class="binding-config-mode-root">
+                  <button
+                    id="binding-config-assign-mode-button"
+                    type="button"
+                    class="binding-config-mode-trigger"
+                    title="Assign mode: Add"
+                    aria-label="Assign mode"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                  >
+                    <svg class="binding-config-mode-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
+                    </svg>
+                  </button>
+                  <div id="binding-config-assign-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Assign mode options">
+                    <button id="binding-config-assign-mode-add" type="button" class="binding-config-mode-option" data-mode="Add" role="menuitem">Add</button>
+                    <button id="binding-config-assign-mode-replace" type="button" class="binding-config-mode-option" data-mode="Replace" role="menuitem">Replace</button>
+                  </div>
+                </div>
+              </span>
+              <div class="binding-config-actions">
+                <span id="binding-config-assign-label" class="binding-config-label">Not mapped</span>
+                <button id="binding-config-assign-learn" type="button" class="binding-config-button binding-config-button--primary">Learn</button>
+                <button id="binding-config-assign-clear" type="button" class="binding-config-button binding-config-button--secondary">Clear</button>
+              </div>
+            </section>
           </div>
+
+          <aside class="binding-config-preview-column">
+            <section class="binding-config-preview-shell">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title">Live</span>
+              </div>
+              <div class="binding-config-preview-card">
+                <div class="binding-config-preview-stage">
+                  <div class="binding-config-preview-target">
+                    <div id="binding-config-preview-target-icon" class="binding-config-preview-target-icon" aria-hidden="true"></div>
+                    <div class="binding-config-preview-target-copy">
+                      <div id="binding-config-preview-target-label" class="binding-config-preview-target-label">Target</div>
+                      <div id="binding-config-preview-target-tags" class="binding-config-preview-target-tags"></div>
+                    </div>
+                  </div>
+                  <div class="binding-config-preview-fader">
+                    <div class="binding-config-preview-scale">
+                      <span>100</span>
+                      <span>75</span>
+                      <span>50</span>
+                      <span>25</span>
+                      <span>0</span>
+                    </div>
+                    <div class="binding-config-preview-track">
+                      <div id="binding-config-preview-fill" class="binding-config-preview-fill"></div>
+                      <div id="binding-config-preview-thumb" class="binding-config-preview-thumb"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="binding-config-preview-meta">
+                  <div class="binding-config-preview-value-block">
+                    <div id="binding-config-preview-value" class="binding-config-preview-value">0%</div>
+                    <div id="binding-config-preview-status" class="binding-config-preview-status">Waiting for live input</div>
+                  </div>
+                  <div class="binding-config-preview-summary">
+                    <div class="binding-config-preview-summary-row">
+                      <span class="binding-config-preview-summary-label">Main MIDI</span>
+                      <span id="binding-config-preview-main-midi" class="binding-config-preview-summary-value">Not mapped</span>
+                    </div>
+                    <div class="binding-config-preview-summary-row">
+                      <span class="binding-config-preview-summary-label">Mute</span>
+                      <span id="binding-config-preview-mute" class="binding-config-preview-summary-value">Not mapped</span>
+                    </div>
+                    <div class="binding-config-preview-summary-row">
+                      <span class="binding-config-preview-summary-label">Assign</span>
+                      <span id="binding-config-preview-assign" class="binding-config-preview-summary-value">Not mapped</span>
+                    </div>
+                    <div class="binding-config-preview-summary-row">
+                      <span class="binding-config-preview-summary-label">Curve</span>
+                      <span id="binding-config-preview-curve" class="binding-config-preview-summary-value">Linear</span>
+                    </div>
+                    <div class="binding-config-preview-summary-row">
+                      <span class="binding-config-preview-summary-label">Value</span>
+                      <span id="binding-config-preview-midi-value" class="binding-config-preview-summary-value">0 / 127</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="binding-config-preview-learn-shell">
+                <div class="binding-config-title-row">
+                  <span class="binding-config-title">Learn</span>
+                </div>
+                <div class="binding-config-preview-learn-row">
+                  <button id="binding-config-preview-learn-button" type="button" class="binding-config-button binding-config-button--primary">Learn Fader</button>
+                  <div id="binding-config-preview-learn-indicator" class="binding-config-preview-learn-indicator hidden" aria-live="polite">
+                    <div class="learn-panel-spinner" aria-hidden="true"></div>
+                    <span id="binding-config-preview-learn-status">Waiting for MIDI input...</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </div>
+
+        <div class="binding-config-footer">
+          <button id="binding-config-cancel" type="button" class="binding-config-button binding-config-button--secondary">Cancel</button>
+          <button id="binding-config-save" type="button" class="binding-config-button binding-config-button--primary">Save</button>
         </div>
       </div>
     </div>
