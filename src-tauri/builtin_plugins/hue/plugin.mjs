@@ -72,6 +72,7 @@ function setStatus(connected, detail = "", opts = null) {
 
   if (ui.statusDot) {
     ui.statusDot.classList.toggle("connected", Boolean(connected));
+    ui.statusDot.classList.toggle("connecting", !connected && connecting);
     ui.statusDot.classList.toggle("error", !connected && !connecting && !disconnectedByUser);
   }
 
@@ -339,7 +340,7 @@ export async function activate(ctx) {
 
     for (const ip of discoveredBridges) {
       const row = document.createElement("label");
-      row.className = "plugins-manager-row";
+      row.className = "plugins-manager-row hue-bridge-row";
       row.style.cursor = "pointer";
       row.style.padding = "8px 10px";
       row.innerHTML = `
@@ -882,11 +883,13 @@ export async function activate(ctx) {
               </div>
             </div>
             <div class="connection-row" data-role="discovery-section" style="margin-top:0;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
+              <div class="hue-discovery-heading">
                 <label style="margin:0;">Discovered Bridges</label>
+              </div>
+              <div class="hue-discovery-field-row">
+                <div data-role="bridge-list" class="plugins-manager-list" style="max-height:130px;overflow:auto;"></div>
                 <button type="button" class="hue-refresh-btn" data-role="refresh">Refresh</button>
               </div>
-              <div data-role="bridge-list" class="plugins-manager-list" style="max-height:130px;overflow:auto;"></div>
               <div data-role="discovery-state" class="plugins-store-status" style="margin-top:6px;"></div>
             </div>
             <div class="connection-row" data-role="manual-ip-row" style="display:none;margin-top:0;">
@@ -895,7 +898,7 @@ export async function activate(ctx) {
             </div>
           </div>
           <div data-role="paired-summary" class="hue-setup-card hue-paired-summary" style="display:none;padding:10px 12px;">
-            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5e7091;margin-bottom:6px;">Bridge Setup</div>
+            <div class="hue-summary-heading">Bridge Setup</div>
             <div data-role="paired-summary-text" class="hue-summary-text">Paired with bridge.</div>
           </div>
         </div>

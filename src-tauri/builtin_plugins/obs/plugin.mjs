@@ -43,6 +43,7 @@ function setStatus(connected, detail = "", opts = null) {
   }
   if (dotEl) {
     dotEl.classList.toggle("connected", Boolean(connected));
+    dotEl.classList.toggle("connecting", !connected && connecting);
     dotEl.classList.toggle("error", !connected && !connecting && !disconnectedByUser);
   }
 

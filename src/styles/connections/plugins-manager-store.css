@@ -490,38 +490,6 @@
   color: #2f4367;
 }
 
-body.dark-mode:not([data-theme]) .hue-setup-card {
-  border-color: #324564;
-  background: #1f2a40;
-}
-
-body.dark-mode:not([data-theme]) .hue-tab-strip {
-  background: #22304a;
-  border-color: #3b5275;
-}
-
-body.dark-mode:not([data-theme]) .hue-mode-btn {
-  background: #2a3958;
-  border-color: #456089;
-  color: #d9e5ff;
-}
-
-body.dark-mode:not([data-theme]) .hue-mode-btn.active {
-  background: #4f70a7;
-  border-color: #4f70a7;
-  color: #f5f8ff;
-}
-
-body.dark-mode:not([data-theme]) .hue-refresh-btn {
-  background: #2b3a57;
-  border-color: #496796;
-  color: #dbe8ff;
-}
-
-body.dark-mode:not([data-theme]) .hue-summary-text {
-  color: #d8e4fb;
-}
-
 /* Placeholder State */
 .connection-placeholder {
   display: flex;

@@ -45,6 +45,7 @@ function setStatus(connected, detail = "", opts = null) {
   }
   if (ui.statusDot) {
     ui.statusDot.classList.toggle("connected", Boolean(connected));
+    ui.statusDot.classList.toggle("connecting", !connected && lastStatus.connecting);
     ui.statusDot.classList.toggle("error", !connected && !lastStatus.connecting && !disconnectedByUser);
   }
 

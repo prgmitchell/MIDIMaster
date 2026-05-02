@@ -1,21 +1,47 @@
 /* Plugin content safety net: plugin UIs should inherit app theme tokens. */
-body[data-theme] .connection-tab,
-body[data-theme] .connection-content-wrapper,
-body[data-theme] .connection-settings,
-body[data-theme] .connection-grid {
+body[data-theme] #plugins-page .connection-tab,
+body[data-theme] #plugins-page .connection-content-wrapper,
+body[data-theme] #plugins-page .connection-settings,
+body[data-theme] #plugins-page .connection-grid {
   color: var(--text-primary);
 }
 
-body[data-theme] .connection-content-wrapper,
-body[data-theme] .connection-settings,
-body[data-theme] .connection-placeholder,
-body[data-theme] .hue-setup-card {
-  background: var(--surface-raised);
+body[data-theme] #plugins-page .plugins-custom-content {
+  color: var(--text-primary);
+}
+
+body[data-theme] #plugins-page .connection-item-header {
+  min-height: 42px;
+  margin-bottom: 8px;
+  padding: 0 0 8px;
+  background: transparent;
+  border-bottom: 1px solid var(--control-border);
+  color: var(--text-primary);
+}
+
+body[data-theme] #plugins-page .connection-content-wrapper {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-primary);
+}
+
+body[data-theme] #plugins-page .connection-description,
+body[data-theme] #plugins-page .connection-settings,
+body[data-theme] #plugins-page .connection-placeholder,
+body[data-theme] #plugins-page .hue-setup-card {
+  background: color-mix(in srgb, var(--surface-subtle) 72%, var(--surface-raised) 28%);
   border-color: var(--control-border);
   color: var(--text-primary);
 }
 
-body[data-theme] .connection-icon {
+body[data-theme] #plugins-page .hue-setup-card {
+  min-height: 156px;
+  border-color: color-mix(in srgb, var(--control-border) 68%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 52%, var(--surface-raised) 48%);
+}
+
+body[data-theme] #plugins-page .connection-icon {
   background: var(--surface-muted);
   border: 1px solid var(--control-border);
   border-radius: 6px;
@@ -23,7 +49,7 @@ body[data-theme] .connection-icon {
   object-fit: contain;
 }
 
-body[data-theme] .connections-nav-item .nav-icon {
+body[data-theme] #plugins-page .connections-nav-item .nav-icon {
   background: var(--surface-muted);
   border: 1px solid transparent;
   border-radius: 6px;
@@ -31,86 +57,272 @@ body[data-theme] .connections-nav-item .nav-icon {
   object-fit: contain;
 }
 
-body[data-theme] .connections-nav-item.active .nav-icon {
+body[data-theme] #plugins-page .connections-nav-item.active .nav-icon {
   border-color: var(--control-border-strong);
 }
 
-body[data-theme] .connection-row,
-body[data-theme] .connection-row label,
-body[data-theme] .connection-footer .checkbox-row,
-body[data-theme] .connection-footer .checkbox-row label,
-body[data-theme] .hue-summary-text {
-  color: var(--text-secondary);
-}
-
-body[data-theme] .connection-row input,
-body[data-theme] .hue-mode-btn,
-body[data-theme] .hue-refresh-btn {
-  background: var(--control-bg);
-  border-color: var(--control-border);
+body[data-theme] #plugins-page .connection-name {
   color: var(--text-primary);
 }
 
-body[data-theme] .connection-row input:focus,
-body[data-theme] .hue-mode-btn:hover,
-body[data-theme] .hue-refresh-btn:hover {
+body[data-theme] #plugins-page .connection-status {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-secondary);
+}
+
+body[data-theme] #plugins-page .connection-status-dot {
+  background: var(--text-muted);
+  box-shadow: none;
+}
+
+body[data-theme] #plugins-page .connection-status-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
+body[data-theme] #plugins-page .connection-status-dot.connecting {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+body[data-theme] #plugins-page .connection-status-dot.error {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+body[data-theme] #plugins-page .connection-row,
+body[data-theme] #plugins-page .connection-row label,
+body[data-theme] #plugins-page .connection-footer .checkbox-row,
+body[data-theme] #plugins-page .connection-footer .checkbox-row label,
+body[data-theme] #plugins-page .hue-summary-heading,
+body[data-theme] #plugins-page .hue-summary-text {
+  color: var(--text-secondary);
+}
+
+body[data-theme] #plugins-page .hue-summary-heading {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+body[data-theme] #plugins-page .connection-description p,
+body[data-theme] #plugins-page .plugins-store-status,
+body[data-theme] #plugins-page .plugins-manager-status {
+  color: var(--text-muted);
+}
+
+body[data-theme] #plugins-page .connection-row input,
+body[data-theme] #plugins-page .hue-mode-btn,
+body[data-theme] #plugins-page .hue-refresh-btn {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+body[data-theme] #plugins-page .connection-row input::placeholder {
+  color: var(--text-muted);
+}
+
+body[data-theme] #plugins-page .connection-row input:focus,
+body[data-theme] #plugins-page .hue-mode-btn:hover,
+body[data-theme] #plugins-page .hue-refresh-btn:hover {
   background: var(--control-bg-hover);
   border-color: var(--control-border-strong);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
-body[data-theme] .hue-tab-strip {
-  background: var(--surface-subtle);
-  border-color: var(--control-border);
+body[data-theme] #plugins-page .hue-tab-strip {
+  display: grid;
+  grid-template-columns: 122px 82px;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
+  border-color: transparent;
 }
 
-body[data-theme] .hue-mode-btn.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+body[data-theme] #plugins-page .hue-mode-btn {
+  width: 100%;
+  min-height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+body[data-theme] #plugins-page .hue-mode-btn.active {
+  background: color-mix(in srgb, var(--accent-soft) 76%, var(--surface-raised) 24%);
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
   color: var(--accent);
 }
 
-body[data-theme] .hue-setup-card .connection-row,
-body[data-theme] .hue-setup-card [role="listbox"],
-body[data-theme] .hue-setup-card [role="option"] {
-  background: var(--surface-subtle);
-  border-color: var(--control-border);
-  color: var(--text-primary);
-}
-
-body[data-theme] .hue-setup-card .plugins-manager-row {
-  background: var(--control-bg);
-  border-color: var(--control-border);
-  color: var(--text-primary);
-}
-
-body[data-theme] .hue-setup-card .plugins-manager-row:hover {
-  background: var(--control-bg-hover);
-  border-color: var(--control-border-strong);
-}
-
-body[data-theme] .hue-setup-card .plugins-manager-row input[type="radio"],
-body[data-theme] .hue-actions input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
-body[data-theme] .hue-actions,
-body[data-theme] .hue-actions .checkbox-row {
+body[data-theme] #plugins-page .hue-refresh-btn {
+  min-height: 26px;
+  border-color: color-mix(in srgb, var(--control-border) 68%, transparent);
+  background: transparent;
   color: var(--text-secondary);
 }
 
-body[data-theme] .hue-paired-summary [style*="color"] {
-  color: var(--text-secondary) !important;
+body[data-theme] #plugins-page .hue-setup-card [data-role="discovery-section"],
+body[data-theme] #plugins-page .hue-setup-card [data-role="manual-ip-row"] {
+  padding-top: 2px;
 }
 
-body[data-theme] .hue-setup-card [role="option"]:hover,
-body[data-theme] .hue-setup-card [role="option"][aria-selected="true"] {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+body[data-theme] #plugins-page .hue-setup-card .hue-discovery-heading {
+  height: 14px;
+  margin-bottom: 5px !important;
 }
 
-body[data-theme] .connection-button.connected,
-body[data-theme] .connection-button:disabled,
-body[data-theme] .connection-button.disabled {
+body[data-theme] #plugins-page .hue-setup-card .hue-discovery-field-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .hue-discovery-field-row .plugins-manager-list {
+  width: min(320px, 100%);
+  flex: 0 1 320px;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .hue-discovery-field-row .hue-refresh-btn {
+  min-width: 68px;
+  flex: 0 0 auto;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .connection-row,
+body[data-theme] #plugins-page .hue-setup-card [role="listbox"],
+body[data-theme] #plugins-page .hue-setup-card [role="option"] {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--control-border) 60%, transparent);
+  color: var(--text-primary);
+}
+
+body[data-theme] #plugins-page .hue-setup-card .plugins-manager-row {
+  min-height: 34px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--control-bg) 64%, transparent);
+  border-color: color-mix(in srgb, var(--control-border) 68%, transparent);
+  color: var(--text-primary);
+}
+
+body[data-theme] #plugins-page .hue-setup-card .plugins-manager-row:hover {
+  background: var(--control-bg-hover);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--control-border));
+}
+
+body[data-theme] #plugins-page .hue-setup-card label {
+  display: block;
+  height: 14px;
+  margin: 0 0 5px;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+body[data-theme] #plugins-page .hue-setup-card [data-role="manual-ip-row"] input,
+body[data-theme] #plugins-page .hue-setup-card .hue-bridge-row {
+  width: min(320px, 100%) !important;
+  max-width: min(320px, 100%) !important;
+  box-sizing: border-box;
+}
+
+body[data-theme] #plugins-page .hue-setup-card [data-role="manual-ip-row"] input,
+body[data-theme] #plugins-page .hue-setup-card .hue-bridge-row {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .hue-bridge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .hue-bridge-row .plugins-manager-row-left {
+  width: 100%;
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  gap: 10px !important;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .hue-bridge-row .plugins-manager-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .hue-bridge-row .plugins-manager-row-name {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .hue-bridge-row input[type="radio"] {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+body[data-theme] #plugins-page .hue-setup-card .plugins-manager-row input[type="radio"],
+body[data-theme] #plugins-page .hue-actions input[type="checkbox"],
+body[data-theme] #plugins-page .connection-row.checkbox-row input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+body[data-theme] #plugins-page .hue-actions,
+body[data-theme] #plugins-page .hue-actions .checkbox-row {
+  color: var(--text-secondary);
+}
+
+body[data-theme] #plugins-page .hue-setup-card [role="option"]:hover,
+body[data-theme] #plugins-page .hue-setup-card [role="option"][aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent-soft) 62%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--control-border));
+}
+
+body[data-theme] #plugins-page .connection-button {
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+body[data-theme] #plugins-page .connection-button:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+body[data-theme] #plugins-page .connection-button.danger {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--control-border));
+  color: var(--danger);
+}
+
+body[data-theme] #plugins-page .connection-button.danger:hover {
+  background: color-mix(in srgb, var(--danger-soft) 72%, var(--surface-raised) 28%);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+body[data-theme] #plugins-page .connection-button.connected,
+body[data-theme] #plugins-page .connection-button:disabled,
+body[data-theme] #plugins-page .connection-button.disabled {
   background: var(--surface-muted);
   border-color: var(--control-border);
   color: var(--text-muted);
@@ -119,3 +331,11 @@ body[data-theme] .connection-button.disabled {
   transform: none;
 }
 
+body[data-theme] #plugins-page .connection-button.connected:hover,
+body[data-theme] #plugins-page .connection-button:disabled:hover,
+body[data-theme] #plugins-page .connection-button.disabled:hover {
+  background: var(--surface-muted);
+  border-color: var(--control-border);
+  color: var(--text-muted);
+  box-shadow: none;
+}
