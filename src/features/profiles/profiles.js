@@ -2,6 +2,7 @@ import { closeAllDropdowns } from "../ui/dropdown_badges.js";
 
 export function createProfilesFeature({
   invoke,
+  i18n,
   dom,
   defaultOsdSettings,
   getActiveProfileName,
@@ -28,6 +29,7 @@ export function createProfilesFeature({
     throw new Error("createProfilesFeature: invoke is required");
   }
   const d = (dom && typeof dom === "object") ? dom : {};
+  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   const defaults = (defaultOsdSettings && typeof defaultOsdSettings === "object") ? defaultOsdSettings : {
     enabled: true,
     monitorIndex: 0,
@@ -102,7 +104,7 @@ export function createProfilesFeature({
 
   function setProfileSelection(name) {
     if (!d.profileCurrent) return;
-    d.profileCurrent.textContent = name ? String(name) : "Select profile";
+    d.profileCurrent.textContent = name ? String(name) : t("profiles.selectProfile");
   }
 
   function currentProfileSelection(fallback = "Default") {
@@ -287,7 +289,7 @@ export function createProfilesFeature({
     if (!safeProfiles.length) {
       const empty = document.createElement("div");
       empty.className = "profile-page-empty";
-      empty.textContent = "No profiles found.";
+      empty.textContent = t("profiles.noProfiles");
       d.profilePageList.appendChild(empty);
       return;
     }
@@ -304,7 +306,7 @@ export function createProfilesFeature({
       details.className = "profile-page-select";
       details.innerHTML = `
         <span class="profile-page-name"></span>
-        <span class="profile-page-meta">${profile.name === currentSelection ? "Active profile" : "Saved profile"}</span>
+        <span class="profile-page-meta">${profile.name === currentSelection ? t("profiles.activeProfile") : t("profiles.savedProfile")}</span>
       `;
       details.querySelector(".profile-page-name").textContent = profile.name;
       details.addEventListener("click", async () => {
@@ -319,7 +321,7 @@ export function createProfilesFeature({
       const exportButton = document.createElement("button");
       exportButton.type = "button";
       exportButton.className = "secondary-action";
-      exportButton.textContent = "Export";
+      exportButton.textContent = t("profiles.export");
       exportButton.addEventListener("click", async (event) => {
         event.stopPropagation();
         await exportProfileByName(profile.name);
@@ -328,7 +330,7 @@ export function createProfilesFeature({
       const deleteButton = document.createElement("button");
       deleteButton.type = "button";
       deleteButton.className = "danger-action";
-      deleteButton.textContent = profile.name === "Default" ? "Locked" : "Delete";
+      deleteButton.textContent = profile.name === "Default" ? t("profiles.locked") : t("common.delete");
       deleteButton.disabled = profile.name === "Default";
       deleteButton.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -341,7 +343,7 @@ export function createProfilesFeature({
         const cancelButton = document.createElement("button");
         cancelButton.type = "button";
         cancelButton.className = "secondary-action";
-        cancelButton.textContent = "Cancel";
+        cancelButton.textContent = t("common.cancel");
         cancelButton.addEventListener("click", (event) => {
           event.stopPropagation();
           pendingProfileDeleteName = null;
@@ -351,7 +353,7 @@ export function createProfilesFeature({
         const confirmButton = document.createElement("button");
         confirmButton.type = "button";
         confirmButton.className = "danger-action";
-        confirmButton.textContent = "Confirm";
+        confirmButton.textContent = t("common.confirm");
         confirmButton.addEventListener("click", async (event) => {
           event.stopPropagation();
           pendingProfileDeleteName = null;
@@ -409,7 +411,7 @@ export function createProfilesFeature({
 
     const createInput = document.createElement("input");
     createInput.type = "text";
-    createInput.placeholder = "New profile name";
+    createInput.placeholder = t("profiles.newProfileName");
     ["pointerdown", "mousedown", "click"].forEach((eventName) => {
       createInput.addEventListener(eventName, (event) => {
         event.stopPropagation();
@@ -418,7 +420,7 @@ export function createProfilesFeature({
 
     const createButton = document.createElement("button");
     createButton.type = "button";
-    createButton.textContent = "Create";
+    createButton.textContent = t("profiles.create");
     ["pointerdown", "mousedown", "click"].forEach((eventName) => {
       createButton.addEventListener(eventName, (event) => {
         event.stopPropagation();
@@ -429,8 +431,8 @@ export function createProfilesFeature({
     importButton.type = "button";
     importButton.className = "icon-action";
     importButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
-    importButton.title = "Import profile from JSON";
-    importButton.setAttribute("aria-label", "Import profile");
+    importButton.title = t("profiles.importJson");
+    importButton.setAttribute("aria-label", t("profiles.importProfile"));
     ["pointerdown", "mousedown", "click"].forEach((eventName) => {
       importButton.addEventListener(eventName, (event) => {
         event.stopPropagation();
@@ -445,8 +447,8 @@ export function createProfilesFeature({
     exportCurrentButton.type = "button";
     exportCurrentButton.className = "icon-action";
     exportCurrentButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg>';
-    exportCurrentButton.title = `Export "${currentSelection || "Default"}"`;
-    exportCurrentButton.setAttribute("aria-label", `Export current profile ${currentSelection || "Default"}`);
+    exportCurrentButton.title = t("profiles.exportNamed", { name: currentSelection || "Default" });
+    exportCurrentButton.setAttribute("aria-label", t("profiles.exportCurrentNamed", { name: currentSelection || "Default" }));
     ["pointerdown", "mousedown", "click"].forEach((eventName) => {
       exportCurrentButton.addEventListener(eventName, (event) => {
         event.stopPropagation();
@@ -527,7 +529,7 @@ export function createProfilesFeature({
         const confirmButton = document.createElement("button");
         confirmButton.type = "button";
         confirmButton.className = "delete confirm";
-        confirmButton.textContent = "Delete";
+        confirmButton.textContent = t("common.delete");
         confirmButton.addEventListener("click", async (event) => {
           event.stopPropagation();
           pendingProfileDeleteName = null;
@@ -537,7 +539,7 @@ export function createProfilesFeature({
         const cancelButton = document.createElement("button");
         cancelButton.type = "button";
         cancelButton.className = "secondary";
-        cancelButton.textContent = "Cancel";
+        cancelButton.textContent = t("common.cancel");
         cancelButton.addEventListener("click", (event) => {
           event.stopPropagation();
           pendingProfileDeleteName = null;
@@ -641,11 +643,11 @@ export function createProfilesFeature({
     try {
       const savedPath = await invoke("export_current_profile", { profileName });
       if (savedPath && typeof showAlert === "function") {
-        showAlert("Profile Exported", `Saved to:\n${savedPath}`);
+        showAlert(t("profiles.exportedTitle"), t("profiles.exportedMessage", { path: savedPath }));
       }
     } catch (error) {
       if (typeof showAlert === "function") {
-        showAlert("Export Failed", String(error));
+        showAlert(t("profiles.exportFailedTitle"), String(error));
       }
     }
   }
@@ -674,16 +676,16 @@ export function createProfilesFeature({
         let choice = "replace";
         if (typeof showChoices === "function") {
           choice = await showChoices({
-            title: "Profile Already Exists",
-            message: `A profile named "${baseName}" already exists.`,
+            title: t("profiles.alreadyExistsTitle"),
+            message: t("profiles.alreadyExistsMessage", { name: baseName }),
             options: [
-              { id: "replace", label: "Replace", variant: "primary" },
-              { id: "keep_both", label: "Keep Both", variant: "secondary" },
-              { id: "cancel", label: "Cancel", variant: "secondary" },
+              { id: "replace", label: t("profiles.replace"), variant: "primary" },
+              { id: "keep_both", label: t("profiles.keepBoth"), variant: "secondary" },
+              { id: "cancel", label: t("common.cancel"), variant: "secondary" },
             ],
           });
         } else if (typeof window !== "undefined" && typeof window.confirm === "function") {
-          const replace = window.confirm(`A profile named "${baseName}" already exists. Replace it?`);
+          const replace = window.confirm(t("profiles.replaceConfirm", { name: baseName }));
           choice = replace ? "replace" : "keep_both";
         }
 
@@ -705,14 +707,14 @@ export function createProfilesFeature({
 
       if (typeof showAlert === "function") {
         if (nextName !== baseName) {
-          showAlert("Profile Imported", `Imported as "${nextName}".`);
+          showAlert(t("profiles.importedTitle"), t("profiles.importedAsMessage", { name: nextName }));
         } else {
-          showAlert("Profile Imported", `Imported "${nextName}".`);
+          showAlert(t("profiles.importedTitle"), t("profiles.importedMessage", { name: nextName }));
         }
       }
     } catch (error) {
       if (typeof showAlert === "function") {
-        showAlert("Import Failed", String(error));
+        showAlert(t("profiles.importFailedTitle"), String(error));
       }
     }
   }
@@ -781,6 +783,9 @@ export function createProfilesFeature({
         exportCurrentProfile();
       });
     }
+    window.addEventListener("midimaster:locale-changed", () => {
+      refreshProfiles(currentProfileSelection()).catch(() => {});
+    });
   }
 
   return {

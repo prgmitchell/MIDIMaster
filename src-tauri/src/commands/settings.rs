@@ -6,6 +6,10 @@ use serde::Serialize;
 use std::process::Command;
 use tauri::{AppHandle, Emitter, State};
 
+const SUPPORTED_LANGUAGE_CODES: &[&str] = &[
+    "en", "fr", "es", "de", "it", "pt-BR", "nl", "pl", "ja", "ko", "zh-Hans",
+];
+
 #[derive(Clone, Serialize)]
 pub struct MonitorInfo {
     pub index: usize,
@@ -183,13 +187,20 @@ pub fn update_app_settings(
     minimize_to_tray: bool,
     exit_to_tray: bool,
     auto_check_updates: bool,
+    language: Option<String>,
 ) -> Result<(), String> {
+    let normalized_language = normalize_language(language.as_deref());
     run_logger::info(
         "settings",
         "update_app_settings",
         &format!(
-            "start_with_windows={} start_in_tray={} minimize_to_tray={} exit_to_tray={} auto_check_updates={}",
-            start_with_windows, start_in_tray, minimize_to_tray, exit_to_tray, auto_check_updates
+            "start_with_windows={} start_in_tray={} minimize_to_tray={} exit_to_tray={} auto_check_updates={} language={}",
+            start_with_windows,
+            start_in_tray,
+            minimize_to_tray,
+            exit_to_tray,
+            auto_check_updates,
+            normalized_language
         ),
     );
     let mut settings = state
@@ -201,6 +212,7 @@ pub fn update_app_settings(
     settings.minimize_to_tray = minimize_to_tray;
     settings.exit_to_tray = exit_to_tray;
     settings.auto_check_updates = auto_check_updates;
+    settings.language = normalized_language;
     let updated = settings.clone();
     drop(settings);
 
@@ -210,6 +222,15 @@ pub fn update_app_settings(
         .map_err(|err| err.to_string())?;
     crate::AppState::apply_app_settings(&app, &updated);
     Ok(())
+}
+
+fn normalize_language(language: Option<&str>) -> String {
+    let value = language.unwrap_or("en").trim();
+    if SUPPORTED_LANGUAGE_CODES.contains(&value) {
+        value.to_string()
+    } else {
+        "en".to_string()
+    }
 }
 
 #[tauri::command]

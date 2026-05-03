@@ -22,6 +22,15 @@ jobs:
             src-tauri -> target
           shared-key: windows-rust-v1
 
+      - name: Validate locale catalogs
+        run: node scripts/i18n/validate-locales.mjs
+
+      - name: Ensure locale catalogs are current
+        run: node scripts/i18n/translate-locales.mjs --dry-run --fail-on-pending
+
+      - name: Scan unlocalized frontend strings
+        run: node scripts/i18n/scan-unlocalized.mjs
+
       - name: Format (rustfmt)
         working-directory: src-tauri
         run: cargo fmt --all -- --check

@@ -16,6 +16,7 @@ pub struct AppSettings {
     pub midi_output_device_name: Option<String>,
     pub active_profile_name: Option<String>,
     pub auto_check_updates: bool,
+    pub language: String,
 }
 
 impl Default for AppSettings {
@@ -32,6 +33,7 @@ impl Default for AppSettings {
             midi_output_device_name: None,
             active_profile_name: None,
             auto_check_updates: true,
+            language: "en".to_string(),
         }
     }
 }
@@ -80,5 +82,52 @@ impl AppSettingsStore {
                 .with_context(|| format!("Failed deleting {}", self.path.display()))?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AppSettings, AppSettingsStore};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn default_language_is_english() {
+        assert_eq!(AppSettings::default().language, "en");
+    }
+
+    #[test]
+    fn missing_language_deserializes_to_english() {
+        let json = r#"{
+            "start_with_windows": true,
+            "start_in_tray": false,
+            "minimize_to_tray": true,
+            "exit_to_tray": false,
+            "ui_theme": "dark",
+            "auto_check_updates": true
+        }"#;
+        let settings: AppSettings = serde_json::from_str(json).expect("settings deserialize");
+        assert_eq!(settings.language, "en");
+        assert!(settings.start_with_windows);
+        assert!(settings.minimize_to_tray);
+    }
+
+    #[test]
+    fn saved_language_round_trips() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("midimaster-settings-test-{unique}"));
+        let store = AppSettingsStore::new(dir.clone());
+        let settings = AppSettings {
+            language: "fr".to_string(),
+            ..AppSettings::default()
+        };
+
+        store.save(&settings).expect("save settings");
+        let loaded = store.load().expect("load settings");
+        assert_eq!(loaded.language, "fr");
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

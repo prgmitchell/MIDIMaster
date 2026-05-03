@@ -1,11 +1,13 @@
 export function createConnectionsPanelController({
   dom,
   pluginsTabs,
+  i18n,
   getPluginHost,
   setPluginHost,
   startPluginHostIfNeeded,
 }) {
   const d = (dom && typeof dom === "object") ? dom : {};
+  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   let connectionsTabsSignature = "";
   let connectionsSidebarListenerBound = false;
   let activeTabId = "installed";
@@ -71,7 +73,10 @@ export function createConnectionsPanelController({
       tab.mount(target);
     } catch {
       if (target) {
-        target.innerHTML = `<div class="plugins-browser-empty">Failed to load ${tab.name} UI.</div>`;
+        const empty = document.createElement("div");
+        empty.className = "plugins-browser-empty";
+        empty.textContent = t("plugins.customUiLoadFailed", { name: tab.name });
+        target.replaceChildren(empty);
       }
     }
   }
@@ -180,8 +185,8 @@ export function createConnectionsPanelController({
 
     const sections = [
       { key: "primary", label: "" },
-      { key: "categories", label: "Collections" },
-      { key: "plugins", label: "Plugin Panels" },
+      { key: "categories", label: t("plugins.collections") },
+      { key: "plugins", label: t("plugins.pluginPanels") },
     ];
 
     for (const section of sections) {
@@ -315,6 +320,9 @@ export function createConnectionsPanelController({
     }
 
     window.addEventListener("resize", scheduleNavIndicatorSync);
+    window.addEventListener("midimaster:locale-changed", () => {
+      mountConnectionsTabs({ force: true, activeTabId: getCurrentActiveTab() }).catch(() => {});
+    });
   }
 
   return {

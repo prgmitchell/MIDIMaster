@@ -1,4 +1,5 @@
 import { parseLabelParts, tagVariant } from "./label_tags.js";
+import { t } from "../../app/i18n.js";
 
 export function renderLabelWithBadges(
   container,
@@ -134,7 +135,7 @@ export function renderLabelFromRawWithTags(
       if (el) {
         const hiddenList = badge.hiddenTags.join(", ");
         el.title = hiddenList;
-        el.setAttribute("aria-label", `Additional tags: ${hiddenList}`);
+        el.setAttribute("aria-label", t("common.additionalTags", { tags: hiddenList }));
       }
     }
   });
@@ -165,6 +166,9 @@ export function wireDropdownToggle({ root, menu, trigger }) {
     if (opening) {
       root.classList.add("open");
       menu.classList.remove("hidden");
+      if (typeof root.__positionDropdownMenu === "function") {
+        root.__positionDropdownMenu();
+      }
       trigger.setAttribute("aria-expanded", "true");
     } else {
       root.classList.remove("open");

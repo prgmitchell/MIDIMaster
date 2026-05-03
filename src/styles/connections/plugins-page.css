@@ -324,9 +324,9 @@
 }
 
 #plugins-page .plugins-browser-card-action-row > .plugins-browser-action {
-  width: 100px;
-  min-width: 100px;
-  max-width: 100px;
+  width: 148px;
+  min-width: 148px;
+  max-width: 148px;
 }
 
 #plugins-page .plugins-browser-action:hover {
@@ -430,7 +430,7 @@
 
 #plugins-page .plugins-browser-card {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 168px;
+  grid-template-columns: 58px minmax(0, 1fr) 210px;
   gap: 12px;
   padding: 12px 14px;
   min-height: 108px;
@@ -527,16 +527,16 @@
   gap: 8px;
   justify-content: flex-start;
   min-height: 100%;
-  width: 168px;
-  min-width: 168px;
+  width: 210px;
+  min-width: 210px;
 }
 
 #plugins-page .plugins-browser-card-action-row {
   display: grid;
-  grid-template-columns: 100px 44px;
+  grid-template-columns: 148px 44px;
   align-items: center;
   justify-content: flex-end;
-  column-gap: 24px;
+  column-gap: 18px;
   min-height: 40px;
   width: 100%;
   align-self: stretch;
@@ -550,13 +550,13 @@
 }
 
 #plugins-page .plugins-browser-action-slot--panel {
-  width: 100px;
+  width: 148px;
 }
 
 #plugins-page .plugins-browser-action-slot--panel > .plugins-browser-action {
-  width: 100px;
-  min-width: 100px;
-  max-width: 100px;
+  width: 148px;
+  min-width: 148px;
+  max-width: 148px;
 }
 
 #plugins-page .plugins-browser-action-slot--toggle {
@@ -564,8 +564,8 @@
 }
 
 #plugins-page .plugins-browser-action-spacer {
-  width: 100px;
-  min-width: 100px;
+  width: 148px;
+  min-width: 148px;
   height: 40px;
   min-height: 40px;
   visibility: hidden;
@@ -1122,15 +1122,15 @@ body[data-theme] .profile-select .select-button:hover {
 body[data-theme] .topbar {
   display: grid;
   grid-template-columns:
-    minmax(220px, 1fr)
+    minmax(320px, 0.95fr)
     1px
-    minmax(250px, 1fr)
-    minmax(250px, 1fr)
+    minmax(330px, 1fr)
+    minmax(330px, 1fr)
     1px
     auto;
   align-items: center;
-  gap: 14px;
-  padding-left: 40px;
+  gap: 12px;
+  padding-left: 36px;
 }
 
 body[data-theme] .topbar-field {

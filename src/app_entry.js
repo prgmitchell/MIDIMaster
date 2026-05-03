@@ -30,6 +30,13 @@ import { createSessionRefresher } from "./app/session_refresh.js";
 import { createPluginRuntime } from "./app/plugin_runtime.js";
 import { createDomRefs } from "./app/dom_refs.js";
 import { createAppShell } from "./app/app_shell.js";
+import {
+  applyTranslations,
+  initI18n,
+  setLocale,
+  supportedLocales,
+  t,
+} from "./app/i18n.js";
 
 const startupLogger = window.__MIDIMASTER_DIAG__;
 
@@ -176,6 +183,7 @@ const {
   startInTraySelect,
   minimizeToTraySelect,
   exitToTraySelect,
+  languageSelect,
   autoCheckUpdatesButton,
   openLogsFolderButton,
   resetAppDataButton,
@@ -235,7 +243,7 @@ let persistedActiveProfileName = "";
 
 function updateThemeToggleMeta(isDark) {
   if (!themeToggleButton) return;
-  const label = isDark ? "Switch to light mode" : "Switch to dark mode";
+  const label = isDark ? t("theme.switchToLight") : t("theme.switchToDark");
   themeToggleButton.setAttribute("aria-label", label);
   themeToggleButton.setAttribute("aria-pressed", String(isDark));
   themeToggleButton.setAttribute("title", label);
@@ -264,7 +272,7 @@ function setInlineMuteButtonState(button, muted) {
   }
   button.innerHTML = muteIconSvg(Boolean(muted));
   button.classList.toggle("muted", Boolean(muted));
-  const label = muted ? "Unmute binding target" : "Mute binding target";
+  const label = muted ? t("bindings.unmuteTarget") : t("bindings.muteTarget");
   button.title = label;
   button.setAttribute("aria-label", label);
   const toggle = button.closest(".binding-row")?.querySelector(".binding-toggle-value");
@@ -534,9 +542,9 @@ function stripDeviceStateSuffix(label) {
 
 function showMain(inputName, outputName, options = {}) {
   mainScreen?.classList?.remove?.("hidden");
-  const input = stripDeviceStateSuffix(inputName) || "Not selected";
-  const output = stripDeviceStateSuffix(outputName) || "Not selected";
-  midiStatus.textContent = `Input: ${input} | Output: ${output}`;
+  const input = stripDeviceStateSuffix(inputName) || t("midi.notSelected");
+  const output = stripDeviceStateSuffix(outputName) || t("midi.notSelected");
+  midiStatus.textContent = t("midi.statusConnected", { input, output });
 }
 
 async function preparePage(page) {
@@ -716,6 +724,7 @@ let appSettings = {
   minimizeToTray: false,
   exitToTray: false,
   autoCheckUpdates: true,
+  language: "en",
 };
 let appStarted = false;
 
@@ -760,6 +769,7 @@ settingsFeature = createSettingsFeature({
     startInTraySelect,
     minimizeToTraySelect,
     exitToTraySelect,
+    languageSelect,
     autoCheckUpdatesButton,
     openLogsFolderButton,
     checkForUpdatesButton,
@@ -768,6 +778,12 @@ settingsFeature = createSettingsFeature({
     updateLatestVersion,
     sidebarAppVersion,
     topbarUpdateButton,
+  },
+  i18n: {
+    applyTranslations,
+    setLocale,
+    supportedLocales,
+    t,
   },
   getOsdSettings: () => osdSettings,
   setOsdSettings: (next) => { osdSettings = next; },
@@ -785,6 +801,7 @@ diagnosticInfo("settings_bind_ok");
 diagnosticInfo("profiles_factory_start");
 profilesFeature = createProfilesFeature({
   invoke,
+  i18n: { t },
   dom: {
     profileDropdown,
     profileToggle,
@@ -833,6 +850,7 @@ diagnosticInfo("profiles_bind_ok");
 diagnosticInfo("targets_factory_start");
 targetsFeature = createTargetsFeature({
   invoke,
+  i18n: { t },
   dom: {
     targetPanel,
     targetPanelList,
@@ -939,6 +957,7 @@ bindingsFeature = createBindingsFeature({
   getMuteForTarget,
   triggerIntegration,
   extractIntegrationTarget,
+  i18n: { t },
   showVolumeOsd,
   showMuteOsd,
   saveBindingsForProfile,
@@ -980,6 +999,7 @@ midiFeature = createMidiFeature({
     learnBindingButton: document.getElementById("learn-binding"),
     bindingAddFooterButton: document.getElementById("binding-add-footer-button"),
   },
+  i18n: { t },
   showMain,
   refreshSessions,
   addBindingFromLearn: async (learned) => {
@@ -989,19 +1009,19 @@ midiFeature = createMidiFeature({
 
       if (conflict && conflict.field === "control") {
         hideCreateLearnPanel();
-        const owner = conflict.binding?.name || "Unnamed binding";
+        const owner = conflict.binding?.name || t("bindings.unnamedBinding");
         showAlert(
-          "Already Assigned",
-          `This control is already assigned to "${owner}" and can't be added again.`,
+          t("bindings.alreadyAssignedTitle"),
+          t("bindings.alreadyAssignedMessage", { name: owner }),
         );
         return;
       }
 
       if (conflict && (conflict.field === "mute_control" || conflict.field === "assign_control")) {
-        const owner = conflict.binding?.name || "Unnamed binding";
-        const ownerSlot = conflict.field === "mute_control" ? "Mute" : "Assign";
+        const owner = conflict.binding?.name || t("bindings.unnamedBinding");
+        const ownerSlot = conflict.field === "mute_control" ? t("bindings.mute") : t("common.assign");
         const confirmed = await promptCreateLearnTransfer(
-          `This control is currently mapped as ${ownerSlot} on "${owner}". Transfer it to this new binding?`,
+          t("bindings.transferFromAuxMessage", { slot: ownerSlot, name: owner }),
         );
         if (!confirmed) {
           hideCreateLearnPanel();
@@ -1022,7 +1042,7 @@ midiFeature = createMidiFeature({
       renderBindings();
     } catch (error) {
       hideCreateLearnPanel();
-      showAlert("Create Binding Failed", String(error));
+      showAlert(t("bindings.createFailedTitle"), String(error));
     }
   },
   getSavedMidiDeviceIds,
@@ -1040,7 +1060,7 @@ midiFeature.bindUi();
 diagnosticInfo("midi_bind_ok");
 
 function bindingFallbackName(_binding, index) {
-  return `Binding ${index + 1}`;
+  return t("bindings.bindingFallback", { number: index + 1 });
 }
 
 function beginBindingEdit(bindingId) {
@@ -1186,6 +1206,7 @@ let connectionsController = null;
 
 const pluginsTabs = createPluginsTabs({
   invoke,
+  i18n: { t },
   getPluginHost,
   reloadPlugins: () => connectionsController?.reloadPlugins?.(),
   showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
@@ -1207,6 +1228,7 @@ connectionsController = createConnectionsPanelController({
     getPluginsBrowserSections: () => pluginsTabs.getPluginsBrowserSections(),
     mountPluginsBrowserTab: (...args) => pluginsTabs.mountPluginsBrowserTab(...args),
   },
+  i18n: { t },
   getPluginHost,
   setPluginHost: (next) => pluginRuntime?.setPluginHost?.(next),
   startPluginHostIfNeeded,
@@ -1327,10 +1349,10 @@ alertsController.bindUi();
 if (resetAppDataButton) {
   resetAppDataButton.addEventListener("click", async () => {
     const confirmed = await alertsController.showConfirm({
-      title: "Reset App Data",
-      message: "This will restore profiles, bindings, device selections, and saved app settings to defaults. This action cannot be undone.",
-      confirmLabel: "Reset",
-      cancelLabel: "Cancel",
+      title: t("settings.resetAppData"),
+      message: t("settings.resetAppDataConfirmMessage"),
+      confirmLabel: t("common.reset"),
+      cancelLabel: t("common.cancel"),
       confirmVariant: "danger",
     });
     if (!confirmed) {
@@ -1366,16 +1388,13 @@ function buildTargetSelect(
   );
 }
 
-const LEARN_PANEL_DEFAULT_TITLE = "Waiting for MIDI Input";
-const LEARN_PANEL_DEFAULT_MESSAGE = "Move a control on your MIDI device to create a binding.";
-
 function resetCreateLearnPanelUi() {
   if (!learnPanel) return;
-  if (learnPanelTitle) learnPanelTitle.textContent = LEARN_PANEL_DEFAULT_TITLE;
-  if (learnPanelMessage) learnPanelMessage.textContent = LEARN_PANEL_DEFAULT_MESSAGE;
+  if (learnPanelTitle) learnPanelTitle.textContent = t("bindings.waitingMidiTitle");
+  if (learnPanelMessage) learnPanelMessage.textContent = t("bindings.learnMessage");
   if (learnPanelSpinner) learnPanelSpinner.classList.remove("hidden");
   if (learnPanelActions) learnPanelActions.classList.add("hidden");
-  if (learnPanelConfirm) learnPanelConfirm.textContent = "Transfer";
+  if (learnPanelConfirm) learnPanelConfirm.textContent = t("common.transfer");
 }
 
 function hideCreateLearnPanel() {
@@ -1473,7 +1492,7 @@ function createBindingFromLearn(payload) {
     controller: payload.controller,
     msg_type: msgType,
   };
-  const defaultName = `Binding ${bindings.length + 1}`;
+  const defaultName = t("bindings.bindingFallback", { number: bindings.length + 1 });
   return {
     id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     name: defaultName,
@@ -1606,11 +1625,11 @@ async function setupListeners() {
     }
     if (!payload) return;
     if (payload.reason === "target_list_full") {
-      showAlert("Target List Full", "This fader already has 8 targets. Remove one before assigning another app.");
+      showAlert(t("dialogs.targetListFullTitle"), t("dialogs.targetListFullMessage"));
       return;
     }
     if (payload.reason === "focused_app_unavailable") {
-      showAlert("Assign Failed", "Could not resolve the focused application. Click the app window and try again.");
+      showAlert(t("dialogs.assignFailedTitle"), t("dialogs.assignFailedMessage"));
     }
   });
 
@@ -1624,8 +1643,8 @@ async function setupListeners() {
       }
     }
     if (!payload || typeof payload !== "object") return;
-    const title = String(payload.title || "Action Failed").trim() || "Action Failed";
-    const message = String(payload.message || "").trim() || "MIDIMaster could not complete this action.";
+    const title = String(payload.title || t("dialogs.actionFailedTitle")).trim() || t("dialogs.actionFailedTitle");
+    const message = String(payload.message || "").trim() || t("dialogs.actionFailedMessage");
     showAlert(title, message);
   });
 
@@ -1684,7 +1703,7 @@ async function setupListeners() {
 
   await listen("midi_event", (event) => {
     if (mainScreen.classList.contains("hidden")) {
-      midiStatus.textContent = `MIDI: ${JSON.stringify(event.payload)}`;
+      midiStatus.textContent = t("midi.eventStatus", { payload: JSON.stringify(event.payload) });
     }
     const payload = typeof event.payload === "string"
       ? (() => {
@@ -1901,7 +1920,7 @@ async function startMainApp() {
   appStarted = true;
   const savedDevice = getSavedMidiDeviceIds().inputId;
   if (!savedDevice && midiStatus) {
-    midiStatus.textContent = "Select input and output MIDI devices.";
+    midiStatus.textContent = t("bindings.selectDevicesSentence");
   }
   const deviceData = await loadMidiDevices();
   
@@ -1963,7 +1982,7 @@ async function startMainApp() {
   }
 
   if (usedLegacyFallback && savedDevice && midiStatus) {
-    midiStatus.textContent = "Select available input/output devices to reconnect.";
+    midiStatus.textContent = t("midi.selectAvailableReconnect");
   }
 }
 
@@ -1978,6 +1997,7 @@ async function init() {
   });
   diagnosticInfo("setup_listeners_done");
   if (isOsdWindow) {
+    await initI18n("en").catch(() => {});
     await loadOsdSettings();
     document.body.setAttribute("data-anchor", osdSettings.anchor || "top-right");
     await refreshSessions().catch((error) => {
@@ -2005,6 +2025,11 @@ async function init() {
   diagnosticInfo("load_app_settings_start");
   await loadAppSettings();
   diagnosticInfo("load_app_settings_done");
+  await initI18n(appSettings.language || "en").catch((error) => {
+    diagnosticError("i18n_init_failed", error);
+  });
+  applyTranslations();
+  applyTheme(document.body.classList.contains("dark-mode") ? "dark" : "light");
   diagnosticInfo("hydrate_client_preferences_start");
   await hydrateClientPreferences();
   diagnosticInfo("hydrate_client_preferences_done");

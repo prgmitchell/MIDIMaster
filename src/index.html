@@ -10,7 +10,7 @@
 
 <body class="dark-mode" data-theme="dark">
   <div class="app-shell sidebar-collapsed">
-    <aside class="app-sidebar" aria-label="Primary navigation">
+    <aside class="app-sidebar" aria-label="Primary navigation" data-i18n-aria-label="app.nav.primary">
       <div class="sidebar-brand">
         <img class="app-logo app-logo--dark" src="assets/MIDIMaster.png" alt="MIDIMaster logo" />
         <img class="app-logo app-logo--light" src="assets/MIDIMaster-light.png" alt="" aria-hidden="true" />
@@ -19,34 +19,34 @@
 
       <nav class="sidebar-nav">
         <div class="sidebar-nav-indicator" aria-hidden="true"></div>
-        <button class="sidebar-nav-item active" type="button" data-page="bindings" aria-current="page" aria-label="Bindings" title="Bindings">
+        <button class="sidebar-nav-item active" type="button" data-page="bindings" aria-current="page" aria-label="Bindings" title="Bindings" data-i18n-aria-label="app.nav.bindings" data-i18n-title="app.nav.bindings">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
               <path d="M6 4v16M12 4v16M18 4v16M4 8h4M10 15h4M16 11h4" />
             </svg>
           </span>
-          <span class="nav-label">Bindings</span>
+          <span class="nav-label" data-i18n="app.nav.bindings">Bindings</span>
         </button>
-        <button id="connections-button" class="sidebar-nav-item" type="button" data-page="plugins" aria-label="Plugins" title="Plugins">
+        <button id="connections-button" class="sidebar-nav-item" type="button" data-page="plugins" aria-label="Plugins" title="Plugins" data-i18n-aria-label="app.nav.plugins" data-i18n-title="app.nav.plugins">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
               <path d="M8 4v5M16 4v5M7 9h10v4a5 5 0 0 1-10 0V9ZM12 18v2" />
             </svg>
           </span>
-          <span class="nav-label">Plugins</span>
+          <span class="nav-label" data-i18n="app.nav.plugins">Plugins</span>
         </button>
-        <button class="sidebar-nav-item" type="button" data-page="settings" aria-label="Settings" title="Settings">
+        <button class="sidebar-nav-item" type="button" data-page="settings" aria-label="Settings" title="Settings" data-i18n-aria-label="app.nav.settings" data-i18n-title="app.nav.settings">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
               <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
               <path d="M15.5 5.5 17 4l3 3-1.5 1.5M8.5 5.5 7 4 4 7l1.5 1.5M15.5 18.5 17 20l3-3-1.5-1.5M8.5 18.5 7 20l-3-3 1.5-1.5M20 12h-2M6 12H4M12 4v2M12 18v2" />
             </svg>
           </span>
-          <span class="nav-label">Settings</span>
+          <span class="nav-label" data-i18n="app.nav.settings">Settings</span>
         </button>
       </nav>
 
-      <div class="sidebar-footer" aria-label="Application information">
+      <div class="sidebar-footer" aria-label="Application information" data-i18n-aria-label="app.info">
         <div class="sidebar-footer-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
             <circle cx="12" cy="12" r="9"></circle>
@@ -55,7 +55,7 @@
           </svg>
         </div>
         <div class="sidebar-footer-meta">
-          <span class="sidebar-footer-version-label">Version</span>
+          <span class="sidebar-footer-version-label" data-i18n="app.version">Version</span>
           <span id="sidebar-app-version" class="sidebar-footer-version">v-</span>
         </div>
       </div>
@@ -64,10 +64,10 @@
     <div class="app-workspace">
       <header class="topbar">
         <div class="topbar-field profile-topbar-field">
-          <span class="topbar-label">Profile</span>
+          <span class="topbar-label" data-i18n="topbar.profile">Profile</span>
           <div class="profile-select" id="profiles-dropdown">
             <button id="profile-toggle" class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false">
-              <span id="profile-current">Default</span>
+              <span id="profile-current" data-i18n="topbar.defaultProfile">Default</span>
               <span class="caret" aria-hidden="true">▾</span>
             </button>
             <div id="profile-list" class="dropdown hidden"></div>
@@ -75,16 +75,16 @@
         </div>
         <div class="topbar-divider" aria-hidden="true"></div>
         <div class="topbar-field">
-          <label class="topbar-label" for="midi-device">Input Device</label>
-          <select id="midi-device" title="Input Device"></select>
+          <label class="topbar-label" for="midi-device" data-i18n="topbar.inputDevice">Input Device</label>
+          <select id="midi-device" title="Input Device" data-i18n-title="topbar.inputDevice"></select>
         </div>
         <div class="topbar-field">
-          <label class="topbar-label" for="midi-output-device">Output Device</label>
-          <select id="midi-output-device" title="Output Device"></select>
+          <label class="topbar-label" for="midi-output-device" data-i18n="topbar.outputDevice">Output Device</label>
+          <select id="midi-output-device" title="Output Device" data-i18n-title="topbar.outputDevice"></select>
         </div>
         <div class="topbar-divider" aria-hidden="true"></div>
         <div class="topbar-actions">
-          <button id="topbar-update-button" class="topbar-icon-button topbar-update-button hidden" type="button" aria-label="Update available" title="Update available">
+          <button id="topbar-update-button" class="topbar-icon-button topbar-update-button hidden" type="button" aria-label="Update available" title="Update available" data-i18n-aria-label="topbar.updateAvailable" data-i18n-title="topbar.updateAvailable">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M12 4v10" />
               <path d="M8 10l4 4 4-4" />
@@ -92,7 +92,7 @@
             </svg>
             <span class="update-dot" aria-hidden="true"></span>
           </button>
-          <button id="theme-toggle-button" class="topbar-icon-button" type="button" aria-label="Switch to light mode" title="Switch to light mode" aria-pressed="true">
+          <button id="theme-toggle-button" class="topbar-icon-button" type="button" aria-label="Switch to light mode" title="Switch to light mode" data-i18n-aria-label="theme.switchToLight" data-i18n-title="theme.switchToLight" aria-pressed="true">
             <svg class="theme-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path class="icon-stars" d="M8.6 6.1L9.3 7.7 10.9 8.4 9.3 9.1 8.6 10.7 7.9 9.1 6.3 8.4 7.9 7.7ZM5.2 10.9L5.7 12 6.8 12.5 5.7 13 5.2 14.1 4.7 13 3.6 12.5 4.7 12ZM8.1 14.5L8.7 15.8 10 16.4 8.7 17 8.1 18.3 7.5 17 6.2 16.4 7.5 15.8Z" />
               <path class="icon-crescent" d="M15.9 2.2a.9.9 0 0 1 1.02 1.26A8.3 8.3 0 1 0 20.35 13.7a.9.9 0 0 1 1.33.97A10.2 10.2 0 1 1 15.9 2.2Z" />
@@ -105,15 +105,15 @@
         <div id="alert-overlay" class="target-panel hidden">
           <div class="target-panel-content alert-panel-content">
             <div class="target-panel-header">
-              <span id="alert-title">Alert</span>
+              <span id="alert-title" data-i18n="alert.title">Alert</span>
               <button id="alert-close" type="button" class="target-panel-close">x</button>
             </div>
             <div class="alert-panel-body">
               <p id="alert-message"></p>
               <div class="alert-panel-actions">
-                <button id="alert-secondary" type="button" class="secondary hidden">Skip</button>
-                <button id="alert-cancel" type="button" class="secondary hidden">Cancel</button>
-                <button id="alert-ok" type="button">OK</button>
+                <button id="alert-secondary" type="button" class="secondary hidden" data-i18n="common.skip">Skip</button>
+                <button id="alert-cancel" type="button" class="secondary hidden" data-i18n="common.cancel">Cancel</button>
+                <button id="alert-ok" type="button" data-i18n="common.ok">OK</button>
               </div>
             </div>
           </div>
@@ -121,30 +121,30 @@
 
         <section id="main-screen" class="app-page active" data-page-panel="bindings">
           <div class="page-heading-row">
-            <h1>Bindings</h1>
+            <h1 data-i18n="bindings.title">Bindings</h1>
             <div class="bindings-toolbar">
               <button id="binding-add-footer-button" type="button" class="binding-add-button">
-                <span>Add Binding</span>
+                <span data-i18n="bindings.addBinding">Add Binding</span>
               </button>
               <label class="binding-search-field">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                   <path d="m21 21-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
                 </svg>
-                <input id="binding-search" type="search" placeholder="Search bindings..." autocomplete="off" />
+                <input id="binding-search" type="search" placeholder="Search bindings..." autocomplete="off" data-i18n-placeholder="bindings.searchPlaceholder" />
               </label>
             </div>
           </div>
 
-          <div class="midi-inline-status visually-hidden" id="midi-status">Select input and output devices</div>
+          <div class="midi-inline-status visually-hidden" id="midi-status" data-i18n="bindings.selectDevices">Select input and output devices</div>
 
           <div class="bindings-card">
             <div class="binding-headers">
-              <span class="binding-drag-header" aria-label="Reorder"></span>
-              <span>Name</span>
-              <span>Mode</span>
-              <span>Target</span>
-              <span>Value</span>
-              <span class="binding-actions-header">Actions</span>
+              <span class="binding-drag-header" aria-label="Reorder" data-i18n-aria-label="bindings.reorder"></span>
+              <span data-i18n="common.name">Name</span>
+              <span data-i18n="bindings.mode">Mode</span>
+              <span data-i18n="common.target">Target</span>
+              <span data-i18n="common.value">Value</span>
+              <span class="binding-actions-header" data-i18n="common.actions">Actions</span>
             </div>
             <div id="bindings" class="list"></div>
           </div>
@@ -152,7 +152,7 @@
 
         <section id="plugins-page" class="app-page hidden" data-page-panel="plugins">
           <div class="page-heading-row">
-            <h1>Plugins</h1>
+            <h1 data-i18n="plugins.title">Plugins</h1>
           </div>
           <div id="connections-panel" class="inline-panel connections-panel-content">
             <div class="connections-panel-body">
@@ -160,13 +160,13 @@
               <div id="connections-content" class="connections-content"></div>
             </div>
           </div>
-          <button id="connections-panel-close" type="button" class="visually-hidden" aria-hidden="true">Close</button>
+          <button id="connections-panel-close" type="button" class="visually-hidden" aria-hidden="true" data-i18n="common.close">Close</button>
         </section>
 
         <section id="settings-panel" class="app-page hidden" data-page-panel="settings">
           <div class="settings-panel-body">
             <div class="settings-shell">
-              <aside class="settings-sidebar" aria-label="Settings sections">
+              <aside class="settings-sidebar" aria-label="Settings sections" data-i18n-aria-label="settings.sections">
                 <div class="settings-nav-indicator" aria-hidden="true"></div>
                 <nav class="settings-nav">
                   <button class="settings-nav-item active" type="button" data-settings-section="startup" aria-current="page">
@@ -180,7 +180,7 @@
                         <path d="M16 11h4"></path>
                       </svg>
                     </span>
-                    <span class="settings-nav-label">General</span>
+                    <span class="settings-nav-label" data-i18n="settings.general">General</span>
                   </button>
                   <button class="settings-nav-item" type="button" data-settings-section="osd">
                     <span class="settings-nav-icon" aria-hidden="true">
@@ -190,7 +190,7 @@
                         <path d="M12 17v3"></path>
                       </svg>
                     </span>
-                    <span class="settings-nav-label">On-Screen Display</span>
+                    <span class="settings-nav-label" data-i18n="settings.osd">On-Screen Display</span>
                   </button>
                   <button class="settings-nav-item" type="button" data-settings-section="maintenance">
                     <span class="settings-nav-icon" aria-hidden="true">
@@ -199,7 +199,7 @@
                         <path d="m14 7 3 3"></path>
                       </svg>
                     </span>
-                    <span class="settings-nav-label">Maintenance</span>
+                    <span class="settings-nav-label" data-i18n="settings.maintenance">Maintenance</span>
                   </button>
                 </nav>
               </aside>
@@ -214,7 +214,24 @@
                           <path d="M12 7v5l3 2"></path>
                         </svg>
                       </span>
-                      <span>Behavior</span>
+                      <span data-i18n="settings.behavior">Behavior</span>
+                    </div>
+                    <div class="settings-startup-row settings-language-row">
+                      <div class="settings-startup-row-main">
+                        <span class="settings-startup-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M4 5h16"></path>
+                            <path d="M8 5c.75 4.5 3.25 8 8 10"></path>
+                            <path d="M16 5c-.75 4.5-3.25 8-8 10"></path>
+                            <path d="M5 19h6"></path>
+                            <path d="m8 15-3 4"></path>
+                            <path d="m8 15 3 4"></path>
+                            <path d="M13 19h6"></path>
+                          </svg>
+                        </span>
+                        <div class="settings-field-label" data-i18n="settings.language">Language</div>
+                      </div>
+                      <select id="language-select" title="Language" data-i18n-title="settings.language"></select>
                     </div>
                     <div class="settings-startup-row">
                       <div class="settings-startup-row-main">
@@ -224,9 +241,9 @@
                             <path d="M7.05 6.35a8 8 0 1 0 9.9 0"></path>
                           </svg>
                         </span>
-                        <div class="settings-field-label">Start with Windows</div>
+                        <div class="settings-field-label" data-i18n="settings.startWithWindows">Start with Windows</div>
                       </div>
-                      <label class="settings-toggle" title="Start with Windows">
+                      <label class="settings-toggle" title="Start with Windows" data-i18n-title="settings.startWithWindows">
                         <input id="start-with-windows" type="checkbox" />
                         <span class="plugins-toggle-ui" aria-hidden="true"></span>
                       </label>
@@ -240,9 +257,9 @@
                             <path d="M5 16h14l-1.5 4h-11L5 16Z"></path>
                           </svg>
                         </span>
-                        <div class="settings-field-label">Start in tray</div>
+                        <div class="settings-field-label" data-i18n="settings.startInTray">Start in tray</div>
                       </div>
-                      <label class="settings-toggle" title="Start in tray">
+                      <label class="settings-toggle" title="Start in tray" data-i18n-title="settings.startInTray">
                         <input id="start-in-tray" type="checkbox" />
                         <span class="plugins-toggle-ui" aria-hidden="true"></span>
                       </label>
@@ -257,9 +274,9 @@
                             <path d="m9 16 3 3 3-3"></path>
                           </svg>
                         </span>
-                        <div class="settings-field-label">Minimize to tray</div>
+                        <div class="settings-field-label" data-i18n="settings.minimizeToTray">Minimize to tray</div>
                       </div>
-                      <label class="settings-toggle" title="Minimize to tray">
+                      <label class="settings-toggle" title="Minimize to tray" data-i18n-title="settings.minimizeToTray">
                         <input id="minimize-to-tray" type="checkbox" />
                         <span class="plugins-toggle-ui" aria-hidden="true"></span>
                       </label>
@@ -273,9 +290,9 @@
                             <path d="M7 12h9"></path>
                           </svg>
                         </span>
-                        <div class="settings-field-label">Exit to tray</div>
+                        <div class="settings-field-label" data-i18n="settings.exitToTray">Exit to tray</div>
                       </div>
-                      <label class="settings-toggle" title="Exit to tray">
+                      <label class="settings-toggle" title="Exit to tray" data-i18n-title="settings.exitToTray">
                         <input id="exit-to-tray" type="checkbox" />
                         <span class="plugins-toggle-ui" aria-hidden="true"></span>
                       </label>
@@ -292,7 +309,7 @@
                           <path d="M17.25 15A7 7 0 0 1 6 17.5L4 14"></path>
                         </svg>
                       </span>
-                      <span>Updates</span>
+                      <span data-i18n="settings.updates">Updates</span>
                     </div>
                     <div class="settings-startup-row settings-update-toggle-row">
                       <div class="settings-startup-row-main">
@@ -303,9 +320,9 @@
                             <path d="M20 4v5h-5"></path>
                           </svg>
                         </span>
-                        <div class="settings-field-label">Automatically check for updates</div>
+                        <div class="settings-field-label" data-i18n="settings.autoCheckUpdates">Automatically check for updates</div>
                       </div>
-                      <label class="settings-toggle" title="Automatically check for updates">
+                      <label class="settings-toggle" title="Automatically check for updates" data-i18n-title="settings.autoCheckUpdates">
                         <input id="auto-check-updates-button" type="checkbox" />
                         <span class="plugins-toggle-ui" aria-hidden="true"></span>
                       </label>
@@ -317,11 +334,11 @@
                             <path d="M5 12.5 9.25 16.75 19 7"></path>
                           </svg>
                         </span>
-                        <span class="settings-status-text">No update check yet.</span>
+                        <span class="settings-status-text" data-i18n="settings.noUpdateCheckYet">No update check yet.</span>
                       </div>
                       <div class="settings-update-versions">
-                        <span>Current <strong id="update-current-version">-</strong></span>
-                        <span>Latest <strong id="update-latest-version">-</strong></span>
+                        <span><span data-i18n="common.current">Current</span> <strong id="update-current-version">-</strong></span>
+                        <span><span data-i18n="common.latest">Latest</span> <strong id="update-latest-version">-</strong></span>
                       </div>
                     </div>
                     <button id="check-for-updates" type="button" class="settings-action">
@@ -333,7 +350,7 @@
                           <path d="M17.25 15A7 7 0 0 1 6 17.5L4 14"></path>
                         </svg>
                       </span>
-                      <span class="settings-button-label">Check for updates</span>
+                      <span class="settings-button-label" data-i18n="settings.checkForUpdates">Check for updates</span>
                     </button>
                   </div>
                 </section>
@@ -341,42 +358,42 @@
                 <section class="settings-section settings-section-panel settings-osd-section" data-settings-panel="osd">
                   <div class="settings-card">
                     <div class="settings-field-row settings-field-row--monitor">
-                      <div class="settings-field-label">Monitor</div>
+                      <div class="settings-field-label" data-i18n="settings.monitor">Monitor</div>
                       <div class="settings-monitor-control">
                         <select id="osd-monitor"></select>
-                        <label class="settings-toggle" title="Toggle on-screen display">
+                        <label class="settings-toggle" title="Toggle on-screen display" data-i18n-title="settings.toggleOsd">
                           <input id="osd-enabled" type="checkbox" />
                           <span class="plugins-toggle-ui" aria-hidden="true"></span>
                         </label>
                       </div>
                     </div>
                     <div class="settings-field-row settings-field-row--appearance">
-                      <div class="settings-field-label">Appearance</div>
+                      <div class="settings-field-label" data-i18n="settings.appearance">Appearance</div>
                       <div class="settings-appearance-grid">
                         <div class="settings-appearance-control">
-                          <span>Style</span>
+                          <span data-i18n="settings.style">Style</span>
                           <select id="osd-style">
-                            <option value="midnight">Dark</option>
-                            <option value="glass">Glass</option>
-                            <option value="neon">Neon</option>
-                            <option value="studio">Studio</option>
+                            <option value="midnight" data-i18n="settings.styleDark">Dark</option>
+                            <option value="glass" data-i18n="settings.styleGlass">Glass</option>
+                            <option value="neon" data-i18n="settings.styleNeon">Neon</option>
+                            <option value="studio" data-i18n="settings.styleStudio">Studio</option>
                           </select>
-                          <div class="osd-style-segments" aria-label="OSD style">
-                            <button type="button" class="osd-style-segment" data-osd-style-option="midnight">Dark</button>
-                            <button type="button" class="osd-style-segment" data-osd-style-option="glass">Glass</button>
-                            <button type="button" class="osd-style-segment" data-osd-style-option="neon">Neon</button>
-                            <button type="button" class="osd-style-segment" data-osd-style-option="studio">Studio</button>
+                          <div class="osd-style-segments" aria-label="OSD style" data-i18n-aria-label="settings.osdStyle">
+                            <button type="button" class="osd-style-segment" data-osd-style-option="midnight" data-i18n="settings.styleDark">Dark</button>
+                            <button type="button" class="osd-style-segment" data-osd-style-option="glass" data-i18n="settings.styleGlass">Glass</button>
+                            <button type="button" class="osd-style-segment" data-osd-style-option="neon" data-i18n="settings.styleNeon">Neon</button>
+                            <button type="button" class="osd-style-segment" data-osd-style-option="studio" data-i18n="settings.styleStudio">Studio</button>
                           </div>
                         </div>
                         <div class="settings-appearance-control">
-                          <span>Transparency</span>
+                          <span data-i18n="settings.transparency">Transparency</span>
                           <div class="settings-range-control">
                             <input id="osd-transparency" class="binding-volume-slider" type="range" min="35" max="100" step="1" value="96" />
                             <span id="osd-transparency-value" class="settings-range-value">96%</span>
                           </div>
                         </div>
                         <div class="settings-appearance-control">
-                          <span>Size</span>
+                          <span data-i18n="settings.size">Size</span>
                           <div class="settings-range-control">
                             <input id="osd-scale" class="binding-volume-slider" type="range" min="75" max="150" step="5" value="100" />
                             <span id="osd-scale-value" class="settings-range-value">100%</span>
@@ -385,19 +402,19 @@
                       </div>
                     </div>
                     <div class="settings-field-row settings-field-row--position">
-                      <div class="settings-field-label">Position</div>
+                      <div class="settings-field-label" data-i18n="settings.position">Position</div>
                       <div class="settings-position-layout" id="osd-position-picker">
                         <div class="settings-osd-preview">
                           <div class="settings-osd-preview-screen">
-                            <button type="button" class="osd-position-dot" data-anchor="top-left" aria-label="Top left"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="top-center" aria-label="Top center"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="top-right" aria-label="Top right"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="center-left" aria-label="Center left"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="center" aria-label="Center"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="center-right" aria-label="Center right"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="bottom-left" aria-label="Bottom left"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="bottom-center" aria-label="Bottom center"></button>
-                            <button type="button" class="osd-position-dot" data-anchor="bottom-right" aria-label="Bottom right"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="top-left" aria-label="Top left" data-i18n-aria-label="settings.positionTopLeft"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="top-center" aria-label="Top center" data-i18n-aria-label="settings.positionTopCenter"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="top-right" aria-label="Top right" data-i18n-aria-label="settings.positionTopRight"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="center-left" aria-label="Center left" data-i18n-aria-label="settings.positionCenterLeft"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="center" aria-label="Center" data-i18n-aria-label="settings.positionCenter"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="center-right" aria-label="Center right" data-i18n-aria-label="settings.positionCenterRight"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="bottom-left" aria-label="Bottom left" data-i18n-aria-label="settings.positionBottomLeft"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="bottom-center" aria-label="Bottom center" data-i18n-aria-label="settings.positionBottomCenter"></button>
+                            <button type="button" class="osd-position-dot" data-anchor="bottom-right" aria-label="Bottom right" data-i18n-aria-label="settings.positionBottomRight"></button>
                             <div class="settings-osd-preview-card">
                               <div class="settings-osd-preview-header">
                                 <div class="settings-osd-preview-icon"></div>
@@ -411,7 +428,7 @@
                           </div>
                           <div class="settings-osd-preview-stand"></div>
                         </div>
-                        <div class="settings-field-help">The on-screen display will appear in the selected area of your screen.</div>
+                        <div class="settings-field-help" data-i18n="settings.osdPositionHelp">The on-screen display will appear in the selected area of your screen.</div>
                       </div>
                     </div>
                   </div>
@@ -429,8 +446,8 @@
                             </svg>
                           </span>
                           <span class="settings-maintenance-copy">
-                            <span class="settings-maintenance-title">Diagnostics</span>
-                            <span class="settings-maintenance-description">View application logs and diagnostics.</span>
+                            <span class="settings-maintenance-title" data-i18n="settings.diagnostics">Diagnostics</span>
+                            <span class="settings-maintenance-description" data-i18n="settings.diagnosticsDescription">View application logs and diagnostics.</span>
                           </span>
                         </div>
                         <button id="open-logs-folder" type="button" class="settings-action settings-maintenance-button">
@@ -440,12 +457,12 @@
                               <path d="M3.75 7.75v-1a2 2 0 0 1 2-2h3.1l1.75 2H18.25a2 2 0 0 1 2 2v1"></path>
                             </svg>
                           </span>
-                          <span class="settings-button-label">Open Logs Folder</span>
+                          <span class="settings-button-label" data-i18n="settings.openLogsFolder">Open Logs Folder</span>
                         </button>
                       </div>
                       <div class="settings-maintenance-inset">
-                        <span class="settings-maintenance-inset-title">Log files</span>
-                        <span class="settings-maintenance-inset-text">Logs can help troubleshoot issues with devices, updates, plugins, and app startup.</span>
+                        <span class="settings-maintenance-inset-title" data-i18n="settings.logFiles">Log files</span>
+                        <span class="settings-maintenance-inset-text" data-i18n="settings.logFilesDescription">Logs can help troubleshoot issues with devices, updates, plugins, and app startup.</span>
                       </div>
                     </div>
 
@@ -462,8 +479,8 @@
                             </svg>
                           </span>
                           <span class="settings-maintenance-copy">
-                            <span class="settings-maintenance-title">App Data</span>
-                            <span class="settings-maintenance-description">Resetting app data will restore all settings to their default values.</span>
+                            <span class="settings-maintenance-title" data-i18n="settings.appData">App Data</span>
+                            <span class="settings-maintenance-description" data-i18n="settings.appDataDescription">Resetting app data will restore all settings to their default values.</span>
                           </span>
                         </div>
                         <button id="reset-app-data" type="button" class="settings-reset settings-maintenance-button settings-maintenance-button--danger">
@@ -476,12 +493,12 @@
                               <path d="M14 11v5"></path>
                             </svg>
                           </span>
-                          <span class="settings-button-label">Reset App Data</span>
+                          <span class="settings-button-label" data-i18n="settings.resetAppData">Reset App Data</span>
                         </button>
                       </div>
                       <div class="settings-maintenance-inset settings-maintenance-inset--danger">
-                        <span class="settings-maintenance-warning">This action cannot be undone.</span>
-                        <span class="settings-maintenance-inset-text">Profiles, bindings, device selections, and saved app settings will be restored to defaults.</span>
+                        <span class="settings-maintenance-warning" data-i18n="settings.cannotUndo">This action cannot be undone.</span>
+                        <span class="settings-maintenance-inset-text" data-i18n="settings.resetAppDataDescription">Profiles, bindings, device selections, and saved app settings will be restored to defaults.</span>
                       </div>
                     </div>
                   </div>
@@ -489,7 +506,7 @@
               </div>
             </div>
           </div>
-          <button id="settings-panel-close" type="button" class="visually-hidden" aria-hidden="true">Close</button>
+          <button id="settings-panel-close" type="button" class="visually-hidden" aria-hidden="true" data-i18n="common.close">Close</button>
         </section>
       </main>
     </div>
@@ -499,12 +516,12 @@
     <div class="target-panel-content">
       <div class="target-panel-header">
         <div class="target-panel-header-left">
-          <button id="target-panel-back" type="button" class="target-panel-back" title="Back" aria-label="Back">
+          <button id="target-panel-back" type="button" class="target-panel-back" title="Back" aria-label="Back" data-i18n-title="common.back" data-i18n-aria-label="common.back">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M15 6l-6 6 6 6" />
             </svg>
           </button>
-          <span id="target-panel-title">Select Target</span>
+          <span id="target-panel-title" data-i18n="targets.selectTarget">Select Target</span>
         </div>
         <button id="target-panel-close" type="button" class="target-panel-close">x</button>
       </div>
@@ -513,11 +530,11 @@
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="m21 21-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
           </svg>
-          <input id="target-panel-search" type="search" placeholder="Search targets..." autocomplete="off" />
+          <input id="target-panel-search" type="search" placeholder="Search targets..." autocomplete="off" data-i18n-placeholder="targets.searchPlaceholder" />
         </label>
       </div>
       <div class="target-panel-body">
-        <div id="target-panel-categories" class="target-panel-categories" aria-label="Target categories"></div>
+        <div id="target-panel-categories" class="target-panel-categories" aria-label="Target categories" data-i18n-aria-label="targets.categories"></div>
         <div id="target-panel-list" class="target-panel-list"></div>
       </div>
     </div>
@@ -526,7 +543,7 @@
   <div id="binding-config-panel" class="target-panel hidden">
     <div class="target-panel-content binding-config-content">
       <div class="target-panel-header">
-        <span>Fader Configuration</span>
+        <span data-i18n="bindings.faderConfiguration">Fader Configuration</span>
         <button id="binding-config-close" type="button" class="target-panel-close">x</button>
       </div>
       <div class="binding-config-body">
@@ -534,26 +551,26 @@
           <div class="binding-config-main-column">
             <section class="binding-config-section binding-config-section--name">
               <label class="binding-config-stack">
-                <span class="binding-config-title">Name</span>
-                <input id="binding-config-name" type="text" placeholder="Binding name" name="binding-config-name" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" />
+                <span class="binding-config-title" data-i18n="common.name">Name</span>
+                <input id="binding-config-name" type="text" placeholder="Binding name" name="binding-config-name" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-i18n-placeholder="bindings.bindingNamePlaceholder" />
               </label>
             </section>
 
             <section class="binding-config-section binding-config-section--curve">
               <div class="binding-config-title-row">
-                <span class="binding-config-title">Curve</span>
+                <span class="binding-config-title" data-i18n="bindings.curve">Curve</span>
                 <div class="binding-config-title-actions">
-                  <button id="binding-config-custom-reset" type="button" class="binding-config-button binding-config-button--secondary">Reset</button>
-                  <span class="binding-config-info-pill" title="Choose how raw MIDI movement maps to output volume.">i</span>
+                  <button id="binding-config-custom-reset" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.reset">Reset</button>
+                  <span class="binding-config-info-pill" title="Choose how raw MIDI movement maps to output volume." data-i18n-title="bindings.chooseCurveInfo">i</span>
                 </div>
               </div>
-              <div id="binding-config-curve-cards" class="binding-config-curve-cards" role="listbox" aria-label="Fader curve options"></div>
-              <p id="binding-config-curve-help" class="binding-config-curve-help">Linear response. Output value changes at the same rate as the fader movement.</p>
+              <div id="binding-config-curve-cards" class="binding-config-curve-cards" role="listbox" aria-label="Fader curve options" data-i18n-aria-label="bindings.curveOptions"></div>
+              <p id="binding-config-curve-help" class="binding-config-curve-help" data-i18n="bindings.linearHelp">Linear response. Output value changes at the same rate as the fader movement.</p>
             </section>
 
             <section class="binding-config-section">
               <span class="binding-config-title binding-config-title-with-action">
-                <span>Mute</span>
+                <span data-i18n="bindings.mute">Mute</span>
                 <div id="binding-config-mute-mode-root" class="binding-config-mode-root">
                   <button
                     id="binding-config-mute-mode-button"
@@ -561,6 +578,8 @@
                     class="binding-config-mode-trigger"
                     title="Mute behavior: Toggle on press"
                     aria-label="Mute behavior"
+                    data-i18n-title="bindings.muteBehaviorToggle"
+                    data-i18n-aria-label="bindings.muteBehavior"
                     aria-haspopup="true"
                     aria-expanded="false"
                   >
@@ -569,22 +588,22 @@
                       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
                     </svg>
                   </button>
-                  <div id="binding-config-mute-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Mute behavior options">
-                    <button id="binding-config-mute-mode-toggle" type="button" class="binding-config-mode-option" data-mode="ToggleOnPress" role="menuitem">Toggle</button>
-                    <button id="binding-config-mute-mode-value" type="button" class="binding-config-mode-option" data-mode="SetFromValue" role="menuitem">Match</button>
+                  <div id="binding-config-mute-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Mute behavior options" data-i18n-aria-label="bindings.muteBehaviorOptions">
+                    <button id="binding-config-mute-mode-toggle" type="button" class="binding-config-mode-option" data-mode="ToggleOnPress" role="menuitem" data-i18n="bindings.toggle">Toggle</button>
+                    <button id="binding-config-mute-mode-value" type="button" class="binding-config-mode-option" data-mode="SetFromValue" role="menuitem" data-i18n="common.match">Match</button>
                   </div>
                 </div>
               </span>
               <div class="binding-config-actions">
-                <span id="binding-config-mute-label" class="binding-config-label">Not mapped</span>
-                <button id="binding-config-mute-learn" type="button" class="binding-config-button binding-config-button--primary">Learn</button>
-                <button id="binding-config-mute-clear" type="button" class="binding-config-button binding-config-button--secondary">Clear</button>
+                <span id="binding-config-mute-label" class="binding-config-label" data-i18n="bindings.notMapped">Not mapped</span>
+                <button id="binding-config-mute-learn" type="button" class="binding-config-button binding-config-button--primary" data-i18n="common.learn">Learn</button>
+                <button id="binding-config-mute-clear" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.clear">Clear</button>
               </div>
             </section>
 
             <section class="binding-config-section">
               <span class="binding-config-title binding-config-title-with-action">
-                <span>Assign</span>
+                <span data-i18n="common.assign">Assign</span>
                 <div id="binding-config-assign-mode-root" class="binding-config-mode-root">
                   <button
                     id="binding-config-assign-mode-button"
@@ -592,6 +611,8 @@
                     class="binding-config-mode-trigger"
                     title="Assign mode: Add"
                     aria-label="Assign mode"
+                    data-i18n-title="bindings.assignModeAdd"
+                    data-i18n-aria-label="bindings.assignMode"
                     aria-haspopup="true"
                     aria-expanded="false"
                   >
@@ -600,16 +621,16 @@
                       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
                     </svg>
                   </button>
-                  <div id="binding-config-assign-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Assign mode options">
-                    <button id="binding-config-assign-mode-add" type="button" class="binding-config-mode-option" data-mode="Add" role="menuitem">Add</button>
-                    <button id="binding-config-assign-mode-replace" type="button" class="binding-config-mode-option" data-mode="Replace" role="menuitem">Replace</button>
+                  <div id="binding-config-assign-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Assign mode options" data-i18n-aria-label="bindings.assignModeOptions">
+                    <button id="binding-config-assign-mode-add" type="button" class="binding-config-mode-option" data-mode="Add" role="menuitem" data-i18n="common.add">Add</button>
+                    <button id="binding-config-assign-mode-replace" type="button" class="binding-config-mode-option" data-mode="Replace" role="menuitem" data-i18n="bindings.replace">Replace</button>
                   </div>
                 </div>
               </span>
               <div class="binding-config-actions">
-                <span id="binding-config-assign-label" class="binding-config-label">Not mapped</span>
-                <button id="binding-config-assign-learn" type="button" class="binding-config-button binding-config-button--primary">Learn</button>
-                <button id="binding-config-assign-clear" type="button" class="binding-config-button binding-config-button--secondary">Clear</button>
+                <span id="binding-config-assign-label" class="binding-config-label" data-i18n="bindings.notMapped">Not mapped</span>
+                <button id="binding-config-assign-learn" type="button" class="binding-config-button binding-config-button--primary" data-i18n="common.learn">Learn</button>
+                <button id="binding-config-assign-clear" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.clear">Clear</button>
               </div>
             </section>
           </div>
@@ -617,14 +638,14 @@
           <aside class="binding-config-preview-column">
             <section class="binding-config-preview-shell">
               <div class="binding-config-title-row">
-                <span class="binding-config-title">Live</span>
+                  <span class="binding-config-title" data-i18n="bindings.live">Live</span>
               </div>
               <div class="binding-config-preview-card">
                 <div class="binding-config-preview-stage">
                   <div class="binding-config-preview-target">
                     <div id="binding-config-preview-target-icon" class="binding-config-preview-target-icon" aria-hidden="true"></div>
                     <div class="binding-config-preview-target-copy">
-                      <div id="binding-config-preview-target-label" class="binding-config-preview-target-label">Target</div>
+                      <div id="binding-config-preview-target-label" class="binding-config-preview-target-label" data-i18n="common.target">Target</div>
                       <div id="binding-config-preview-target-tags" class="binding-config-preview-target-tags"></div>
                     </div>
                   </div>
@@ -645,27 +666,27 @@
                 <div class="binding-config-preview-meta">
                   <div class="binding-config-preview-value-block">
                     <div id="binding-config-preview-value" class="binding-config-preview-value">0%</div>
-                    <div id="binding-config-preview-status" class="binding-config-preview-status">Waiting for live input</div>
+                    <div id="binding-config-preview-status" class="binding-config-preview-status" data-i18n="bindings.waitingForLiveInput">Waiting for live input</div>
                   </div>
                   <div class="binding-config-preview-summary">
                     <div class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label">Main MIDI</span>
-                      <span id="binding-config-preview-main-midi" class="binding-config-preview-summary-value">Not mapped</span>
+                      <span class="binding-config-preview-summary-label" data-i18n="bindings.mainMidi">Main MIDI</span>
+                      <span id="binding-config-preview-main-midi" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
                     </div>
                     <div class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label">Mute</span>
-                      <span id="binding-config-preview-mute" class="binding-config-preview-summary-value">Not mapped</span>
+                      <span class="binding-config-preview-summary-label" data-i18n="bindings.mute">Mute</span>
+                      <span id="binding-config-preview-mute" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
                     </div>
                     <div class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label">Assign</span>
-                      <span id="binding-config-preview-assign" class="binding-config-preview-summary-value">Not mapped</span>
+                      <span class="binding-config-preview-summary-label" data-i18n="common.assign">Assign</span>
+                      <span id="binding-config-preview-assign" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
                     </div>
                     <div class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label">Curve</span>
-                      <span id="binding-config-preview-curve" class="binding-config-preview-summary-value">Linear</span>
+                      <span class="binding-config-preview-summary-label" data-i18n="bindings.curve">Curve</span>
+                      <span id="binding-config-preview-curve" class="binding-config-preview-summary-value" data-i18n="bindings.linear">Linear</span>
                     </div>
                     <div class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label">Value</span>
+                      <span class="binding-config-preview-summary-label" data-i18n="common.value">Value</span>
                       <span id="binding-config-preview-midi-value" class="binding-config-preview-summary-value">0 / 127</span>
                     </div>
                   </div>
@@ -673,13 +694,13 @@
               </div>
               <div class="binding-config-preview-learn-shell">
                 <div class="binding-config-title-row">
-                  <span class="binding-config-title">Learn</span>
+                  <span class="binding-config-title" data-i18n="common.learn">Learn</span>
                 </div>
                 <div class="binding-config-preview-learn-row">
-                  <button id="binding-config-preview-learn-button" type="button" class="binding-config-button binding-config-button--primary">Learn Fader</button>
+                  <button id="binding-config-preview-learn-button" type="button" class="binding-config-button binding-config-button--primary" data-i18n="bindings.learnFader">Learn Fader</button>
                   <div id="binding-config-preview-learn-indicator" class="binding-config-preview-learn-indicator hidden" aria-live="polite">
                     <div class="learn-panel-spinner" aria-hidden="true"></div>
-                    <span id="binding-config-preview-learn-status">Waiting for MIDI input...</span>
+                    <span id="binding-config-preview-learn-status" data-i18n="bindings.waitingMidiInput">Waiting for MIDI input...</span>
                   </div>
                 </div>
               </div>
@@ -688,8 +709,8 @@
         </div>
 
         <div class="binding-config-footer">
-          <button id="binding-config-cancel" type="button" class="binding-config-button binding-config-button--secondary">Cancel</button>
-          <button id="binding-config-save" type="button" class="binding-config-button binding-config-button--primary">Save</button>
+          <button id="binding-config-cancel" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.cancel">Cancel</button>
+          <button id="binding-config-save" type="button" class="binding-config-button binding-config-button--primary" data-i18n="common.save">Save</button>
         </div>
       </div>
     </div>
@@ -698,15 +719,15 @@
   <div id="learn-panel" class="target-panel hidden">
     <div class="target-panel-content learn-panel-content">
       <div class="target-panel-header">
-        <span id="learn-panel-title">Waiting for MIDI Input</span>
+        <span id="learn-panel-title" data-i18n="bindings.waitingMidiTitle">Waiting for MIDI Input</span>
         <button id="learn-panel-close" type="button" class="target-panel-close">x</button>
       </div>
       <div class="learn-panel-body">
         <div id="learn-panel-spinner" class="learn-panel-spinner" aria-hidden="true"></div>
-        <p id="learn-panel-message">Move a control on your MIDI device to create a binding.</p>
+        <p id="learn-panel-message" data-i18n="bindings.learnMessage">Move a control on your MIDI device to create a binding.</p>
         <div id="learn-panel-actions" class="learn-panel-actions hidden">
-          <button id="learn-panel-cancel" type="button" class="secondary">Cancel</button>
-          <button id="learn-panel-confirm" type="button">Transfer</button>
+          <button id="learn-panel-cancel" type="button" class="secondary" data-i18n="common.cancel">Cancel</button>
+          <button id="learn-panel-confirm" type="button" data-i18n="common.transfer">Transfer</button>
         </div>
       </div>
     </div>

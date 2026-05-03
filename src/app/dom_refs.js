@@ -128,6 +128,7 @@ export function createDomRefs() {
   const startInTraySelect = document.getElementById("start-in-tray");
   const minimizeToTraySelect = document.getElementById("minimize-to-tray");
   const exitToTraySelect = document.getElementById("exit-to-tray");
+  const languageSelect = document.getElementById("language-select");
   const autoCheckUpdatesButton = document.getElementById("auto-check-updates-button");
   const openLogsFolderButton = document.getElementById("open-logs-folder");
   const resetAppDataButton = document.getElementById("reset-app-data");
@@ -245,6 +246,7 @@ export function createDomRefs() {
     startInTraySelect,
     minimizeToTraySelect,
     exitToTraySelect,
+    languageSelect,
     autoCheckUpdatesButton,
     openLogsFolderButton,
     resetAppDataButton,

@@ -26,11 +26,13 @@ export function createMidiFeature({
   saveMidiDeviceIds,
   clearSavedMidiDeviceIds,
   onProfileDeviceSelected,
+  i18n,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createMidiFeature: invoke is required");
   }
   const d = (dom && typeof dom === "object") ? dom : {};
+  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
 
   let autoRefreshTimer = null;
   let sessionRefreshTimer = null;
@@ -116,7 +118,7 @@ export function createMidiFeature({
       const entry = createSelectDropdownShell({
         selectEl,
         rootClass: "midi-device-dropdown",
-        title: kind === "input" ? "Input Device" : "Output Device",
+        title: kind === "input" ? t("topbar.inputDevice") : t("topbar.outputDevice"),
       });
       if (!entry) return;
 
@@ -153,7 +155,7 @@ export function createMidiFeature({
       closeDropdowns: closeDeviceDropdowns,
       formatOptionText: (opt) => stripUnavailableSuffix(opt.textContent || ""),
       getOptionBadges: (opt) => (opt.dataset.unavailable === "true"
-        ? [{ text: "Unavailable", kind: "state" }]
+        ? [{ text: t("targets.unavailable"), kind: "state" }]
         : []),
       getDisplayBadges: () => [],
       truncateMenuLabels: false,
@@ -171,8 +173,8 @@ export function createMidiFeature({
 
   function renderDeviceDropdowns() {
     ensureDeviceDropdowns();
-    renderDeviceDropdownForSelect(d.midiSelect, inputMenuEl, inputDisplayEl, "Select input device");
-    renderDeviceDropdownForSelect(d.midiOutputSelect, outputMenuEl, outputDisplayEl, "Select output device");
+    renderDeviceDropdownForSelect(d.midiSelect, inputMenuEl, inputDisplayEl, t("midi.selectInputDevice"));
+    renderDeviceDropdownForSelect(d.midiOutputSelect, outputMenuEl, outputDisplayEl, t("midi.selectOutputDevice"));
   }
 
   function hasPreference(pref) {
@@ -223,7 +225,7 @@ export function createMidiFeature({
     const nextInputId = String(inputId || "").trim();
     const nextOutputId = String(outputId || "").trim();
     if (!nextInputId || !nextOutputId) {
-      if (d.midiStatus) d.midiStatus.textContent = "Select both input and output devices";
+      if (d.midiStatus) d.midiStatus.textContent = t("bindings.selectBothDevices");
       renderDeviceDropdowns();
       return { connected: false, reason: "invalid_selection" };
     }
@@ -237,7 +239,7 @@ export function createMidiFeature({
     );
     if (inputUnavailable || outputUnavailable) {
       if (d.midiStatus) {
-        d.midiStatus.textContent = "Selected device is unavailable. Choose an available input/output pair.";
+        d.midiStatus.textContent = t("midi.unavailablePair");
       }
       renderDeviceDropdowns();
       return { connected: false, reason: "unavailable_selection" };
@@ -261,7 +263,7 @@ export function createMidiFeature({
       };
     }
 
-    if (d.midiStatus) d.midiStatus.textContent = "Applying MIDI device change...";
+    if (d.midiStatus) d.midiStatus.textContent = t("midi.applyingChange");
     if (d.midiSelect) d.midiSelect.value = nextInputId;
     if (d.midiOutputSelect) d.midiOutputSelect.value = nextOutputId;
 
@@ -330,7 +332,7 @@ export function createMidiFeature({
           await applySelectedDevices(next);
         } catch (error) {
           if (d.midiStatus) {
-            d.midiStatus.textContent = `Connect failed: ${error}`;
+            d.midiStatus.textContent = t("midi.connectFailed", { message: error });
           }
         }
       }
@@ -379,7 +381,7 @@ export function createMidiFeature({
             showMain(displayInputName, displayOutputName, { connected: false });
           }
           if (d.midiStatus) {
-            d.midiStatus.textContent = "MIDI device disconnected.";
+            d.midiStatus.textContent = t("midi.disconnected");
           }
           await refreshMidiDevices();
           return;
@@ -395,7 +397,7 @@ export function createMidiFeature({
             fromProfile: true,
           });
           if (d.midiStatus) {
-            d.midiStatus.textContent = "Reconnected to profile MIDI device.";
+            d.midiStatus.textContent = t("midi.reconnectedProfile");
           }
         } catch {
           // Ignore transient reconnect failures; watcher will retry.
@@ -460,7 +462,7 @@ export function createMidiFeature({
     }
     d.learnPanel.classList.add("hidden");
     if (d.learnPanelTitle) {
-      d.learnPanelTitle.textContent = "Waiting for MIDI Input";
+      d.learnPanelTitle.textContent = t("bindings.waitingMidiTitle");
     }
     if (d.learnPanelSpinner) {
       d.learnPanelSpinner.classList.remove("hidden");
@@ -475,7 +477,7 @@ export function createMidiFeature({
       return;
     }
     if (d.learnPanelTitle) {
-      d.learnPanelTitle.textContent = "Waiting for MIDI Input";
+      d.learnPanelTitle.textContent = t("bindings.waitingMidiTitle");
     }
     if (d.learnPanelSpinner) {
       d.learnPanelSpinner.classList.remove("hidden");
@@ -514,7 +516,7 @@ export function createMidiFeature({
         d.midiSelect.innerHTML = "";
         const placeholder = document.createElement("option");
         placeholder.value = "";
-        placeholder.textContent = "Select input device";
+        placeholder.textContent = t("midi.selectInputDevice");
         d.midiSelect.appendChild(placeholder);
       }
 
@@ -522,7 +524,7 @@ export function createMidiFeature({
         d.midiOutputSelect.innerHTML = "";
         const outPlaceholder = document.createElement("option");
         outPlaceholder.value = "";
-        outPlaceholder.textContent = "Select output device";
+        outPlaceholder.textContent = t("midi.selectOutputDevice");
         d.midiOutputSelect.appendChild(outPlaceholder);
       }
 
@@ -546,7 +548,7 @@ export function createMidiFeature({
         if (d.midiSelect && pref.inputDeviceId) d.midiSelect.value = pref.inputDeviceId;
         if (d.midiOutputSelect && pref.outputDeviceId) d.midiOutputSelect.value = pref.outputDeviceId;
         if (d.midiStatus) {
-          d.midiStatus.textContent = "Searching for devices...";
+          d.midiStatus.textContent = t("midi.searchingDevices");
         }
         renderDeviceDropdowns();
         startAutoRefresh(refreshMidiDevices);
@@ -610,7 +612,10 @@ export function createMidiFeature({
       }
 
       if (d.midiStatus && !connectedInputId && !connectedOutputId) {
-        d.midiStatus.textContent = `Found ${(devices || []).length} inputs, ${(outputDevices || []).length} outputs`;
+        d.midiStatus.textContent = t("midi.foundDevices", {
+          inputs: (devices || []).length,
+          outputs: (outputDevices || []).length,
+        });
       }
       renderDeviceDropdowns();
       if (pref.inputDeviceId && pref.outputDeviceId && !connectedInputId && !connectedOutputId) {
@@ -621,7 +626,7 @@ export function createMidiFeature({
       return { inputs: Array.isArray(devices) ? devices : [], outputs: Array.isArray(outputDevices) ? outputDevices : [] };
     } catch (error) {
       if (d.midiStatus) {
-        d.midiStatus.textContent = `MIDI error: ${error}`;
+        d.midiStatus.textContent = t("midi.error", { message: error });
       }
       renderDeviceDropdowns();
       startAutoRefresh(refreshMidiDevices);
@@ -634,7 +639,7 @@ export function createMidiFeature({
     const outputId = d.midiOutputSelect ? d.midiOutputSelect.value : "";
     if (!inputId || !outputId) {
       if (d.midiStatus) {
-        d.midiStatus.textContent = "Select both input and output devices";
+        d.midiStatus.textContent = t("bindings.selectBothDevices");
       }
       renderDeviceDropdowns();
       return;
@@ -659,7 +664,7 @@ export function createMidiFeature({
     if (typeof clearSavedMidiDeviceIds === "function") {
       await clearSavedMidiDeviceIds();
     }
-    if (d.midiStatus) d.midiStatus.textContent = "Not connected";
+    if (d.midiStatus) d.midiStatus.textContent = t("midi.notConnected");
     await refreshMidiDevices();
     if (typeof onDisconnected === "function") {
       onDisconnected();
@@ -669,7 +674,7 @@ export function createMidiFeature({
   async function startLearnBinding() {
     try {
       await invoke("start_midi_learn");
-      openLearnPanel("Move a control on your MIDI device to create a binding.");
+      openLearnPanel(t("bindings.learnMessage"));
       if (learnTimer) {
         clearInterval(learnTimer);
       }
@@ -687,7 +692,7 @@ export function createMidiFeature({
     } catch (error) {
       closeLearnPanel();
       if (d.learnPanelMessage && d.learnPanel && !d.learnPanel.classList.contains("hidden")) {
-        d.learnPanelMessage.textContent = `Learn failed: ${error}`;
+        d.learnPanelMessage.textContent = t("midi.learnFailed", { message: error });
       }
     }
   }
@@ -743,17 +748,17 @@ export function createMidiFeature({
               outputName: outputMatch?.name || "",
               auto: true,
             });
-            if (d.midiStatus) d.midiStatus.textContent = "Auto-connected first available MIDI pair.";
+            if (d.midiStatus) d.midiStatus.textContent = t("midi.autoConnected");
             return { connected: true, autoSelected: true };
           } catch (error) {
-            if (d.midiStatus) d.midiStatus.textContent = `Connect failed: ${error}`;
+            if (d.midiStatus) d.midiStatus.textContent = t("midi.connectFailed", { message: error });
             renderDeviceDropdowns();
             return { connected: false, reason: "auto_select_connect_failed" };
           }
         }
       }
 
-      if (d.midiStatus) d.midiStatus.textContent = "Select input and output devices.";
+      if (d.midiStatus) d.midiStatus.textContent = t("bindings.selectDevicesSentence");
       renderDeviceDropdowns();
       return { connected: false, reason: "missing_saved" };
     }
@@ -769,7 +774,7 @@ export function createMidiFeature({
 
     if (!inputMatch || !outputMatch) {
       if (d.midiStatus) {
-        d.midiStatus.textContent = "Saved MIDI device unavailable. Select a new available pair.";
+        d.midiStatus.textContent = t("midi.savedUnavailable");
       }
       ensureOption(
         d.midiSelect,
@@ -804,7 +809,7 @@ export function createMidiFeature({
     } catch (error) {
       setConnectedState("", "", "", "");
       if (d.midiStatus) {
-        d.midiStatus.textContent = `Connect failed: ${error}`;
+        d.midiStatus.textContent = t("midi.connectFailed", { message: error });
       }
       renderDeviceDropdowns();
       return { connected: false };
@@ -858,8 +863,8 @@ export function createMidiFeature({
 
       if (d.midiStatus) {
         d.midiStatus.textContent = connectedInputId && connectedOutputId
-          ? "Profile MIDI device unavailable. Keeping current connection."
-          : "Saved profile MIDI device(s) not found.";
+          ? t("midi.profileUnavailableKeepingCurrent")
+          : t("midi.savedProfileDevicesNotFound");
       }
       renderDeviceDropdowns();
       return {
@@ -878,7 +883,7 @@ export function createMidiFeature({
       });
       return { handled: true, connected: true };
     } catch (error) {
-      if (d.midiStatus) d.midiStatus.textContent = `Connect failed: ${error}`;
+      if (d.midiStatus) d.midiStatus.textContent = t("midi.connectFailed", { message: error });
       renderDeviceDropdowns();
       return { handled: true, connected: false, reason: "connect_failed" };
     }
@@ -924,6 +929,12 @@ export function createMidiFeature({
         startLearnBinding();
       });
     }
+    window.addEventListener("midimaster:locale-changed", () => {
+      renderDeviceDropdowns();
+      if (d.learnPanel && !d.learnPanel.classList.contains("hidden") && d.learnPanelTitle) {
+        d.learnPanelTitle.textContent = t("bindings.waitingMidiTitle");
+      }
+    });
   }
 
   return {

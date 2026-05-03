@@ -122,12 +122,13 @@ function pickMidimasterPackageFile() {
   });
 }
 
-export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showConfirm }) {
+export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, showConfirm }) {
   if (typeof invoke !== "function") {
     throw new Error("createPluginsTabs: invoke is required");
   }
 
   const getHost = (typeof getPluginHost === "function") ? getPluginHost : (() => null);
+  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   const reload = (typeof reloadPlugins === "function") ? reloadPlugins : (async () => { });
   const confirmAction = (typeof showConfirm === "function")
     ? showConfirm
@@ -139,6 +140,14 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
   let storeCatalogPromise = null;
   let storeCatalogError = "";
   const installedIconCache = new Map();
+
+  function translateCategory(category) {
+    const label = String(category || "").trim();
+    if (!label) return "";
+    const key = `plugins.category.${slugify(label)}`;
+    const translated = t(key);
+    return translated && translated !== key ? translated : label;
+  }
 
   async function warmInstalledIcons(plugins) {
     const list = Array.isArray(plugins) ? plugins : [];
@@ -197,7 +206,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
       } catch (error) {
         console.error("Failed to fetch store catalog", error);
         storeCatalogCache = { plugins: [] };
-        storeCatalogError = "Could not load store catalog.";
+        storeCatalogError = t("plugins.storeLoadFailed");
       }
       return storeCatalogCache;
     })();
@@ -303,7 +312,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
     for (const entry of entries) {
       for (const category of entry.categories) {
         const slug = slugify(category);
-        const current = categoryMap.get(slug) || { id: `category:${slug}`, name: category, slug, count: 0 };
+        const current = categoryMap.get(slug) || { id: `category:${slug}`, name: translateCategory(category), slug, count: 0 };
         current.count += 1;
         categoryMap.set(slug, current);
       }
@@ -315,10 +324,10 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
 
     return {
       primary: [
-        { id: "installed", name: "Installed", count: installedEntries.length },
-        { id: "all", name: "All Plugins", count: entries.length },
-        { id: "updates", name: "Updates", count: updatesEntries.length },
-        { id: "store", name: "Store", count: storeEntries.length },
+        { id: "installed", name: t("plugins.installed"), count: installedEntries.length },
+        { id: "all", name: t("plugins.allPlugins"), count: entries.length },
+        { id: "updates", name: t("plugins.updates"), count: updatesEntries.length },
+        { id: "store", name: t("plugins.store"), count: storeEntries.length },
       ],
       categories,
     };
@@ -374,23 +383,23 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
   function getViewEmptyState(view) {
     switch (view) {
       case "installed":
-        return "No installed plugins yet.";
+        return t("plugins.noInstalled");
       case "updates":
-        return "All installed plugins are up to date.";
+        return t("plugins.allUpToDate");
       case "store":
-        return "No store plugins matched your search.";
+        return t("plugins.noStoreMatches");
       default:
-        return "No plugins matched your filters.";
+        return t("plugins.noFilterMatches");
     }
   }
 
   function getActionLabel(entry, currentView) {
     if (entry.isInstalled) {
-      if (entry.hasUpdate) return "Update";
-      if (currentView === "store") return "Installed";
+      if (entry.hasUpdate) return t("plugins.update");
+      if (currentView === "store") return t("plugins.installedAction");
       return "";
     }
-    if (entry.store) return "Install";
+    if (entry.store) return t("plugins.install");
     return "";
   }
 
@@ -421,7 +430,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
       await reload();
     } catch (error) {
       console.error("Failed to install plugin package", error);
-      setStatus("Failed to install plugin. Check the package file and try again.", "error");
+      setStatus(t("plugins.installFailed"), "error");
     }
   }
 
@@ -442,11 +451,11 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
     } catch (error) {
       console.error(`Plugin action failed: ${action}`, error);
       if (action === "toggle") {
-        setStatus("Failed to update plugin state.", "error");
+        setStatus(t("plugins.updateStateFailed"), "error");
       } else if (action === "uninstall") {
-        setStatus("Failed to uninstall plugin.", "error");
+        setStatus(t("plugins.uninstallFailed"), "error");
       } else {
-        setStatus("Install failed. The package may be untrusted or unavailable.", "error");
+        setStatus(t("plugins.installUnavailable"), "error");
       }
     }
   }
@@ -466,19 +475,19 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
 
       const tags = entry.categories
         .slice(0, 3)
-        .map((category) => `<span class="plugins-browser-tag">${escapeHtml(category)}</span>`)
+        .map((category) => `<span class="plugins-browser-tag">${escapeHtml(translateCategory(category))}</span>`)
         .join("");
 
       const metaParts = [];
       if (entry.author) metaParts.push(escapeHtml(entry.author));
       metaParts.push(escapeHtml(entry.id));
-      if (entry.bundled) metaParts.push("Bundled");
+      if (entry.bundled) metaParts.push(t("plugins.bundled"));
       const meta = metaParts.join(" - ");
       const actionLabel = getActionLabel(entry, view);
       const pluginPanelTabId = getPluginPanelTabId(entry.id);
       const versionValue = escapeHtml(entry.installedVersion || entry.latestVersion || "v0.0.0");
       const secondaryValue = entry.hasUpdate
-        ? `<span class="plugins-browser-version plugins-browser-version--update">Update ${escapeHtml(entry.latestVersion)}</span>`
+        ? `<span class="plugins-browser-version plugins-browser-version--update">${escapeHtml(t("plugins.updateVersion", { version: entry.latestVersion }))}</span>`
         : "";
 
       row.innerHTML = `
@@ -493,7 +502,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
               ${secondaryValue}
             </div>
           </div>
-          <p class="plugins-browser-card-description">${escapeHtml(entry.description || "No description provided.")}</p>
+          <p class="plugins-browser-card-description">${escapeHtml(entry.description || t("plugins.noDescription"))}</p>
           <div class="plugins-browser-card-meta">${meta}</div>
           ${tags ? `<div class="plugins-browser-card-tags">${tags}</div>` : ""}
         </div>
@@ -539,7 +548,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
         const panelButton = document.createElement("button");
         panelButton.type = "button";
         panelButton.className = "plugins-browser-action is-panel";
-        panelButton.textContent = "Open Panel";
+        panelButton.textContent = t("plugins.openPanel");
         panelButton.addEventListener("click", () => {
           if (typeof onOpenPluginPanel === "function") {
             onOpenPluginPanel(pluginPanelTabId);
@@ -558,14 +567,14 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
         uninstallButton.type = "button";
         uninstallButton.className = "plugins-browser-icon-button is-danger";
         uninstallButton.innerHTML = TRASH_ICON;
-        uninstallButton.setAttribute("aria-label", "Remove plugin");
-        uninstallButton.title = "Remove plugin";
+        uninstallButton.setAttribute("aria-label", t("plugins.removePlugin"));
+        uninstallButton.title = t("plugins.removePlugin");
         uninstallButton.addEventListener("click", async () => {
           const confirmed = await confirmAction({
-            title: "Remove Plugin",
-            message: `Remove ${entry.name} from MIDIMaster?`,
-            confirmLabel: "Remove",
-            cancelLabel: "Cancel",
+            title: t("plugins.removePluginTitle"),
+            message: t("plugins.removePluginMessage", { name: entry.name }),
+            confirmLabel: t("plugins.remove"),
+            cancelLabel: t("common.cancel"),
             confirmVariant: "danger",
           });
           if (!confirmed) {
@@ -580,7 +589,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
       if (entry.isInstalled) {
         const toggle = document.createElement("label");
         toggle.className = "plugins-toggle plugins-browser-toggle";
-        toggle.title = entry.enabled ? "Disable plugin" : "Enable plugin";
+        toggle.title = entry.enabled ? t("plugins.disablePlugin") : t("plugins.enablePlugin");
         toggle.innerHTML = `
           <input type="checkbox" ${entry.enabled ? "checked" : ""} />
           <span class="plugins-toggle-ui" aria-hidden="true"></span>
@@ -623,19 +632,19 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
                 <path d="m21 21-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"></path>
               </svg>
             </span>
-            <input type="search" data-role="search" placeholder="Search plugins..." autocomplete="off" />
+            <input type="search" data-role="search" placeholder="${escapeHtml(t("plugins.searchPlaceholder"))}" autocomplete="off" />
           </label>
           <div class="plugins-browser-toolbar-actions">
           <label class="plugins-browser-sort-wrap">
-            <span class="plugins-browser-sort-label">Sort by</span>
+            <span class="plugins-browser-sort-label">${escapeHtml(t("plugins.sortBy"))}</span>
             <select class="plugins-browser-sort" data-role="sort">
-                <option value="name-asc">Name (A-Z)</option>
-                <option value="name-desc">Name (Z-A)</option>
-                <option value="updates-first">Updates first</option>
-                <option value="version-desc">Newest version</option>
+                <option value="name-asc">${escapeHtml(t("plugins.nameAsc"))}</option>
+                <option value="name-desc">${escapeHtml(t("plugins.nameDesc"))}</option>
+                <option value="updates-first">${escapeHtml(t("plugins.updatesFirst"))}</option>
+                <option value="version-desc">${escapeHtml(t("plugins.newestVersion"))}</option>
               </select>
             </label>
-            <button type="button" class="plugins-browser-install" data-role="install-file">Add Plugin</button>
+            <button type="button" class="plugins-browser-install" data-role="install-file">${escapeHtml(t("plugins.addPlugin"))}</button>
           </div>
         </div>
         <div class="plugins-browser-status hidden" data-role="status"></div>
@@ -658,7 +667,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
     const sortDropdown = createSelectDropdownShell({
       selectEl: sortEl,
       rootClass: "plugins-sort-dropdown",
-      title: "Sort plugins",
+      title: t("plugins.sortPlugins"),
     });
 
     const render = () => {
@@ -673,13 +682,18 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
       const visibleEntries = sortEntries(filteredEntries, sortValue);
 
       renderPluginCards({ listEl, entries: visibleEntries, view, setStatus, onOpenPluginPanel });
-      const noun = visibleEntries.length === 1 ? "plugin" : "plugins";
-      footerEl.textContent = `${visibleEntries.length} of ${baseEntries.length} ${noun} shown in ${label}.`;
+      const noun = visibleEntries.length === 1 ? t("plugins.pluginSingular") : t("plugins.pluginPlural");
+      footerEl.textContent = t("plugins.footer", {
+        visible: visibleEntries.length,
+        total: baseEntries.length,
+        noun,
+        label,
+      });
 
       renderNativeSelectDropdown({
         entry: sortDropdown,
         selectEl: sortEl,
-        fallbackText: "Name (A-Z)",
+        fallbackText: t("plugins.nameAsc"),
         formatOptionText: (opt) => opt.textContent || "",
         truncateMenuLabels: false,
         truncateDisplayLabel: false,
@@ -690,7 +704,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
       model = null;
       setStatus("");
       if (listEl) {
-        listEl.innerHTML = "<div class=\"plugins-browser-empty\">Loading plugins...</div>";
+        listEl.innerHTML = `<div class="plugins-browser-empty">${escapeHtml(t("plugins.loading"))}</div>`;
       }
       const data = await loadBrowserData();
       model = {
@@ -715,7 +729,7 @@ export function createPluginsTabs({ invoke, getPluginHost, reloadPlugins, showCo
 
     load().catch((error) => {
       console.error("Failed to render plugins browser", error);
-      setStatus("Failed to load plugins.", "error");
+      setStatus(t("plugins.loadFailed"), "error");
     });
   }
 

@@ -44,6 +44,7 @@ export function createBindingsFeature({
   getMuteForTarget,
   triggerIntegration,
   extractIntegrationTarget,
+  i18n,
   showVolumeOsd,
   showMuteOsd,
   saveBindingsForProfile,
@@ -71,6 +72,7 @@ export function createBindingsFeature({
   const sliderIntentSequenceByBinding = {};
   const pendingSliderActionsByBinding = new Map();
   const d = (dom && typeof dom === "object") ? dom : {};
+  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   if (!d.bindingsContainer) {
     throw new Error("createBindingsFeature: dom.bindingsContainer is required");
   }
@@ -263,7 +265,7 @@ export function createBindingsFeature({
     const nextMuted = Boolean(muted);
     button.innerHTML = muteIconSvg(nextMuted);
     button.classList.toggle("muted", nextMuted);
-    const label = nextMuted ? "Unmute binding target" : "Mute binding target";
+    const label = nextMuted ? t("bindings.unmuteTarget") : t("bindings.muteTarget");
     button.title = label;
     button.setAttribute("aria-label", label);
 
@@ -456,8 +458,8 @@ export function createBindingsFeature({
   const nameDrafts = new Map();
   let pendingRerender = false;
   let suppressPendingFocusClearUntil = 0;
-  const defaultLearnPanelTitle = "Waiting for MIDI Input";
-  const defaultLearnPanelMessage = "Move a control on your MIDI device to create a binding.";
+  const defaultLearnPanelTitle = () => t("bindings.waitingMidiTitle");
+  const defaultLearnPanelMessage = () => t("bindings.learnMessage");
 
   function clearTransferPrompt() {
     transferPrompt = null;
@@ -474,13 +476,13 @@ export function createBindingsFeature({
 
   function resetLearnPanelUi() {
     if (!hasLearnPanelSupport()) return;
-    if (d.learnPanelTitle) d.learnPanelTitle.textContent = defaultLearnPanelTitle;
-    if (d.learnPanelMessage) d.learnPanelMessage.textContent = defaultLearnPanelMessage;
+    if (d.learnPanelTitle) d.learnPanelTitle.textContent = defaultLearnPanelTitle();
+    if (d.learnPanelMessage) d.learnPanelMessage.textContent = defaultLearnPanelMessage();
     if (d.learnPanelSpinner) d.learnPanelSpinner.classList.remove("hidden");
     if (d.learnPanelActions) d.learnPanelActions.classList.add("hidden");
-    if (d.learnPanelCancel) d.learnPanelCancel.textContent = "Cancel";
+    if (d.learnPanelCancel) d.learnPanelCancel.textContent = t("common.cancel");
     if (d.learnPanelConfirm) {
-      d.learnPanelConfirm.textContent = "Transfer";
+      d.learnPanelConfirm.textContent = t("common.transfer");
       d.learnPanelConfirm.classList.remove("hidden");
     }
   }
@@ -498,8 +500,8 @@ export function createBindingsFeature({
 
   function setLearnPanelWaiting() {
     if (!hasLearnPanelSupport()) return;
-    if (d.learnPanelTitle) d.learnPanelTitle.textContent = defaultLearnPanelTitle;
-    if (d.learnPanelMessage) d.learnPanelMessage.textContent = defaultLearnPanelMessage;
+    if (d.learnPanelTitle) d.learnPanelTitle.textContent = defaultLearnPanelTitle();
+    if (d.learnPanelMessage) d.learnPanelMessage.textContent = defaultLearnPanelMessage();
     if (d.learnPanelSpinner) d.learnPanelSpinner.classList.remove("hidden");
     if (d.learnPanelActions) d.learnPanelActions.classList.add("hidden");
     showLearnPanel();
@@ -507,13 +509,13 @@ export function createBindingsFeature({
 
   function setLearnPanelTransfer(message) {
     if (!hasLearnPanelSupport()) return;
-    if (d.learnPanelTitle) d.learnPanelTitle.textContent = "Transfer Mapping";
+    if (d.learnPanelTitle) d.learnPanelTitle.textContent = t("bindings.transferMapping");
     if (d.learnPanelMessage) d.learnPanelMessage.textContent = message || "";
     if (d.learnPanelSpinner) d.learnPanelSpinner.classList.add("hidden");
     if (d.learnPanelActions) d.learnPanelActions.classList.remove("hidden");
-    if (d.learnPanelCancel) d.learnPanelCancel.textContent = "Cancel";
+    if (d.learnPanelCancel) d.learnPanelCancel.textContent = t("common.cancel");
     if (d.learnPanelConfirm) {
-      d.learnPanelConfirm.textContent = "Transfer";
+      d.learnPanelConfirm.textContent = t("common.transfer");
       d.learnPanelConfirm.classList.remove("hidden");
     }
     showLearnPanel();
@@ -602,13 +604,13 @@ export function createBindingsFeature({
     }
 
     hotkeyLearnBindingId = binding.id;
-    if (d.learnPanelTitle) d.learnPanelTitle.textContent = "Press Hotkey";
+    if (d.learnPanelTitle) d.learnPanelTitle.textContent = t("bindings.pressHotkey");
     if (d.learnPanelMessage) {
-      d.learnPanelMessage.textContent = "Press a key or combo (example: Ctrl+Shift+S).";
+      d.learnPanelMessage.textContent = t("bindings.pressHotkeyMessage");
     }
     if (d.learnPanelSpinner) d.learnPanelSpinner.classList.add("hidden");
     if (d.learnPanelActions) d.learnPanelActions.classList.remove("hidden");
-    if (d.learnPanelCancel) d.learnPanelCancel.textContent = "Cancel";
+    if (d.learnPanelCancel) d.learnPanelCancel.textContent = t("common.cancel");
     if (d.learnPanelConfirm) d.learnPanelConfirm.classList.add("hidden");
     showLearnPanel();
 
@@ -671,7 +673,7 @@ export function createBindingsFeature({
     if (assignLearn) {
       const active = configLearnField === "assign_control";
       assignLearn.classList.remove("is-learning");
-      assignLearn.textContent = "Learn";
+      assignLearn.textContent = t("common.learn");
       assignLearn.disabled = transferLocked || Boolean(configLearnField && !active);
     }
 
@@ -682,7 +684,7 @@ export function createBindingsFeature({
     if (d.bindingConfigAssignModeButton) d.bindingConfigAssignModeButton.disabled = lockClear;
     if (previewLearnButton) {
       previewLearnButton.classList.toggle("is-learning", learningPrimary);
-      previewLearnButton.textContent = learningPrimary ? "Listening..." : "Learn Fader";
+      previewLearnButton.textContent = learningPrimary ? t("bindings.listening") : t("bindings.learnFader");
       previewLearnButton.disabled = transferLocked || Boolean(configLearnField && !learningPrimary);
     }
   }
@@ -869,13 +871,13 @@ export function createBindingsFeature({
     if (d.bindingConfigPreviewMidiValue) d.bindingConfigPreviewMidiValue.textContent = formatPreviewMidiValue(binding, previewValue);
     if (d.bindingConfigPreviewStatus) {
       if (learningPrimary) {
-        d.bindingConfigPreviewStatus.textContent = "Waiting for new fader input";
+        d.bindingConfigPreviewStatus.textContent = t("bindings.waitingForNewFaderInput");
       } else if (muted) {
-        d.bindingConfigPreviewStatus.textContent = "Target currently muted";
+        d.bindingConfigPreviewStatus.textContent = t("bindings.targetMuted");
       } else if ((bindingId != null && bindingLastValues[bindingId] != null) || liveMidiValue != null) {
-        d.bindingConfigPreviewStatus.textContent = "Receiving live feedback";
+        d.bindingConfigPreviewStatus.textContent = t("bindings.receivingLiveFeedback");
       } else {
-        d.bindingConfigPreviewStatus.textContent = "Waiting for live input";
+        d.bindingConfigPreviewStatus.textContent = t("bindings.waitingForLiveInput");
       }
     }
     if (d.bindingConfigPreviewLearnIndicator) {
@@ -883,7 +885,7 @@ export function createBindingsFeature({
       d.bindingConfigPreviewLearnIndicator.classList.toggle("is-learning", learningPrimary);
     }
     if (d.bindingConfigPreviewLearnStatus) {
-      d.bindingConfigPreviewLearnStatus.textContent = "Waiting for MIDI input...";
+      d.bindingConfigPreviewLearnStatus.textContent = t("bindings.waitingMidiInput");
     }
   }
 
@@ -1386,7 +1388,7 @@ export function createBindingsFeature({
     if (!Array.isArray(bindings) || bindings.length === 0) {
       const empty = document.createElement("div");
       empty.className = "bindings-empty";
-      empty.textContent = "No bindings yet. Use the button below to add one.";
+      empty.textContent = t("bindings.noBindings");
       d.bindingsContainer.appendChild(empty);
       queueBindingsScrollLayoutSync();
       return;
@@ -1492,7 +1494,7 @@ export function createBindingsFeature({
           const nameLabel = document.createElement("div");
           nameLabel.className = "binding-name";
           nameLabel.textContent = binding.name?.trim() || fallbackName;
-          nameLabel.title = "Double-click to rename";
+          nameLabel.title = t("bindings.doubleClickRename");
           nameLabel.addEventListener("mousedown", (event) => {
             event.stopPropagation();
           });
@@ -1507,8 +1509,8 @@ export function createBindingsFeature({
         const rowNumber = document.createElement("button");
         rowNumber.type = "button";
         rowNumber.className = "binding-index binding-drag";
-        rowNumber.title = "Drag to reorder binding";
-        rowNumber.setAttribute("aria-label", "Drag to reorder binding");
+        rowNumber.title = t("bindings.dragToReorder");
+        rowNumber.setAttribute("aria-label", t("bindings.dragToReorder"));
         const dragGrip = document.createElement("span");
         dragGrip.className = "drag-grip";
         dragGrip.setAttribute("aria-hidden", "true");
@@ -1529,7 +1531,7 @@ export function createBindingsFeature({
         const modeButton = document.createElement("button");
         modeButton.type = "button";
         modeButton.className = "target-button";
-        modeButton.title = "Control Mode";
+        modeButton.title = t("bindings.controlMode");
         const modeDisplay = document.createElement("span");
         modeDisplay.className = "target-display";
         const modeCaret = document.createElement("span");
@@ -1541,10 +1543,10 @@ export function createBindingsFeature({
         modeMenu.className = "target-menu hidden";
 
         const modeOptions = [
-          { value: "fader_abs", label: "Absolute", badge: "Fader", title: "" },
-          { value: "fader_rel", label: "Relative", badge: "Fader", title: "" },
-          { value: "button_toggle", label: "Toggle", badge: "Button", title: modeTooltip("button_toggle") },
-          { value: "button_match", label: "Match", badge: "Button", title: modeTooltip("button_match") },
+          { value: "fader_abs", label: t("bindings.absolute"), badge: t("bindings.fader"), title: "" },
+          { value: "fader_rel", label: t("bindings.relative"), badge: t("bindings.fader"), title: "" },
+          { value: "button_toggle", label: t("bindings.toggle"), badge: t("bindings.button"), title: modeTooltip("button_toggle") },
+          { value: "button_match", label: t("common.match"), badge: t("bindings.button"), title: modeTooltip("button_match") },
         ];
 
         let modeValue = "fader_abs";
@@ -1827,7 +1829,7 @@ export function createBindingsFeature({
         const editButton = document.createElement("button");
         editButton.type = "button";
         editButton.className = "binding-action";
-        setActionIcon(editButton, "edit", isButton ? "Edit name" : "Configure fader");
+        setActionIcon(editButton, "edit", isButton ? t("bindings.editName") : t("bindings.configureFader"));
         editButton.addEventListener("click", () => {
           beginBindingEdit(binding.id);
         });
@@ -1835,13 +1837,13 @@ export function createBindingsFeature({
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
         deleteButton.className = "binding-action delete";
-        setActionIcon(deleteButton, "delete", "Delete binding");
+        setActionIcon(deleteButton, "delete", t("bindings.deleteBinding"));
         deleteButton.addEventListener("click", async () => {
           const confirmed = await confirmAction({
-            title: "Delete binding?",
-            message: `Delete binding "${binding.name || "Binding"}"?`,
-            confirmLabel: "Delete",
-            cancelLabel: "Cancel",
+            title: t("bindings.deleteBindingTitle"),
+            message: t("bindings.deleteBindingMessage", { name: binding.name || t("bindings.title") }),
+            confirmLabel: t("common.delete"),
+            cancelLabel: t("common.cancel"),
             confirmVariant: "danger",
           });
           if (!confirmed) {
@@ -1879,7 +1881,7 @@ export function createBindingsFeature({
           );
           pulse.classList.toggle("is-active", isStatefulButton && buttonFillActive(binding, isMuted));
           pulse.dataset.bindingId = binding.id;
-          pulse.title = isStatefulButton ? "Toggle binding" : "Trigger binding";
+          pulse.title = isStatefulButton ? t("bindings.toggleBinding") : t("bindings.triggerBinding");
           pulse.setAttribute("aria-label", pulse.title);
 
           const invokeButtonValue = async (value) => {
@@ -2020,7 +2022,7 @@ export function createBindingsFeature({
       } catch (err) {
         const errorItem = document.createElement("div");
         errorItem.className = "list-item binding-item error-binding";
-        errorItem.textContent = `Error: ${err.message || err}`;
+        errorItem.textContent = t("bindings.errorPrefix", { message: err.message || err });
         errorItem.style.color = "red";
         errorItem.style.padding = "10px";
 
@@ -2030,10 +2032,10 @@ export function createBindingsFeature({
         delBtn.onclick = async (e) => {
           e.stopPropagation();
           const confirmed = await confirmAction({
-            title: "Delete broken binding?",
-            message: "This binding could not be rendered correctly and will be removed.",
-            confirmLabel: "Delete",
-            cancelLabel: "Cancel",
+            title: t("bindings.deleteBrokenTitle"),
+            message: t("bindings.deleteBrokenMessage"),
+            confirmLabel: t("common.delete"),
+            cancelLabel: t("common.cancel"),
             confirmVariant: "danger",
           });
           if (!confirmed) {
@@ -2054,7 +2056,7 @@ export function createBindingsFeature({
     if (renderedCount === 0) {
       const empty = document.createElement("div");
       empty.className = "bindings-empty";
-      empty.textContent = "No bindings match your search.";
+      empty.textContent = t("bindings.noSearchResults");
       d.bindingsContainer.appendChild(empty);
     }
 
@@ -2428,6 +2430,11 @@ export function createBindingsFeature({
   window.addEventListener("resize", () => {
     bindingsScrollbarWidth = 0;
     queueBindingsScrollLayoutSync();
+  });
+  window.addEventListener("midimaster:locale-changed", () => {
+    renderBindings();
+    resetLearnPanelUi();
+    renderConfigModal();
   });
   queueBindingsScrollLayoutSync();
   updateAuxLearnUi();

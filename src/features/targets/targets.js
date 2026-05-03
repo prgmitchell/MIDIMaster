@@ -2,6 +2,7 @@ import { closeOpenDropdowns, renderLabelFromRawWithTags } from "../ui/dropdown_b
 
 export function createTargetsFeature({
   invoke,
+  i18n,
   dom,
   masterIconData,
   focusIconData,
@@ -26,6 +27,7 @@ export function createTargetsFeature({
   const targetKey = (typeof integrationTargetKey === "function") ? integrationTargetKey : (() => "");
   const resolveDisplay = (typeof resolveOsdTarget === "function") ? resolveOsdTarget : (() => null);
   const callInvoke = (typeof invoke === "function") ? invoke : null;
+  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
 
   let activeTargetPanelSelect = null;
   let activeTargetPanelBack = null;
@@ -140,28 +142,33 @@ export function createTargetsFeature({
 
   const INTEGRATION_META = {
     obs: {
-      description: "Control OBS scenes, sources, and recording actions.",
+      descriptionKey: "targets.integration.obsDescription",
     },
     hue: {
-      description: "Control lights, brightness, and color scenes.",
+      descriptionKey: "targets.integration.hueDescription",
     },
     wavelink: {
-      description: "Adjust channel levels and mute states.",
+      descriptionKey: "targets.integration.wavelinkDescription",
     },
   };
 
   const CATEGORY_META = {
-    all: { label: "All Targets", icon: "all" },
-    builtIn: { label: "Built-in", icon: "built-in" },
-    utilities: { label: "Utilities", icon: "utilities" },
-    integrations: { label: "Integrations", icon: "integrations" },
-    applications: { label: "Applications", icon: "applications" },
-    playback: { label: "Playback Devices", icon: "playback" },
-    recording: { label: "Recording Devices", icon: "recording" },
-    devices: { label: "Devices", icon: "devices" },
-    actions: { label: "Actions", icon: "actions" },
-    other: { label: "Other", icon: "other" },
+    all: { key: "targets.category.all", icon: "all" },
+    builtIn: { key: "targets.category.builtIn", icon: "built-in" },
+    utilities: { key: "targets.category.utilities", icon: "utilities" },
+    integrations: { key: "targets.category.integrations", icon: "integrations" },
+    applications: { key: "targets.category.applications", icon: "applications" },
+    playback: { key: "targets.category.playback", icon: "playback" },
+    recording: { key: "targets.category.recording", icon: "recording" },
+    devices: { key: "targets.category.devices", icon: "devices" },
+    actions: { key: "targets.category.actions", icon: "actions" },
+    other: { key: "targets.category.other", icon: "other" },
   };
+
+  function categoryLabel(id) {
+    const meta = CATEGORY_META[id] || CATEGORY_META.other;
+    return t(meta.key);
+  }
 
   function targetPanelParts() {
     const panel = d.targetPanel || null;
@@ -192,48 +199,48 @@ export function createTargetsFeature({
 
   function descriptionForOption(option, category) {
     if (option?.description) return String(option.description);
-    if (option?.kind === "master") return "Global master output for all bindings.";
-    if (option?.kind === "focus") return "Currently focused application or audio session.";
-    if (option?.kind === "media-control") return "Control playback actions from a button binding.";
-    if (option?.kind === "hotkey-target") return "Trigger a keyboard shortcut from a button binding.";
-    if (option?.kind === "open-application-target") return "Launch a selected application from a button binding.";
-    if (option?.kind === "session") return option.ghost ? "Saved application target is currently unavailable." : "Application audio session.";
+    if (option?.kind === "master") return t("targets.description.master");
+    if (option?.kind === "focus") return t("targets.description.focus");
+    if (option?.kind === "media-control") return t("targets.description.mediaControl");
+    if (option?.kind === "hotkey-target") return t("targets.description.hotkey");
+    if (option?.kind === "open-application-target") return t("targets.description.openApplication");
+    if (option?.kind === "session") return option.ghost ? t("targets.description.savedApplicationUnavailable") : t("targets.description.applicationSession");
     if (option?.kind === "device") {
-      if (option.ghost) return "Saved device target is currently unavailable.";
-      if (category === "playback") return "Playback output device.";
-      if (category === "recording") return "Recording input device.";
-      return "Audio device endpoint.";
+      if (option.ghost) return t("targets.description.savedDeviceUnavailable");
+      if (category === "playback") return t("targets.description.playbackDevice");
+      if (category === "recording") return t("targets.description.recordingDevice");
+      return t("targets.description.audioDevice");
     }
     if (option?.kind === "integration-root") {
       const meta = INTEGRATION_META[String(option.value || "").toLowerCase()];
-      return meta?.description || "Open integration targets.";
+      return meta?.descriptionKey ? t(meta.descriptionKey) : t("targets.description.openIntegrationTargets");
     }
     if (option?.kind === "integration-target") {
       const integration = option?.target?.Integration || option?.target?.integration;
       const integrationId = String(integration?.integration_id || option?.integrationId || option?.integration_id || "").toLowerCase();
       const targetKind = String(integration?.kind || "").toLowerCase();
       if (integrationId === "wavelink") {
-        if (targetKind === "mix") return "Wave Link mix output.";
-        if (targetKind === "channel") return "Wave Link channel.";
-        if (targetKind === "channel_mix") return "Wave Link channel in mix.";
-        return "Wave Link target.";
+        if (targetKind === "mix") return t("targets.description.wavelinkMix");
+        if (targetKind === "channel") return t("targets.description.wavelinkChannel");
+        if (targetKind === "channel_mix") return t("targets.description.wavelinkChannelMix");
+        return t("targets.description.wavelinkTarget");
       }
       if (integrationId === "obs") {
-        if (targetKind === "input") return "OBS audio input.";
-        if (targetKind === "scene") return "OBS scene.";
-        if (targetKind === "source") return "OBS scene source.";
-        if (targetKind === "action") return "OBS action.";
+        if (targetKind === "input") return t("targets.description.obsInput");
+        if (targetKind === "scene") return t("targets.description.obsScene");
+        if (targetKind === "source") return t("targets.description.obsSource");
+        if (targetKind === "action") return t("targets.description.obsAction");
       }
       if (integrationId === "hue") {
-        if (targetKind === "group") return "Hue room or group.";
-        if (targetKind === "light") return "Hue light.";
+        if (targetKind === "group") return t("targets.description.hueGroup");
+        if (targetKind === "light") return t("targets.description.hueLight");
       }
       return "";
     }
-    if (option?.kind === "integration-nav") return "Open this integration group.";
+    if (option?.kind === "integration-nav") return t("targets.description.integrationGroup");
     if (option?.kind === "action") return "";
     if (option?.kind === "placeholder") return "";
-    return CATEGORY_META[category]?.label || "";
+    return categoryLabel(category);
   }
 
   function tagsForOption(option, category) {
@@ -244,7 +251,7 @@ export function createTargetsFeature({
         tags.push(text);
       }
     };
-    if (option?.ghost && !option?.suppressUnavailableTag) add("Unavailable");
+    if (option?.ghost && !option?.suppressUnavailableTag) add(t("targets.unavailable"));
 
     if (option?.kind !== "integration-root") {
       (option?.tags || []).forEach(add);
@@ -277,7 +284,7 @@ export function createTargetsFeature({
       const next = {
         ...option,
         category,
-        categoryLabel: meta.label,
+        categoryLabel: categoryLabel(category),
       };
       if (!next.description) {
         next.description = descriptionForOption(next, category);
@@ -335,7 +342,7 @@ export function createTargetsFeature({
     }
   }
 
-  function openTargetPanel(options, selectedValue, selectedKind, onSelect, title = "Select Target", nav = null) {
+  function openTargetPanel(options, selectedValue, selectedKind, onSelect, title = "", nav = null) {
     if (!d.targetPanel || !d.targetPanelList) {
       return;
     }
@@ -372,7 +379,7 @@ export function createTargetsFeature({
       searchInput.value = "";
     }
     if (d.targetPanelTitle) {
-      d.targetPanelTitle.textContent = title;
+      d.targetPanelTitle.textContent = title || t("targets.selectTarget");
     }
 
     const renderOption = (option) => {
@@ -424,7 +431,7 @@ export function createTargetsFeature({
 
         const badge = document.createElement("span");
         badge.className = "target-card-kind-badge";
-        badge.textContent = "Integration";
+        badge.textContent = t("targets.integration");
         navMeta.appendChild(badge);
 
         const arrow = document.createElement("span");
@@ -475,7 +482,7 @@ export function createTargetsFeature({
       if (filtered.length === 0) {
         const empty = document.createElement("div");
         empty.className = "target-panel-empty";
-        empty.textContent = query ? "No targets match your search." : "No targets available.";
+        empty.textContent = query ? t("targets.noMatches") : t("targets.noneAvailable");
         d.targetPanelList.appendChild(empty);
         return;
       }
@@ -533,7 +540,7 @@ export function createTargetsFeature({
 
         const label = document.createElement("span");
         label.className = "target-category-label";
-        label.textContent = meta.label;
+        label.textContent = categoryLabel(id);
         button.appendChild(label);
 
         const countEl = document.createElement("span");
@@ -613,13 +620,13 @@ export function createTargetsFeature({
     const options = [
       {
         value: "master",
-        label: "Master",
+        label: t("targets.master"),
         icon_data: masterIconData,
         kind: "master",
       },
       {
         value: "focus",
-        label: "Focus",
+        label: t("targets.focus"),
         icon_data: focusIconData,
         kind: "focus",
       },
@@ -628,19 +635,19 @@ export function createTargetsFeature({
     if (isButton) {
       options.push({
         value: "media-control",
-        label: "Media Controls",
+        label: t("targets.mediaControls"),
         icon_data: mediaPlayPauseIconData,
         kind: "media-control",
       });
       options.push({
         value: "hotkey-target",
-        label: "Hotkey",
+        label: t("targets.hotkey"),
         icon_data: HOTKEY_ICON_DATA,
         kind: "hotkey-target",
       });
       options.push({
         value: "open-application-target",
-        label: "Open Application",
+        label: t("targets.openApplication"),
         icon_data: OPEN_APPLICATION_TARGET_ICON_DATA,
         kind: "open-application-target",
       });
@@ -649,7 +656,7 @@ export function createTargetsFeature({
     if (pluginHost) {
       const integrations = pluginHost.getIntegrations();
       if (Array.isArray(integrations) && integrations.length > 0) {
-        options.push({ kind: "divider", label: "Integrations" });
+        options.push({ kind: "divider", label: t("targets.category.integrations") });
         for (const integ of integrations) {
           if (!integ || !integ.id) continue;
           options.push({
@@ -665,7 +672,7 @@ export function createTargetsFeature({
     const seen = new Set();
     const sessionsAdded = sessions.filter((session) => !session.is_master && session.id !== "master");
     if (sessionsAdded.length > 0) {
-      options.push({ kind: "divider", label: "Applications" });
+      options.push({ kind: "divider", label: t("targets.category.applications") });
       sessionsAdded.forEach((session) => {
         const key = normalizeKey(session);
         if (!key) return;
@@ -687,13 +694,13 @@ export function createTargetsFeature({
 
     if (selectedAppName && !seen.has(selectedAppKey)) {
       if (sessionsAdded.length === 0) {
-        options.push({ kind: "divider", label: "Applications" });
+        options.push({ kind: "divider", label: t("targets.category.applications") });
       }
       const label = selectedAppDisplayName
         || (selectedAppName.charAt(0).toUpperCase() + selectedAppName.slice(1));
       options.push({
         value: selectedAppKey,
-        label: `${label} (Unavailable)`,
+        label: t("targets.unavailableName", { name: label }),
         display_name: label,
         icon_data: selectedAppIconData,
         kind: "session",
@@ -702,7 +709,7 @@ export function createTargetsFeature({
     }
 
     if (playbackDevices.length > 0) {
-      options.push({ kind: "divider", label: "Playback Devices" });
+      options.push({ kind: "divider", label: t("targets.category.playback") });
       playbackDevices.forEach((device) => {
         options.push({
           value: `playback:${device.id}`,
@@ -714,7 +721,7 @@ export function createTargetsFeature({
     }
 
     if (recordingDevices.length > 0) {
-      options.push({ kind: "divider", label: "Recording Devices" });
+      options.push({ kind: "divider", label: t("targets.category.recording") });
       recordingDevices.forEach((device) => {
         options.push({
           value: `recording:${device.id}`,
@@ -729,11 +736,11 @@ export function createTargetsFeature({
       const found = options.some((opt) => opt.value === selectedDeviceId);
       if (!found) {
         if (playbackDevices.length === 0 && recordingDevices.length === 0) {
-          options.push({ kind: "divider", label: "Devices" });
+          options.push({ kind: "divider", label: t("targets.category.devices") });
         }
         options.push({
           value: selectedDeviceId,
-          label: "Device (Unavailable)",
+          label: t("targets.unavailableName", { name: t("targets.category.devices") }),
           kind: "device",
           ghost: true,
         });
@@ -742,7 +749,7 @@ export function createTargetsFeature({
 
     let activeIntegrationOption = null;
     if (selectedKind === "integration-target" && selectedValue) {
-      let label = "Integration Target";
+      let label = t("targets.integrationTarget");
       let ghost = false;
       let icon_data = null;
       if (integration) {
@@ -756,7 +763,7 @@ export function createTargetsFeature({
           } catch { }
         }
 
-        if (!icon_data || label === "Integration Target") {
+        if (!icon_data || label === t("targets.integrationTarget")) {
           try {
             const fallback = resolveDisplay({ Integration: integration });
             if (fallback?.label) label = fallback.label;
@@ -768,8 +775,8 @@ export function createTargetsFeature({
           ghost = true;
         }
 
-        if (ghost && label && typeof label === "string" && !label.includes("Unavailable")) {
-          label = `${label} (Unavailable)`;
+        if (ghost && label && typeof label === "string" && !label.includes(t("targets.unavailable"))) {
+          label = t("targets.unavailableName", { name: label });
         }
       }
       activeIntegrationOption = {
@@ -855,7 +862,7 @@ export function createTargetsFeature({
     const { options, selectedValue, selectedKind, activeIntegrationOption } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
     const placeholderOption = {
       value: "",
-      label: "Select an application or device",
+      label: t("targets.selectApplicationOrDevice"),
       icon_data: null,
       kind: "placeholder",
     };
@@ -887,18 +894,18 @@ export function createTargetsFeature({
           if (match?.label) return match.label;
         }
       }
-      if (action === "MediaPlayPause") return "Media Play/Pause";
-      if (action === "MediaNextTrack") return "Media Next Track";
-      if (action === "MediaPrevTrack") return "Media Previous Track";
-      if (action === "MediaStop") return "Media Stop";
-      if (action === "Hotkey") return "Hotkey";
-      if (action === "ToggleMute") return "Toggle Mute";
-      if (action === "SetDefaultDevice") return "Set Default";
-      if (action === "OpenApplication") return "Open Application";
+      if (action === "MediaPlayPause") return t("targets.action.mediaPlayPause");
+      if (action === "MediaNextTrack") return t("targets.action.mediaNextTrack");
+      if (action === "MediaPrevTrack") return t("targets.action.mediaPrevTrack");
+      if (action === "MediaStop") return t("targets.action.mediaStop");
+      if (action === "Hotkey") return t("targets.hotkey");
+      if (action === "ToggleMute") return t("targets.action.toggleMute");
+      if (action === "SetDefaultDevice") return t("targets.action.setDefault");
+      if (action === "OpenApplication") return t("targets.openApplication");
       if (action === "Volume" && isBindingButton) {
         const targetKind = String(integ?.kind || "").toLowerCase();
         if (targetKind === "action" || targetKind === "scene") return "";
-        return "Trigger";
+        return t("targets.action.trigger");
       }
       return action;
     };
@@ -908,12 +915,12 @@ export function createTargetsFeature({
       const cached = targetDisplayCache.get(key);
       if (target === "Hotkey") {
         return {
-          label: hotkeyDisplay ? `Hotkey (${hotkeyDisplay})` : "Hotkey (Not Set)",
+          label: hotkeyDisplay ? t("targets.hotkeyWithValue", { value: hotkeyDisplay }) : t("targets.hotkeyNotSet"),
           icon_data: cached?.icon_data ?? HOTKEY_ICON_DATA,
         };
       }
       if (target === "OpenApplication") {
-        const openAppLabel = friendlyAppName(selectedOpenApplication?.display || selectedOpenApplication?.path || "") || "Open Application";
+        const openAppLabel = friendlyAppName(selectedOpenApplication?.display || selectedOpenApplication?.path || "") || t("targets.openApplication");
         return {
           label: openAppLabel,
           icon_data: selectedOpenApplication?.icon_data
@@ -935,7 +942,7 @@ export function createTargetsFeature({
       const displayOption = cachedDisplayForTarget(target);
       const chip = document.createElement("span");
       chip.className = "target-chip";
-      if (/\(\s*Unavailable\s*\)\s*$/i.test(String(displayOption?.label || ""))) {
+      if (/\(\s*Unavailable\s*\)\s*$/i.test(String(displayOption?.label || "")) || String(displayOption?.label || "").includes(t("targets.unavailable"))) {
         chip.classList.add("unavailable");
       }
       chip.dataset.index = String(index);
@@ -960,8 +967,8 @@ export function createTargetsFeature({
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "target-chip-remove";
-      remove.title = "Remove target";
-      remove.setAttribute("aria-label", "Remove target");
+      remove.title = t("targets.removeTarget");
+      remove.setAttribute("aria-label", t("targets.removeTarget"));
       remove.textContent = "×";
       remove.addEventListener("click", (event) => {
         event.preventDefault();
@@ -1111,7 +1118,7 @@ export function createTargetsFeature({
       const cachedLabel = String(option?.label || "").trim();
       if (cachedLabel || option?.icon_data) {
         targetDisplayCache.set(key, {
-          label: cachedLabel || "Target",
+          label: cachedLabel || t("common.target"),
           icon_data: option?.icon_data ?? null,
         });
       }
@@ -1150,10 +1157,10 @@ export function createTargetsFeature({
       const buildButtonActionOptions = (targetOption) => {
         if (targetOption?.kind === "media-control") {
           return [
-            { label: "Media Play/Pause", value: "MediaPlayPause", kind: "action", icon_data: mediaPlayPauseIconData },
-            { label: "Media Next Track", value: "MediaNextTrack", kind: "action", icon_data: mediaNextTrackIconData },
-            { label: "Media Previous Track", value: "MediaPrevTrack", kind: "action", icon_data: mediaPrevTrackIconData },
-            { label: "Media Stop", value: "MediaStop", kind: "action", icon_data: mediaStopIconData },
+            { label: t("targets.action.mediaPlayPause"), value: "MediaPlayPause", kind: "action", icon_data: mediaPlayPauseIconData },
+            { label: t("targets.action.mediaNextTrack"), value: "MediaNextTrack", kind: "action", icon_data: mediaNextTrackIconData },
+            { label: t("targets.action.mediaPrevTrack"), value: "MediaPrevTrack", kind: "action", icon_data: mediaPrevTrackIconData },
+            { label: t("targets.action.mediaStop"), value: "MediaStop", kind: "action", icon_data: mediaStopIconData },
           ];
         }
         if (
@@ -1163,7 +1170,7 @@ export function createTargetsFeature({
           || targetOption?.kind === "application"
         ) {
           return [{
-            label: "Toggle Mute",
+            label: t("targets.action.toggleMute"),
             value: "ToggleMute",
             kind: "action",
             icon_data: TOGGLE_MUTE_ICON_DATA,
@@ -1172,13 +1179,13 @@ export function createTargetsFeature({
         if (targetOption?.kind === "device") {
           return [
             {
-              label: "Toggle Mute",
+              label: t("targets.action.toggleMute"),
               value: "ToggleMute",
               kind: "action",
               icon_data: TOGGLE_MUTE_ICON_DATA,
             },
             {
-              label: "Set Default Device",
+              label: t("targets.action.setDefaultDevice"),
               value: "SetDefaultDevice",
               kind: "action",
               icon_data: SET_DEFAULT_DEVICE_ICON_DATA,
@@ -1189,7 +1196,7 @@ export function createTargetsFeature({
         // Check per-target buttonActions first (set by plugins in getTargetOptions)
         if (Array.isArray(targetOption?.buttonActions) && targetOption.buttonActions.length > 0) {
           return targetOption.buttonActions.map((a) => ({
-            label: a.label || a.value || "Action",
+            label: a.label || a.value || t("targets.category.actions"),
             value: a.value || "Volume",
             kind: "action",
             icon_data: a.icon_data || targetOption.icon_data || null,
@@ -1204,7 +1211,7 @@ export function createTargetsFeature({
           const handler = pluginHost?.getIntegration(integ.integration_id);
           if (Array.isArray(handler?.buttonActions) && handler.buttonActions.length > 0) {
             return handler.buttonActions.map((a) => ({
-              label: a.label || a.value || "Action",
+              label: a.label || a.value || t("targets.category.actions"),
               value: a.value || "Volume",
               kind: "action",
               icon_data: a.icon_data || targetOption.icon_data || null,
@@ -1215,8 +1222,8 @@ export function createTargetsFeature({
 
         // Default fallback for integrations without declared actions
         return [
-          { label: "Trigger", value: "Volume", kind: "action" },
-          { label: "Toggle Mute", value: "ToggleMute", kind: "action" },
+          { label: t("targets.action.trigger"), value: "Volume", kind: "action" },
+          { label: t("targets.action.toggleMute"), value: "ToggleMute", kind: "action" },
         ];
       };
 
@@ -1238,7 +1245,7 @@ export function createTargetsFeature({
                   if (!openApplication) return;
                   selectOption(targetOption, {
                     value: "OpenApplication",
-                    label: "Open Application",
+                    label: t("targets.openApplication"),
                     openApplication,
                   });
                   closeTargetPanel();
@@ -1254,7 +1261,7 @@ export function createTargetsFeature({
             selectOption(targetOption);
             return true;
           },
-          "Select Targets",
+          t("targets.selectTargets"),
         );
       };
 
@@ -1267,7 +1274,7 @@ export function createTargetsFeature({
         setTimeout(() => {
           openTargetPanel(actionOptions, selectedAction, "action", (actionOption) => {
             selectOption(targetOption, actionOption);
-          }, "Select Action");
+          }, t("targets.selectAction"));
         }, 10);
         return false;
       };
@@ -1301,8 +1308,8 @@ export function createTargetsFeature({
           } catch { }
           sub = [{
             label: isDisconnected
-              ? "Not connected. Connect this integration in Plugins to load targets."
-              : "No compatible targets found for this control.",
+              ? t("targets.integrationNotConnected")
+              : t("targets.noCompatibleTargets"),
             value: "",
             kind: "placeholder",
             ghost: true,
@@ -1318,7 +1325,7 @@ export function createTargetsFeature({
           .map((o) => {
             if (o.nav) {
               return {
-                label: o.label || "Open",
+                label: o.label || t("common.open"),
                 icon_data: o.icon_data || handler?.icon_data || null,
                 kind: "integration-nav",
                 value: JSON.stringify(o.nav),
@@ -1330,7 +1337,7 @@ export function createTargetsFeature({
               };
             }
             const mapped = {
-              label: o.label || "Integration Target",
+              label: o.label || t("targets.integrationTarget"),
               icon_data: o.icon_data || handler?.icon_data || null,
               kind: o.kind || "integration-target",
               value: targetKey((o.target?.Integration || o.target?.integration) || {}),
@@ -1366,7 +1373,7 @@ export function createTargetsFeature({
             selectOption(opt);
             return true;
           },
-          handler?.name ? `Select ${handler.name} Target` : "Select Integration Target",
+          handler?.name ? t("targets.selectNamedTarget", { name: handler.name }) : t("targets.selectIntegrationTarget"),
           {
             integrationId,
             refresh: () => showIntegrationSubmenu(integrationId, navStack, navState).catch(() => { }),

@@ -11,6 +11,7 @@ export function createSettingsFeature({
   invoke,
   listen,
   dom,
+  i18n,
   getOsdSettings,
   setOsdSettings,
   getMonitorOptions,
@@ -23,6 +24,12 @@ export function createSettingsFeature({
     throw new Error("createSettingsFeature: invoke is required");
   }
   const d = (dom && typeof dom === "object") ? dom : {};
+  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
+  const applyTranslations = () => {
+    if (i18n && typeof i18n.applyTranslations === "function") {
+      i18n.applyTranslations(d.settingsPanel || document);
+    }
+  };
   let monitorDropdownEl = null;
   let monitorMenuEl = null;
   let monitorDisplayEl = null;
@@ -40,6 +47,9 @@ export function createSettingsFeature({
     scale: 1,
   };
   const osdStyles = new Set(["midnight", "glass", "neon", "studio"]);
+  const languageOptions = Array.isArray(i18n?.supportedLocales) ? i18n.supportedLocales : [
+    { code: "en", label: "English" },
+  ];
   const updateState = {
     currentVersion: "-",
     latestVersion: "-",
@@ -169,17 +179,17 @@ export function createSettingsFeature({
   }
 
   function formatUpdaterError(error) {
-    const message = String(error || "Update check failed.");
+    const message = String(error || t("settings.updateCheckFailed"));
     const normalized = message.toLowerCase();
     if (
       normalized.includes("valid release json")
       || normalized.includes("latest.json")
       || normalized.includes("404")
     ) {
-      return "Updater metadata is missing from the update server for this release. A store deploy may have overwritten it. Use GitHub Releases for manual install.";
+      return t("settings.updateMetadataMissing");
     }
     if (normalized.includes("network") || normalized.includes("timeout")) {
-      return "Unable to reach update server right now. Try again in a moment.";
+      return t("settings.updateNetworkError");
     }
     return message;
   }
@@ -202,13 +212,13 @@ export function createSettingsFeature({
     }
     if (d.checkForUpdatesButton) {
       if (updateState.downloading) {
-        setTextContent(d.checkForUpdatesButton, "Downloading...", ".settings-button-label");
+        setTextContent(d.checkForUpdatesButton, t("settings.downloadingUpdate"), ".settings-button-label");
       } else if (updateState.checking) {
-        setTextContent(d.checkForUpdatesButton, "Checking...", ".settings-button-label");
+        setTextContent(d.checkForUpdatesButton, t("settings.checkingUpdates"), ".settings-button-label");
       } else if (updateState.available) {
-        setTextContent(d.checkForUpdatesButton, "Download and install", ".settings-button-label");
+        setTextContent(d.checkForUpdatesButton, t("settings.downloadAndInstall"), ".settings-button-label");
       } else {
-        setTextContent(d.checkForUpdatesButton, "Check for updates", ".settings-button-label");
+        setTextContent(d.checkForUpdatesButton, t("settings.checkForUpdates"), ".settings-button-label");
       }
       d.checkForUpdatesButton.disabled = updateState.checking || updateState.downloading;
     }
@@ -219,10 +229,9 @@ export function createSettingsFeature({
       d.topbarUpdateButton.closest(".topbar")?.classList.toggle("has-update", showTopbarUpdate);
       d.topbarUpdateButton.disabled = updateState.checking || updateState.downloading;
       d.topbarUpdateButton.setAttribute("aria-hidden", showTopbarUpdate ? "false" : "true");
-      const versionSuffix = updateState.latestVersion && updateState.latestVersion !== "-"
-        ? `: ${updateState.latestVersion}`
-        : "";
-      const label = `Update available${versionSuffix}`;
+      const label = updateState.latestVersion && updateState.latestVersion !== "-"
+        ? t("topbar.updateAvailableVersion", { version: updateState.latestVersion })
+        : t("topbar.updateAvailable");
       d.topbarUpdateButton.setAttribute("aria-label", label);
       d.topbarUpdateButton.setAttribute("title", label);
       d.topbarUpdateButton.title = label;
@@ -244,7 +253,7 @@ export function createSettingsFeature({
     updateState.checking = true;
     renderUpdateUi();
     if (!silent) {
-      setUpdateStatus("Checking for updates...");
+      setUpdateStatus(t("settings.checkingUpdates"));
     }
     try {
       const updateInfo = await invoke("check_for_updates");
@@ -254,10 +263,14 @@ export function createSettingsFeature({
       updateState.available = normalized.available;
       updateState.body = normalized.body;
       if (normalized.available) {
-        const suffix = normalized.body ? " (release notes available)" : "";
-        setUpdateStatus(`Update available: ${normalized.latestVersion}${suffix}`, "success");
+        setUpdateStatus(
+          normalized.body
+            ? t("settings.updateAvailableNotes", { version: normalized.latestVersion })
+            : t("settings.updateAvailable", { version: normalized.latestVersion }),
+          "success",
+        );
       } else {
-        setUpdateStatus("You are up to date.", "success");
+        setUpdateStatus(t("settings.upToDate"), "success");
       }
       return normalized;
     } catch (error) {
@@ -277,14 +290,14 @@ export function createSettingsFeature({
   async function installAvailableUpdate() {
     updateState.downloading = true;
     renderUpdateUi();
-    setUpdateStatus("Downloading update...");
+    setUpdateStatus(t("settings.downloadingUpdate"));
     try {
       await invoke("download_and_install_update");
     } catch (error) {
       updateState.available = false;
       updateState.body = "";
       console.error("Updater install failed:", error);
-      setUpdateStatus(String(error || "Update install failed."), "error");
+      setUpdateStatus(String(error || t("settings.updateInstallFailed")), "error");
     } finally {
       updateState.downloading = false;
       renderUpdateUi();
@@ -304,30 +317,30 @@ export function createSettingsFeature({
       }
       if (phase === "checking") {
         updateState.checking = true;
-        setUpdateStatus("Checking for updates...");
+        setUpdateStatus(t("settings.checkingUpdates"));
       } else if (phase === "available") {
         updateState.available = true;
-        setUpdateStatus(`Update available: ${updateState.latestVersion}`, "success");
+        setUpdateStatus(t("settings.updateAvailable", { version: updateState.latestVersion }), "success");
       } else if (phase === "no_update") {
         updateState.available = false;
         updateState.body = "";
-        setUpdateStatus("You are up to date.", "success");
+        setUpdateStatus(t("settings.upToDate"), "success");
       } else if (phase === "downloading") {
         updateState.downloading = true;
         const downloaded = Number(payload.downloaded || 0);
         const total = Number(payload.content_length || 0);
         if (total > 0) {
           const pct = Math.min(100, Math.round((downloaded / total) * 100));
-          setUpdateStatus(`Downloading update... ${pct}%`);
+          setUpdateStatus(t("settings.downloadingUpdatePercent", { percent: pct }));
         } else {
-          setUpdateStatus("Downloading update...");
+          setUpdateStatus(t("settings.downloadingUpdate"));
         }
       } else if (phase === "downloaded") {
-        setUpdateStatus("Update downloaded. Installing...");
+        setUpdateStatus(t("settings.updateDownloadedInstalling"));
       } else if (phase === "installed") {
         updateState.available = false;
         updateState.body = "";
-        setUpdateStatus("Update installed. Restarting app...", "success");
+        setUpdateStatus(t("settings.updateInstalledRestarting"), "success");
       } else if (phase === "failed") {
         updateState.available = false;
         updateState.checking = false;
@@ -335,7 +348,7 @@ export function createSettingsFeature({
         if (payload.message) {
           console.error("Updater event failure:", payload.message);
         }
-        setUpdateStatus(formatUpdaterError(payload.message || "Update failed."), "error");
+        setUpdateStatus(formatUpdaterError(payload.message || t("settings.updateInstallFailed")), "error");
       }
       if (phase === "available" || phase === "no_update" || phase === "installed") {
         updateState.checking = false;
@@ -578,14 +591,14 @@ export function createSettingsFeature({
 
   function renderSettingsSelectDropdown(selectEl) {
     if (!selectEl) return;
-    const entry = ensureSettingsSelectDropdown(selectEl, { title: selectEl.title || selectEl.id || "Select" });
+    const entry = ensureSettingsSelectDropdown(selectEl, { title: selectEl.title || selectEl.id || t("common.select") });
     if (!entry) return;
     selectEl.classList.add("hidden");
     selectEl.parentElement?.classList.add("has-custom-select");
     renderNativeSelectDropdown({
       entry,
       selectEl,
-      fallbackText: "Select",
+      fallbackText: t("common.select"),
       closeDropdowns: () => closeOpenDropdowns({ except: null }),
       formatOptionText: (opt) => opt.textContent || "",
       getOptionBadges: () => [],
@@ -595,6 +608,9 @@ export function createSettingsFeature({
   }
 
   function renderAllSettingsSelectDropdowns() {
+    if (d.languageSelect) {
+      renderSettingsSelectDropdown(d.languageSelect);
+    }
   }
 
   function scheduleSettingsControlSync() {
@@ -612,8 +628,8 @@ export function createSettingsFeature({
   function renderMonitorDisplay(option) {
     if (!monitorDisplayEl) return;
     renderLabelWithBadges(monitorDisplayEl, {
-      text: option?.label || "Monitor",
-      badges: option?.isPrimary ? [{ text: "MAIN", kind: "neutral" }] : [],
+      text: option?.label || t("settings.monitor"),
+      badges: option?.isPrimary ? [{ text: t("settings.primaryBadge"), kind: "neutral" }] : [],
       truncate: true,
     });
   }
@@ -628,7 +644,7 @@ export function createSettingsFeature({
     const entry = createSelectDropdownShell({
       selectEl: d.osdMonitorSelect,
       rootClass: "settings-monitor-dropdown",
-      title: "Monitor",
+      title: t("settings.monitor"),
     });
     if (!entry) return;
     monitorDropdownEl = entry.root;
@@ -652,16 +668,16 @@ export function createSettingsFeature({
     renderNativeSelectDropdown({
       entry: { root: monitorDropdownEl, menu: monitorMenuEl, display: monitorDisplayEl },
       selectEl: d.osdMonitorSelect,
-      fallbackText: "Monitor",
+      fallbackText: t("settings.monitor"),
       closeDropdowns: closeMonitorDropdown,
       formatOptionText: (opt) => opt.textContent || "",
       getOptionBadges: (opt) => (opt.dataset.isPrimary === "true"
-        ? [{ text: "MAIN", kind: "neutral" }]
+        ? [{ text: t("settings.primaryBadge"), kind: "neutral" }]
         : []),
       onOptionSelected: (opt) => {
         renderMonitorDisplay({
           value: String(opt.value || "0"),
-          label: opt.textContent || "Monitor",
+          label: opt.textContent || t("settings.monitor"),
           isPrimary: opt.dataset.isPrimary === "true",
         });
       },
@@ -670,7 +686,7 @@ export function createSettingsFeature({
     });
 
     if (list.length === 0) {
-      renderMonitorDisplay({ value: "0", label: "Monitor", isPrimary: true });
+      renderMonitorDisplay({ value: "0", label: t("settings.monitor"), isPrimary: true });
     }
   }
 
@@ -703,7 +719,7 @@ export function createSettingsFeature({
       if (next.length === 0) {
         const option = document.createElement("option");
         option.value = "0";
-        option.textContent = "Primary monitor";
+        option.textContent = t("settings.primaryMonitor");
         d.osdMonitorSelect.appendChild(option);
         d.osdMonitorSelect.value = "0";
       } else {
@@ -744,6 +760,10 @@ export function createSettingsFeature({
     if (d.exitToTraySelect) {
       d.exitToTraySelect.checked = Boolean(merged.exitToTray);
     }
+    if (d.languageSelect) {
+      d.languageSelect.value = normalizeLanguage(merged.language);
+      renderSettingsSelectDropdown(d.languageSelect);
+    }
     renderAutoCheckButton();
   }
 
@@ -755,8 +775,24 @@ export function createSettingsFeature({
       minimizeToTray: Boolean(s.minimizeToTray),
       exitToTray: Boolean(s.exitToTray),
       autoCheckUpdates: s.autoCheckUpdates !== false,
+      language: normalizeLanguage(s.language),
     }).catch((error) => {
       console.error("Failed to update app settings", error);
+    });
+  }
+
+  function normalizeLanguage(language) {
+    const value = String(language || "en").trim();
+    return languageOptions.some((option) => option.code === value) ? value : "en";
+  }
+
+  function populateLanguageSelect() {
+    if (!d.languageSelect || d.languageSelect.options.length > 0) return;
+    languageOptions.forEach((language) => {
+      const option = document.createElement("option");
+      option.value = language.code;
+      option.textContent = language.label;
+      d.languageSelect.appendChild(option);
     });
   }
 
@@ -770,10 +806,15 @@ export function createSettingsFeature({
           minimizeToTray: Boolean(settings.minimize_to_tray ?? settings.minimizeToTray),
           exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
           autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
+          language: normalizeLanguage(settings.language ?? settings.languageCode ?? "en"),
         };
         if (typeof setAppSettings === "function") {
           setAppSettings(next);
         }
+        await i18n?.setLocale?.(next.language).catch((error) => {
+          console.error("Failed to apply language setting", error);
+        });
+        applyTranslations();
       }
     } catch (error) {
       console.error("Failed to load app settings", error);
@@ -782,6 +823,7 @@ export function createSettingsFeature({
 
   function bindUi() {
     bindUpdaterEvents().catch(() => {});
+    populateLanguageSelect();
     if (d.settingsPanel) {
       activateSettingsSection(defaultSettingsSection);
       window.addEventListener("resize", () => {
@@ -930,6 +972,18 @@ export function createSettingsFeature({
         persistAppSettings();
       });
     }
+    if (d.languageSelect) {
+      d.languageSelect.addEventListener("change", async () => {
+        const language = normalizeLanguage(d.languageSelect.value);
+        syncAppSettingsUI({ language });
+        await i18n?.setLocale?.(language).catch((error) => {
+          console.error("Failed to apply language setting", error);
+        });
+        applyTranslations();
+        renderUpdateUi();
+        persistAppSettings();
+      });
+    }
     if (d.autoCheckUpdatesButton) {
       d.autoCheckUpdatesButton.addEventListener("change", () => {
         syncAppSettingsUI({ autoCheckUpdates: d.autoCheckUpdatesButton.checked });
@@ -959,7 +1013,14 @@ export function createSettingsFeature({
       });
     }
 
-    setUpdateStatus("No update check yet.");
+    window.addEventListener("midimaster:locale-changed", () => {
+      applyTranslations();
+      renderAllSettingsSelectDropdowns();
+      renderMonitorDropdownOptions((typeof getMonitorOptions === "function") ? (getMonitorOptions() || []) : []);
+      renderUpdateUi();
+    });
+
+    setUpdateStatus(t("settings.noUpdateCheckYet"));
     renderUpdateUi();
     renderAllSettingsSelectDropdowns();
     scheduleSettingsControlSync();

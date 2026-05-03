@@ -401,6 +401,28 @@
   border-bottom: 1px solid color-mix(in srgb, var(--control-border) 48%, transparent);
 }
 
+.settings-language-row {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+}
+
+.settings-language-row .settings-select-dropdown {
+  width: 100%;
+  min-width: 180px;
+}
+
+.settings-language-row .settings-select-dropdown .target-button {
+  width: 100%;
+  min-height: 40px;
+  justify-content: space-between;
+}
+
+.settings-language-row .settings-select-dropdown .target-menu {
+  min-width: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
 .settings-startup-row:last-child {
   border-bottom: 0;
 }
@@ -1192,17 +1214,33 @@ body[data-theme="light"] .settings-osd-preview-stand {
 }
 
 .settings-maintenance-button {
-  width: auto;
-  min-width: 164px;
-  flex: 0 0 164px;
+  width: 240px;
+  min-width: 240px;
+  flex: 0 0 240px;
   min-height: 40px;
   padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   white-space: nowrap;
+}
+
+.settings-maintenance-section .settings-maintenance-button {
+  width: 240px;
+  max-width: 240px;
+  display: inline-flex;
 }
 
 .settings-maintenance-button .settings-button-icon {
   width: 18px;
   height: 18px;
+}
+
+.settings-maintenance-button .settings-button-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .settings-maintenance-card--danger .settings-maintenance-icon {
@@ -1212,7 +1250,7 @@ body[data-theme="light"] .settings-osd-preview-stand {
 }
 
 .settings-maintenance-button--danger {
-  min-width: 164px;
+  min-width: 240px;
 }
 
 body[data-theme] .settings-maintenance-button--danger:hover,
@@ -1279,9 +1317,9 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  min-height: 64px;
-  margin: 12px 16px;
-  padding: 12px 14px;
+  min-height: 56px;
+  margin: 10px 16px 12px;
+  padding: 9px 14px;
   border: 1px solid color-mix(in srgb, var(--control-border) 58%, transparent);
   border-radius: 5px;
   background:
@@ -1305,13 +1343,20 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
   align-items: center;
   gap: 5px;
   min-height: 28px;
-  padding: 0 9px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-raised) 76%, transparent);
-  border: 1px solid color-mix(in srgb, var(--control-border) 50%, transparent);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
 }
 
 .settings-update-versions strong {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-raised) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--control-border) 50%, transparent);
   color: var(--text-primary);
   font-weight: 800;
 }
@@ -1365,7 +1410,7 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 
 .settings-update-card > .settings-action {
   width: calc(100% - 32px);
-  margin: 0 16px 16px;
+  margin: 0 16px 20px;
 }
 
 .settings-mini-toggle {
@@ -1457,7 +1502,13 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 
   .settings-maintenance-button {
     width: 100%;
+    max-width: none;
     flex-basis: auto;
+  }
+
+  .settings-maintenance-section .settings-maintenance-button {
+    width: 100%;
+    max-width: none;
   }
 
   .settings-field-row {
