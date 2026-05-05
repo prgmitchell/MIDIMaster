@@ -98,6 +98,10 @@ pub enum BindingAction {
     ToggleMute,
     SetDefaultDevice,
     OpenApplication,
+    FocusWindow,
+    FullScreenshot,
+    SnipScreenshot,
+    ToggleScreenRecording,
     MediaPlayPause,
     MediaNextTrack,
     MediaPrevTrack,
@@ -173,6 +177,7 @@ pub enum BindingTarget {
         data: serde_json::Value,
     },
     MediaControl,
+    CaptureControl,
     Hotkey,
     OpenApplication,
     Unset,
@@ -184,6 +189,7 @@ impl PartialEq for BindingTarget {
             (BindingTarget::Master, BindingTarget::Master)
             | (BindingTarget::Focus, BindingTarget::Focus)
             | (BindingTarget::MediaControl, BindingTarget::MediaControl)
+            | (BindingTarget::CaptureControl, BindingTarget::CaptureControl)
             | (BindingTarget::Hotkey, BindingTarget::Hotkey)
             | (BindingTarget::OpenApplication, BindingTarget::OpenApplication)
             | (BindingTarget::Unset, BindingTarget::Unset) => true,
@@ -243,6 +249,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
             "Master" => Ok(BindingTarget::Master),
             "Focus" => Ok(BindingTarget::Focus),
             "MediaControl" => Ok(BindingTarget::MediaControl),
+            "CaptureControl" => Ok(BindingTarget::CaptureControl),
             "Hotkey" => Ok(BindingTarget::Hotkey),
             "OpenApplication" => Ok(BindingTarget::OpenApplication),
             "Unset" => Ok(BindingTarget::Unset),
@@ -324,6 +331,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
         }
         "Unset" => Ok(BindingTarget::Unset),
         "MediaControl" => Ok(BindingTarget::MediaControl),
+        "CaptureControl" => Ok(BindingTarget::CaptureControl),
         "Hotkey" => Ok(BindingTarget::Hotkey),
         "OpenApplication" => Ok(BindingTarget::OpenApplication),
 

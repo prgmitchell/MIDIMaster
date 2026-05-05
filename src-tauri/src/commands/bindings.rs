@@ -1,4 +1,5 @@
 use crate::run_logger;
+use crate::runtime_helpers::{focus_window_by_process_name, send_hotkey};
 use crate::{bindings::BindingKey, model, model::Binding, AppState};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -176,6 +177,118 @@ fn emit_integration_binding_triggered_batch(
         payload["source_sequence"] = serde_json::Value::Number(source_sequence.into());
     }
     let _ = app.emit("integration_binding_triggered_batch", payload);
+}
+
+fn emit_localized_action_error(
+    app: &AppHandle,
+    reason: &str,
+    binding_id: &str,
+    title_key: &str,
+    message_key: &str,
+    params: serde_json::Value,
+) {
+    let _ = app.emit(
+        "binding_action_error",
+        serde_json::json!({
+            "reason": reason,
+            "binding_id": binding_id,
+            "title_key": title_key,
+            "message_key": message_key,
+            "params": params,
+        }),
+    );
+}
+
+fn binding_focus_target_name(binding: &Binding) -> Option<String> {
+    binding.normalized_targets().into_iter().find_map(|target| {
+        if let model::BindingTarget::Application { name, .. } = target {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+        None
+    })
+}
+
+fn apply_special_button_action(
+    app: &AppHandle,
+    binding: &Binding,
+    action: &model::BindingAction,
+    value: f32,
+) -> bool {
+    if value <= 0.0 {
+        return true;
+    }
+
+    match action {
+        model::BindingAction::FocusWindow => {
+            let Some(process_name) = binding_focus_target_name(binding) else {
+                emit_localized_action_error(
+                    app,
+                    "focus_window_missing_target",
+                    &binding.id,
+                    "dialogs.focusWindowUnavailableTitle",
+                    "dialogs.focusWindowMissingTargetMessage",
+                    serde_json::json!({}),
+                );
+                return true;
+            };
+            if let Err(err) = focus_window_by_process_name(&process_name) {
+                run_logger::warn(
+                    "bindings_cmd",
+                    "focus_window_failed",
+                    &format!(
+                        "binding_id={} process={} error={}",
+                        binding.id, process_name, err
+                    ),
+                );
+                emit_localized_action_error(
+                    app,
+                    "focus_window_unavailable",
+                    &binding.id,
+                    "dialogs.focusWindowUnavailableTitle",
+                    "dialogs.focusWindowUnavailableMessage",
+                    serde_json::json!({ "name": process_name }),
+                );
+            }
+            true
+        }
+        model::BindingAction::FullScreenshot => {
+            if !binding
+                .normalized_targets()
+                .iter()
+                .any(|target| matches!(target, model::BindingTarget::CaptureControl))
+            {
+                return true;
+            }
+            send_hotkey(&["META".to_string(), "PRINTSCREEN".to_string()]);
+            true
+        }
+        model::BindingAction::SnipScreenshot => {
+            if !binding
+                .normalized_targets()
+                .iter()
+                .any(|target| matches!(target, model::BindingTarget::CaptureControl))
+            {
+                return true;
+            }
+            send_hotkey(&["META".to_string(), "SHIFT".to_string(), "S".to_string()]);
+            true
+        }
+        model::BindingAction::ToggleScreenRecording => {
+            if !binding
+                .normalized_targets()
+                .iter()
+                .any(|target| matches!(target, model::BindingTarget::CaptureControl))
+            {
+                return true;
+            }
+            send_hotkey(&["META".to_string(), "ALT".to_string(), "R".to_string()]);
+            true
+        }
+        _ => false,
+    }
 }
 
 fn apply_binding_action_internal(
@@ -807,6 +920,10 @@ pub fn apply_binding_action(
         model::BindingAction::Volume
             | model::BindingAction::ToggleMute
             | model::BindingAction::SetDefaultDevice
+            | model::BindingAction::FocusWindow
+            | model::BindingAction::FullScreenshot
+            | model::BindingAction::SnipScreenshot
+            | model::BindingAction::ToggleScreenRecording
     ) {
         run_logger::warn(
             "bindings_cmd",
@@ -814,6 +931,17 @@ pub fn apply_binding_action(
             &format!("binding_id={} action={:?}", binding.id, effective_action),
         );
         return Ok(());
+    }
+
+    if apply_special_button_action(&app, &binding, &effective_action, value) {
+        return set_binding_feedback(
+            app,
+            state,
+            binding.id.clone(),
+            value,
+            Some(effective_action),
+            silent,
+        );
     }
 
     let any_applied = apply_binding_action_internal(

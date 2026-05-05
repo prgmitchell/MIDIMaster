@@ -333,6 +333,7 @@ pub(crate) fn apply_midi_event(
                 }
                 model::BindingTarget::Unset
                 | model::BindingTarget::MediaControl
+                | model::BindingTarget::CaptureControl
                 | model::BindingTarget::Hotkey
                 | model::BindingTarget::OpenApplication => {}
             }
@@ -511,6 +512,7 @@ pub(crate) fn apply_midi_event(
             }
             model::BindingTarget::Unset
             | model::BindingTarget::MediaControl
+            | model::BindingTarget::CaptureControl
             | model::BindingTarget::Hotkey
             | model::BindingTarget::OpenApplication => {}
         }

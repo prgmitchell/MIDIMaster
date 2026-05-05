@@ -2191,7 +2191,7 @@ dependencies = [
 
 [[package]]
 name = "midimaster"
-version = "3.1.0"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2218,6 +2218,7 @@ dependencies = [
  "url",
  "uuid",
  "windows 0.61.3",
+ "windows-core 0.61.2",
  "zip 2.4.2",
 ]
 

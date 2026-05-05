@@ -79,8 +79,7 @@ impl ProfileStore {
                         return Ok(profiles);
                     }
                 }
-                Err(primary_err)
-                    .with_context(|| format!("Failed parsing {}", self.path.display()))
+                Err(primary_err).with_context(|| format!("Failed parsing {}", self.path.display()))
             }
         }
     }
@@ -242,14 +241,19 @@ mod tests {
         std::fs::copy(dir.join("profiles.json"), dir.join("profiles.json.bak")).expect("backup");
         std::fs::write(dir.join("profiles.json"), b"\0\0\0\0").expect("corrupt primary");
 
-        store.save_profile(profile("new")).expect("save after fallback");
+        store
+            .save_profile(profile("new"))
+            .expect("save after fallback");
 
         let backup = std::fs::read_to_string(dir.join("profiles.json.bak")).expect("backup");
         let profiles: Vec<Profile> = serde_json::from_str(&backup).expect("parse backup");
         assert_eq!(profiles.len(), 1);
         assert_eq!(profiles[0].name, "recovered");
 
-        let loaded = store.load_profile("new").expect("load new").expect("new profile");
+        let loaded = store
+            .load_profile("new")
+            .expect("load new")
+            .expect("new profile");
         assert_eq!(loaded.name, "new");
 
         let _ = std::fs::remove_dir_all(dir);
@@ -262,9 +266,14 @@ mod tests {
         std::fs::write(dir.join("profiles.json"), b"\0\0\0\0").expect("corrupt primary");
         let store = ProfileStore::new(dir.clone());
 
-        store.save_profile(profile("Default")).expect("save default");
+        store
+            .save_profile(profile("Default"))
+            .expect("save default");
 
-        let loaded = store.load_profile("Default").expect("load").expect("profile");
+        let loaded = store
+            .load_profile("Default")
+            .expect("load")
+            .expect("profile");
         assert_eq!(loaded.name, "Default");
         assert!(!dir.join("profiles.json.bak").exists());
 

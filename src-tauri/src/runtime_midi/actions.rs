@@ -1,7 +1,7 @@
 use crate::bindings::BindingKey;
 use crate::model::{self, Binding, BindingTarget, MidiEvent};
 use crate::run_logger;
-use crate::runtime_helpers::{send_hotkey, send_media_key};
+use crate::runtime_helpers::{focus_window_by_process_name, send_hotkey, send_media_key};
 use crate::AppState;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
@@ -35,6 +35,38 @@ fn emit_button_feedback(
       "source": "button_feedback",
     });
     let _ = app.emit("volume_update", payload);
+}
+
+fn emit_localized_action_error(
+    app: &AppHandle,
+    reason: &str,
+    binding_id: &str,
+    title_key: &str,
+    message_key: &str,
+    params: serde_json::Value,
+) {
+    let _ = app.emit(
+        "binding_action_error",
+        serde_json::json!({
+            "reason": reason,
+            "binding_id": binding_id,
+            "title_key": title_key,
+            "message_key": message_key,
+            "params": params,
+        }),
+    );
+}
+
+fn focus_target_name(targets: &[BindingTarget]) -> Option<String> {
+    targets.iter().find_map(|target| {
+        if let BindingTarget::Application { name, .. } = target {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+        None
+    })
 }
 
 pub(super) fn handle_special_action(
@@ -188,6 +220,82 @@ pub(super) fn handle_special_action(
                 );
             }
         }
+        return Ok(true);
+    }
+
+    if binding.action == model::BindingAction::FocusWindow {
+        if event.value == 0 {
+            emit_button_feedback(state, app, binding, event, targets, 0.0);
+            return Ok(true);
+        }
+        emit_button_feedback(state, app, binding, event, targets, 1.0);
+        let Some(process_name) = focus_target_name(targets) else {
+            emit_localized_action_error(
+                app,
+                "focus_window_missing_target",
+                &binding.id,
+                "dialogs.focusWindowUnavailableTitle",
+                "dialogs.focusWindowMissingTargetMessage",
+                serde_json::json!({}),
+            );
+            return Ok(true);
+        };
+        if let Err(err) = focus_window_by_process_name(&process_name) {
+            run_logger::warn(
+                "bindings",
+                "focus_window_failed",
+                &format!(
+                    "binding_id={} process={} error={}",
+                    binding.id, process_name, err
+                ),
+            );
+            emit_localized_action_error(
+                app,
+                "focus_window_unavailable",
+                &binding.id,
+                "dialogs.focusWindowUnavailableTitle",
+                "dialogs.focusWindowUnavailableMessage",
+                serde_json::json!({ "name": process_name }),
+            );
+        }
+        return Ok(true);
+    }
+
+    if matches!(
+        binding.action,
+        model::BindingAction::FullScreenshot
+            | model::BindingAction::SnipScreenshot
+            | model::BindingAction::ToggleScreenRecording
+    ) {
+        if !targets
+            .iter()
+            .any(|target| matches!(target, BindingTarget::CaptureControl))
+        {
+            return Ok(true);
+        }
+        if event.value == 0 {
+            emit_button_feedback(state, app, binding, event, targets, 0.0);
+            return Ok(true);
+        }
+        emit_button_feedback(state, app, binding, event, targets, 1.0);
+        let keys = match binding.action {
+            model::BindingAction::FullScreenshot => {
+                vec!["META".to_string(), "PRINTSCREEN".to_string()]
+            }
+            model::BindingAction::SnipScreenshot => {
+                vec!["META".to_string(), "SHIFT".to_string(), "S".to_string()]
+            }
+            model::BindingAction::ToggleScreenRecording => {
+                vec!["META".to_string(), "ALT".to_string(), "R".to_string()]
+            }
+            _ => unreachable!(),
+        };
+        send_hotkey(&keys);
+        run_logger::info(
+            "bindings",
+            "capture_action_sent",
+            &format!("binding_id={} action={:?}", binding.id, binding.action),
+        );
         return Ok(true);
     }
 

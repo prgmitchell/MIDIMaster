@@ -8,6 +8,15 @@ pub(crate) struct LearnCandidate {
     pub saw_max: bool,
 }
 
+fn normalize_process_name(value: &str) -> String {
+    let raw = value.trim().to_lowercase();
+    let filename = raw.rsplit(['\\', '/']).next().unwrap_or(&raw);
+    filename
+        .strip_suffix(".exe")
+        .unwrap_or(filename)
+        .to_string()
+}
+
 #[cfg(target_os = "windows")]
 fn key_name_to_vk(name: &str) -> Option<u16> {
     let upper = name.trim().to_uppercase();
@@ -52,6 +61,109 @@ fn key_name_to_vk(name: &str) -> Option<u16> {
             None
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn query_process_path(process_id: u32) -> Option<String> {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    if process_id == 0 {
+        return None;
+    }
+    let handle =
+        unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) }.ok()?;
+    if handle.is_invalid() {
+        return None;
+    }
+    let mut buffer = vec![0u16; 4096];
+    let mut size = buffer.len() as u32;
+    let result = unsafe {
+        QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_WIN32,
+            PWSTR(buffer.as_mut_ptr()),
+            &mut size,
+        )
+    };
+    let _ = unsafe { CloseHandle(handle) };
+    if result.is_err() {
+        return None;
+    }
+    buffer.truncate(size as usize);
+    Some(OsString::from_wide(&buffer).to_string_lossy().to_string())
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn focus_window_by_process_name(process_name: &str) -> Result<(), String> {
+    use windows::Win32::Foundation::{HWND, LPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
+        SetForegroundWindow, ShowWindow, SW_RESTORE,
+    };
+
+    struct Search {
+        needle: String,
+        hwnd: HWND,
+    }
+
+    unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> windows_core::BOOL {
+        let search = unsafe { &mut *(lparam.0 as *mut Search) };
+        if !unsafe { IsWindowVisible(hwnd) }.as_bool() {
+            return windows_core::BOOL(1);
+        }
+        if unsafe { GetWindowTextLengthW(hwnd) } <= 0 {
+            return windows_core::BOOL(1);
+        }
+
+        let mut process_id = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut process_id)) };
+        let Some(path) = query_process_path(process_id) else {
+            return windows_core::BOOL(1);
+        };
+        if normalize_process_name(&path) != search.needle {
+            return windows_core::BOOL(1);
+        }
+
+        search.hwnd = hwnd;
+        windows_core::BOOL(0)
+    }
+
+    let needle = normalize_process_name(process_name);
+    if needle.is_empty() {
+        return Err("missing_process_name".to_string());
+    }
+
+    let mut search = Search {
+        needle,
+        hwnd: HWND::default(),
+    };
+    unsafe {
+        let _ = EnumWindows(Some(enum_proc), LPARAM(&mut search as *mut Search as isize));
+    }
+    if search.hwnd.is_invalid() {
+        return Err("window_not_found".to_string());
+    }
+    unsafe {
+        if IsIconic(search.hwnd).as_bool() {
+            let _ = ShowWindow(search.hwnd, SW_RESTORE);
+        }
+        if !SetForegroundWindow(search.hwnd).as_bool() {
+            return Err("set_foreground_failed".to_string());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn focus_window_by_process_name(_process_name: &str) -> Result<(), String> {
+    Err("unsupported_platform".to_string())
 }
 
 #[cfg(target_os = "windows")]

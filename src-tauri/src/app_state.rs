@@ -306,6 +306,7 @@ impl AppState {
                     }
                     model::BindingTarget::Unset => None,
                     model::BindingTarget::MediaControl => None,
+                    model::BindingTarget::CaptureControl => None,
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::Integration { .. } => None,
@@ -376,6 +377,7 @@ impl AppState {
                     }
                     model::BindingTarget::Unset => None,
                     model::BindingTarget::MediaControl => None,
+                    model::BindingTarget::CaptureControl => None,
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::Integration { .. } => None,

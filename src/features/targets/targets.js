@@ -37,6 +37,10 @@ export function createTargetsFeature({
   const OPEN_APPLICATION_TARGET_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='3.6' width='15.6' height='12.8' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6.2 7.3h4.9M6.2 10h7.6M6.2 12.7h5.7' stroke='%23c7d2f3' stroke-width='1.3' stroke-linecap='round'/><path d='M12.3 5.2l2.9 2.9-2.9 2.9' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const TOGGLE_MUTE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M3 8.2v3.6h2.6l3.3 2.8V5.4L5.6 8.2H3z' fill='%23c7d2f3'/><path d='M12.4 7.1l4.5 5.8M16.9 7.1l-4.5 5.8' stroke='%23f7a7a7' stroke-width='1.5' stroke-linecap='round'/></svg>";
   const SET_DEFAULT_DEVICE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='5' width='15.6' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6 10h4.6M8.6 7.4L11.2 10l-2.6 2.6' stroke='%23c7d2f3' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/><path d='M13.7 8.1v3.8M15.6 10l-1.9 1.9M11.8 10l1.9 1.9' stroke='%2386d6a7' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+  const WINDOW_FOCUS_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.5' y='4' width='15' height='12' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M2.5 7.5h15' stroke='%2398a6cc' stroke-width='1.2'/><path d='M8 11h4M10 9v4' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round'/></svg>";
+  const CAPTURE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='3' y='5.2' width='14' height='10.3' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M7 5.2l1-1.7h4l1 1.7' stroke='%2398a6cc' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/><circle cx='10' cy='10.5' r='2.5' stroke='%238fd5ff' stroke-width='1.3'/></svg>";
+  const SNIP_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 5h10v10H5z' stroke='%2398a6cc' stroke-width='1.2' stroke-dasharray='2 2'/><path d='M7 13l6-6M7 7l6 6' stroke='%238fd5ff' stroke-width='1.3' stroke-linecap='round'/></svg>";
+  const RECORD_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='3' y='5' width='14' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><circle cx='10' cy='10' r='2.6' fill='%23f26d6d'/></svg>";
 
   function normalizeOpenApplication(raw) {
     if (!raw || typeof raw !== "object") return null;
@@ -183,7 +187,7 @@ export function createTargetsFeature({
     if (option.category) return option.category;
     if (option.integrationId || option.integration_id) return "integrations";
     if (option.kind === "master" || option.kind === "focus") return "builtIn";
-    if (option.kind === "media-control" || option.kind === "hotkey-target" || option.kind === "open-application-target") return "utilities";
+    if (option.kind === "media-control" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
     if (option.kind === "integration-root" || option.kind === "integration-target" || option.kind === "integration-nav") return "integrations";
     if (option.kind === "session") return "applications";
     if (option.kind === "device") {
@@ -204,6 +208,9 @@ export function createTargetsFeature({
     if (option?.kind === "media-control") return t("targets.description.mediaControl");
     if (option?.kind === "hotkey-target") return t("targets.description.hotkey");
     if (option?.kind === "open-application-target") return t("targets.description.openApplication");
+    if (option?.kind === "action-root" && option?.value === "window-focus") return t("targets.description.windowFocus");
+    if (option?.kind === "action-root" && option?.value === "capture") return t("targets.description.captureControls");
+    if (option?.kind === "capture-action") return t("targets.description.captureAction");
     if (option?.kind === "session") return option.ghost ? t("targets.description.savedApplicationUnavailable") : t("targets.description.applicationSession");
     if (option?.kind === "device") {
       if (option.ghost) return t("targets.description.savedDeviceUnavailable");
@@ -425,13 +432,13 @@ export function createTargetsFeature({
 
       item.appendChild(copy);
 
-      if (option.kind === "integration-root" || option.kind === "integration-nav") {
+      if (option.kind === "integration-root" || option.kind === "integration-nav" || option.kind === "action-root") {
         const navMeta = document.createElement("span");
         navMeta.className = "target-card-nav-meta";
 
         const badge = document.createElement("span");
         badge.className = "target-card-kind-badge";
-        badge.textContent = t("targets.integration");
+        badge.textContent = option.kind === "action-root" ? t("targets.category.actions") : t("targets.integration");
         navMeta.appendChild(badge);
 
         const arrow = document.createElement("span");
@@ -605,6 +612,7 @@ export function createTargetsFeature({
             : (currentTarget === "Master" || currentTarget?.Master != null) ? "master"
               : (currentTarget === "Focus" || currentTarget?.Focus != null) ? "focus"
                 : currentTarget === "MediaControl" ? "media-control"
+                  : currentTarget === "CaptureControl" ? "capture-control"
                   : currentTarget === "Hotkey" ? "hotkey-target"
                     : currentTarget === "OpenApplication" ? "open-application-target"
                 : "placeholder"
@@ -614,7 +622,7 @@ export function createTargetsFeature({
     if (selectedKind === "integration-target") selectedValue = targetKey(integration);
     else if (selectedKind === "session") selectedValue = selectedAppKey || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
-    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "hotkey-target" || selectedKind === "open-application-target") selectedValue = selectedKind;
+    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "hotkey-target" || selectedKind === "open-application-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
     const options = [
@@ -638,6 +646,18 @@ export function createTargetsFeature({
         label: t("targets.mediaControls"),
         icon_data: mediaPlayPauseIconData,
         kind: "media-control",
+      });
+      options.push({
+        value: "window-focus",
+        label: t("targets.windowFocus"),
+        icon_data: WINDOW_FOCUS_ICON_DATA,
+        kind: "action-root",
+      });
+      options.push({
+        value: "capture",
+        label: t("targets.captureControls"),
+        icon_data: CAPTURE_ICON_DATA,
+        kind: "action-root",
       });
       options.push({
         value: "hotkey-target",
@@ -831,6 +851,7 @@ export function createTargetsFeature({
       if (target === "Master" || target?.Master != null) return "master";
       if (target === "Focus" || target?.Focus != null) return "focus";
       if (target === "MediaControl") return "media-control";
+      if (target === "CaptureControl") return "capture-control";
       if (target === "Hotkey") return "hotkey-target";
       if (target === "OpenApplication") return "open-application-target";
       const integration = target?.Integration || target?.integration;
@@ -898,6 +919,10 @@ export function createTargetsFeature({
       if (action === "MediaNextTrack") return t("targets.action.mediaNextTrack");
       if (action === "MediaPrevTrack") return t("targets.action.mediaPrevTrack");
       if (action === "MediaStop") return t("targets.action.mediaStop");
+      if (action === "FocusWindow") return t("targets.action.focusWindow");
+      if (action === "FullScreenshot") return t("targets.action.fullScreenshot");
+      if (action === "SnipScreenshot") return t("targets.action.snipScreenshot");
+      if (action === "ToggleScreenRecording") return t("targets.action.toggleScreenRecording");
       if (action === "Hotkey") return t("targets.hotkey");
       if (action === "ToggleMute") return t("targets.action.toggleMute");
       if (action === "SetDefaultDevice") return t("targets.action.setDefault");
@@ -927,6 +952,12 @@ export function createTargetsFeature({
             || resolveOpenApplicationIcon(selectedOpenApplication)
             || cached?.icon_data
             || OPEN_APPLICATION_TARGET_ICON_DATA,
+        };
+      }
+      if (target === "CaptureControl") {
+        return {
+          label: t("targets.captureControls"),
+          icon_data: CAPTURE_ICON_DATA,
         };
       }
       const resolved = resolveDisplay(target);
@@ -1039,6 +1070,9 @@ export function createTargetsFeature({
       if (option.kind === "media-control") {
         return "MediaControl";
       }
+      if (option.kind === "capture-action") {
+        return "CaptureControl";
+      }
       if (option.kind === "hotkey-target") {
         return "Hotkey";
       }
@@ -1123,7 +1157,10 @@ export function createTargetsFeature({
         });
       }
       const exists = selectedTargets.findIndex((t) => targetIdentity(t) === key);
-      if (exists >= 0) {
+      const updatesExistingAction = exists >= 0 && nextActionValue && option?.kind === "capture-action";
+      if (updatesExistingAction) {
+        selectedTargets[exists] = mapped;
+      } else if (exists >= 0) {
         selectedTargets.splice(exists, 1);
       } else if (selectedTargets.length < 8) {
         selectedTargets.push(mapped);
@@ -1227,6 +1264,86 @@ export function createTargetsFeature({
         ];
       };
 
+      const buildWindowFocusOptions = () => {
+        const seen = new Set();
+        return getSess()
+          .filter((session) => session && !session.is_master && session.id !== "master")
+          .map((session) => {
+            const key = normalizeKey(session);
+            if (!key || seen.has(key)) return null;
+            seen.add(key);
+            return {
+              value: key,
+              label: session.display_name || key,
+              display_name: session.display_name || key,
+              icon_data: session.icon_data || WINDOW_FOCUS_ICON_DATA,
+              kind: "session",
+              category: "applications",
+              description: t("targets.description.windowFocusApp"),
+            };
+          })
+          .filter(Boolean);
+      };
+
+      const captureOptions = () => [
+        {
+          value: "FullScreenshot",
+          label: t("targets.action.fullScreenshot"),
+          kind: "capture-action",
+          icon_data: CAPTURE_ICON_DATA,
+        },
+        {
+          value: "SnipScreenshot",
+          label: t("targets.action.snipScreenshot"),
+          kind: "capture-action",
+          icon_data: SNIP_ICON_DATA,
+        },
+        {
+          value: "ToggleScreenRecording",
+          label: t("targets.action.toggleScreenRecording"),
+          kind: "capture-action",
+          icon_data: RECORD_ICON_DATA,
+        },
+      ];
+
+      const showWindowFocusSubmenu = () => {
+        const focusOptions = buildWindowFocusOptions();
+        openTargetPanel(
+          focusOptions.length > 0 ? focusOptions : [{
+            value: "",
+            label: t("targets.noRunningApplications"),
+            kind: "placeholder",
+            icon_data: WINDOW_FOCUS_ICON_DATA,
+          }],
+          null,
+          null,
+          (option) => {
+            selectOption(option, {
+              value: "FocusWindow",
+              label: t("targets.action.focusWindow"),
+            });
+          },
+          t("targets.windowFocus"),
+          { onBack: openRootTargetPanel },
+        );
+      };
+
+      const showCaptureSubmenu = () => {
+        openTargetPanel(
+          captureOptions(),
+          selectedAction,
+          "capture-action",
+          (option) => {
+            selectOption(option, {
+              value: option.value,
+              label: option.label,
+            });
+          },
+          t("targets.captureControls"),
+          { onBack: openRootTargetPanel },
+        );
+      };
+
       const openRootTargetPanel = () => {
         openTargetPanel(
           options,
@@ -1235,6 +1352,16 @@ export function createTargetsFeature({
           (targetOption) => {
             if (targetOption.kind === "integration-root") {
               showIntegrationSubmenu(targetOption.value, [], null).catch(() => { });
+              return false;
+            }
+
+            if (targetOption.kind === "action-root" && targetOption.value === "window-focus") {
+              showWindowFocusSubmenu();
+              return false;
+            }
+
+            if (targetOption.kind === "action-root" && targetOption.value === "capture") {
+              showCaptureSubmenu();
               return false;
             }
 

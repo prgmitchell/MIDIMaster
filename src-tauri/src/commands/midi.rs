@@ -164,10 +164,7 @@ pub fn start_midi_device(
 pub fn stop_midi_device(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     run_logger::info("midi_cmd", "stop_requested", "");
     let active = {
-        let mut midi = state
-            .midi
-            .lock()
-            .map_err(|_| "Lock poisoned".to_string())?;
+        let mut midi = state.midi.lock().map_err(|_| "Lock poisoned".to_string())?;
         let active = midi.active_pair();
         midi.stop();
         active

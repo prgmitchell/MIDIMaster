@@ -1714,8 +1714,13 @@ async function setupListeners() {
       }
     }
     if (!payload || typeof payload !== "object") return;
-    const title = String(payload.title || t("dialogs.actionFailedTitle")).trim() || t("dialogs.actionFailedTitle");
-    const message = String(payload.message || "").trim() || t("dialogs.actionFailedMessage");
+    const params = (payload.params && typeof payload.params === "object") ? payload.params : {};
+    const title = String(
+      payload.title_key ? t(payload.title_key, params) : (payload.title || t("dialogs.actionFailedTitle")),
+    ).trim() || t("dialogs.actionFailedTitle");
+    const message = String(
+      payload.message_key ? t(payload.message_key, params) : (payload.message || t("dialogs.actionFailedMessage")),
+    ).trim() || t("dialogs.actionFailedMessage");
     showAlert(title, message);
   });
 

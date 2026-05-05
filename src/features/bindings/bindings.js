@@ -1644,6 +1644,7 @@ export function createBindingsFeature({
             ? targetSelect.__selectedTargets
             : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
           setTargets(binding, selectedTargets);
+          const hasSelectedTarget = selectedTargets.some((target) => target && target !== "Unset");
           const hasHotkeyTarget = selectedTargets.some(isHotkeyTarget);
           const hasOpenApplicationTarget = selectedTargets.some(isOpenApplicationTarget);
           const previousAction = binding.action;
@@ -1651,7 +1652,9 @@ export function createBindingsFeature({
           const previousOpenApplication = normalizeOpenApplicationMapping(binding.open_application);
 
           if (isButton) {
-            binding.action = hasHotkeyTarget
+            binding.action = !hasSelectedTarget
+              ? "ToggleMute"
+              : hasHotkeyTarget
               ? "Hotkey"
               : hasOpenApplicationTarget
                 ? "OpenApplication"
