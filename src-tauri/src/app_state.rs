@@ -3,6 +3,7 @@ use crate::audio::AudioBackend;
 use crate::bindings::{BindingKey, BindingState};
 use crate::device_target::{parse_device_target, DeviceTargetKind};
 use crate::midi::MidiManager;
+use crate::midi_event_queue::MidiEventQueue;
 use crate::model::{self, LearnedControl, MidiEvent, OsdSettings, Profile};
 use crate::profile_store::ProfileStore;
 use crate::run_logger;
@@ -75,6 +76,7 @@ pub(crate) fn focused_application_name() -> Option<String> {
 pub(crate) struct AppState {
     pub(crate) audio: Box<dyn AudioBackend>,
     pub(crate) midi: Arc<Mutex<MidiManager>>,
+    pub(crate) midi_event_queue: Arc<Mutex<MidiEventQueue>>,
     pub(crate) profile_store: ProfileStore,
     pub(crate) app_settings_store: AppSettingsStore,
     pub(crate) active_profile: Mutex<Option<Profile>>,

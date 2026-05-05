@@ -8,6 +8,7 @@ mod bindings;
 mod commands;
 mod device_target;
 mod midi;
+mod midi_event_queue;
 mod model;
 mod monitors;
 mod osd_window;
@@ -28,6 +29,7 @@ use audio::AudioBackend;
 use bindings::BindingKey;
 use commands::*;
 use midi::MidiManager;
+use midi_event_queue::{log_queue_stats, MidiEventQueue};
 use model::OsdSettings;
 use runtime_helpers::classify_learned_control;
 
@@ -38,7 +40,7 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuEvent, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tokio::time::sleep;
 
 pub(crate) use monitors::collect_monitor_descriptors;
@@ -321,6 +323,7 @@ fn main() {
             app.manage(AppState {
                 audio,
                 midi: Arc::new(Mutex::new(MidiManager::new())),
+                midi_event_queue: Arc::new(Mutex::new(MidiEventQueue::default())),
                 profile_store,
                 app_settings_store,
                 active_profile: Mutex::new(None),
@@ -471,6 +474,37 @@ fn main() {
             }
 
             let _app_handle = app.handle().clone();
+
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let state = app_handle.state::<AppState>();
+                    let (events, stats) = state
+                        .midi_event_queue
+                        .lock()
+                        .map(|mut queue| {
+                            let events = queue.drain();
+                            let stats = queue.take_stats();
+                            (events, stats)
+                        })
+                        .unwrap_or_default();
+
+                    log_queue_stats(stats);
+
+                    for event in events {
+                        let _ = app_handle.emit("midi_event", &event);
+                        if let Err(err) = state.apply_midi_event(&app_handle, event) {
+                            run_logger::error(
+                                "midi_queue",
+                                "event_apply_failed",
+                                &format!("error={}", err),
+                            );
+                        }
+                    }
+
+                    sleep(Duration::from_millis(8)).await;
+                }
+            });
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

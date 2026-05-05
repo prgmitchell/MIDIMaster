@@ -33,12 +33,20 @@ export function createMidiFeature({
   }
   const d = (dom && typeof dom === "object") ? dom : {};
   const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
+  const MIDI_ENUM_MIN_INTERVAL_MS = 5000;
+  const MIDI_ENUM_STALE_MS = 3000;
+  const MIDI_AVAILABILITY_INTERVAL_MS = 15000;
+  const MIDI_AUTO_REFRESH_INTERVAL_MS = 10000;
+  const MIDI_OUTPUT_ENUM_DELAY_MS = 250;
 
   let autoRefreshTimer = null;
   let sessionRefreshTimer = null;
   let learnTimer = null;
   let availabilityTimer = null;
   let availabilityCheckInFlight = false;
+  let deviceRefreshInFlight = null;
+  let lastDeviceRefreshAt = 0;
+  let lastDeviceSnapshot = { inputs: [], outputs: [] };
   let suspendProfileAutoReconnect = false;
   let applyInFlight = false;
   let queuedApply = null;
@@ -122,6 +130,14 @@ export function createMidiFeature({
       });
       if (!entry) return;
 
+      const refreshReason = kind === "input" ? "input_dropdown" : "output_dropdown";
+      entry.root.addEventListener("pointerdown", () => {
+        refreshDevicesIfStale(refreshReason);
+      });
+      entry.root.addEventListener("focusin", () => {
+        refreshDevicesIfStale(refreshReason);
+      });
+
       if (kind === "input") {
         inputDropdownEl = entry.root;
         inputMenuEl = entry.menu;
@@ -180,6 +196,49 @@ export function createMidiFeature({
   function hasPreference(pref) {
     const normalized = normalizeMidiPreference(pref);
     return Boolean(normalized.inputDeviceId && normalized.outputDeviceId);
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function enumerateMidiDevices({ force = false, reason = "unknown" } = {}) {
+    const now = Date.now();
+    if (!force && now - lastDeviceRefreshAt < MIDI_ENUM_MIN_INTERVAL_MS) {
+      return lastDeviceSnapshot;
+    }
+    if (deviceRefreshInFlight) {
+      return deviceRefreshInFlight;
+    }
+
+    deviceRefreshInFlight = (async () => {
+      try {
+        const inputs = await invoke("list_midi_devices").catch((error) => {
+          console.warn(`Failed to list MIDI inputs (${reason}):`, error);
+          return lastDeviceSnapshot.inputs || [];
+        });
+        await sleep(MIDI_OUTPUT_ENUM_DELAY_MS);
+        const outputs = await invoke("list_midi_output_devices").catch((error) => {
+          console.warn(`Failed to list MIDI outputs (${reason}):`, error);
+          return lastDeviceSnapshot.outputs || [];
+        });
+        lastDeviceSnapshot = {
+          inputs: Array.isArray(inputs) ? inputs : [],
+          outputs: Array.isArray(outputs) ? outputs : [],
+        };
+        lastDeviceRefreshAt = Date.now();
+        return lastDeviceSnapshot;
+      } finally {
+        deviceRefreshInFlight = null;
+      }
+    })();
+
+    return deviceRefreshInFlight;
+  }
+
+  function refreshDevicesIfStale(reason) {
+    if (Date.now() - lastDeviceRefreshAt < MIDI_ENUM_STALE_MS) return;
+    refreshMidiDevices({ force: true, reason }).catch(() => { });
   }
 
   function matchesConnectedPreference(pref) {
@@ -358,8 +417,9 @@ export function createMidiFeature({
       const currentlyConnected = Boolean(connectedInputId && connectedOutputId);
       if (!prefAvailable && !currentlyConnected) return;
 
-      const devices = await invoke("list_midi_devices").catch(() => []);
-      const outputDevices = await invoke("list_midi_output_devices").catch(() => []);
+      const deviceSnapshot = await enumerateMidiDevices({ reason: "availability" });
+      const devices = deviceSnapshot.inputs;
+      const outputDevices = deviceSnapshot.outputs;
       const inputMatch = prefAvailable
         ? findPreferredDevice(devices, pref.inputDeviceId, pref.inputDeviceName)
         : null;
@@ -383,7 +443,7 @@ export function createMidiFeature({
           if (d.midiStatus) {
             d.midiStatus.textContent = t("midi.disconnected");
           }
-          await refreshMidiDevices();
+          refreshDevicesIfStale("disconnect");
           return;
         }
       }
@@ -412,7 +472,7 @@ export function createMidiFeature({
     if (availabilityTimer) return;
     availabilityTimer = setInterval(() => {
       checkAvailabilityLoop().catch(() => { });
-    }, 1500);
+    }, MIDI_AVAILABILITY_INTERVAL_MS);
   }
 
   function startAutoRefresh(refreshFn) {
@@ -427,7 +487,7 @@ export function createMidiFeature({
       if (connectedInputId && connectedOutputId) {
         stopAutoRefresh();
       }
-    }, 1500);
+    }, MIDI_AUTO_REFRESH_INTERVAL_MS);
   }
 
   function stopAutoRefresh() {
@@ -499,10 +559,14 @@ export function createMidiFeature({
     closeLearnPanel();
   }
 
-  async function refreshMidiDevices() {
+  async function refreshMidiDevices(options = {}) {
     try {
-      const devices = await invoke("list_midi_devices");
-      const outputDevices = await invoke("list_midi_output_devices");
+      const snapshot = await enumerateMidiDevices({
+        force: Boolean(options.force),
+        reason: options.reason || "refresh",
+      });
+      const devices = snapshot.inputs;
+      const outputDevices = snapshot.outputs;
 
       const pref = normalizeMidiPreference(currentProfilePreference);
       const previousSelection = d.midiSelect
@@ -906,15 +970,21 @@ export function createMidiFeature({
 
     if (d.refreshMidiButton) {
       d.refreshMidiButton.addEventListener("click", async () => {
-        await refreshMidiDevices();
+        await refreshMidiDevices({ force: true, reason: "manual_refresh" });
       });
     }
     if (d.midiSelect) {
+      d.midiSelect.addEventListener("pointerdown", () => {
+        refreshDevicesIfStale("input_dropdown");
+      });
       d.midiSelect.addEventListener("change", async () => {
         await connectSelected();
       });
     }
     if (d.midiOutputSelect) {
+      d.midiOutputSelect.addEventListener("pointerdown", () => {
+        refreshDevicesIfStale("output_dropdown");
+      });
       d.midiOutputSelect.addEventListener("change", async () => {
         await connectSelected();
       });

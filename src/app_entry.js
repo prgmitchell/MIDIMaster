@@ -638,6 +638,27 @@ function flashBindingTrigger(bindingId) {
   });
 }
 
+function findBindingSlider(bindingId) {
+  if (!bindingId) return null;
+  return document.querySelector(`.binding-volume-slider[data-binding-id="${CSS.escape(String(bindingId))}"]`);
+}
+
+function queueMidiUiEvent(payload) {
+  if (!payload || typeof payload !== "object") return;
+  pendingMidiUiEvents.push(payload);
+  if (midiUiFlushQueued) return;
+  midiUiFlushQueued = true;
+  requestAnimationFrame(flushMidiUiEvents);
+}
+
+function flushMidiUiEvents() {
+  midiUiFlushQueued = false;
+  const events = pendingMidiUiEvents.splice(0);
+  for (const payload of events) {
+    applyMidiUiEvent(payload);
+  }
+}
+
 function isBindingTargetMenuOpen() {
   return Boolean(document.querySelector(".target-dropdown.open"));
 }
@@ -696,6 +717,8 @@ const bindingInteractionTimes = {}; // Track last interaction time per binding I
 const bindingLastValues = {}; // Track last valid volume per binding ID
 const bindingMuteValues = {}; // Track last known mute per binding ID (from feedback)
 const liveMidiValuesByControl = new Map();
+const pendingMidiUiEvents = [];
+let midiUiFlushQueued = false;
 
 function midiControlSignature(deviceId, control) {
   if (!control) return "";
@@ -1162,6 +1185,54 @@ function resolveOsdVolume(binding, payload) {
   return normalizeFaderCurve(binding.fader_curve) === "Custom"
     ? applyCustomFaderCurve(binding.custom_curve, normalized)
     : applyFaderCurve(binding.fader_curve, normalized);
+}
+
+function applyMidiUiEvent(payload) {
+  const normalizedLiveValue = payload.controller === 224 && payload.value_14 != null
+    ? payload.value_14 / 16383
+    : ((Number(payload.value) || 0) / 127);
+  liveMidiValuesByControl.set(midiControlSignature(payload.device_id, {
+    channel: payload.channel,
+    controller: payload.controller,
+    msg_type: payload.msg_type || "ControlChange",
+  }), normalizedLiveValue);
+
+  const binding = findBindingForEvent(payload);
+  if (!binding || getBindingTargets(binding).length === 0) {
+    return;
+  }
+  flashBindingTrigger(binding.id);
+  if (binding.action === "ToggleMute") {
+    if ((Number(payload.value) || 0) > 0) {
+      const muteButton = findInlineMuteButton(binding.id);
+      if (muteButton) {
+        const currentlyMuted = bindingMuteValues[binding.id] != null
+          ? Boolean(bindingMuteValues[binding.id])
+          : muteButton.classList.contains("muted");
+        const nextMuted = !currentlyMuted;
+        bindingMuteValues[binding.id] = nextMuted;
+        setInlineMuteButtonState(muteButton, nextMuted);
+      }
+    }
+    return;
+  }
+
+  const volume = resolveOsdVolume(binding, payload);
+  if (volume == null) {
+    return;
+  }
+
+  const directSlider = findBindingSlider(binding.id);
+  if (directSlider) {
+    setBindingSliderVolume(directSlider, volume, {
+      bindingId: binding.id,
+      markMidiUpdate: true,
+    });
+  }
+
+  if (!bindingHasIntegrationTarget(binding)) {
+    showVolumeOsd(getPrimaryBindingTarget(binding), volume);
+  }
 }
 
 function showVolumeOsd(target, volume, focusSession) {
@@ -1718,56 +1789,28 @@ async function setupListeners() {
     if (!payload || typeof payload !== "object") {
       return;
     }
-    const normalizedLiveValue = payload.controller === 224 && payload.value_14 != null
-      ? payload.value_14 / 16383
-      : ((Number(payload.value) || 0) / 127);
-    liveMidiValuesByControl.set(midiControlSignature(payload.device_id, {
-      channel: payload.channel,
-      controller: payload.controller,
-      msg_type: payload.msg_type || "ControlChange",
-    }), normalizedLiveValue);
-    const binding = findBindingForEvent(payload);
-    if (!binding || getBindingTargets(binding).length === 0) {
-      return;
-    }
-    flashBindingTrigger(binding.id);
-    if (binding.action === "ToggleMute") {
-      if ((Number(payload.value) || 0) > 0) {
-        const muteButton = findInlineMuteButton(binding.id);
-        if (muteButton) {
-          const currentlyMuted = bindingMuteValues[binding.id] != null
-            ? Boolean(bindingMuteValues[binding.id])
-            : muteButton.classList.contains("muted");
-          const nextMuted = !currentlyMuted;
-          bindingMuteValues[binding.id] = nextMuted;
-          setInlineMuteButtonState(muteButton, nextMuted);
+    queueMidiUiEvent(payload);
+  });
+
+  await listen("midi_connection_status", (event) => {
+    const payload = typeof event.payload === "string"
+      ? (() => {
+        try {
+          return JSON.parse(event.payload);
+        } catch {
+          return null;
         }
-      }
-      return;
-    }
-    if (bindingHasIntegrationTarget(binding)) {
-      // Integrations drive OSD/feedback through set_binding_feedback.
-      // We still update the slider directly below to keep UI responsive.
-    }
-    const volume = resolveOsdVolume(binding, payload);
-    if (volume == null) {
-      return;
-    }
-
-    // Direct UI Update (Midi Event)
-    // 1. Find the specific slider for this binding ID
-    const allSliders = Array.from(document.querySelectorAll(".binding-volume-slider"));
-    const directSlider = binding.id ? allSliders.find(s => s.dataset.bindingId === binding.id) : null;
-
-    if (directSlider) {
-      setBindingSliderVolume(directSlider, volume, {
-        bindingId: binding.id,
-        markMidiUpdate: true,
-      });
-    }
-
-    if (!bindingHasIntegrationTarget(binding)) {
-      showVolumeOsd(getPrimaryBindingTarget(binding), volume);
+      })()
+      : event.payload;
+    if (!payload || typeof payload !== "object" || !midiStatus) return;
+    if (payload.state === "disconnected") {
+      midiStatus.textContent = t("midi.disconnected");
+    } else if (payload.state === "reconnecting") {
+      midiStatus.textContent = t("midi.searchingDevices");
+    } else if (payload.state === "failed") {
+      midiStatus.textContent = t("midi.connectFailed", { message: payload.reason || "MIDI connection failed" });
+    } else if (payload.state === "connected") {
+      midiStatus.textContent = "Connected.";
     }
   });
 
@@ -1863,7 +1906,7 @@ async function setupListeners() {
       if (toggle) {
         toggle.classList.toggle("on", Number(payload.volume) > 0.5);
       }
-      const s = document.querySelector(`.binding-volume-slider[data-binding-id="${payload.binding_id}"]`);
+      const s = findBindingSlider(payload.binding_id);
       if (s) {
         const lastMidi = Number(s.dataset.lastMidiUpdate || 0);
         // Ignore immediate backend echo briefly so hardware feedback does not

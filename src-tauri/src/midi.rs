@@ -85,6 +85,14 @@ impl MidiManager {
         Ok(devices)
     }
 
+    pub fn active_pair(&self) -> Option<(String, String)> {
+        Some((
+            self.active_device.clone()?,
+            self.active_output_device.clone()?,
+        ))
+        .filter(|_| self.input_connection.is_some() && !self.output_connections.is_empty())
+    }
+
     fn connect_output(&mut self, output_device_id: &str) -> Result<()> {
         // Clear existing output connections first
         self.output_connections.clear();
@@ -119,8 +127,39 @@ impl MidiManager {
     where
         F: Fn(MidiEvent) + Send + 'static,
     {
+        if self.active_device.as_deref() == Some(input_device_id)
+            && self.active_output_device.as_deref() == Some(output_device_id)
+            && self.input_connection.is_some()
+            && !self.output_connections.is_empty()
+        {
+            run_logger::info(
+                "midi",
+                "start_device_noop",
+                &format!(
+                    "input_device_id={} output_device_id={}",
+                    input_device_id, output_device_id
+                ),
+            );
+            return Ok(());
+        }
+
+        run_logger::info(
+            "midi",
+            "switch_device_begin",
+            &format!(
+                "previous_input={} previous_output={} next_input={} next_output={}",
+                self.active_device.as_deref().unwrap_or(""),
+                self.active_output_device.as_deref().unwrap_or(""),
+                input_device_id,
+                output_device_id
+            ),
+        );
+
         // Clear existing input connection first
         self.input_connection = None;
+        self.output_connections.clear();
+        self.active_device = None;
+        self.active_output_device = None;
 
         // Input setup
         let input_port_index = input_device_id

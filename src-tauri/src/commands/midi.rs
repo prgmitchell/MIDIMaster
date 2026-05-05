@@ -2,6 +2,24 @@ use crate::run_logger;
 use crate::{model::DeviceInfo, AppState};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+fn emit_midi_connection_status(
+    app: &AppHandle,
+    input_device_id: &str,
+    output_device_id: &str,
+    state: &str,
+    reason: &str,
+) {
+    let _ = app.emit(
+        "midi_connection_status",
+        serde_json::json!({
+            "inputDeviceId": input_device_id,
+            "outputDeviceId": output_device_id,
+            "state": state,
+            "reason": reason,
+        }),
+    );
+}
+
 #[tauri::command]
 pub fn list_midi_devices(state: State<AppState>) -> Result<Vec<DeviceInfo>, String> {
     state
@@ -37,6 +55,13 @@ pub fn start_midi_device(
             input_device_id, output_device_id
         ),
     );
+    emit_midi_connection_status(
+        &app,
+        &input_device_id,
+        &output_device_id,
+        "reconnecting",
+        "start_requested",
+    );
     let app_handle = app.clone();
     {
         if let Err(err) = state
@@ -44,9 +69,14 @@ pub fn start_midi_device(
             .lock()
             .map_err(|_| "Lock poisoned".to_string())?
             .start_device(&input_device_id, &output_device_id, move |event| {
-                let _ = app_handle.emit("midi_event", &event);
                 let state = app_handle.state::<AppState>();
-                let _ = state.apply_midi_event(&app_handle, event);
+                {
+                    if let Ok(mut queue) = state.midi_event_queue.lock() {
+                        queue.enqueue(event);
+                    } else {
+                        run_logger::error("midi_queue", "enqueue_failed", "queue lock poisoned");
+                    }
+                };
             })
             .map_err(|err| err.to_string())
         {
@@ -57,6 +87,13 @@ pub fn start_midi_device(
                     "input_device_id={} output_device_id={} error={}",
                     input_device_id, output_device_id, err
                 ),
+            );
+            emit_midi_connection_status(
+                &app,
+                &input_device_id,
+                &output_device_id,
+                "failed",
+                "start_failed",
             );
             return Err(err);
         }
@@ -112,18 +149,38 @@ pub fn start_midi_device(
             input_device_id, output_device_id, migrated_count
         ),
     );
+    emit_midi_connection_status(
+        &app,
+        &input_device_id,
+        &output_device_id,
+        "connected",
+        "start_succeeded",
+    );
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn stop_midi_device(state: State<AppState>) -> Result<(), String> {
+pub fn stop_midi_device(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     run_logger::info("midi_cmd", "stop_requested", "");
-    state
-        .midi
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?
-        .stop();
+    let active = {
+        let mut midi = state
+            .midi
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?;
+        let active = midi.active_pair();
+        midi.stop();
+        active
+    };
+    if let Some((input_device_id, output_device_id)) = active {
+        emit_midi_connection_status(
+            &app,
+            &input_device_id,
+            &output_device_id,
+            "disconnected",
+            "stop_requested",
+        );
+    }
     Ok(())
 }
 

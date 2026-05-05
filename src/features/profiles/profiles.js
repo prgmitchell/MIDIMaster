@@ -563,8 +563,7 @@ export function createProfilesFeature({
   function getProfileNameForSave() {
     const current = (typeof getActiveProfileName === "function") ? (getActiveProfileName() || "") : "";
     if (current) return current;
-    const name = window.prompt("Profile name", "");
-    return name ? name.trim() : "";
+    return currentProfileSelection("Default");
   }
 
   async function saveBindingsForProfile() {
