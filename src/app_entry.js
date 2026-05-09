@@ -1678,9 +1678,16 @@ async function setupListeners() {
       return;
     }
 
+    const migrateAuxControl = (control) => (
+      control && typeof control === "object"
+        ? { ...control, device_id: deviceId }
+        : control
+    );
     bindings = (bindings || []).map((binding) => ({
       ...binding,
       device_id: deviceId,
+      mute_control: migrateAuxControl(binding?.mute_control),
+      assign_control: migrateAuxControl(binding?.assign_control),
     }));
     requestBindingsRerender("bindings_migrated");
   });
