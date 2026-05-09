@@ -15,7 +15,7 @@ Integrations are plugin-driven. Plugins can be installed at runtime (no rebuild 
 - Runtime behavior when a binding triggers
 - Feedback updates (UI + OSD + motor faders)
 
-<img width="1440" height="909" alt="midimaster-newimage" src="https://github.com/user-attachments/assets/a76243d5-b196-41e7-8730-85c6548a4d29" />
+<img width="1308" height="890" alt="midimaster-night-light" src="https://github.com/user-attachments/assets/80d65d1d-9210-4777-9528-f5b37cf27911" />
 
 ## Platform support
 
