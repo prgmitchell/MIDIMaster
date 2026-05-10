@@ -89,21 +89,37 @@ header {
 }
 
 .theme-toggle-icon {
-  width: 21px;
-  height: 21px;
+  width: 18px;
+  height: 18px;
 }
 
-.theme-toggle-icon .icon-stars,
-.theme-toggle-icon .icon-crescent {
-  fill: currentColor;
+.theme-toggle-icon .theme-icon-sun,
+.theme-toggle-icon .theme-icon-moon {
+  display: none;
 }
 
-body.dark-mode:not([data-theme]) .theme-toggle-icon .icon-crescent {
+.theme-toggle-icon .theme-icon-sun *,
+.theme-toggle-icon .theme-icon-moon * {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.theme-toggle-icon .theme-icon-moon-crescent,
+.theme-toggle-icon .theme-icon-moon-dot {
+  fill: currentColor;
+  stroke: none;
+}
+
+body[data-theme="dark"] .theme-toggle-icon .theme-icon-sun,
+body.dark-mode:not([data-theme]) .theme-toggle-icon .theme-icon-sun {
+  display: block;
+}
+
+body[data-theme="light"] .theme-toggle-icon .theme-icon-moon,
+body:not(.dark-mode):not([data-theme]) .theme-toggle-icon .theme-icon-moon {
+  display: block;
 }
 
 body.dark-mode:not([data-theme]) {

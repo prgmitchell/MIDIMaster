@@ -94,8 +94,21 @@
           </button>
           <button id="theme-toggle-button" class="topbar-icon-button" type="button" aria-label="Switch to light mode" title="Switch to light mode" data-i18n-aria-label="theme.switchToLight" data-i18n-title="theme.switchToLight" aria-pressed="true">
             <svg class="theme-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path class="icon-stars" d="M8.6 6.1L9.3 7.7 10.9 8.4 9.3 9.1 8.6 10.7 7.9 9.1 6.3 8.4 7.9 7.7ZM5.2 10.9L5.7 12 6.8 12.5 5.7 13 5.2 14.1 4.7 13 3.6 12.5 4.7 12ZM8.1 14.5L8.7 15.8 10 16.4 8.7 17 8.1 18.3 7.5 17 6.2 16.4 7.5 15.8Z" />
-              <path class="icon-crescent" d="M15.9 2.2a.9.9 0 0 1 1.02 1.26A8.3 8.3 0 1 0 20.35 13.7a.9.9 0 0 1 1.33.97A10.2 10.2 0 1 1 15.9 2.2Z" />
+              <g class="theme-icon-sun">
+                <circle cx="12" cy="12" r="3.3"></circle>
+                <path d="M12 3.5v1.8"></path>
+                <path d="M12 18.7v1.8"></path>
+                <path d="m5.98 5.98 1.27 1.27"></path>
+                <path d="m16.75 16.75 1.27 1.27"></path>
+                <path d="M3.5 12h1.8"></path>
+                <path d="M18.7 12h1.8"></path>
+                <path d="m5.98 18.02 1.27-1.27"></path>
+                <path d="m16.75 7.25 1.27-1.27"></path>
+              </g>
+              <g class="theme-icon-moon">
+                <path class="theme-icon-moon-crescent" d="M19.6 13.15A7.1 7.1 0 0 1 10.85 4.4 7.8 7.8 0 1 0 19.6 13.15Z"></path>
+                <circle class="theme-icon-moon-dot" cx="16.7" cy="5.2" r="0.8"></circle>
+              </g>
             </svg>
           </button>
         </div>
