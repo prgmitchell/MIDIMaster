@@ -1,5 +1,7 @@
 # MIDIMaster
 
+https://midimaster.app/
+
 DISCLAIMER: nearly 100% of everything you see on this repo was written with the assistance of AI.
 
 MIDIMaster is a desktop app that lets you bind MIDI controls (faders/knobs/buttons) to:
