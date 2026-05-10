@@ -190,6 +190,7 @@
   "settings.updates": "Bijwerken",
   "settings.autoCheckUpdates": "Automatisch controleren op updates",
   "settings.noUpdateCheckYet": "Nog geen update controle.",
+  "settings.autoCheckUpdatesOff": "Automatische updatecontroles zijn uitgeschakeld.",
   "settings.checkForUpdates": "Controleren op updates",
   "settings.checkingUpdates": "Controleren op updates...",
   "settings.downloadingUpdate": "Downloaden van update...",

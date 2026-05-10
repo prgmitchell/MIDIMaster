@@ -190,6 +190,7 @@
   "settings.updates": "(주)",
   "settings.autoCheckUpdates": "자주 묻는 질문",
   "settings.noUpdateCheckYet": "아직 업데이트가 없습니다.",
+  "settings.autoCheckUpdatesOff": "자동 업데이트 확인이 꺼져 있습니다.",
   "settings.checkForUpdates": "자주 묻는 질문",
   "settings.checkingUpdates": "자주 묻는 질문.",
   "settings.downloadingUpdate": "다운로드 업데이트 ...",

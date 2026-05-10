@@ -190,6 +190,7 @@
   "settings.updates": "最新情况",
   "settings.autoCheckUpdates": "自动检查更新",
   "settings.noUpdateCheckYet": "还没有更新检查 .",
+  "settings.autoCheckUpdatesOff": "自动更新检查已关闭。",
   "settings.checkForUpdates": "检查更新",
   "settings.checkingUpdates": "正在检查更新...",
   "settings.downloadingUpdate": "正在下载更新...",

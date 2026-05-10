@@ -190,6 +190,7 @@
   "settings.updates": "Atualizações",
   "settings.autoCheckUpdates": "Verifique automaticamente as atualizações",
   "settings.noUpdateCheckYet": "Nenhuma atualização ainda.",
+  "settings.autoCheckUpdatesOff": "As verificações automáticas de atualização estão desativadas.",
   "settings.checkForUpdates": "Procure por atualizações",
   "settings.checkingUpdates": "Procurando por atualizações...",
   "settings.downloadingUpdate": "Baixando atualização...",

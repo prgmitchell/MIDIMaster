@@ -190,6 +190,7 @@
   "settings.updates": "Aggiornamenti",
   "settings.autoCheckUpdates": "Controlla automaticamente gli aggiornamenti",
   "settings.noUpdateCheckYet": "Nessun controllo di aggiornamento.",
+  "settings.autoCheckUpdatesOff": "Il controllo automatico degli aggiornamenti è disattivato.",
   "settings.checkForUpdates": "Controllare gli aggiornamenti",
   "settings.checkingUpdates": "Controllo degli aggiornamenti...",
   "settings.downloadingUpdate": "Scarica l'aggiornamento...",

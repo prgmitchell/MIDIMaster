@@ -56,8 +56,10 @@ export function createSettingsFeature({
     available: false,
     checking: false,
     downloading: false,
+    hasChecked: false,
     body: "",
   };
+  let updateCheckPromise = null;
 
   function setTextContent(target, text, selector = null) {
     const value = String(text ?? "");
@@ -196,11 +198,32 @@ export function createSettingsFeature({
 
   function setUpdateStatus(message, kind = "") {
     if (!d.settingsUpdateStatus) return;
+    d.settingsUpdateStatus.querySelector(".settings-status-text")?.removeAttribute("data-i18n");
     setTextContent(d.settingsUpdateStatus, String(message || ""), ".settings-status-text");
     d.settingsUpdateStatus.classList.remove("error", "success");
     if (kind === "error" || kind === "success") {
       d.settingsUpdateStatus.classList.add(kind);
     }
+  }
+
+  function setStaticUpdateStatus(key, kind = "") {
+    if (!d.settingsUpdateStatus) return;
+    const textEl = d.settingsUpdateStatus.querySelector(".settings-status-text");
+    if (textEl) {
+      textEl.setAttribute("data-i18n", key);
+    }
+    setTextContent(d.settingsUpdateStatus, t(key), ".settings-status-text");
+    d.settingsUpdateStatus.classList.remove("error", "success");
+    if (kind === "error" || kind === "success") {
+      d.settingsUpdateStatus.classList.add(kind);
+    }
+  }
+
+  function renderIdleUpdateStatus() {
+    if (updateState.checking || updateState.downloading || updateState.hasChecked || updateState.available) return;
+    setStaticUpdateStatus(
+      shouldAutoCheckUpdates() ? "settings.noUpdateCheckYet" : "settings.autoCheckUpdatesOff",
+    );
   }
 
   function renderUpdateUi() {
@@ -237,6 +260,7 @@ export function createSettingsFeature({
       d.topbarUpdateButton.title = label;
     }
     renderAutoCheckButton();
+    renderIdleUpdateStatus();
   }
 
   function normalizeUpdateInfo(updateInfo) {
@@ -249,42 +273,59 @@ export function createSettingsFeature({
     return { available, currentVersion, latestVersion, body };
   }
 
+  function shouldAutoCheckUpdates() {
+    return (typeof getAppSettings === "function")
+      ? ((getAppSettings() || {}).autoCheckUpdates !== false)
+      : true;
+  }
+
+  function ensureAutoUpdateCheck() {
+    if (!shouldAutoCheckUpdates() || updateState.hasChecked) {
+      return updateCheckPromise || Promise.resolve(null);
+    }
+    return checkForUpdates({ silent: true });
+  }
+
   async function checkForUpdates({ silent = false } = {}) {
+    if (updateCheckPromise) {
+      return updateCheckPromise;
+    }
     updateState.checking = true;
+    updateState.hasChecked = true;
     renderUpdateUi();
-    if (!silent) {
-      setUpdateStatus(t("settings.checkingUpdates"));
-    }
-    try {
-      const updateInfo = await invoke("check_for_updates");
-      const normalized = normalizeUpdateInfo(updateInfo);
-      updateState.currentVersion = normalized.currentVersion;
-      updateState.latestVersion = normalized.latestVersion;
-      updateState.available = normalized.available;
-      updateState.body = normalized.body;
-      if (normalized.available) {
-        setUpdateStatus(
-          normalized.body
-            ? t("settings.updateAvailableNotes", { version: normalized.latestVersion })
-            : t("settings.updateAvailable", { version: normalized.latestVersion }),
-          "success",
-        );
-      } else {
-        setUpdateStatus(t("settings.upToDate"), "success");
-      }
-      return normalized;
-    } catch (error) {
-      updateState.available = false;
-      updateState.body = "";
-      console.error("Updater check failed:", error);
-      if (!silent) {
+    setUpdateStatus(t("settings.checkingUpdates"));
+    updateCheckPromise = (async () => {
+      try {
+        const updateInfo = await invoke("check_for_updates");
+        const normalized = normalizeUpdateInfo(updateInfo);
+        updateState.currentVersion = normalized.currentVersion;
+        updateState.latestVersion = normalized.latestVersion;
+        updateState.available = normalized.available;
+        updateState.body = normalized.body;
+        if (normalized.available) {
+          setUpdateStatus(
+            normalized.body
+              ? t("settings.updateAvailableNotes", { version: normalized.latestVersion })
+              : t("settings.updateAvailable", { version: normalized.latestVersion }),
+            "success",
+          );
+        } else {
+          setUpdateStatus(t("settings.upToDate"), "success");
+        }
+        return normalized;
+      } catch (error) {
+        updateState.available = false;
+        updateState.body = "";
+        console.error("Updater check failed:", error);
         setUpdateStatus(formatUpdaterError(error), "error");
+        return null;
+      } finally {
+        updateState.checking = false;
+        renderUpdateUi();
+        updateCheckPromise = null;
       }
-      return null;
-    } finally {
-      updateState.checking = false;
-      renderUpdateUi();
-    }
+    })();
+    return updateCheckPromise;
   }
 
   async function installAvailableUpdate() {
@@ -764,7 +805,7 @@ export function createSettingsFeature({
       d.languageSelect.value = normalizeLanguage(merged.language);
       renderSettingsSelectDropdown(d.languageSelect);
     }
-    renderAutoCheckButton();
+    renderUpdateUi();
   }
 
   function persistAppSettings() {
@@ -989,6 +1030,7 @@ export function createSettingsFeature({
         syncAppSettingsUI({ autoCheckUpdates: d.autoCheckUpdatesButton.checked });
         persistAppSettings();
         renderUpdateUi();
+        ensureAutoUpdateCheck();
       });
     }
     if (d.checkForUpdatesButton) {
@@ -1020,7 +1062,7 @@ export function createSettingsFeature({
       renderUpdateUi();
     });
 
-    setUpdateStatus(t("settings.noUpdateCheckYet"));
+    setStaticUpdateStatus("settings.noUpdateCheckYet");
     renderUpdateUi();
     renderAllSettingsSelectDropdowns();
     scheduleSettingsControlSync();
@@ -1055,6 +1097,7 @@ export function createSettingsFeature({
     syncAppSettingsUI,
     persistAppSettings,
     checkForUpdates,
+    ensureAutoUpdateCheck,
     installAvailableUpdate,
     activateSettingsSection,
     renderAllSettingsSelectDropdowns,

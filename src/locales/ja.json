@@ -190,6 +190,7 @@
   "settings.updates": "アップデート",
   "settings.autoCheckUpdates": "アップデートを自動的にチェック",
   "settings.noUpdateCheckYet": "更新情報はまだありません.",
+  "settings.autoCheckUpdatesOff": "自動更新チェックはオフです。",
   "settings.checkForUpdates": "アップデートの確認",
   "settings.checkingUpdates": "アップデートの確認.",
   "settings.downloadingUpdate": "更新をダウンロード...",

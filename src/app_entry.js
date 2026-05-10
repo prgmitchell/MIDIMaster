@@ -562,6 +562,7 @@ async function preparePage(page) {
     await loadAppSettings();
     await settingsFeature?.loadCurrentAppVersion?.();
     syncAppSettingsUI(appSettings);
+    settingsFeature?.ensureAutoUpdateCheck?.();
     settingsFeature?.openSettingsPanel?.();
     settingsFeature?.renderAllSettingsSelectDropdowns?.();
     settingsFeature?.syncOsdAppearanceControls?.();
