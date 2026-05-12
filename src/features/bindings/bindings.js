@@ -711,8 +711,9 @@ export function createBindingsFeature({
     return `Ch ${control.channel} ${msg} ${control.controller}`;
   }
 
-  function formatPreviewMidiValue(binding, normalizedValue) {
-    const clamped = Math.min(1, Math.max(0, Number(normalizedValue) || 0));
+  function formatPreviewMidiValue(binding, normalizedValue, rawNormalizedValue = null) {
+    const sourceValue = rawNormalizedValue != null ? rawNormalizedValue : normalizedValue;
+    const clamped = Math.min(1, Math.max(0, Number(sourceValue) || 0));
     const msgType = String(binding?.control?.msg_type || "ControlChange");
     if (msgType === "PitchBend") {
       const raw = Math.round(clamped * 16383);
@@ -868,7 +869,9 @@ export function createBindingsFeature({
     if (d.bindingConfigPreviewMute) d.bindingConfigPreviewMute.textContent = formatMidiControlLabel(binding.mute_control);
     if (d.bindingConfigPreviewAssign) d.bindingConfigPreviewAssign.textContent = formatMidiControlLabel(binding.assign_control);
     if (d.bindingConfigPreviewCurve) d.bindingConfigPreviewCurve.textContent = curveDisplayName(binding.fader_curve);
-    if (d.bindingConfigPreviewMidiValue) d.bindingConfigPreviewMidiValue.textContent = formatPreviewMidiValue(binding, previewValue);
+    if (d.bindingConfigPreviewMidiValue) {
+      d.bindingConfigPreviewMidiValue.textContent = formatPreviewMidiValue(binding, previewValue, liveMidiValue);
+    }
     if (d.bindingConfigPreviewStatus) {
       if (learningPrimary) {
         d.bindingConfigPreviewStatus.textContent = t("bindings.waitingForNewFaderInput");
