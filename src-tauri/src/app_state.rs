@@ -82,6 +82,7 @@ pub(crate) struct AppState {
     pub(crate) active_profile: Mutex<Option<Profile>>,
     pub(crate) binding_state: Arc<Mutex<HashMap<BindingKey, BindingState>>>,
     pub(crate) feedback_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
+    pub(crate) activity_button_light_generations: Arc<Mutex<HashMap<BindingKey, u64>>>,
     pub(crate) last_mute_input_active: Mutex<HashMap<BindingKey, bool>>,
     pub(crate) focus_volume_failure_logs: Mutex<HashMap<String, Instant>>,
     pub(crate) mute_transition_until: Mutex<HashMap<BindingKey, Instant>>,
@@ -212,6 +213,20 @@ impl AppState {
         crate::runtime_midi::apply_midi_event(self, app, event)
     }
 
+    pub(crate) fn activity_button_light_input_active(&self, key: &BindingKey) -> bool {
+        self.binding_state
+            .lock()
+            .ok()
+            .and_then(|states| states.get(key).map(|state| state.last_value > 0.5))
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn cancel_activity_button_light_holds(&self) {
+        if let Ok(mut generations) = self.activity_button_light_generations.lock() {
+            generations.clear();
+        }
+    }
+
     pub(crate) fn sync_feedback_values(&self, profile: &Profile) {
         let sessions = match self.audio.list_sessions() {
             Ok(sessions) => sessions,
@@ -236,6 +251,13 @@ impl AppState {
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
             if let Some(value) = binding.idle_button_light_feedback_value() {
+                let value = if binding.activity_button_light_feedback_value(true) == Some(1.0)
+                    && self.activity_button_light_input_active(&key)
+                {
+                    1.0
+                } else {
+                    value
+                };
                 feedback.insert(key, value);
                 continue;
             }
@@ -418,6 +440,8 @@ impl AppState {
     }
 
     pub(crate) fn send_idle_button_light_feedback_values(&self, profile: &Profile) {
+        self.cancel_activity_button_light_holds();
+
         if let Ok(mut feedback) = self.feedback_values.lock() {
             for binding in &profile.bindings {
                 if let Some(value) = binding.idle_button_light_feedback_value() {

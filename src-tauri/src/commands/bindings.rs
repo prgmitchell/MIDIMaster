@@ -5,13 +5,17 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, State};
 
-fn binding_user_active(state: &AppState, key: &BindingKey, is_note: bool) -> bool {
+fn binding_state_user_active(state: &crate::bindings::BindingState, is_note: bool) -> bool {
     if is_note {
-        return false;
+        return state.last_value > 0.5;
     }
+    state.last_update.elapsed().as_millis() < 500
+}
+
+fn binding_user_active(state: &AppState, key: &BindingKey, is_note: bool) -> bool {
     if let Ok(states) = state.binding_state.lock() {
         if let Some(st) = states.get(key) {
-            return st.last_update.elapsed().as_millis() < 500;
+            return binding_state_user_active(st, is_note);
         }
     }
     false
@@ -681,6 +685,7 @@ pub fn update_midi_feedback(
             let key = BindingKey::from_binding(binding);
             let feedback_value = binding
                 .mapped_button_light_feedback_value()
+                .or_else(|| binding.idle_button_light_feedback_value())
                 .unwrap_or(value);
 
             let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
@@ -748,6 +753,7 @@ pub fn set_binding_feedback(
     let action_matches_binding = action.is_none() || effective_action == binding.action;
     let feedback_value = binding
         .mapped_button_light_feedback_value()
+        .or_else(|| binding.idle_button_light_feedback_value())
         .unwrap_or(value);
 
     let silent = silent.unwrap_or(false);
@@ -833,6 +839,7 @@ pub fn set_binding_feedback(
             if emitted_controls.insert(primary_key.clone()) {
                 let candidate_value = candidate
                     .mapped_button_light_feedback_value()
+                    .or_else(|| candidate.idle_button_light_feedback_value())
                     .unwrap_or(value);
                 send_feedback_to_control(
                     &state,
@@ -980,4 +987,36 @@ pub fn apply_binding_action(
         Some(effective_action),
         silent,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bindings::BindingState;
+
+    fn binding_state(last_value: f32, elapsed_ms: u64) -> BindingState {
+        BindingState {
+            last_value,
+            last_update: Instant::now()
+                .checked_sub(Duration::from_millis(elapsed_ms))
+                .unwrap_or_else(Instant::now),
+            relative_auto_format: None,
+            relative_seen_midpoint: false,
+            relative_seen_sign_band: false,
+            relative_seen_high_negative: false,
+            relative_seen_low_negative_hint: false,
+        }
+    }
+
+    #[test]
+    fn note_button_is_active_only_while_input_is_pressed() {
+        assert!(binding_state_user_active(&binding_state(1.0, 10), true));
+        assert!(!binding_state_user_active(&binding_state(0.0, 10), true));
+    }
+
+    #[test]
+    fn continuous_control_activity_uses_recent_update_window() {
+        assert!(binding_state_user_active(&binding_state(0.0, 100), false));
+        assert!(!binding_state_user_active(&binding_state(0.0, 700), false));
+    }
 }

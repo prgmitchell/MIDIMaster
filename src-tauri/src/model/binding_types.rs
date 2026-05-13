@@ -532,6 +532,25 @@ impl Binding {
         })
     }
 
+    pub fn activity_button_light_feedback_value(&self, input_active: bool) -> Option<f32> {
+        if !self.is_button_binding()
+            || matches!(self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
+            || self.uses_stateful_toggle_feedback()
+        {
+            return None;
+        }
+
+        let targets = self.normalized_targets();
+        if targets
+            .iter()
+            .any(|target| !matches!(target, BindingTarget::Unset))
+        {
+            return Some(if input_active { 1.0 } else { 0.0 });
+        }
+
+        None
+    }
+
     pub fn idle_button_light_feedback_value(&self) -> Option<f32> {
         if !self.is_button_binding() {
             return None;

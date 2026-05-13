@@ -91,6 +91,191 @@ fn resolve_integration_button_event(
     }
 }
 
+const ACTIVITY_BUTTON_LIGHT_HOLD_RETRY_DELAYS_MS: [u64; 3] = [10, 35, 75];
+const ACTIVITY_BUTTON_LIGHT_HOLD_INTERVAL_MS: u64 = 100;
+
+fn start_activity_button_light_generation(
+    generations: &mut HashMap<BindingKey, u64>,
+    key: &BindingKey,
+) -> u64 {
+    let generation = generations.get(key).copied().unwrap_or(0).wrapping_add(1);
+    generations.insert(key.clone(), generation);
+    generation
+}
+
+fn cancel_activity_button_light_generation(
+    generations: &mut HashMap<BindingKey, u64>,
+    key: &BindingKey,
+) {
+    generations.remove(key);
+}
+
+fn activity_button_light_generation_is_current(
+    generations: &HashMap<BindingKey, u64>,
+    key: &BindingKey,
+    generation: u64,
+) -> bool {
+    generations.get(key).copied() == Some(generation)
+}
+
+fn activity_button_light_hold_should_continue(
+    generations: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, u64>>>,
+    binding_state: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, BindingState>>>,
+    key: &BindingKey,
+    generation: u64,
+) -> bool {
+    let generation_current = generations
+        .lock()
+        .ok()
+        .map(|generations| {
+            activity_button_light_generation_is_current(&generations, key, generation)
+        })
+        .unwrap_or(false);
+    if !generation_current {
+        return false;
+    }
+
+    binding_state
+        .lock()
+        .ok()
+        .and_then(|states| states.get(key).map(|state| state.last_value > 0.5))
+        .unwrap_or(false)
+}
+
+fn send_activity_button_light_hold_feedback(
+    feedback_values: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, f32>>>,
+    midi: &std::sync::Arc<std::sync::Mutex<crate::midi::MidiManager>>,
+    key: &BindingKey,
+    device_id: &str,
+    channel: u8,
+    controller: u8,
+    msg_type: model::MidiMessageType,
+) {
+    if let Ok(mut feedback) = feedback_values.lock() {
+        feedback.insert(key.clone(), 1.0);
+    }
+    if let Ok(mut midi) = midi.lock() {
+        let _ = midi.send_feedback(device_id, channel, controller, 1.0, msg_type);
+    }
+}
+
+fn send_activity_button_light_hold_feedback_if_current(
+    generations: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, u64>>>,
+    binding_state: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, BindingState>>>,
+    feedback_values: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, f32>>>,
+    midi: &std::sync::Arc<std::sync::Mutex<crate::midi::MidiManager>>,
+    key: &BindingKey,
+    generation: u64,
+    device_id: &str,
+    channel: u8,
+    controller: u8,
+    msg_type: model::MidiMessageType,
+) -> bool {
+    let Ok(generations_guard) = generations.lock() else {
+        return false;
+    };
+    if !activity_button_light_generation_is_current(&generations_guard, key, generation) {
+        return false;
+    }
+
+    let still_pressed = binding_state
+        .lock()
+        .ok()
+        .and_then(|states| states.get(key).map(|state| state.last_value > 0.5))
+        .unwrap_or(false);
+    if !still_pressed {
+        return false;
+    }
+
+    send_activity_button_light_hold_feedback(
+        feedback_values,
+        midi,
+        key,
+        device_id,
+        channel,
+        controller,
+        msg_type,
+    );
+    true
+}
+
+pub(super) fn update_activity_button_light_hold_feedback(
+    state: &AppState,
+    binding: &model::Binding,
+    key: BindingKey,
+    input_active: bool,
+) {
+    if binding
+        .activity_button_light_feedback_value(input_active)
+        .is_none()
+        || !input_active
+    {
+        if let Ok(mut generations) = state.activity_button_light_generations.lock() {
+            cancel_activity_button_light_generation(&mut generations, &key);
+        }
+        return;
+    }
+
+    let generation = match state.activity_button_light_generations.lock() {
+        Ok(mut generations) => start_activity_button_light_generation(&mut generations, &key),
+        Err(_) => return,
+    };
+
+    let generations = state.activity_button_light_generations.clone();
+    let binding_state = state.binding_state.clone();
+    let feedback_values = state.feedback_values.clone();
+    let midi = state.midi.clone();
+    let device_id = binding.device_id.clone();
+    let channel = binding.control.channel;
+    let controller = binding.control.controller;
+    let msg_type = binding.control.msg_type.clone();
+
+    tauri::async_runtime::spawn(async move {
+        let mut previous_delay = 0;
+        for delay in ACTIVITY_BUTTON_LIGHT_HOLD_RETRY_DELAYS_MS {
+            tokio::time::sleep(Duration::from_millis(delay - previous_delay)).await;
+            previous_delay = delay;
+
+            if !send_activity_button_light_hold_feedback_if_current(
+                &generations,
+                &binding_state,
+                &feedback_values,
+                &midi,
+                &key,
+                generation,
+                &device_id,
+                channel,
+                controller,
+                msg_type.clone(),
+            ) {
+                return;
+            }
+        }
+
+        loop {
+            tokio::time::sleep(Duration::from_millis(
+                ACTIVITY_BUTTON_LIGHT_HOLD_INTERVAL_MS,
+            ))
+            .await;
+
+            if !send_activity_button_light_hold_feedback_if_current(
+                &generations,
+                &binding_state,
+                &feedback_values,
+                &midi,
+                &key,
+                generation,
+                &device_id,
+                channel,
+                controller,
+                msg_type.clone(),
+            ) {
+                return;
+            }
+        }
+    });
+}
+
 pub(crate) fn apply_midi_event(
     state: &AppState,
     app: &AppHandle,
@@ -561,7 +746,13 @@ pub(crate) fn apply_midi_event(
 
     let primary_feedback_value = binding
         .mapped_button_light_feedback_value()
+        .or_else(|| binding.activity_button_light_feedback_value(event.value > 0))
         .unwrap_or(volume);
+
+    let input_active = event.value > 0;
+    if !integration_button_feedback_owned && !input_active {
+        update_activity_button_light_hold_feedback(state, &binding, key.clone(), false);
+    }
 
     if !integration_button_feedback_owned {
         if let Ok(mut feedback) = state.feedback_values.lock() {
@@ -582,6 +773,9 @@ pub(crate) fn apply_midi_event(
                 primary_feedback_value,
                 binding.control.msg_type.clone(),
             );
+        }
+        if input_active {
+            update_activity_button_light_hold_feedback(state, &binding, key.clone(), true);
         }
     }
 
@@ -612,4 +806,102 @@ pub(crate) fn apply_midi_event(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key(controller: u8) -> BindingKey {
+        BindingKey {
+            device_id: "device".to_string(),
+            channel: 0,
+            controller,
+            msg_type: model::MidiMessageType::Note,
+        }
+    }
+
+    #[test]
+    fn activity_button_light_generation_refresh_invalidates_old_task() {
+        let key = key(23);
+        let mut generations = HashMap::new();
+
+        let first = start_activity_button_light_generation(&mut generations, &key);
+        assert!(activity_button_light_generation_is_current(
+            &generations,
+            &key,
+            first
+        ));
+
+        let second = start_activity_button_light_generation(&mut generations, &key);
+        assert!(!activity_button_light_generation_is_current(
+            &generations,
+            &key,
+            first
+        ));
+        assert!(activity_button_light_generation_is_current(
+            &generations,
+            &key,
+            second
+        ));
+    }
+
+    #[test]
+    fn activity_button_light_generation_cancel_invalidates_task() {
+        let key = key(23);
+        let mut generations = HashMap::new();
+
+        let generation = start_activity_button_light_generation(&mut generations, &key);
+        cancel_activity_button_light_generation(&mut generations, &key);
+
+        assert!(!activity_button_light_generation_is_current(
+            &generations,
+            &key,
+            generation
+        ));
+    }
+
+    #[test]
+    fn note_button_hold_detection_uses_last_input_value() {
+        let key = key(23);
+        let generations = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let binding_state = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let generation = {
+            let mut generations = generations.lock().unwrap();
+            start_activity_button_light_generation(&mut generations, &key)
+        };
+
+        {
+            let mut states = binding_state.lock().unwrap();
+            states.insert(
+                key.clone(),
+                BindingState {
+                    last_value: 1.0,
+                    last_update: Instant::now(),
+                    relative_auto_format: None,
+                    relative_seen_midpoint: false,
+                    relative_seen_sign_band: false,
+                    relative_seen_high_negative: false,
+                    relative_seen_low_negative_hint: false,
+                },
+            );
+        }
+        assert!(activity_button_light_hold_should_continue(
+            &generations,
+            &binding_state,
+            &key,
+            generation
+        ));
+
+        {
+            let mut states = binding_state.lock().unwrap();
+            states.get_mut(&key).unwrap().last_value = 0.0;
+        }
+        assert!(!activity_button_light_hold_should_continue(
+            &generations,
+            &binding_state,
+            &key,
+            generation
+        ));
+    }
 }

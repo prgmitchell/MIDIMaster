@@ -60,6 +60,7 @@ use audio::unsupported::UnsupportedAudioBackend;
 
 fn shutdown_lights(state: &AppState) {
     run_logger::info("app", "shutdown_lights_start", "");
+    state.cancel_activity_button_light_holds();
     if let Ok(profile_guard) = state.active_profile.lock() {
         if let Some(profile) = profile_guard.as_ref() {
             run_logger::info(
@@ -329,6 +330,7 @@ fn main() {
                 active_profile: Mutex::new(None),
                 binding_state: Arc::new(Mutex::new(HashMap::new())),
                 feedback_values: Arc::new(Mutex::new(HashMap::new())),
+                activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
                 last_mute_input_active: Mutex::new(HashMap::new()),
                 focus_volume_failure_logs: Mutex::new(HashMap::new()),
                 mute_transition_until: Mutex::new(HashMap::new()),

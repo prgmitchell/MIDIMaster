@@ -1,3 +1,4 @@
+use super::update_activity_button_light_hold_feedback;
 use crate::bindings::BindingKey;
 use crate::model::{self, Binding, BindingTarget, MidiEvent};
 use crate::run_logger;
@@ -16,11 +17,16 @@ fn emit_button_feedback(
     value: f32,
 ) {
     let key = BindingKey::from_event(event);
+    let input_active = event.value > 0;
     let feedback_value = binding
         .mapped_button_light_feedback_value()
+        .or_else(|| binding.activity_button_light_feedback_value(input_active))
         .unwrap_or(value);
+    if !input_active {
+        update_activity_button_light_hold_feedback(state, binding, key.clone(), false);
+    }
     if let Ok(mut feedback) = state.feedback_values.lock() {
-        feedback.insert(key, feedback_value);
+        feedback.insert(key.clone(), feedback_value);
     }
     if let Ok(mut midi) = state.midi.lock() {
         let _ = midi.send_feedback(
@@ -30,6 +36,9 @@ fn emit_button_feedback(
             feedback_value,
             binding.control.msg_type.clone(),
         );
+    }
+    if input_active {
+        update_activity_button_light_hold_feedback(state, binding, key, true);
     }
     let payload = serde_json::json!({
       "target": targets.first().unwrap_or(&BindingTarget::Unset),

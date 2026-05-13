@@ -315,3 +315,35 @@ fn idle_button_light_clears_activity_mode_for_stateless_actions() {
     assert_eq!(binding.mapped_button_light_feedback_value(), None);
     assert_eq!(binding.idle_button_light_feedback_value(), Some(0.0));
 }
+
+#[test]
+fn activity_button_light_tracks_button_press_for_stateless_actions() {
+    let mut binding = mapped_button_binding(
+        BindingAction::OpenApplication,
+        vec![BindingTarget::OpenApplication],
+    );
+    binding.button_light_mode = ButtonLightMode::Activity;
+
+    assert_eq!(
+        binding.activity_button_light_feedback_value(false),
+        Some(0.0)
+    );
+    assert_eq!(
+        binding.activity_button_light_feedback_value(true),
+        Some(1.0)
+    );
+}
+
+#[test]
+fn activity_button_light_does_not_override_mapped_or_stateful_feedback() {
+    let mapped = mapped_button_binding(
+        BindingAction::MediaPlayPause,
+        vec![BindingTarget::MediaControl],
+    );
+    assert_eq!(mapped.activity_button_light_feedback_value(true), None);
+
+    let mut stateful =
+        mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    stateful.button_light_mode = ButtonLightMode::Activity;
+    assert_eq!(stateful.activity_button_light_feedback_value(true), None);
+}
