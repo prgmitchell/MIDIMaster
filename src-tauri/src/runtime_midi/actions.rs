@@ -16,21 +16,24 @@ fn emit_button_feedback(
     value: f32,
 ) {
     let key = BindingKey::from_event(event);
+    let feedback_value = binding
+        .mapped_button_light_feedback_value()
+        .unwrap_or(value);
     if let Ok(mut feedback) = state.feedback_values.lock() {
-        feedback.insert(key, value);
+        feedback.insert(key, feedback_value);
     }
     if let Ok(mut midi) = state.midi.lock() {
         let _ = midi.send_feedback(
             &binding.device_id,
             binding.control.channel,
             binding.control.controller,
-            value,
+            feedback_value,
             binding.control.msg_type.clone(),
         );
     }
     let payload = serde_json::json!({
       "target": targets.first().unwrap_or(&BindingTarget::Unset),
-      "volume": value,
+      "volume": feedback_value,
       "binding_id": binding.id,
       "source": "button_feedback",
     });

@@ -352,8 +352,12 @@ pub(crate) fn apply_midi_event(
             *last_update = Some(Instant::now());
         }
 
+        let feedback_value = binding
+            .mapped_button_light_feedback_value()
+            .unwrap_or(if muted { 1.0 } else { 0.0 });
+
         if let Ok(mut feedback) = state.feedback_values.lock() {
-            feedback.insert(key.clone(), if muted { 1.0 } else { 0.0 });
+            feedback.insert(key.clone(), feedback_value);
         }
 
         if let Ok(mut midi) = state.midi.lock() {
@@ -362,7 +366,7 @@ pub(crate) fn apply_midi_event(
                 &binding.device_id,
                 binding.control.channel,
                 binding.control.controller,
-                if muted { 1.0 } else { 0.0 },
+                feedback_value,
                 binding.control.msg_type.clone(),
             );
         }
@@ -555,9 +559,13 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
 
+    let primary_feedback_value = binding
+        .mapped_button_light_feedback_value()
+        .unwrap_or(volume);
+
     if !integration_button_feedback_owned {
         if let Ok(mut feedback) = state.feedback_values.lock() {
-            feedback.insert(key.clone(), volume);
+            feedback.insert(key.clone(), primary_feedback_value);
         }
     }
 
@@ -571,7 +579,7 @@ pub(crate) fn apply_midi_event(
                 &binding.device_id,
                 binding.control.channel,
                 binding.control.controller,
-                volume,
+                primary_feedback_value,
                 binding.control.msg_type.clone(),
             );
         }

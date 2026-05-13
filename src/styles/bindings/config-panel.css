@@ -55,6 +55,11 @@
   gap: 12px;
 }
 
+.binding-config-section.hidden,
+.binding-config-preview-summary-row.hidden {
+  display: none;
+}
+
 .binding-config-title-row {
   display: flex;
   align-items: center;
@@ -118,6 +123,44 @@
   height: 40px;
   border-radius: 10px;
   font-size: 14px;
+}
+
+.binding-config-toggle-row {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 144, 184, 0.16);
+  background: rgba(11, 18, 28, 0.62);
+}
+
+.binding-config-toggle-row.is-disabled {
+  opacity: 0.62;
+}
+
+.binding-config-toggle-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.binding-config-toggle-title {
+  color: #e3eeff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.binding-config-toggle-help {
+  color: #93a5c4;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.binding-config-toggle {
+  flex: 0 0 auto;
 }
 
 .binding-config-actions {
@@ -386,6 +429,10 @@
   background: linear-gradient(180deg, rgba(15, 23, 34, 0.72), rgba(12, 19, 29, 0.86));
 }
 
+.binding-config-preview-learn-shell.hidden {
+  display: none;
+}
+
 .binding-config-preview-learn-row {
   display: grid;
   align-content: start;
@@ -426,6 +473,10 @@
   gap: 6px;
 }
 
+.binding-config-preview-stage-title {
+  display: none;
+}
+
 .binding-config-preview-target-label {
   color: #ecf3ff;
   font-size: 18px;
@@ -457,6 +508,54 @@
   margin: 0 auto;
   height: 100%;
   min-height: 280px;
+}
+
+.binding-config-preview-fader.hidden {
+  display: none;
+}
+
+.binding-config-preview-button {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.binding-config-preview-button.hidden {
+  display: none;
+}
+
+.binding-config-preview-button-face {
+  width: min(172px, 62%);
+  aspect-ratio: 1;
+  border-radius: 18px;
+  border: 1px solid rgba(120, 144, 184, 0.22);
+  background: linear-gradient(180deg, rgba(12, 20, 31, 0.98), rgba(7, 12, 20, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 36px rgba(0, 0, 0, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #96a8c6;
+  font-weight: 800;
+  letter-spacing: 0;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+
+.binding-config-preview-button-face.is-active {
+  border-color: rgba(83, 178, 255, 0.68);
+  background: linear-gradient(180deg, rgba(83, 178, 255, 0.62), rgba(42, 113, 248, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 28px rgba(83, 178, 255, 0.34),
+    0 18px 36px rgba(0, 0, 0, 0.34);
+  color: #f4f9ff;
+}
+
+.binding-config-preview-button-label {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .binding-config-preview-scale {
@@ -552,6 +651,249 @@
   display: flex;
   align-items: center;
   font-weight: 600;
+}
+
+.binding-config-panel--button .binding-config-content {
+  width: min(940px, 96vw);
+}
+
+.binding-config-panel--button .binding-config-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px 20px 16px;
+}
+
+.binding-config-panel--button .binding-config-main-column {
+  align-content: start;
+  border-right: none;
+  gap: 12px;
+  grid-template-rows: auto auto 1fr;
+  padding: 0;
+}
+
+.binding-config-panel--button .binding-config-preview-column {
+  align-items: flex-start;
+  padding: 0;
+}
+
+.binding-config-panel--button .binding-config-preview-shell {
+  width: 100%;
+  flex: none;
+  grid-template-rows: auto;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.binding-config-panel--button .binding-config-preview-shell > .binding-config-title-row {
+  display: none;
+}
+
+.binding-config-panel--button .binding-config-preview-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.binding-config-panel--button .binding-config-preview-stage {
+  min-height: 112px;
+  height: auto;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.binding-config-panel--button .binding-config-preview-stage-title {
+  display: block;
+  grid-column: 1 / -1;
+}
+
+.binding-config-panel--button .binding-config-preview-target {
+  display: none;
+}
+
+.binding-config-panel--button .binding-config-preview-target-copy {
+  display: none;
+}
+
+.binding-config-panel--button .binding-config-preview-target-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 13px;
+}
+
+.binding-config-panel--button .binding-config-preview-target-icon .target-icon,
+.binding-config-panel--button .binding-config-preview-target-icon img {
+  width: 32px;
+  height: 32px;
+}
+
+.binding-config-panel--button .binding-config-preview-button {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  height: 46px;
+  align-self: center;
+  justify-content: stretch;
+}
+
+.binding-config-panel--button .binding-config-preview-button-face {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.binding-config-panel--button .binding-config-preview-button-face.is-active {
+  box-shadow: none;
+}
+
+.binding-config-panel--button .binding-config-preview-button-label {
+  font-size: 14px;
+}
+
+.binding-config-panel--button .binding-config-preview-meta {
+  height: auto;
+  grid-template-rows: auto;
+  gap: 0;
+  padding: 14px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 144, 184, 0.18);
+  background: linear-gradient(180deg, rgba(16, 25, 39, 0.72), rgba(13, 20, 31, 0.88));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.binding-config-panel--button .binding-config-preview-value-block {
+  display: none;
+}
+
+.binding-config-panel--button .binding-config-preview-value {
+  font-size: 0;
+}
+
+.binding-config-panel--button .binding-config-preview-summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #aebbd0;
+}
+
+.binding-config-panel--button .binding-config-preview-summary {
+  gap: 10px;
+}
+
+.binding-config-panel--button .binding-config-preview-summary-value {
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 14px;
+}
+
+.binding-config-panel--button .binding-config-preview-learn-shell {
+  display: none;
+}
+
+.binding-config-panel--button .binding-config-section {
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(16, 25, 39, 0.72), rgba(13, 20, 31, 0.88));
+}
+
+.binding-config-panel--button .binding-config-title {
+  font-size: 14px;
+}
+
+.binding-config-panel--button .binding-config-stack input[type="text"] {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.binding-config-panel--button .binding-config-toggle-row {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.binding-config-panel--button .binding-config-section--button-learn {
+  align-content: start;
+}
+
+.binding-config-panel--button .binding-config-toggle-title {
+  font-size: 14px;
+}
+
+.binding-config-panel--button .binding-config-toggle-help {
+  max-width: 300px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.binding-config-panel--button .binding-config-preview-learn-row .binding-config-button {
+  height: 42px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.binding-config-panel--button .binding-config-footer {
+  padding: 12px 26px 16px;
+}
+
+.binding-config-panel--button .binding-config-footer button {
+  min-width: 136px;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-section,
+body[data-theme] .binding-config-panel--button .binding-config-preview-stage,
+body[data-theme] .binding-config-panel--button .binding-config-preview-meta {
+  border-color: var(--control-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, var(--surface-raised)) 0%, var(--surface) 100%);
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-toggle-row {
+  border-color: transparent;
+  background: transparent;
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-preview-button-face {
+  border-color: var(--control-border);
+  background: color-mix(in srgb, var(--control-bg) 72%, var(--surface-muted) 28%);
+  color: var(--text-secondary);
+}
+
+body[data-theme="dark"] .binding-config-panel--button .binding-config-preview-button-face {
+  background: color-mix(in srgb, var(--control-bg) 58%, var(--surface-muted) 42%);
+  color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-muted) 16%);
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-preview-button-face.is-active {
+  border-color: color-mix(in srgb, var(--accent) 74%, var(--control-border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 76%, white) 0%, var(--accent) 100%);
+  color: #f7fbff;
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-toggle-title,
+body[data-theme] .binding-config-panel--button .binding-config-preview-stage-title,
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary-value {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-toggle-help,
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary-label {
+  color: var(--text-secondary);
 }
 
 .binding-config-footer {

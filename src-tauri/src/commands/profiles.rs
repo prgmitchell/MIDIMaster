@@ -81,6 +81,7 @@ fn set_active_profile_state(
     }
 
     state.sync_feedback_values(profile);
+    state.send_idle_button_light_feedback_values(profile);
     Ok(())
 }
 

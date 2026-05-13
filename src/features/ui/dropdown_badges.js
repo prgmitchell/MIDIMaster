@@ -155,6 +155,50 @@ export function closeOpenDropdowns(options = {}) {
   closeAllDropdowns(options);
 }
 
+export function positionFloatingDropdownMenu({
+  menu,
+  trigger,
+  minHeight = 160,
+  maxHeight = 280,
+  gap = 6,
+  viewportPadding = 14,
+  zIndex = 1000,
+} = {}) {
+  if (!menu || !trigger || menu.classList.contains("hidden")) return;
+
+  const rect = trigger.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || rect.right;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || rect.bottom;
+  const safeWidth = Math.max(120, Math.min(rect.width, viewportWidth - (viewportPadding * 2)));
+  const left = Math.max(
+    viewportPadding,
+    Math.min(rect.left, viewportWidth - safeWidth - viewportPadding),
+  );
+  const availableBelow = viewportHeight - rect.bottom - viewportPadding - gap;
+  const availableAbove = rect.top - viewportPadding - gap;
+  const availableSpace = Math.max(availableBelow, availableAbove);
+  const safeMaxHeight = Math.max(
+    Math.min(minHeight, maxHeight),
+    Math.min(maxHeight, availableSpace),
+  );
+
+  menu.style.position = "fixed";
+  menu.style.left = `${left}px`;
+  menu.style.right = "auto";
+  menu.style.width = `${safeWidth}px`;
+  menu.style.minWidth = `${safeWidth}px`;
+  menu.style.maxWidth = `${Math.max(120, viewportWidth - (viewportPadding * 2))}px`;
+  menu.style.maxHeight = `${safeMaxHeight}px`;
+  menu.style.zIndex = String(zIndex);
+
+  const menuHeight = Math.min(menu.scrollHeight || safeMaxHeight, safeMaxHeight);
+  const openUp = availableBelow < Math.min(180, menuHeight) && availableAbove > availableBelow;
+  const top = openUp
+    ? Math.max(viewportPadding, rect.top - gap - menuHeight)
+    : Math.min(rect.bottom + gap, viewportHeight - viewportPadding - menuHeight);
+  menu.style.top = `${top}px`;
+}
+
 export function wireDropdownToggle({ root, menu, trigger }) {
   if (!root || !menu || !trigger) return () => {};
 

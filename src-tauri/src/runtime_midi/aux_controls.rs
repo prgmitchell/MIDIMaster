@@ -206,6 +206,7 @@ pub(super) fn handle_aux_or_unmatched(
                                     .save_profile(active_profile.clone())
                                     .map_err(|err| err.to_string())?;
                                 state.sync_feedback_values(active_profile);
+                                state.send_idle_button_light_feedback_values(active_profile);
                             }
                         }
                         if let Some(updated_targets) = updated_targets {

@@ -235,6 +235,11 @@ impl AppState {
 
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
+            if let Some(value) = binding.idle_button_light_feedback_value() {
+                feedback.insert(key, value);
+                continue;
+            }
+
             let primary_target = binding.primary_target();
             if matches!(
                 binding.action,
@@ -408,6 +413,31 @@ impl AppState {
                 }
 
                 feedback.insert(key, val);
+            }
+        }
+    }
+
+    pub(crate) fn send_idle_button_light_feedback_values(&self, profile: &Profile) {
+        if let Ok(mut feedback) = self.feedback_values.lock() {
+            for binding in &profile.bindings {
+                if let Some(value) = binding.idle_button_light_feedback_value() {
+                    feedback.insert(BindingKey::from_binding(binding), value);
+                }
+            }
+        }
+
+        if let Ok(mut midi) = self.midi.lock() {
+            for binding in &profile.bindings {
+                let Some(value) = binding.idle_button_light_feedback_value() else {
+                    continue;
+                };
+                let _ = midi.send_feedback(
+                    &binding.device_id,
+                    binding.control.channel,
+                    binding.control.controller,
+                    value,
+                    binding.control.msg_type.clone(),
+                );
             }
         }
     }

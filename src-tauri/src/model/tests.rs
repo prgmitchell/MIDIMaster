@@ -116,6 +116,7 @@ fn serialize_binding_uses_targets_not_target() {
         deadzone: 0.0,
         debounce_ms: 0,
         mute_behavior: MuteBehavior::ToggleOnPress,
+        button_light_mode: ButtonLightMode::Activity,
         mute_control: None,
         assign_control: None,
         assign_mode: AssignMode::Add,
@@ -188,6 +189,13 @@ fn deserialize_binding_defaults_mute_behavior_to_toggle_on_press() {
 }
 
 #[test]
+fn deserialize_binding_defaults_button_light_mode_to_activity() {
+    let binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+    assert_eq!(binding.button_light_mode, ButtonLightMode::Activity);
+}
+
+#[test]
 fn deserialize_aux_control_defaults_mute_behavior_to_toggle_on_press() {
     let aux: AuxiliaryControl = serde_json::from_value(serde_json::json!({
         "device_id": "midi-dev",
@@ -202,4 +210,108 @@ fn deserialize_aux_control_defaults_mute_behavior_to_toggle_on_press() {
     .expect("aux control should deserialize");
 
     assert_eq!(aux.mute_behavior, MuteBehavior::ToggleOnPress);
+}
+
+fn mapped_button_binding(action: BindingAction, targets: Vec<BindingTarget>) -> Binding {
+    let mut binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+    binding.control_kind = BindingControlKind::Button;
+    binding.button_light_mode = ButtonLightMode::MappedWhenAssigned;
+    binding.action = action;
+    binding.targets = targets;
+    binding.ensure_targets();
+    binding
+}
+
+#[test]
+fn mapped_button_light_requires_open_application_path() {
+    let mut binding = mapped_button_binding(
+        BindingAction::OpenApplication,
+        vec![BindingTarget::OpenApplication],
+    );
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(0.0));
+
+    binding.open_application = Some(OpenApplicationMapping {
+        path: "C:\\Program Files\\App\\app.exe".to_string(),
+        display: "App".to_string(),
+        icon_data: None,
+    });
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+}
+
+#[test]
+fn mapped_button_light_requires_hotkey_keys() {
+    let mut binding = mapped_button_binding(BindingAction::Hotkey, vec![BindingTarget::Hotkey]);
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(0.0));
+
+    binding.hotkey = Some(HotkeyMapping {
+        keys: vec!["Ctrl".to_string(), "Shift".to_string(), "S".to_string()],
+        display: "Ctrl+Shift+S".to_string(),
+    });
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+}
+
+#[test]
+fn mapped_button_light_does_not_override_toggle_mute_state() {
+    let binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    assert_eq!(binding.mapped_button_light_feedback_value(), None);
+    assert_eq!(binding.idle_button_light_feedback_value(), None);
+}
+
+#[test]
+fn mapped_button_light_supports_momentary_integration_actions() {
+    let binding = mapped_button_binding(
+        BindingAction::Volume,
+        vec![BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "scene".to_string(),
+            data: serde_json::json!({ "action_kind": "momentary" }),
+        }],
+    );
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+}
+
+#[test]
+fn mapped_button_light_does_not_override_stateful_integration_actions() {
+    let binding = mapped_button_binding(
+        BindingAction::Volume,
+        vec![BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "action".to_string(),
+            data: serde_json::json!({ "action_kind": "stateful", "action": "ToggleMute" }),
+        }],
+    );
+    assert_eq!(binding.mapped_button_light_feedback_value(), None);
+    assert_eq!(binding.idle_button_light_feedback_value(), None);
+}
+
+#[test]
+fn mapped_button_light_does_not_override_obs_toggle_actions() {
+    let binding = mapped_button_binding(
+        BindingAction::Volume,
+        vec![BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "action".to_string(),
+            data: serde_json::json!({ "action": "ToggleVirtualCam" }),
+        }],
+    );
+    assert_eq!(binding.mapped_button_light_feedback_value(), None);
+    assert_eq!(binding.idle_button_light_feedback_value(), None);
+}
+
+#[test]
+fn idle_button_light_clears_activity_mode_for_stateless_actions() {
+    let mut binding = mapped_button_binding(
+        BindingAction::OpenApplication,
+        vec![BindingTarget::OpenApplication],
+    );
+    binding.button_light_mode = ButtonLightMode::Activity;
+    binding.open_application = Some(OpenApplicationMapping {
+        path: "C:\\Program Files\\App\\app.exe".to_string(),
+        display: "App".to_string(),
+        icon_data: None,
+    });
+
+    assert_eq!(binding.mapped_button_light_feedback_value(), None);
+    assert_eq!(binding.idle_button_light_feedback_value(), Some(0.0));
 }

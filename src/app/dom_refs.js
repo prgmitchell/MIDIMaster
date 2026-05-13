@@ -26,10 +26,21 @@ export function createDomRefs() {
   const targetPanelClose = document.getElementById("target-panel-close");
   const targetPanelBack = document.getElementById("target-panel-back");
   const bindingConfigPanel = document.getElementById("binding-config-panel");
+  const bindingConfigTitle = document.getElementById("binding-config-title");
   const bindingConfigClose = document.getElementById("binding-config-close");
   const bindingConfigCancel = document.getElementById("binding-config-cancel");
   const bindingConfigSave = document.getElementById("binding-config-save");
   const bindingConfigName = document.getElementById("binding-config-name");
+  const bindingConfigButtonLightSection = document.getElementById("binding-config-button-light-section");
+  const bindingConfigButtonLightToggle = document.getElementById("binding-config-button-light-toggle");
+  const bindingConfigButtonLightHelp = document.getElementById("binding-config-button-light-help");
+  const bindingConfigButtonLearnSection = document.getElementById("binding-config-button-learn-section");
+  const bindingConfigButtonLearnButton = document.getElementById("binding-config-button-learn-button");
+  const bindingConfigButtonLearnIndicator = document.getElementById("binding-config-button-learn-indicator");
+  const bindingConfigButtonLearnStatus = document.getElementById("binding-config-button-learn-status");
+  const bindingConfigCurveSection = document.getElementById("binding-config-curve-section");
+  const bindingConfigMuteSection = document.getElementById("binding-config-mute-section");
+  const bindingConfigAssignSection = document.getElementById("binding-config-assign-section");
   const bindingConfigMuteLabel = document.getElementById("binding-config-mute-label");
   const bindingConfigMuteLearn = document.getElementById("binding-config-mute-learn");
   const bindingConfigMuteClear = document.getElementById("binding-config-mute-clear");
@@ -52,6 +63,7 @@ export function createDomRefs() {
   const bindingConfigCustomSurface = document.getElementById("binding-config-custom-surface");
   const bindingConfigCustomReset = document.getElementById("binding-config-custom-reset");
   const bindingConfigAssignHelp = document.getElementById("binding-config-assign-help");
+  const bindingConfigPreviewLearnShell = document.getElementById("binding-config-preview-learn-shell");
   const bindingConfigPreviewLearnButton = document.getElementById("binding-config-preview-learn-button");
   const bindingConfigPreviewLearnIndicator = document.getElementById("binding-config-preview-learn-indicator");
   const bindingConfigPreviewLearnStatus = document.getElementById("binding-config-preview-learn-status");
@@ -60,12 +72,20 @@ export function createDomRefs() {
   const bindingConfigPreviewTargetTags = document.getElementById("binding-config-preview-target-tags");
   const bindingConfigPreviewFill = document.getElementById("binding-config-preview-fill");
   const bindingConfigPreviewThumb = document.getElementById("binding-config-preview-thumb");
+  const bindingConfigPreviewButton = document.getElementById("binding-config-preview-button");
+  const bindingConfigPreviewButtonFace = document.getElementById("binding-config-preview-button-face");
+  const bindingConfigPreviewButtonLabel = document.getElementById("binding-config-preview-button-label");
   const bindingConfigPreviewValue = document.getElementById("binding-config-preview-value");
   const bindingConfigPreviewStatus = document.getElementById("binding-config-preview-status");
   const bindingConfigPreviewMainMidi = document.getElementById("binding-config-preview-main-midi");
+  const bindingConfigPreviewMuteRow = document.getElementById("binding-config-preview-mute-row");
   const bindingConfigPreviewMute = document.getElementById("binding-config-preview-mute");
+  const bindingConfigPreviewAssignRow = document.getElementById("binding-config-preview-assign-row");
   const bindingConfigPreviewAssign = document.getElementById("binding-config-preview-assign");
+  const bindingConfigPreviewCurveRow = document.getElementById("binding-config-preview-curve-row");
   const bindingConfigPreviewCurve = document.getElementById("binding-config-preview-curve");
+  const bindingConfigPreviewLightRow = document.getElementById("binding-config-preview-light-row");
+  const bindingConfigPreviewLight = document.getElementById("binding-config-preview-light");
   const bindingConfigPreviewMidiValue = document.getElementById("binding-config-preview-midi-value");
   
   // Defensive cleanup for older builds that injected extra back buttons.
@@ -175,10 +195,21 @@ export function createDomRefs() {
     targetPanelClose,
     targetPanelBack,
     bindingConfigPanel,
+    bindingConfigTitle,
     bindingConfigClose,
     bindingConfigCancel,
     bindingConfigSave,
     bindingConfigName,
+    bindingConfigButtonLightSection,
+    bindingConfigButtonLightToggle,
+    bindingConfigButtonLightHelp,
+    bindingConfigButtonLearnSection,
+    bindingConfigButtonLearnButton,
+    bindingConfigButtonLearnIndicator,
+    bindingConfigButtonLearnStatus,
+    bindingConfigCurveSection,
+    bindingConfigMuteSection,
+    bindingConfigAssignSection,
     bindingConfigMuteLabel,
     bindingConfigMuteLearn,
     bindingConfigMuteClear,
@@ -201,6 +232,7 @@ export function createDomRefs() {
     bindingConfigCustomSurface,
     bindingConfigCustomReset,
     bindingConfigAssignHelp,
+    bindingConfigPreviewLearnShell,
     bindingConfigPreviewLearnButton,
     bindingConfigPreviewLearnIndicator,
     bindingConfigPreviewLearnStatus,
@@ -209,12 +241,20 @@ export function createDomRefs() {
     bindingConfigPreviewTargetTags,
     bindingConfigPreviewFill,
     bindingConfigPreviewThumb,
+    bindingConfigPreviewButton,
+    bindingConfigPreviewButtonFace,
+    bindingConfigPreviewButtonLabel,
     bindingConfigPreviewValue,
     bindingConfigPreviewStatus,
     bindingConfigPreviewMainMidi,
+    bindingConfigPreviewMuteRow,
     bindingConfigPreviewMute,
+    bindingConfigPreviewAssignRow,
     bindingConfigPreviewAssign,
+    bindingConfigPreviewCurveRow,
     bindingConfigPreviewCurve,
+    bindingConfigPreviewLightRow,
+    bindingConfigPreviewLight,
     bindingConfigPreviewMidiValue,
     learnPanel,
     learnPanelTitle,

@@ -1,4 +1,5 @@
 import {
+  positionFloatingDropdownMenu,
   renderLabelWithBadges,
   wireDropdownToggle,
 } from "../ui/dropdown_badges.js";
@@ -21,6 +22,7 @@ import {
   modeTooltip,
   muteBehaviorLabel,
   muteBehaviorTooltip,
+  normalizeButtonLightMode,
   normalizeControlKind,
   normalizeCustomCurve,
   normalizeFaderCurve,
@@ -208,8 +210,118 @@ export function createBindingsFeature({
     return null;
   }
 
+  function targetIsNonUnset(target) {
+    return Boolean(target && target !== "Unset" && !("Unset" in Object(target)) && !("unset" in Object(target)));
+  }
+
+  function integrationFromTarget(target) {
+    return target?.Integration || target?.integration || null;
+  }
+
+  function targetIsCompleteForMappedLight(target) {
+    if (!targetIsNonUnset(target)) return false;
+    if (targetUsesStatefulToggleFeedback(target)) return false;
+    if (
+      target === "Master"
+      || target === "Focus"
+      || target === "MediaControl"
+      || target === "CaptureControl"
+    ) {
+      return true;
+    }
+    const session = target?.Session || target?.session;
+    if (session) return Boolean(String(session.session_id || "").trim());
+    const app = target?.Application || target?.application;
+    if (app) return Boolean(String(app.name || "").trim());
+    const device = target?.Device || target?.device;
+    if (device) return Boolean(String(device.device_id || "").trim());
+    const integration = integrationFromTarget(target);
+    if (integration) {
+      return Boolean(String(integration.integration_id || "").trim())
+        && Boolean(String(integration.kind || "").trim());
+    }
+    return false;
+  }
+
+  function targetUsesStatefulToggleFeedback(target) {
+    const integration = integrationFromTarget(target);
+    if (!integration) return false;
+    const data = integration.data || {};
+    const actionKind = String(data.action_kind || "").toLowerCase();
+    if (actionKind === "stateful") return true;
+    return String(integration.integration_id || "").toLowerCase() === "obs"
+      && String(integration.kind || "").toLowerCase() === "action"
+      && String(data.action || "").startsWith("Toggle");
+  }
+
+  function bindingUsesStatefulToggleFeedback(binding) {
+    return String(binding?.action || "") === "ToggleMute"
+      || getTargets(binding).some(targetUsesStatefulToggleFeedback);
+  }
+
+  function mappedButtonLightTargetComplete(binding) {
+    const targets = getTargets(binding);
+    const action = String(binding?.action || "");
+    if (action === "OpenApplication") {
+      return targets.some(isOpenApplicationTarget)
+        && Boolean(String(normalizeOpenApplicationMapping(binding?.open_application)?.path || "").trim());
+    }
+    if (action === "Hotkey") {
+      return targets.some(isHotkeyTarget)
+        && Boolean(normalizeHotkeyMapping(binding?.hotkey)?.keys?.length);
+    }
+    if (
+      action === "MediaPlayPause"
+      || action === "MediaNextTrack"
+      || action === "MediaPrevTrack"
+      || action === "MediaStop"
+    ) {
+      return targets.some((target) => target === "MediaControl");
+    }
+    if (action === "FocusWindow") {
+      return targets.some((target) => {
+        const app = target?.Application || target?.application;
+        return Boolean(String(app?.name || "").trim());
+      });
+    }
+    if (
+      action === "FullScreenshot"
+      || action === "SnipScreenshot"
+      || action === "ToggleScreenRecording"
+    ) {
+      return targets.some((target) => target === "CaptureControl");
+    }
+    if (action === "SetDefaultDevice") {
+      return targets.some((target) => Boolean(String((target?.Device || target?.device)?.device_id || "").trim()));
+    }
+    return targets.some(targetIsCompleteForMappedLight);
+  }
+
+  function mappedButtonLightFeedbackValue(binding) {
+    if (
+      !effectiveIsButton(binding)
+      || normalizeButtonLightMode(binding?.button_light_mode) !== "MappedWhenAssigned"
+      || bindingUsesStatefulToggleFeedback(binding)
+    ) {
+      return null;
+    }
+    const targets = getTargets(binding);
+    if (!targets.some(targetIsNonUnset)) {
+      return 0;
+    }
+    return mappedButtonLightTargetComplete(binding) ? 1 : 0;
+  }
+
+  function buttonLightLabel(binding) {
+    return normalizeButtonLightMode(binding?.button_light_mode) === "MappedWhenAssigned"
+      ? t("bindings.mapped")
+      : t("bindings.activity");
+  }
+
   function buttonFillActive(binding, fallbackMuted = false) {
     if (!binding) return false;
+    const mappedLight = mappedButtonLightFeedbackValue(binding);
+    if (mappedLight != null) return mappedLight > 0.5;
     if (binding.action === "ToggleMute") {
       if (bindingMuteValues[binding.id] != null) return Boolean(bindingMuteValues[binding.id]);
       return Boolean(fallbackMuted);
@@ -661,13 +773,16 @@ export function createBindingsFeature({
     const muteClear = d.bindingConfigMuteClear;
     const assignClear = d.bindingConfigAssignClear;
     const previewLearnButton = d.bindingConfigPreviewLearnButton;
+    const buttonLearnButton = d.bindingConfigButtonLearnButton;
     const transferLocked = Boolean(transferPrompt);
     const learningPrimary = configLearnField === "control";
+    const binding = getConfigBinding();
+    const isButton = effectiveIsButton(binding);
 
     if (muteLearn) {
       const active = configLearnField === "mute_control";
       muteLearn.classList.remove("is-learning");
-      muteLearn.textContent = "Learn";
+      muteLearn.textContent = t("common.learn");
       muteLearn.disabled = transferLocked || Boolean(configLearnField && !active);
     }
     if (assignLearn) {
@@ -682,10 +797,13 @@ export function createBindingsFeature({
     if (assignClear) assignClear.disabled = lockClear;
     if (d.bindingConfigMuteModeButton) d.bindingConfigMuteModeButton.disabled = lockClear;
     if (d.bindingConfigAssignModeButton) d.bindingConfigAssignModeButton.disabled = lockClear;
-    if (previewLearnButton) {
-      previewLearnButton.classList.toggle("is-learning", learningPrimary);
-      previewLearnButton.textContent = learningPrimary ? t("bindings.listening") : t("bindings.learnFader");
-      previewLearnButton.disabled = transferLocked || Boolean(configLearnField && !learningPrimary);
+    for (const learnButton of [previewLearnButton, buttonLearnButton]) {
+      if (!learnButton) continue;
+      learnButton.classList.toggle("is-learning", learningPrimary);
+      learnButton.textContent = learningPrimary
+        ? t("bindings.listening")
+        : (isButton ? t("bindings.learnButton") : t("bindings.learnFader"));
+      learnButton.disabled = transferLocked || Boolean(configLearnField && !learningPrimary);
     }
   }
 
@@ -847,8 +965,10 @@ export function createBindingsFeature({
     const binding = getConfigBinding();
     if (!binding) return;
     const bindingId = configBindingId;
+    const isButton = effectiveIsButton(binding);
     const target = getPrimaryTarget(binding);
     const liveMidiValue = getLiveMidiValue(binding.device_id, binding.control);
+    const mappedLightValue = mappedButtonLightFeedbackValue(binding);
     const liveValue = liveMidiValue != null
       ? applyCurveToNormalized(binding, liveMidiValue)
       : (bindingId != null && bindingLastValues[bindingId] != null
@@ -857,24 +977,65 @@ export function createBindingsFeature({
     const muted = bindingId != null && bindingMuteValues[bindingId] != null
       ? Boolean(bindingMuteValues[bindingId])
       : Boolean(getMuted(target));
-    const previewValue = Math.min(1, Math.max(0, Number(liveValue) || 0));
+    const statefulToggleFeedback = isButton && bindingUsesStatefulToggleFeedback(binding);
+    const buttonActive = isButton
+      ? (
+          statefulToggleFeedback
+            ? buttonFillActive(binding, muted)
+            : liveMidiValue != null
+            ? liveMidiValue > 0.5
+            : (mappedLightValue != null ? mappedLightValue > 0.5 : buttonFillActive(binding, muted))
+        )
+      : false;
+    const previewValue = isButton
+      ? (buttonActive ? 1 : 0)
+      : Math.min(1, Math.max(0, Number(liveValue) || 0));
     const fillPercent = Math.round(Math.min(1, Math.max(0, previewValue)) * 100);
     const learningPrimary = configLearnField === "control";
 
     renderPreviewTarget(binding);
-    if (d.bindingConfigPreviewValue) d.bindingConfigPreviewValue.textContent = `${fillPercent}%`;
+    const faderPreview = d.bindingConfigPreviewFill?.closest?.(".binding-config-preview-fader");
+    if (faderPreview) {
+      faderPreview.classList.toggle("hidden", isButton);
+      faderPreview.setAttribute("aria-hidden", String(isButton));
+    }
+    if (d.bindingConfigPreviewButton) {
+      d.bindingConfigPreviewButton.classList.toggle("hidden", !isButton);
+      d.bindingConfigPreviewButton.setAttribute("aria-hidden", String(!isButton));
+    }
+    if (d.bindingConfigPreviewButtonFace) {
+      d.bindingConfigPreviewButtonFace.classList.toggle("is-active", buttonActive);
+      d.bindingConfigPreviewButtonFace.classList.toggle("is-mapped", mappedLightValue != null && mappedLightValue > 0.5);
+    }
+    if (d.bindingConfigPreviewButtonLabel) {
+      d.bindingConfigPreviewButtonLabel.textContent = buttonActive ? t("bindings.on") : t("bindings.off");
+    }
+    if (d.bindingConfigPreviewValue) {
+      d.bindingConfigPreviewValue.textContent = isButton
+        ? (buttonActive ? t("bindings.on") : t("bindings.off"))
+        : `${fillPercent}%`;
+    }
     if (d.bindingConfigPreviewFill) d.bindingConfigPreviewFill.style.height = `${fillPercent}%`;
     if (d.bindingConfigPreviewThumb) d.bindingConfigPreviewThumb.style.bottom = `calc(${fillPercent}% - 18px)`;
     if (d.bindingConfigPreviewMainMidi) d.bindingConfigPreviewMainMidi.textContent = labelForControl(binding.control || {});
+    if (d.bindingConfigPreviewMuteRow) d.bindingConfigPreviewMuteRow.classList.toggle("hidden", isButton);
+    if (d.bindingConfigPreviewAssignRow) d.bindingConfigPreviewAssignRow.classList.toggle("hidden", isButton);
+    if (d.bindingConfigPreviewCurveRow) d.bindingConfigPreviewCurveRow.classList.toggle("hidden", isButton);
+    if (d.bindingConfigPreviewLightRow) d.bindingConfigPreviewLightRow.classList.toggle("hidden", !isButton);
     if (d.bindingConfigPreviewMute) d.bindingConfigPreviewMute.textContent = formatMidiControlLabel(binding.mute_control);
     if (d.bindingConfigPreviewAssign) d.bindingConfigPreviewAssign.textContent = formatMidiControlLabel(binding.assign_control);
     if (d.bindingConfigPreviewCurve) d.bindingConfigPreviewCurve.textContent = curveDisplayName(binding.fader_curve);
+    if (d.bindingConfigPreviewLight) d.bindingConfigPreviewLight.textContent = buttonLightLabel(binding);
     if (d.bindingConfigPreviewMidiValue) {
       d.bindingConfigPreviewMidiValue.textContent = formatPreviewMidiValue(binding, previewValue, liveMidiValue);
     }
     if (d.bindingConfigPreviewStatus) {
       if (learningPrimary) {
-        d.bindingConfigPreviewStatus.textContent = t("bindings.waitingForNewFaderInput");
+        d.bindingConfigPreviewStatus.textContent = isButton
+          ? t("bindings.waitingForNewButtonInput")
+          : t("bindings.waitingForNewFaderInput");
+      } else if (isButton && mappedLightValue != null && mappedLightValue > 0.5) {
+        d.bindingConfigPreviewStatus.textContent = t("bindings.mappedLightOn");
       } else if (muted) {
         d.bindingConfigPreviewStatus.textContent = t("bindings.targetMuted");
       } else if ((bindingId != null && bindingLastValues[bindingId] != null) || liveMidiValue != null) {
@@ -889,6 +1050,13 @@ export function createBindingsFeature({
     }
     if (d.bindingConfigPreviewLearnStatus) {
       d.bindingConfigPreviewLearnStatus.textContent = t("bindings.waitingMidiInput");
+    }
+    if (d.bindingConfigButtonLearnIndicator) {
+      d.bindingConfigButtonLearnIndicator.classList.toggle("hidden", !learningPrimary);
+      d.bindingConfigButtonLearnIndicator.classList.toggle("is-learning", learningPrimary);
+    }
+    if (d.bindingConfigButtonLearnStatus) {
+      d.bindingConfigButtonLearnStatus.textContent = t("bindings.waitingMidiInput");
     }
   }
 
@@ -1039,15 +1207,47 @@ export function createBindingsFeature({
     closeMuteModeMenu();
     ensureAuxShape(binding);
     ensureBindingShape(binding);
+    const isButton = effectiveIsButton(binding);
+    if (d.bindingConfigTitle) {
+      d.bindingConfigTitle.textContent = isButton ? t("bindings.buttonConfiguration") : t("bindings.faderConfiguration");
+    }
+    if (d.bindingConfigPanel) {
+      d.bindingConfigPanel.classList.toggle("binding-config-panel--button", isButton);
+      d.bindingConfigPanel.classList.toggle("binding-config-panel--fader", !isButton);
+    }
+    if (d.bindingConfigButtonLightSection) d.bindingConfigButtonLightSection.classList.toggle("hidden", !isButton);
+    if (d.bindingConfigButtonLearnSection) d.bindingConfigButtonLearnSection.classList.toggle("hidden", !isButton);
+    if (d.bindingConfigPreviewLearnShell) d.bindingConfigPreviewLearnShell.classList.toggle("hidden", isButton);
+    if (d.bindingConfigCurveSection) d.bindingConfigCurveSection.classList.toggle("hidden", isButton);
+    if (d.bindingConfigMuteSection) d.bindingConfigMuteSection.classList.toggle("hidden", isButton);
+    if (d.bindingConfigAssignSection) d.bindingConfigAssignSection.classList.toggle("hidden", isButton);
     if (d.bindingConfigName) d.bindingConfigName.value = binding.name?.trim() || "";
-    renderCurveCards();
-    renderCustomCurveEditor();
-    renderMuteMappingLabel(binding);
-    renderAssignMappingLabel(binding);
-    syncMuteModeUi(binding?.mute_control?.mute_behavior || binding?.mute_behavior || "ToggleOnPress");
-    syncAssignModeUi(binding.assign_mode || "Add");
+    if (isButton) {
+      syncButtonLightUi(binding);
+    } else {
+      renderCurveCards();
+      renderCustomCurveEditor();
+      renderMuteMappingLabel(binding);
+      renderAssignMappingLabel(binding);
+      syncMuteModeUi(binding?.mute_control?.mute_behavior || binding?.mute_behavior || "ToggleOnPress");
+      syncAssignModeUi(binding.assign_mode || "Add");
+    }
     renderConfigPreview();
     updateAuxLearnUi();
+  }
+
+  function syncButtonLightUi(binding) {
+    const toggle = d.bindingConfigButtonLightToggle;
+    if (!toggle) return;
+    toggle.checked = normalizeButtonLightMode(binding?.button_light_mode) === "MappedWhenAssigned";
+    toggle.disabled = false;
+    const row = toggle.closest?.(".binding-config-toggle-row");
+    if (row) {
+      row.classList.remove("is-disabled");
+    }
+    if (d.bindingConfigButtonLightHelp) {
+      d.bindingConfigButtonLightHelp.textContent = t("bindings.lightWhenMappedHelp");
+    }
   }
 
   function closeMuteModeMenu() {
@@ -1306,7 +1506,7 @@ export function createBindingsFeature({
   function beginBindingEdit(bindingId, forceInline = false) {
     const binding = getBindingById(bindingId);
     if (!binding) return;
-    if (!forceInline && !effectiveIsButton(binding)) {
+    if (!forceInline) {
       openConfigModal(bindingId);
       return;
     }
@@ -1535,6 +1735,8 @@ export function createBindingsFeature({
         modeButton.type = "button";
         modeButton.className = "target-button";
         modeButton.title = t("bindings.controlMode");
+        modeButton.setAttribute("aria-haspopup", "listbox");
+        modeButton.setAttribute("aria-expanded", "false");
         const modeDisplay = document.createElement("span");
         modeDisplay.className = "target-display";
         const modeCaret = document.createElement("span");
@@ -1615,6 +1817,7 @@ export function createBindingsFeature({
             event.stopPropagation();
             modeDropdown.classList.remove("open");
             modeMenu.classList.add("hidden");
+            modeButton.setAttribute("aria-expanded", "false");
             await applyModeSelection(option.value);
           });
           modeMenu.appendChild(optionButton);
@@ -1626,6 +1829,15 @@ export function createBindingsFeature({
           modeButton.title = activeModeOption.title;
           modeButton.setAttribute("aria-label", activeModeOption.title);
         }
+
+        modeDropdown.__positionDropdownMenu = () => {
+          positionFloatingDropdownMenu({
+            menu: modeMenu,
+            trigger: modeButton,
+            minHeight: 132,
+            maxHeight: 240,
+          });
+        };
 
         wireDropdownToggle({ root: modeDropdown, menu: modeMenu, trigger: modeButton });
 
@@ -1835,7 +2047,7 @@ export function createBindingsFeature({
         const editButton = document.createElement("button");
         editButton.type = "button";
         editButton.className = "binding-action";
-        setActionIcon(editButton, "edit", isButton ? t("bindings.editName") : t("bindings.configureFader"));
+        setActionIcon(editButton, "edit", isButton ? t("bindings.configureButton") : t("bindings.configureFader"));
         editButton.addEventListener("click", () => {
           beginBindingEdit(binding.id);
         });
@@ -2224,8 +2436,24 @@ export function createBindingsFeature({
         renderConfigPreview();
       });
     }
+    if (d.bindingConfigButtonLightToggle) {
+      d.bindingConfigButtonLightToggle.addEventListener("change", () => {
+        const binding = getConfigBinding();
+        if (!binding) return;
+        binding.button_light_mode = d.bindingConfigButtonLightToggle.checked
+          ? "MappedWhenAssigned"
+          : "Activity";
+        syncButtonLightUi(binding);
+        renderConfigPreview();
+      });
+    }
     if (d.bindingConfigPreviewLearnButton) {
       d.bindingConfigPreviewLearnButton.addEventListener("click", async () => {
+        await startPrimaryLearn();
+      });
+    }
+    if (d.bindingConfigButtonLearnButton) {
+      d.bindingConfigButtonLearnButton.addEventListener("click", async () => {
         await startPrimaryLearn();
       });
     }

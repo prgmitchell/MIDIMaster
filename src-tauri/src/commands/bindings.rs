@@ -583,6 +583,7 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
     });
     profile.bindings.push(binding);
     state.sync_feedback_values(profile);
+    state.send_idle_button_light_feedback_values(profile);
     run_logger::info(
         "bindings_cmd",
         "add_succeeded",
@@ -678,6 +679,9 @@ pub fn update_midi_feedback(
 
         if matches {
             let key = BindingKey::from_binding(binding);
+            let feedback_value = binding
+                .mapped_button_light_feedback_value()
+                .unwrap_or(value);
 
             let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
             if binding_user_active(&state, &key, is_note) {
@@ -689,11 +693,11 @@ pub fn update_midi_feedback(
                 continue;
             }
 
-            if !update_feedback_cache_if_changed(&state, &key, value) {
+            if !update_feedback_cache_if_changed(&state, &key, feedback_value) {
                 run_logger::debug(
                     "bindings_cmd",
                     "feedback_skipped_unchanged",
-                    &format!("binding_id={} value={}", binding.id, value),
+                    &format!("binding_id={} value={}", binding.id, feedback_value),
                 );
                 continue;
             }
@@ -704,14 +708,14 @@ pub fn update_midi_feedback(
                     &binding.device_id,
                     binding.control.channel,
                     binding.control.controller,
-                    value,
+                    feedback_value,
                     binding.control.msg_type.clone(),
                 );
             }
             run_logger::debug(
                 "bindings_cmd",
                 "feedback_sent",
-                &format!("binding_id={} value={}", binding.id, value),
+                &format!("binding_id={} value={}", binding.id, feedback_value),
             );
         }
     }
@@ -742,13 +746,16 @@ pub fn set_binding_feedback(
     let affected_targets = binding.normalized_targets();
     let effective_action = action.clone().unwrap_or_else(|| binding.action.clone());
     let action_matches_binding = action.is_none() || effective_action == binding.action;
+    let feedback_value = binding
+        .mapped_button_light_feedback_value()
+        .unwrap_or(value);
 
     let silent = silent.unwrap_or(false);
     if action_matches_binding {
         send_feedback_to_control(
             &state,
             &FeedbackControlKey::from_binding(&binding),
-            value,
+            feedback_value,
             silent,
             &format!("primary:{}", binding.id),
         );
@@ -824,10 +831,13 @@ pub fn set_binding_feedback(
             }
             let primary_key = FeedbackControlKey::from_binding(candidate);
             if emitted_controls.insert(primary_key.clone()) {
+                let candidate_value = candidate
+                    .mapped_button_light_feedback_value()
+                    .unwrap_or(value);
                 send_feedback_to_control(
                     &state,
                     &primary_key,
-                    value,
+                    candidate_value,
                     silent,
                     &format!("volume_binding:{}", candidate.id),
                 );
@@ -875,7 +885,7 @@ pub fn set_binding_feedback(
             };
             let payload = serde_json::json!({
               "target": primary_target,
-              "volume": value,
+              "volume": feedback_value,
               "focus_session": focus_session,
               "binding_id": binding.id,
               "silent": silent

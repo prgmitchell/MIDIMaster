@@ -3,6 +3,7 @@ import {
   applyFaderCurve,
   getBindingTargets,
   getPrimaryBindingTarget,
+  normalizeButtonLightMode as normalizeCoreButtonLightMode,
   normalizeCustomCurvePoints,
   normalizeFaderCurve as normalizeCoreFaderCurve,
   normalizeRelativeFormat as normalizeCoreRelativeFormat,
@@ -24,6 +25,10 @@ export function normalizeRelativeFormat(raw) {
 
 export function normalizeMuteBehavior(raw) {
   return raw === "SetFromValue" ? "SetFromValue" : "ToggleOnPress";
+}
+
+export function normalizeButtonLightMode(raw) {
+  return normalizeCoreButtonLightMode(raw);
 }
 
 export function muteBehaviorLabel(raw) {
@@ -140,6 +145,7 @@ export function ensureBindingShape(binding) {
   binding.fader_curve = normalizeFaderCurve(binding.fader_curve);
   binding.custom_curve = customCurvePoints(binding);
   binding.mute_behavior = normalizeMuteBehavior(binding.mute_behavior);
+  binding.button_light_mode = normalizeButtonLightMode(binding.button_light_mode);
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
   }

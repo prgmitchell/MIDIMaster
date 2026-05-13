@@ -170,6 +170,17 @@ pub fn start_midi_device(
             serde_json::json!({ "device_id": input_device_id, "count": migrated_count }),
         );
     }
+
+    let profile_for_lights = state
+        .active_profile
+        .lock()
+        .ok()
+        .and_then(|profile| profile.clone());
+    if let Some(profile) = profile_for_lights {
+        state.sync_feedback_values(&profile);
+        state.send_idle_button_light_feedback_values(&profile);
+    }
+
     run_logger::info(
         "midi_cmd",
         "start_succeeded",
@@ -298,6 +309,7 @@ mod tests {
             deadzone: 0.0,
             debounce_ms: 0,
             mute_behavior: MuteBehavior::ToggleOnPress,
+            button_light_mode: model::ButtonLightMode::Activity,
             mute_control: mute_device_id.map(|id| aux_control(id, 18)),
             assign_control: assign_device_id.map(|id| aux_control(id, 19)),
             assign_mode: AssignMode::Add,

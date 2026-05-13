@@ -6,8 +6,8 @@ mod profile_types;
 #[allow(unused_imports)]
 pub use binding_types::{
     AssignMode, AuxiliaryControl, Binding, BindingAction, BindingControlKind, BindingTarget,
-    FaderCurve, FaderCurvePoint, HotkeyMapping, MidiMode, MuteBehavior, OpenApplicationMapping,
-    RelativeFormat,
+    ButtonLightMode, FaderCurve, FaderCurvePoint, HotkeyMapping, MidiMode, MuteBehavior,
+    OpenApplicationMapping, RelativeFormat,
 };
 #[allow(unused_imports)]
 pub use midi_types::{

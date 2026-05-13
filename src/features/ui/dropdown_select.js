@@ -1,5 +1,6 @@
 import {
   closeOpenDropdowns,
+  positionFloatingDropdownMenu,
   renderLabelWithBadges,
   wireDropdownToggle,
 } from "./dropdown_badges.js";
@@ -37,28 +38,7 @@ export function createSelectDropdownShell({
   menu.className = "target-menu hidden";
   root.__positionDropdownMenu = () => {
     if (!root.classList.contains("settings-select-dropdown") || menu.classList.contains("hidden")) return;
-    const rect = button.getBoundingClientRect();
-    const gap = 6;
-    const viewportPadding = 14;
-    const availableBelow = window.innerHeight - rect.bottom - viewportPadding - gap;
-    const availableAbove = rect.top - viewportPadding - gap;
-    const maxHeight = Math.max(160, Math.min(280, Math.max(availableBelow, availableAbove)));
-
-    menu.style.position = "fixed";
-    menu.style.left = `${Math.max(viewportPadding, Math.min(rect.left, window.innerWidth - rect.width - viewportPadding))}px`;
-    menu.style.width = `${rect.width}px`;
-    menu.style.minWidth = `${rect.width}px`;
-    menu.style.maxWidth = `${Math.max(120, window.innerWidth - (viewportPadding * 2))}px`;
-    menu.style.maxHeight = `${maxHeight}px`;
-    menu.style.zIndex = "1000";
-
-    const menuHeight = Math.min(menu.scrollHeight || maxHeight, maxHeight);
-    const openUp = availableBelow < Math.min(180, menuHeight) && availableAbove > availableBelow;
-    const top = openUp
-      ? Math.max(viewportPadding, rect.top - gap - menuHeight)
-      : Math.min(rect.bottom + gap, window.innerHeight - viewportPadding - menuHeight);
-    menu.style.top = `${top}px`;
-    menu.style.right = "auto";
+    positionFloatingDropdownMenu({ menu, trigger: button });
   };
   wireDropdownToggle({ root, menu, trigger: button });
 

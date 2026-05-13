@@ -48,6 +48,7 @@ export function normalizeBinding(binding) {
     };
   }
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
+  out.button_light_mode = normalizeButtonLightMode(out.button_light_mode);
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
   if (!out.open_application || typeof out.open_application !== "object") {
     out.open_application = null;
@@ -73,6 +74,10 @@ export function normalizeRelativeFormat(raw) {
     return value;
   }
   return "Auto";
+}
+
+export function normalizeButtonLightMode(raw) {
+  return raw === "MappedWhenAssigned" ? "MappedWhenAssigned" : "Activity";
 }
 
 export function decodeRelativeTwosComplement(value) {

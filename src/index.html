@@ -556,7 +556,7 @@
   <div id="binding-config-panel" class="target-panel hidden">
     <div class="target-panel-content binding-config-content">
       <div class="target-panel-header">
-        <span data-i18n="bindings.faderConfiguration">Fader Configuration</span>
+        <span id="binding-config-title" data-i18n="bindings.faderConfiguration">Fader Configuration</span>
         <button id="binding-config-close" type="button" class="target-panel-close">x</button>
       </div>
       <div class="binding-config-body">
@@ -569,7 +569,36 @@
               </label>
             </section>
 
-            <section class="binding-config-section binding-config-section--curve">
+            <section id="binding-config-button-light-section" class="binding-config-section binding-config-section--button-light hidden">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title" data-i18n="bindings.light">Light</span>
+              </div>
+              <label class="binding-config-toggle-row" id="binding-config-button-light-row">
+                <span class="binding-config-toggle-copy">
+                  <span class="binding-config-toggle-title" data-i18n="bindings.lightWhenMapped">Light when mapped</span>
+                  <span id="binding-config-button-light-help" class="binding-config-toggle-help" data-i18n="bindings.lightWhenMappedHelp">Keep the controller light on when this button has a mapped target.</span>
+                </span>
+                <span class="settings-toggle binding-config-toggle">
+                  <input id="binding-config-button-light-toggle" type="checkbox" />
+                  <span class="plugins-toggle-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+            </section>
+
+            <section id="binding-config-button-learn-section" class="binding-config-section binding-config-section--button-learn hidden">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title" data-i18n="common.learn">Learn</span>
+              </div>
+              <div class="binding-config-preview-learn-row">
+                <button id="binding-config-button-learn-button" type="button" class="binding-config-button binding-config-button--primary" data-i18n="bindings.learnButton">Learn Button</button>
+                <div id="binding-config-button-learn-indicator" class="binding-config-preview-learn-indicator hidden" aria-live="polite">
+                  <div class="learn-panel-spinner" aria-hidden="true"></div>
+                  <span id="binding-config-button-learn-status" data-i18n="bindings.waitingMidiInput">Waiting for MIDI input...</span>
+                </div>
+              </div>
+            </section>
+
+            <section id="binding-config-curve-section" class="binding-config-section binding-config-section--curve">
               <div class="binding-config-title-row">
                 <span class="binding-config-title" data-i18n="bindings.curve">Curve</span>
                 <div class="binding-config-title-actions">
@@ -581,7 +610,7 @@
               <p id="binding-config-curve-help" class="binding-config-curve-help" data-i18n="bindings.linearHelp">Linear response. Output value changes at the same rate as the fader movement.</p>
             </section>
 
-            <section class="binding-config-section">
+            <section id="binding-config-mute-section" class="binding-config-section">
               <span class="binding-config-title binding-config-title-with-action">
                 <span data-i18n="bindings.mute">Mute</span>
                 <div id="binding-config-mute-mode-root" class="binding-config-mode-root">
@@ -614,7 +643,7 @@
               </div>
             </section>
 
-            <section class="binding-config-section">
+            <section id="binding-config-assign-section" class="binding-config-section">
               <span class="binding-config-title binding-config-title-with-action">
                 <span data-i18n="common.assign">Assign</span>
                 <div id="binding-config-assign-mode-root" class="binding-config-mode-root">
@@ -655,6 +684,7 @@
               </div>
               <div class="binding-config-preview-card">
                 <div class="binding-config-preview-stage">
+                  <div class="binding-config-preview-stage-title binding-config-title" data-i18n="bindings.live">Live</div>
                   <div class="binding-config-preview-target">
                     <div id="binding-config-preview-target-icon" class="binding-config-preview-target-icon" aria-hidden="true"></div>
                     <div class="binding-config-preview-target-copy">
@@ -675,6 +705,11 @@
                       <div id="binding-config-preview-thumb" class="binding-config-preview-thumb"></div>
                     </div>
                   </div>
+                  <div id="binding-config-preview-button" class="binding-config-preview-button hidden" aria-hidden="true">
+                    <div id="binding-config-preview-button-face" class="binding-config-preview-button-face">
+                      <span id="binding-config-preview-button-label" class="binding-config-preview-button-label" data-i18n="bindings.button">Button</span>
+                    </div>
+                  </div>
                 </div>
                 <div class="binding-config-preview-meta">
                   <div class="binding-config-preview-value-block">
@@ -686,17 +721,21 @@
                       <span class="binding-config-preview-summary-label" data-i18n="bindings.mainMidi">Main MIDI</span>
                       <span id="binding-config-preview-main-midi" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
                     </div>
-                    <div class="binding-config-preview-summary-row">
+                    <div id="binding-config-preview-mute-row" class="binding-config-preview-summary-row">
                       <span class="binding-config-preview-summary-label" data-i18n="bindings.mute">Mute</span>
                       <span id="binding-config-preview-mute" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
                     </div>
-                    <div class="binding-config-preview-summary-row">
+                    <div id="binding-config-preview-assign-row" class="binding-config-preview-summary-row">
                       <span class="binding-config-preview-summary-label" data-i18n="common.assign">Assign</span>
                       <span id="binding-config-preview-assign" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
                     </div>
-                    <div class="binding-config-preview-summary-row">
+                    <div id="binding-config-preview-curve-row" class="binding-config-preview-summary-row">
                       <span class="binding-config-preview-summary-label" data-i18n="bindings.curve">Curve</span>
                       <span id="binding-config-preview-curve" class="binding-config-preview-summary-value" data-i18n="bindings.linear">Linear</span>
+                    </div>
+                    <div id="binding-config-preview-light-row" class="binding-config-preview-summary-row hidden">
+                      <span class="binding-config-preview-summary-label" data-i18n="bindings.light">Light</span>
+                      <span id="binding-config-preview-light" class="binding-config-preview-summary-value" data-i18n="bindings.activity">Activity</span>
                     </div>
                     <div class="binding-config-preview-summary-row">
                       <span class="binding-config-preview-summary-label" data-i18n="common.value">Value</span>
@@ -705,7 +744,7 @@
                   </div>
                 </div>
               </div>
-              <div class="binding-config-preview-learn-shell">
+              <div id="binding-config-preview-learn-shell" class="binding-config-preview-learn-shell">
                 <div class="binding-config-title-row">
                   <span class="binding-config-title" data-i18n="common.learn">Learn</span>
                 </div>

@@ -277,6 +277,7 @@ mod tests {
             deadzone: 0.0,
             debounce_ms: 0,
             mute_behavior: crate::model::MuteBehavior::ToggleOnPress,
+            button_light_mode: crate::model::ButtonLightMode::Activity,
             mute_control: None,
             assign_control: None,
             assign_mode: crate::model::AssignMode::Add,

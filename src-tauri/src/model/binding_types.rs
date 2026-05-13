@@ -58,6 +58,18 @@ impl Default for MuteBehavior {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ButtonLightMode {
+    Activity,
+    MappedWhenAssigned,
+}
+
+impl Default for ButtonLightMode {
+    fn default() -> Self {
+        ButtonLightMode::Activity
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum RelativeFormat {
     Auto,
     TwosComplement,
@@ -477,6 +489,8 @@ pub struct Binding {
     #[serde(default)]
     pub mute_behavior: MuteBehavior,
     #[serde(default)]
+    pub button_light_mode: ButtonLightMode,
+    #[serde(default)]
     pub mute_control: Option<AuxiliaryControl>,
     #[serde(default)]
     pub assign_control: Option<AuxiliaryControl>,
@@ -489,6 +503,172 @@ pub struct Binding {
 }
 
 impl Binding {
+    pub fn is_button_binding(&self) -> bool {
+        matches!(self.control_kind, BindingControlKind::Button)
+            || (matches!(self.control_kind, BindingControlKind::Auto)
+                && matches!(self.control.msg_type, MidiMessageType::Note))
+    }
+
+    pub fn mapped_button_light_feedback_value(&self) -> Option<f32> {
+        if !self.is_button_binding()
+            || !matches!(self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
+            || self.uses_stateful_toggle_feedback()
+        {
+            return None;
+        }
+
+        let targets = self.normalized_targets();
+        if !targets
+            .iter()
+            .any(|target| !matches!(target, BindingTarget::Unset))
+        {
+            return Some(0.0);
+        }
+
+        Some(if self.has_complete_mapped_button_light_target(&targets) {
+            1.0
+        } else {
+            0.0
+        })
+    }
+
+    pub fn idle_button_light_feedback_value(&self) -> Option<f32> {
+        if !self.is_button_binding() {
+            return None;
+        }
+
+        if let Some(value) = self.mapped_button_light_feedback_value() {
+            return Some(value);
+        }
+
+        let targets = self.normalized_targets();
+        if !self.uses_stateful_toggle_feedback()
+            && targets
+                .iter()
+                .any(|target| !matches!(target, BindingTarget::Unset))
+        {
+            return Some(0.0);
+        }
+
+        None
+    }
+
+    pub fn has_complete_mapped_button_light_target(&self, targets: &[BindingTarget]) -> bool {
+        match self.action {
+            BindingAction::OpenApplication => {
+                targets
+                    .iter()
+                    .any(|target| matches!(target, BindingTarget::OpenApplication))
+                    && self
+                        .open_application
+                        .as_ref()
+                        .map(|mapping| !mapping.path.trim().is_empty())
+                        .unwrap_or(false)
+            }
+            BindingAction::Hotkey => {
+                targets
+                    .iter()
+                    .any(|target| matches!(target, BindingTarget::Hotkey))
+                    && self
+                        .hotkey
+                        .as_ref()
+                        .map(|mapping| !mapping.keys.is_empty())
+                        .unwrap_or(false)
+            }
+            BindingAction::MediaPlayPause
+            | BindingAction::MediaNextTrack
+            | BindingAction::MediaPrevTrack
+            | BindingAction::MediaStop => targets
+                .iter()
+                .any(|target| matches!(target, BindingTarget::MediaControl)),
+            BindingAction::FocusWindow => targets.iter().any(|target| {
+                matches!(
+                    target,
+                    BindingTarget::Application { name, .. } if !name.trim().is_empty()
+                )
+            }),
+            BindingAction::FullScreenshot
+            | BindingAction::SnipScreenshot
+            | BindingAction::ToggleScreenRecording => targets
+                .iter()
+                .any(|target| matches!(target, BindingTarget::CaptureControl)),
+            BindingAction::SetDefaultDevice => targets.iter().any(|target| {
+                matches!(
+                    target,
+                    BindingTarget::Device { device_id } if !device_id.trim().is_empty()
+                )
+            }),
+            BindingAction::Volume => targets
+                .iter()
+                .any(Self::target_is_complete_for_mapped_light),
+            BindingAction::ToggleMute => false,
+        }
+    }
+
+    fn uses_stateful_toggle_feedback(&self) -> bool {
+        self.action == BindingAction::ToggleMute
+            || self
+                .normalized_targets()
+                .iter()
+                .any(Self::target_uses_stateful_toggle_feedback)
+    }
+
+    fn target_uses_stateful_toggle_feedback(target: &BindingTarget) -> bool {
+        let BindingTarget::Integration {
+            integration_id,
+            kind,
+            data,
+        } = target
+        else {
+            return false;
+        };
+
+        if data
+            .get("action_kind")
+            .and_then(|value| value.as_str())
+            .map(|value| value.eq_ignore_ascii_case("stateful"))
+            .unwrap_or(false)
+        {
+            return true;
+        }
+
+        integration_id.eq_ignore_ascii_case("obs")
+            && kind.eq_ignore_ascii_case("action")
+            && data
+                .get("action")
+                .and_then(|value| value.as_str())
+                .map(|value| value.starts_with("Toggle"))
+                .unwrap_or(false)
+    }
+
+    fn target_is_complete_for_mapped_light(target: &BindingTarget) -> bool {
+        match target {
+            BindingTarget::Unset => false,
+            BindingTarget::Master
+            | BindingTarget::Focus
+            | BindingTarget::MediaControl
+            | BindingTarget::CaptureControl => true,
+            BindingTarget::Session { session_id } => !session_id.trim().is_empty(),
+            BindingTarget::Application { name, .. } => !name.trim().is_empty(),
+            BindingTarget::Device { device_id } => !device_id.trim().is_empty(),
+            BindingTarget::Integration {
+                integration_id,
+                kind,
+                data,
+            } => {
+                !integration_id.trim().is_empty()
+                    && !kind.trim().is_empty()
+                    && !Self::target_uses_stateful_toggle_feedback(target)
+                    && data
+                        .get("action_kind")
+                        .and_then(|value| value.as_str())
+                        .map(|value| !value.eq_ignore_ascii_case("stateful"))
+                        .unwrap_or(true)
+            }
+            BindingTarget::Hotkey | BindingTarget::OpenApplication => false,
+        }
+    }
+
     pub fn normalized_targets(&self) -> Vec<BindingTarget> {
         if !self.targets.is_empty() {
             self.targets.clone()
