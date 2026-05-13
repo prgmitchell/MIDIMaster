@@ -657,6 +657,11 @@
   width: min(940px, 96vw);
 }
 
+.binding-config-panel--button {
+  --button-config-control-height: 44px;
+  --button-config-top-section-height: 102px;
+}
+
 .binding-config-panel--button .binding-config-layout {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
@@ -698,8 +703,8 @@
 }
 
 .binding-config-panel--button .binding-config-preview-stage {
-  min-height: 112px;
-  height: auto;
+  min-height: var(--button-config-top-section-height);
+  height: var(--button-config-top-section-height);
   grid-template-columns: 1fr;
   grid-template-rows: auto 1fr;
   gap: 10px;
@@ -737,7 +742,7 @@
   grid-column: 1;
   grid-row: 2;
   min-height: 0;
-  height: 46px;
+  height: var(--button-config-control-height);
   align-self: center;
   justify-content: stretch;
 }
@@ -805,12 +810,17 @@
   background: linear-gradient(180deg, rgba(16, 25, 39, 0.72), rgba(13, 20, 31, 0.88));
 }
 
+.binding-config-panel--button .binding-config-section--name {
+  min-height: var(--button-config-top-section-height);
+  height: var(--button-config-top-section-height);
+}
+
 .binding-config-panel--button .binding-config-title {
   font-size: 14px;
 }
 
 .binding-config-panel--button .binding-config-stack input[type="text"] {
-  height: 44px;
+  height: var(--button-config-control-height);
   padding: 0 14px;
   border-radius: 10px;
   font-size: 16px;
