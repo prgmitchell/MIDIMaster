@@ -14,6 +14,8 @@ use crate::app_paths::app_data_root_dir;
 use crate::run_logger;
 
 const BUNDLED_PLUGIN_IDS: &[&str] = &["hue", "obs", "wavelink"];
+const HUE_API_TIMEOUT_MS: u64 = 4500;
+const HUE_PAIR_TIMEOUT_MS: u64 = 3500;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -281,6 +283,12 @@ fn validate_hue_path(path: &str) -> Result<String, String> {
     Ok(trimmed.to_string())
 }
 
+fn hue_agent(timeout_ms: u64) -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout(Duration::from_millis(timeout_ms))
+        .build()
+}
+
 #[tauri::command]
 pub fn hue_discover_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<String>, String> {
     fn is_hue_oui(mac: &str) -> bool {
@@ -465,7 +473,9 @@ pub fn hue_pair_bridge(
         dtype_raw.trim().to_string()
     };
     let url = format!("http://{}/api", bridge);
-    let resp = ureq::post(&url)
+    let agent = hue_agent(HUE_PAIR_TIMEOUT_MS);
+    let resp = agent
+        .post(&url)
         .set("Content-Type", "application/json")
         .send_json(serde_json::json!({ "devicetype": dtype }))
         .map_err(|e| e.to_string())?;
@@ -482,7 +492,8 @@ pub fn hue_api_get(
     let user = validate_hue_username(&username)?;
     let p = validate_hue_path(&path)?;
     let url = format!("http://{}/api/{}{}", bridge, user, p);
-    let resp = ureq::get(&url).call().map_err(|e| e.to_string())?;
+    let agent = hue_agent(HUE_API_TIMEOUT_MS);
+    let resp = agent.get(&url).call().map_err(|e| e.to_string())?;
     resp.into_json().map_err(|e| e.to_string())
 }
 
@@ -497,7 +508,9 @@ pub fn hue_api_put(
     let user = validate_hue_username(&username)?;
     let p = validate_hue_path(&path)?;
     let url = format!("http://{}/api/{}{}", bridge, user, p);
-    let resp = ureq::put(&url)
+    let agent = hue_agent(HUE_API_TIMEOUT_MS);
+    let resp = agent
+        .put(&url)
         .set("Content-Type", "application/json")
         .send_json(body)
         .map_err(|e| e.to_string())?;

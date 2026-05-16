@@ -8,6 +8,23 @@ function clamp01(v) {
   return Math.max(0, Math.min(1, n));
 }
 
+function clampHueBri(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(254, Math.round(n)));
+}
+
+function volumeToHueBri(value) {
+  const v = clamp01(value);
+  if (v <= 0) return 0;
+  return Math.max(1, Math.min(254, Math.round(v * 254)));
+}
+
+function hueVolumeFromState(entry) {
+  if (!entry || !entry.on) return 0;
+  return clamp01((Number(entry.bri) || 0) / 254);
+}
+
 function normalizeHueGroupType(type) {
   return String(type || "").trim().toLowerCase();
 }
@@ -34,7 +51,199 @@ const REQUEST_TIMEOUT_MS = 4000;
 const LOCAL_WRITE_QUIET_MS = 1200;
 const DEFAULT_AUTO_CONNECT = true;
 const PAIR_WINDOW_MS = 30000;
-const FADER_WRITE_COALESCE_MS = 75;
+const LIGHT_WRITE_INTERVAL_MS = 110;
+const GROUP_WRITE_INTERVAL_MS = 1050;
+const BRIGHTNESS_EPSILON = 0.004;
+const LOCAL_INTENT_HOLD_MS = 1800;
+const POST_WRITE_REFRESH_DEBOUNCE_MS = 250;
+const MAX_TRANSIENT_WRITE_FAILURES = 3;
+const GROUP_FANOUT_MAX_LIGHTS = 3;
+
+function createHueWriteScheduler({
+  put,
+  now = () => Date.now(),
+  setTimer = (fn, ms) => setTimeout(fn, ms),
+  clearTimer = (timer) => clearTimeout(timer),
+  lightIntervalMs = LIGHT_WRITE_INTERVAL_MS,
+  groupIntervalMs = GROUP_WRITE_INTERVAL_MS,
+  onWriteSuccess = null,
+  onWriteFailure = null,
+} = {}) {
+  if (typeof put !== "function") {
+    throw new Error("createHueWriteScheduler requires put(kind, id, body)");
+  }
+
+  const entries = new Map();
+  const nextAllowedAtByKind = new Map([
+    ["light", 0],
+    ["group", 0],
+  ]);
+  const idleResolvers = new Set();
+
+  function keyFor(kind, id) {
+    return `${String(kind || "")}::${String(id || "")}`;
+  }
+
+  function intervalForKind(kind) {
+    return kind === "group" ? groupIntervalMs : lightIntervalMs;
+  }
+
+  function entryIsIdle(entry) {
+    return Boolean(entry) && !entry.pending && !entry.inFlight && !entry.timer;
+  }
+
+  function isIdle() {
+    for (const entry of entries.values()) {
+      if (!entryIsIdle(entry)) return false;
+    }
+    return true;
+  }
+
+  function notifyIdleIfNeeded() {
+    if (!isIdle()) return;
+    for (const resolve of idleResolvers) {
+      try { resolve(); } catch {}
+    }
+    idleResolvers.clear();
+  }
+
+  function getOrCreateEntry(kind, id) {
+    const key = keyFor(kind, id);
+    let entry = entries.get(key);
+    if (!entry) {
+      entry = {
+        key,
+        kind: String(kind || ""),
+        id: String(id || ""),
+        pending: null,
+        inFlight: false,
+        timer: null,
+      };
+      entries.set(key, entry);
+    }
+    return entry;
+  }
+
+  function scheduleEntry(entry) {
+    if (!entry || entry.timer || entry.inFlight || !entry.pending) return;
+
+    const dueAt = nextAllowedAtByKind.get(entry.kind) || 0;
+    const delay = Math.max(0, dueAt - now());
+    entry.timer = setTimer(() => {
+      entry.timer = null;
+      runEntry(entry).catch(() => {});
+    }, delay);
+  }
+
+  async function runEntry(entry) {
+    if (!entry || entry.inFlight || !entry.pending) {
+      notifyIdleIfNeeded();
+      return;
+    }
+
+    const dueAt = nextAllowedAtByKind.get(entry.kind) || 0;
+    const delay = dueAt - now();
+    if (delay > 0) {
+      scheduleEntry(entry);
+      return;
+    }
+
+    const pending = entry.pending;
+    entry.pending = null;
+    entry.inFlight = true;
+    nextAllowedAtByKind.set(entry.kind, now() + intervalForKind(entry.kind));
+
+    try {
+      if (!pending.shouldSend || pending.shouldSend()) {
+        await put(entry.kind, entry.id, pending.body);
+        if (typeof onWriteSuccess === "function") {
+          onWriteSuccess({ kind: entry.kind, id: entry.id, body: pending.body, key: entry.key });
+        }
+      }
+    } catch (err) {
+      if (typeof onWriteFailure === "function") {
+        onWriteFailure(err, {
+          kind: entry.kind,
+          id: entry.id,
+          body: pending.body,
+          key: entry.key,
+          hasNewerPending: Boolean(entry.pending),
+        });
+      }
+    } finally {
+      entry.inFlight = false;
+      if (entry.pending) {
+        scheduleEntry(entry);
+      } else {
+        notifyIdleIfNeeded();
+      }
+    }
+  }
+
+  function enqueue(kind, id, body, options = null) {
+    const entry = getOrCreateEntry(kind, id);
+    entry.pending = {
+      body: body || {},
+      shouldSend: (options && typeof options.shouldSend === "function") ? options.shouldSend : null,
+    };
+    scheduleEntry(entry);
+  }
+
+  function cancel(kind, id) {
+    const key = keyFor(kind, id);
+    const entry = entries.get(key);
+    if (!entry) return;
+    entry.pending = null;
+    if (entry.timer) {
+      clearTimer(entry.timer);
+      entry.timer = null;
+    }
+    notifyIdleIfNeeded();
+  }
+
+  function clear() {
+    for (const entry of entries.values()) {
+      if (entry.timer) clearTimer(entry.timer);
+    }
+    entries.clear();
+    nextAllowedAtByKind.set("light", 0);
+    nextAllowedAtByKind.set("group", 0);
+    notifyIdleIfNeeded();
+  }
+
+  function whenIdle(timeoutMs = 2000) {
+    if (isIdle()) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const timer = setTimer(() => {
+        idleResolvers.delete(done);
+        reject(new Error("Hue scheduler did not become idle"));
+      }, timeoutMs);
+      const done = () => {
+        clearTimer(timer);
+        resolve();
+      };
+      idleResolvers.add(done);
+    });
+  }
+
+  return {
+    enqueue,
+    cancel,
+    clear,
+    whenIdle,
+    isIdle,
+  };
+}
+
+export function createHueWriteSchedulerForTests(options) {
+  return createHueWriteScheduler(options);
+}
+
+export const hueTestUtils = {
+  clampHueBri,
+  volumeToHueBri,
+  hueVolumeFromState,
+};
 
 const ui = {
   statusText: null,
@@ -121,7 +330,13 @@ export async function activate(ctx) {
   let bindings = [];
   const stateByKey = new Map();
   const lastLocalWriteAt = new Map();
-  const pendingBrightnessWrites = new Map();
+  const localIntentByKey = new Map();
+  const lastNonzeroBriByKey = new Map();
+  const lastQueuedVolumeByKey = new Map();
+  const groupLightIdsByKey = new Map();
+  const groupWriteGenerationByKey = new Map();
+  let postWriteRefreshTimer = null;
+  let transientWriteFailures = 0;
 
   function ensurePairPanel() {
     let panel = document.getElementById("hue-pair-panel");
@@ -173,6 +388,77 @@ export async function activate(ctx) {
     return `${String(kind || "")}::${String(id || "")}`;
   }
 
+  function bindingTargets(binding) {
+    if (Array.isArray(binding?.targets) && binding.targets.length > 0) {
+      return binding.targets;
+    }
+    return binding?.target ? [binding.target] : [];
+  }
+
+  function rememberNonzeroBri(key, bri) {
+    const next = clampHueBri(bri);
+    if (next > 0) {
+      lastNonzeroBriByKey.set(key, next);
+    }
+  }
+
+  function savedBriForKey(key, fallback = 254) {
+    const saved = clampHueBri(lastNonzeroBriByKey.get(key));
+    if (saved > 0) return saved;
+    const current = stateByKey.get(key);
+    const currentBri = clampHueBri(current?.bri);
+    if (currentBri > 0) return currentBri;
+    return Math.max(1, Math.min(254, clampHueBri(fallback) || 254));
+  }
+
+  function rememberLocalIntent(key, intent) {
+    const next = {
+      ...(intent && typeof intent === "object" ? intent : {}),
+      at: Date.now(),
+    };
+    localIntentByKey.set(key, next);
+    lastLocalWriteAt.set(key, next.at);
+  }
+
+  function freshLocalIntent(key, now = Date.now()) {
+    const intent = localIntentByKey.get(key);
+    if (!intent) return null;
+    if ((now - Number(intent.at || 0)) >= LOCAL_INTENT_HOLD_MS) {
+      localIntentByKey.delete(key);
+      return null;
+    }
+    return intent;
+  }
+
+  function stateMatchesIntent(state, intent) {
+    if (!state || !intent) return false;
+    if (typeof intent.on === "boolean" && Boolean(state.on) !== intent.on) {
+      return false;
+    }
+    if (typeof intent.bri === "number") {
+      return Math.abs(clampHueBri(state.bri) - clampHueBri(intent.bri)) <= 2;
+    }
+    return true;
+  }
+
+  function mergeIncomingStateWithLocalIntent(key, incoming) {
+    const intent = freshLocalIntent(key);
+    if (!intent) return incoming;
+
+    if (stateMatchesIntent(incoming, intent)) {
+      localIntentByKey.delete(key);
+      return incoming;
+    }
+
+    const current = stateByKey.get(key);
+    if (!current) return incoming;
+    return {
+      ...incoming,
+      on: current.on,
+      bri: current.bri,
+    };
+  }
+
   function normalizeIntegrationTarget(rawTarget) {
     const t = rawTarget?.Integration || rawTarget?.integration || rawTarget;
     if (!t || t.integration_id !== "hue") return null;
@@ -190,8 +476,7 @@ export async function activate(ctx) {
 
   function parseLightState(entry) {
     const state = entry?.state || {};
-    const briRaw = Number(state.bri);
-    const bri = Number.isFinite(briRaw) ? Math.max(0, Math.min(254, Math.round(briRaw))) : 0;
+    const bri = clampHueBri(state.bri);
     return {
       on: Boolean(state.on),
       bri,
@@ -202,13 +487,15 @@ export async function activate(ctx) {
 
   function parseGroupState(entry) {
     const action = entry?.action || {};
-    const briRaw = Number(action.bri);
-    const bri = Number.isFinite(briRaw) ? Math.max(0, Math.min(254, Math.round(briRaw))) : 0;
+    const groupState = entry?.state || {};
+    const bri = clampHueBri(action.bri);
+    const hasAggregateOn = typeof groupState.any_on === "boolean";
     return {
-      on: Boolean(action.on),
+      on: hasAggregateOn ? Boolean(groupState.any_on) : Boolean(action.on),
       bri,
       name: String(entry?.name || "Hue Group"),
       group_type: String(entry?.type || ""),
+      light_ids: Array.isArray(entry?.lights) ? entry.lights.map((id) => String(id)).filter(Boolean) : [],
       kind: "group",
     };
   }
@@ -260,30 +547,78 @@ export async function activate(ctx) {
     return json;
   }
 
-  function queueBrightnessWrite(kind, id, value) {
-    const key = targetKey(kind, id);
-    const nextValue = clamp01(value);
-    const existing = pendingBrightnessWrites.get(key);
-    if (existing && existing.timer) {
-      existing.value = nextValue;
-      pendingBrightnessWrites.set(key, existing);
-      return;
+  function schedulePostWriteRefresh() {
+    if (postWriteRefreshTimer) return;
+    postWriteRefreshTimer = setTimeout(async () => {
+      postWriteRefreshTimer = null;
+      try {
+        await writeScheduler.whenIdle(30000);
+      } catch {
+        // A long-running fader move should not block refresh forever.
+      }
+      if (!connected || connecting) return;
+      refreshHueState({ silent: true }).catch(() => {
+        markDisconnected("Disconnected");
+      });
+    }, LOCAL_WRITE_QUIET_MS + POST_WRITE_REFRESH_DEBOUNCE_MS);
+  }
+
+  const writeScheduler = createHueWriteScheduler({
+    put: huePut,
+    onWriteSuccess: () => {
+      transientWriteFailures = 0;
+      schedulePostWriteRefresh();
+    },
+    onWriteFailure: (_err, failedWrite) => {
+      transientWriteFailures += 1;
+      if (transientWriteFailures >= MAX_TRANSIENT_WRITE_FAILURES) {
+        markDisconnected("Disconnected");
+        return;
+      }
+      if (!failedWrite?.hasNewerPending && failedWrite?.kind && failedWrite?.id) {
+        writeScheduler.enqueue(failedWrite.kind, failedWrite.id, failedWrite.body || {});
+      }
+    },
+  });
+
+  function incrementGroupGeneration(key) {
+    const next = (groupWriteGenerationByKey.get(key) || 0) + 1;
+    groupWriteGenerationByKey.set(key, next);
+    return next;
+  }
+
+  function currentGroupGeneration(key) {
+    return groupWriteGenerationByKey.get(key) || 0;
+  }
+
+  function queueHueWrite(kind, id, body, options = null) {
+    const targetKind = String(kind || "");
+    const targetId = String(id || "");
+    if (!targetKind || !targetId) return;
+
+    const key = targetKey(targetKind, targetId);
+    const fanoutGroup = Boolean(options?.fanoutGroup);
+    if (targetKind === "group" && fanoutGroup && body?.on === true && typeof body?.bri === "number") {
+      const lightIds = groupLightIdsByKey.get(key) || [];
+      if (lightIds.length > 0 && lightIds.length <= GROUP_FANOUT_MAX_LIGHTS) {
+        const generation = currentGroupGeneration(key);
+        for (const lightId of lightIds) {
+          writeScheduler.enqueue("light", lightId, body, {
+            shouldSend: () => currentGroupGeneration(key) === generation,
+          });
+        }
+        return;
+      }
     }
 
-    const entry = { kind, id, value: nextValue, timer: null };
-    entry.timer = setTimeout(async () => {
-      const latest = pendingBrightnessWrites.get(key);
-      pendingBrightnessWrites.delete(key);
-      if (!latest) return;
-      const bri = Math.max(1, Math.min(254, Math.round(latest.value * 254)));
-      try {
-        await huePut(latest.kind, latest.id, { on: true, bri, transitiontime: 1 });
-      } catch {
-        markDisconnected("Disconnected");
+    if (targetKind === "group") {
+      incrementGroupGeneration(key);
+      const lightIds = groupLightIdsByKey.get(key) || [];
+      for (const lightId of lightIds) {
+        writeScheduler.cancel("light", lightId);
       }
-    }, FADER_WRITE_COALESCE_MS);
-
-    pendingBrightnessWrites.set(key, entry);
+    }
+    writeScheduler.enqueue(targetKind, targetId, body);
   }
 
   async function persistProfilePatch(patch) {
@@ -448,6 +783,45 @@ export async function activate(ctx) {
     bindings = Array.isArray(nextBindings) ? nextBindings : [];
   }
 
+  function firstHueTargetForBinding(binding) {
+    for (const rawTarget of bindingTargets(binding)) {
+      const target = normalizeIntegrationTarget(rawTarget);
+      if (target) return target;
+    }
+    return null;
+  }
+
+  function bindingHasHueTargetKey(binding, key) {
+    for (const rawTarget of bindingTargets(binding)) {
+      const target = normalizeIntegrationTarget(rawTarget);
+      if (target && targetKey(target.kind, target.id) === key) return true;
+    }
+    return false;
+  }
+
+  async function syncFeedbackForKey(key, opts = null) {
+    const silent = (opts && typeof opts === "object") ? Boolean(opts.silent) : true;
+    const skipBindingId = String(opts?.skipBindingId || "");
+    const entry = stateByKey.get(key);
+    if (!entry) return;
+
+    for (const b of bindings) {
+      const bindingId = String(b?.id || "");
+      if (!bindingId || bindingId === skipBindingId) continue;
+      if (!bindingHasHueTargetKey(b, key)) continue;
+
+      try {
+        if ((b?.action || "Volume") === "ToggleMute") {
+          await ctx.feedback.set(bindingId, entry.on ? 1.0 : 0.0, "ToggleMute", { silent });
+        } else {
+          await ctx.feedback.set(bindingId, hueVolumeFromState(entry), "Volume", { silent });
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   async function syncAllFeedback(opts = null) {
     const silent = (opts && typeof opts === "object") ? Boolean(opts.silent) : true;
     const allowQuietSkip = (opts && typeof opts === "object") ? Boolean(opts.allowQuietSkip) : false;
@@ -457,12 +831,16 @@ export async function activate(ctx) {
       const bindingId = String(b?.id || "");
       if (!bindingId) continue;
 
-      const t = normalizeIntegrationTarget(b?.target);
+      const t = firstHueTargetForBinding(b);
       if (!t) continue;
 
       const key = targetKey(t.kind, t.id);
       if (allowQuietSkip) {
+        const intent = freshLocalIntent(key, now);
         const lastWrite = lastLocalWriteAt.get(key) || 0;
+        if (intent) {
+          continue;
+        }
         if (lastWrite > 0 && (now - lastWrite) < LOCAL_WRITE_QUIET_MS) {
           continue;
         }
@@ -475,8 +853,7 @@ export async function activate(ctx) {
         if ((b?.action || "Volume") === "ToggleMute") {
           await ctx.feedback.set(bindingId, entry.on ? 1.0 : 0.0, "ToggleMute", { silent });
         } else {
-          const vol = clamp01((Number(entry.bri) || 0) / 254);
-          await ctx.feedback.set(bindingId, vol, "Volume", { silent });
+          await ctx.feedback.set(bindingId, hueVolumeFromState(entry), "Volume", { silent });
         }
       } catch {
         // ignore
@@ -494,7 +871,9 @@ export async function activate(ctx) {
     if (lightsJson && typeof lightsJson === "object") {
       for (const [id, light] of Object.entries(lightsJson)) {
         const parsed = parseLightState(light);
-        nextState.set(targetKey("light", id), { ...parsed, id: String(id) });
+        const key = targetKey("light", id);
+        rememberNonzeroBri(key, parsed.bri);
+        nextState.set(key, mergeIncomingStateWithLocalIntent(key, { ...parsed, id: String(id) }));
       }
     }
 
@@ -502,7 +881,10 @@ export async function activate(ctx) {
       for (const [id, group] of Object.entries(groupsJson)) {
         if (!isSelectableHueGroup(group)) continue;
         const parsed = parseGroupState(group);
-        nextState.set(targetKey("group", id), { ...parsed, id: String(id) });
+        const key = targetKey("group", id);
+        rememberNonzeroBri(key, parsed.bri);
+        groupLightIdsByKey.set(key, parsed.light_ids || []);
+        nextState.set(key, mergeIncomingStateWithLocalIntent(key, { ...parsed, id: String(id) }));
       }
     }
 
@@ -515,6 +897,12 @@ export async function activate(ctx) {
   function markDisconnected(detail = "Disconnected") {
     connected = false;
     connecting = false;
+    transientWriteFailures = 0;
+    writeScheduler.clear();
+    if (postWriteRefreshTimer) {
+      clearTimeout(postWriteRefreshTimer);
+      postWriteRefreshTimer = null;
+    }
     setStatus(false, detail, { disconnectedByUser });
   }
 
@@ -542,6 +930,7 @@ export async function activate(ctx) {
       await refreshHueState({ silent: true });
       connected = true;
       connecting = false;
+      transientWriteFailures = 0;
       manualConnectRequested = false;
       disconnectedByUser = false;
       setStatus(true, `Connected (${ip})`);
@@ -744,6 +1133,167 @@ export async function activate(ctx) {
     }
   })();
 
+  function rememberIntentForTargetAndMembers(target, intent) {
+    const key = targetKey(target.kind, target.id);
+    rememberLocalIntent(key, intent);
+
+    if (target.kind !== "group") return;
+    const lightIds = groupLightIdsByKey.get(key) || [];
+    for (const lightId of lightIds) {
+      rememberLocalIntent(targetKey("light", lightId), intent);
+    }
+  }
+
+  function rememberQueuedVolumeForTargetAndMembers(target, volume) {
+    const next = clamp01(volume);
+    const key = targetKey(target.kind, target.id);
+    lastQueuedVolumeByKey.set(key, next);
+
+    if (target.kind !== "group") return;
+    const lightIds = groupLightIdsByKey.get(key) || [];
+    for (const lightId of lightIds) {
+      lastQueuedVolumeByKey.set(targetKey("light", lightId), next);
+    }
+  }
+
+  function updateOptimisticState(target, nextState) {
+    const key = targetKey(target.kind, target.id);
+    const current = stateByKey.get(key) || { id: target.id, name: target.name, kind: target.kind, bri: savedBriForKey(key) };
+    const bri = nextState.bri == null ? clampHueBri(current.bri) : clampHueBri(nextState.bri);
+    const next = {
+      ...current,
+      ...nextState,
+      id: String(target.id),
+      name: current.name || target.name,
+      kind: target.kind,
+      bri,
+    };
+    stateByKey.set(key, next);
+    rememberNonzeroBri(key, bri);
+
+    if (target.kind !== "group") return;
+    const lightIds = groupLightIdsByKey.get(key) || [];
+    for (const lightId of lightIds) {
+      const lightKey = targetKey("light", lightId);
+      const lightCurrent = stateByKey.get(lightKey) || { id: String(lightId), name: `Hue Light ${lightId}`, kind: "light", bri };
+      const lightNext = {
+        ...lightCurrent,
+        on: next.on,
+        bri,
+      };
+      stateByKey.set(lightKey, lightNext);
+      rememberNonzeroBri(lightKey, bri);
+    }
+  }
+
+  async function syncAffectedFeedback(target, skipBindingId = "") {
+    const key = targetKey(target.kind, target.id);
+    await syncFeedbackForKey(key, { silent: true, skipBindingId });
+
+    if (target.kind !== "group") return;
+    const lightIds = groupLightIdsByKey.get(key) || [];
+    for (const lightId of lightIds) {
+      await syncFeedbackForKey(targetKey("light", lightId), { silent: true, skipBindingId });
+    }
+  }
+
+  function queueToggleWrite(target, on) {
+    const key = targetKey(target.kind, target.id);
+    const body = on
+      ? { on: true, bri: savedBriForKey(key), transitiontime: 0 }
+      : { on: false, transitiontime: 0 };
+    queueHueWrite(target.kind, target.id, body, { fanoutGroup: false });
+  }
+
+  function queueVolumeWrite(target, value, options = null) {
+    const key = targetKey(target.kind, target.id);
+    const volume = clamp01(value);
+    const force = Boolean(options?.force);
+    const previousQueued = lastQueuedVolumeByKey.get(key);
+    if (!force && typeof previousQueued === "number" && Math.abs(previousQueued - volume) < BRIGHTNESS_EPSILON) {
+      return;
+    }
+
+    rememberQueuedVolumeForTargetAndMembers(target, volume);
+    if (volume <= 0) {
+      queueHueWrite(target.kind, target.id, { on: false, transitiontime: 0 }, { fanoutGroup: false });
+      return;
+    }
+
+    const bri = volumeToHueBri(volume);
+    rememberNonzeroBri(key, bri);
+    queueHueWrite(target.kind, target.id, { on: true, bri, transitiontime: 0 }, { fanoutGroup: true });
+  }
+
+  function normalizeBatchTargets(payload) {
+    const rawTargets = Array.isArray(payload?.targets) ? payload.targets : [];
+    return rawTargets.map((entry, index) => {
+      const target = normalizeIntegrationTarget(entry?.target || entry);
+      if (!target) return null;
+      return {
+        target,
+        target_index: Number(entry?.target_index ?? index),
+        target_count: Number(entry?.target_count ?? rawTargets.length),
+        is_primary_target: entry?.is_primary_target === true,
+      };
+    }).filter(Boolean);
+  }
+
+  async function handleHueToggle(payload) {
+    const target = normalizeIntegrationTarget(payload?.target);
+    if (!target || !connected) return;
+
+    const bindingId = String(payload?.binding_id || "");
+    const on = clamp01(payload?.value) > 0.5;
+    const key = targetKey(target.kind, target.id);
+    const bri = on ? savedBriForKey(key) : savedBriForKey(key, stateByKey.get(key)?.bri || 254);
+
+    updateOptimisticState(target, { on, bri });
+    rememberIntentForTargetAndMembers(target, on ? { on, bri } : { on: false });
+    rememberQueuedVolumeForTargetAndMembers(target, on ? clamp01(bri / 254) : 0);
+    queueToggleWrite(target, on);
+
+    if (bindingId) {
+      await ctx.feedback.set(bindingId, on ? 1.0 : 0.0, "ToggleMute");
+    }
+    await syncAffectedFeedback(target, bindingId);
+  }
+
+  async function handleHueVolumeTargets(payload, targets) {
+    if (!connected || targets.length === 0) return;
+
+    const bindingId = String(payload?.binding_id || "");
+    const value = clamp01(payload?.value);
+
+    for (const entry of targets) {
+      const target = entry.target;
+      const key = targetKey(target.kind, target.id);
+      const priorState = stateByKey.get(key);
+      const nextBri = value <= 0 ? savedBriForKey(key, priorState?.bri || 254) : volumeToHueBri(value);
+      const forceWrite = value <= 0
+        ? Boolean(priorState?.on)
+        : (!priorState?.on || Math.abs(clampHueBri(priorState?.bri) - nextBri) > 2);
+      if (value <= 0) {
+        const bri = nextBri;
+        updateOptimisticState(target, { on: false, bri });
+        rememberIntentForTargetAndMembers(target, { on: false });
+      } else {
+        const bri = nextBri;
+        updateOptimisticState(target, { on: true, bri });
+        rememberIntentForTargetAndMembers(target, { on: true, bri });
+      }
+      queueVolumeWrite(target, value, { force: forceWrite });
+    }
+
+    if (bindingId) {
+      await ctx.feedback.set(bindingId, value, "Volume");
+    }
+
+    for (const entry of targets) {
+      await syncAffectedFeedback(entry.target, bindingId);
+    }
+  }
+
   ctx.registerIntegration({
     id: "hue",
     name: "Philips Hue",
@@ -819,40 +1369,37 @@ export async function activate(ctx) {
 
       return opts;
     },
-    onBindingTriggered: async (payload) => {
-      const t = normalizeIntegrationTarget(payload?.target);
-      if (!t || !connected) return;
-
-      const bindingId = String(payload?.binding_id || "");
-      const action = String(payload?.action || "Volume");
-      const value = clamp01(payload?.value);
-      const key = targetKey(t.kind, t.id);
-
+    onBindingTriggeredBatch: async (payload) => {
+      if (String(payload?.action || "Volume") !== "Volume") return;
       try {
+        await handleHueVolumeTargets(payload, normalizeBatchTargets(payload));
+      } catch {
+        transientWriteFailures += 1;
+        if (transientWriteFailures >= MAX_TRANSIENT_WRITE_FAILURES) {
+          markDisconnected("Disconnected");
+        }
+      }
+    },
+    onBindingTriggered: async (payload) => {
+      try {
+        const action = String(payload?.action || "Volume");
         if (action === "ToggleMute") {
-          const on = value > 0.5;
-          const current = stateByKey.get(key) || { bri: 0, name: t.name, kind: t.kind };
-          stateByKey.set(key, { ...current, on });
-          lastLocalWriteAt.set(key, Date.now());
-          if (bindingId) {
-            await ctx.feedback.set(bindingId, on ? 1.0 : 0.0, "ToggleMute");
-          }
-          huePut(t.kind, t.id, { on, transitiontime: 1 }).catch(() => {
-            markDisconnected("Disconnected");
-          });
+          await handleHueToggle(payload);
           return;
         }
-
-        const current = stateByKey.get(key) || { on: true, name: t.name, kind: t.kind };
-        const bri = Math.max(1, Math.min(254, Math.round(value * 254)));
-        stateByKey.set(key, { ...current, on: true, bri });
-        lastLocalWriteAt.set(key, Date.now());
-        if (bindingId) {
-          await ctx.feedback.set(bindingId, value, "Volume");
-        }
-        queueBrightnessWrite(t.kind, t.id, value);
+        const target = normalizeIntegrationTarget(payload?.target);
+        if (!target) return;
+        await handleHueVolumeTargets(payload, [{
+          target,
+          target_index: Number(payload?.target_index ?? 0),
+          target_count: Number(payload?.target_count ?? 1),
+          is_primary_target: payload?.is_primary_target !== false,
+        }]);
       } catch {
-        markDisconnected("Disconnected");
+        transientWriteFailures += 1;
+        if (transientWriteFailures >= MAX_TRANSIENT_WRITE_FAILURES) {
+          markDisconnected("Disconnected");
+        }
       }
     },
   });
@@ -993,10 +1540,6 @@ export async function activate(ctx) {
       });
     },
     unmount: () => {
-      for (const pending of pendingBrightnessWrites.values()) {
-        if (pending?.timer) clearTimeout(pending.timer);
-      }
-      pendingBrightnessWrites.clear();
       ui.statusText = null;
       ui.statusDot = null;
       ui.autoConnectInput = null;
