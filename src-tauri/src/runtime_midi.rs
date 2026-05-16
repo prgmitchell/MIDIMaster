@@ -312,14 +312,23 @@ pub(crate) fn apply_midi_event(
         );
         return Ok(());
     }
+    let event_value_14 = event
+        .value_14
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "none".to_string());
     run_logger::debug(
         "bindings",
         "event_matched",
         &format!(
-            "binding_id={} action={:?} targets={} control_kind={:?} msg_type={:?}",
+            "binding_id={} action={:?} targets={} device_id={} channel={} controller={} value={} value_14={} control_kind={:?} msg_type={:?}",
             binding.id,
             binding.action,
             targets.len(),
+            event.device_id,
+            event.channel,
+            event.controller,
+            event.value,
+            event_value_14,
             binding.control_kind,
             binding.control.msg_type
         ),
@@ -369,11 +378,7 @@ pub(crate) fn apply_midi_event(
             // Clone Arcs for async task
             let feedback_arc = state.feedback_values.clone();
             let midi_arc = state.midi.clone();
-
-            let device_id = binding.device_id.clone();
-            let channel = binding.control.channel;
-            let controller = binding.control.controller;
-            let msg_type = binding.control.msg_type.clone();
+            let binding_for_feedback = binding.clone();
 
             tauri::async_runtime::spawn(async move {
                 // Sleep for 20ms to allow the hardware to process the "Note Off" completely
@@ -382,13 +387,7 @@ pub(crate) fn apply_midi_event(
                 if let Ok(feedback) = feedback_arc.lock() {
                     let current_val = feedback.get(&key_clone).cloned().unwrap_or(0.0);
                     if let Ok(mut midi) = midi_arc.lock() {
-                        let _ = midi.send_feedback(
-                            &device_id,
-                            channel,
-                            controller,
-                            current_val,
-                            msg_type,
-                        );
+                        let _ = midi.send_binding_feedback(&binding_for_feedback, current_val);
                     }
                 }
             });
@@ -548,13 +547,7 @@ pub(crate) fn apply_midi_event(
 
         if let Ok(mut midi) = state.midi.lock() {
             // println!("MIDI Event Matched Binding: {:?} -> {:?}", binding.name, binding.target);
-            let _ = midi.send_feedback(
-                &binding.device_id,
-                binding.control.channel,
-                binding.control.controller,
-                feedback_value,
-                binding.control.msg_type.clone(),
-            );
+            let _ = midi.send_binding_feedback(&binding, feedback_value);
         }
 
         let settings_enabled = state
@@ -767,13 +760,7 @@ pub(crate) fn apply_midi_event(
 
     if !integration_button_feedback_owned {
         if let Ok(mut midi) = state.midi.lock() {
-            let _ = midi.send_feedback(
-                &binding.device_id,
-                binding.control.channel,
-                binding.control.controller,
-                primary_feedback_value,
-                binding.control.msg_type.clone(),
-            );
+            let _ = midi.send_binding_feedback(&binding, primary_feedback_value);
         }
         if input_active {
             update_activity_button_light_hold_feedback(state, &binding, key.clone(), true);

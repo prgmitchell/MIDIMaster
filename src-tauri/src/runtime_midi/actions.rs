@@ -29,13 +29,7 @@ fn emit_button_feedback(
         feedback.insert(key.clone(), feedback_value);
     }
     if let Ok(mut midi) = state.midi.lock() {
-        let _ = midi.send_feedback(
-            &binding.device_id,
-            binding.control.channel,
-            binding.control.controller,
-            feedback_value,
-            binding.control.msg_type.clone(),
-        );
+        let _ = midi.send_binding_feedback(binding, feedback_value);
     }
     if input_active {
         update_activity_button_light_hold_feedback(state, binding, key, true);

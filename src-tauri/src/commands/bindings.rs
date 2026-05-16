@@ -114,6 +114,44 @@ fn send_feedback_to_control(
     }
 }
 
+fn send_feedback_to_binding(
+    state: &AppState,
+    binding: &Binding,
+    value: f32,
+    silent: bool,
+    context: &str,
+) {
+    let control = FeedbackControlKey::from_binding(binding);
+    let key = control.to_binding_key();
+    let is_note = matches!(control.msg_type, model::MidiMessageType::Note);
+    let user_active = binding_user_active(state, &key, is_note);
+
+    if user_active && silent {
+        run_logger::debug(
+            "bindings_cmd",
+            "set_feedback_silent_ignored_user_active",
+            &format!("context={} key={:?}", context, key),
+        );
+        return;
+    }
+
+    if !update_feedback_cache_if_changed(state, &key, value) {
+        run_logger::debug(
+            "bindings_cmd",
+            "set_feedback_skipped_unchanged",
+            &format!("context={} key={:?} value={}", context, key, value),
+        );
+        return;
+    }
+
+    // Suppress hardware feedback while the user is actively moving this control.
+    if !user_active {
+        if let Ok(mut midi) = state.midi.lock() {
+            let _ = midi.send_binding_feedback(binding, value);
+        }
+    }
+}
+
 fn targets_overlap(a: &Binding, b: &Binding) -> bool {
     let a_targets = a.normalized_targets();
     let b_targets = b.normalized_targets();
@@ -641,13 +679,7 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
 
     // 4. Send 0.0 value to the binding's control
     if let Ok(mut midi) = state.midi.lock() {
-        let _ = midi.send_feedback(
-            &binding.device_id,
-            binding.control.channel,
-            binding.control.controller,
-            0.0,
-            binding.control.msg_type.clone(),
-        );
+        let _ = midi.send_binding_feedback(&binding, 0.0);
     }
 
     Ok(())
@@ -709,13 +741,7 @@ pub fn update_midi_feedback(
 
             // Send the actual MIDI feedback
             if let Ok(mut midi) = state.midi.lock() {
-                let _ = midi.send_feedback(
-                    &binding.device_id,
-                    binding.control.channel,
-                    binding.control.controller,
-                    feedback_value,
-                    binding.control.msg_type.clone(),
-                );
+                let _ = midi.send_binding_feedback(binding, feedback_value);
             }
             run_logger::debug(
                 "bindings_cmd",
@@ -758,9 +784,9 @@ pub fn set_binding_feedback(
 
     let silent = silent.unwrap_or(false);
     if action_matches_binding {
-        send_feedback_to_control(
+        send_feedback_to_binding(
             &state,
-            &FeedbackControlKey::from_binding(&binding),
+            &binding,
             feedback_value,
             silent,
             &format!("primary:{}", binding.id),
@@ -812,9 +838,9 @@ pub fn set_binding_feedback(
             if matches!(candidate.action, model::BindingAction::ToggleMute) {
                 let primary_key = FeedbackControlKey::from_binding(candidate);
                 if emitted_controls.insert(primary_key.clone()) {
-                    send_feedback_to_control(
+                    send_feedback_to_binding(
                         &state,
-                        &primary_key,
+                        candidate,
                         value,
                         silent,
                         &format!("toggle_binding:{}", candidate.id),
@@ -841,9 +867,9 @@ pub fn set_binding_feedback(
                     .mapped_button_light_feedback_value()
                     .or_else(|| candidate.idle_button_light_feedback_value())
                     .unwrap_or(value);
-                send_feedback_to_control(
+                send_feedback_to_binding(
                     &state,
-                    &primary_key,
+                    candidate,
                     candidate_value,
                     silent,
                     &format!("volume_binding:{}", candidate.id),

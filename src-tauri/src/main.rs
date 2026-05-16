@@ -70,13 +70,7 @@ fn shutdown_lights(state: &AppState) {
             );
             if let Ok(mut midi) = state.midi.lock() {
                 for binding in &profile.bindings {
-                    let _ = midi.send_feedback(
-                        &binding.device_id,
-                        binding.control.channel,
-                        binding.control.controller,
-                        0.0,
-                        binding.control.msg_type.clone(),
-                    );
+                    let _ = midi.send_binding_feedback(binding, 0.0);
                 }
             }
         }
@@ -568,13 +562,7 @@ fn main() {
 
                                     last_known_volumes.insert(key.clone(), volume);
 
-                                    let _ = midi.send_feedback(
-                                        &binding.device_id,
-                                        binding.control.channel,
-                                        binding.control.controller,
-                                        volume,
-                                        binding.control.msg_type.clone(),
-                                    );
+                                    let _ = midi.send_binding_feedback(binding, volume);
                                 }
                             }
                         }

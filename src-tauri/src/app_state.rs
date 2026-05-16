@@ -455,13 +455,7 @@ impl AppState {
                 let Some(value) = binding.idle_button_light_feedback_value() else {
                     continue;
                 };
-                let _ = midi.send_feedback(
-                    &binding.device_id,
-                    binding.control.channel,
-                    binding.control.controller,
-                    value,
-                    binding.control.msg_type.clone(),
-                );
+                let _ = midi.send_binding_feedback(binding, value);
             }
         }
     }
