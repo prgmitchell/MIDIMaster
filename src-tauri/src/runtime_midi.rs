@@ -118,6 +118,7 @@ fn activity_button_light_generation_is_current(
     generations.get(key).copied() == Some(generation)
 }
 
+#[cfg(test)]
 fn activity_button_light_hold_should_continue(
     generations: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, u64>>>,
     binding_state: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, BindingState>>>,
