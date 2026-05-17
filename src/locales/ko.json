@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Reorder 바인딩에 드래그",
   "bindings.doubleClickRename": "더블 클릭",
   "bindings.unset": "기타 제품",
+  "bindings.loading": "바인딩을 불러오는 중...",
   "bindings.noBindings": "아직 바인딩 없음. 아래 버튼을 사용하여 하나를 추가합니다.",
   "bindings.noSearchResults": "검색에 바인딩이 없습니다.",
   "bindings.bindingFallback": "바인딩 {number}",

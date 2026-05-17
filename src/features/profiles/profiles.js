@@ -11,6 +11,7 @@ export function createProfilesFeature({
   setProfilePluginSettings,
   getBindings,
   setBindings,
+  normalizeBinding,
   bindingFallbackName,
   renderBindings,
   getPluginHost,
@@ -138,7 +139,14 @@ export function createProfilesFeature({
     pendingProfileDeleteName = null;
   }
 
-  async function loadProfileByName(name) {
+  async function loadProfileByName(name, options = {}) {
+    const {
+      applyOsd = true,
+      persistActiveProfile = true,
+      render = true,
+      startPlugins = true,
+      syncMidi = true,
+    } = (options && typeof options === "object") ? options : {};
     const n = String(name || "").trim();
     if (!n) return;
     const profile = await invoke("load_profile", { name: n });
@@ -149,7 +157,9 @@ export function createProfilesFeature({
     try {
       localStorage.setItem("activeProfileName", profile.name);
     } catch { }
-    await invoke("set_active_profile_preference", { profileName: profile.name }).catch(() => { });
+    if (persistActiveProfile) {
+      await invoke("set_active_profile_preference", { profileName: profile.name }).catch(() => { });
+    }
 
     const pps = (profile.plugin_settings && typeof profile.plugin_settings === "object")
       ? profile.plugin_settings
@@ -162,10 +172,14 @@ export function createProfilesFeature({
       setActiveProfileMidiPreference(midiPref);
     }
 
-    const nextBindings = (profile.bindings || []).map((binding, index) => ({
-      ...binding,
-      name: binding.name?.trim() || (typeof bindingFallbackName === "function" ? bindingFallbackName(binding, index) : (binding.name || "Binding")),
-    }));
+    const nextBindings = (profile.bindings || []).map((binding, index) => {
+      const normalized = typeof normalizeBinding === "function"
+        ? normalizeBinding(binding)
+        : { ...binding };
+      normalized.name = normalized.name?.trim()
+        || (typeof bindingFallbackName === "function" ? bindingFallbackName(normalized, index) : (normalized.name || "Binding"));
+      return normalized;
+    });
     if (typeof setBindings === "function") {
       setBindings(nextBindings);
     }
@@ -175,7 +189,7 @@ export function createProfilesFeature({
       try { host.setBindings(nextBindings); } catch { }
       try { host.setProfileState({ name: profile.name, plugin_settings: pps }); } catch { }
     }
-    if (typeof startPluginHostIfNeeded === "function") {
+    if (startPlugins && typeof startPluginHostIfNeeded === "function") {
       await startPluginHostIfNeeded().catch(() => { });
     }
 
@@ -193,21 +207,22 @@ export function createProfilesFeature({
       if (typeof setOsdSettings === "function") {
         setOsdSettings(nextOsd);
       }
-      if (typeof applyOsdSettings === "function") {
+      if (applyOsd && typeof applyOsdSettings === "function") {
         await applyOsdSettings(nextOsd);
       }
     }
 
-    if (typeof renderBindings === "function") {
+    if (render && typeof renderBindings === "function") {
       renderBindings();
     }
     setProfileSelection(profile.name);
-    if (typeof onProfileLoaded === "function") {
+    if (syncMidi && typeof onProfileLoaded === "function") {
       await onProfileLoaded({
         name: profile.name,
         midiDevicePreference: midiPref,
       });
     }
+    return profile;
   }
 
   async function deleteProfileByName(name) {

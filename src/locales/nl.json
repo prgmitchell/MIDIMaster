@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Sleep om de binding te herschikken",
   "bindings.doubleClickRename": "Dubbelklik om te hernoemen",
   "bindings.unset": "Niet ingesteld",
+  "bindings.loading": "Bindingen laden...",
   "bindings.noBindings": "Nog geen bindingen. Gebruik de knop hieronder om er een toe te voegen.",
   "bindings.noSearchResults": "Geen bindingen die overeenkomen met uw zoekopdracht.",
   "bindings.bindingFallback": "{number} binden",

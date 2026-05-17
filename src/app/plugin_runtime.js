@@ -21,6 +21,7 @@ export function createPluginRuntime({
 }) {
   let pluginHost = null;
   let pluginHostStarted = false;
+  let bindingsInvalidationSuppressed = false;
 
   function getPluginHost() {
     return pluginHost;
@@ -33,8 +34,12 @@ export function createPluginRuntime({
     }
   }
 
-  async function startPluginHostIfNeeded() {
-    if (isOsdWindow) return;
+  async function startPluginHostIfNeeded(options = {}) {
+    if (isOsdWindow) return { started: false, metadataChanged: false };
+    const suppressInitialBindingsInvalidation = Boolean(options?.suppressInitialBindingsInvalidation);
+    const wasStarted = pluginHostStarted;
+    const shouldSuppressInvalidation = suppressInitialBindingsInvalidation && !pluginHostStarted;
+    let metadataChanged = false;
 
     if (!pluginHost) {
       pluginHost = createPluginHost({
@@ -45,42 +50,55 @@ export function createPluginRuntime({
       });
     }
 
-    try {
-      pluginHost.setProfileState({
-        name: getActiveProfileName() || localStorage.getItem("activeProfileName") || "Default",
-        plugin_settings: getProfilePluginSettings() || {},
-      });
-    } catch { }
-
-    if (!pluginHostStarted) {
-      await pluginHost.loadInstalledPlugins().catch(() => { });
-      await pluginHost.start().catch(() => { });
-      pluginHostStarted = true;
+    if (shouldSuppressInvalidation) {
+      bindingsInvalidationSuppressed = true;
     }
 
     try {
-      pluginHost.setBindings(getBindings());
-    } catch { }
+      try {
+        pluginHost.setProfileState({
+          name: getActiveProfileName() || localStorage.getItem("activeProfileName") || "Default",
+          plugin_settings: getProfilePluginSettings() || {},
+        });
+      } catch { }
 
-    try {
-      const changed = hydrateIntegrationDisplayMetadata();
-      if (changed) {
-        try { pluginHost.setBindings(getBindings()); } catch { }
-        await saveBindingsForProfile();
+      if (!pluginHostStarted) {
+        await pluginHost.loadInstalledPlugins().catch(() => { });
+        await pluginHost.start().catch(() => { });
+        pluginHostStarted = true;
       }
-    } catch { }
 
-    try {
-      const connectionsPanel = getConnectionsPanel();
-      if (connectionsPanel && !connectionsPanel.classList.contains("hidden")) {
-        mountConnectionsTabs({ force: true });
+      try {
+        pluginHost.setBindings(getBindings());
+      } catch { }
+
+      try {
+        metadataChanged = hydrateIntegrationDisplayMetadata();
+        if (metadataChanged) {
+          try { pluginHost.setBindings(getBindings()); } catch { }
+          await saveBindingsForProfile();
+        }
+      } catch { }
+
+      try {
+        const connectionsPanel = getConnectionsPanel();
+        if (connectionsPanel && !connectionsPanel.classList.contains("hidden")) {
+          mountConnectionsTabs({ force: true });
+        }
+      } catch { }
+    } finally {
+      if (shouldSuppressInvalidation) {
+        bindingsInvalidationSuppressed = false;
       }
-    } catch { }
+    }
+
+    return { started: !wasStarted && pluginHostStarted, metadataChanged };
   }
 
   function createBindingsInvalidator() {
     let t = null;
     return () => {
+      if (bindingsInvalidationSuppressed) return;
       if (t) return;
       t = setTimeout(() => {
         t = null;

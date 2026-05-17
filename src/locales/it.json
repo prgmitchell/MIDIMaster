@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Trascinare per riordinare il binding",
   "bindings.doubleClickRename": "Fare doppio clic per rinominare",
   "bindings.unset": "Un set",
+  "bindings.loading": "Caricamento dei binding...",
   "bindings.noBindings": "Ancora nessun legame. Utilizzare il pulsante qui sotto per aggiungere uno.",
   "bindings.noSearchResults": "Nessun legame corrisponde alla tua ricerca.",
   "bindings.bindingFallback": "Binding {number}",

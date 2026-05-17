@@ -892,6 +892,15 @@ export function createTargetsFeature({
       return target?.Integration || target?.integration || null;
     };
 
+    const escapeRegExp = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const unavailableSuffixPattern = new RegExp(`\\s*\\(\\s*(?:Unavailable|${escapeRegExp(t("targets.unavailable"))})\\s*\\)\\s*$`, "i");
+    const hasUnavailableSuffix = (label) => unavailableSuffixPattern.test(String(label || ""));
+    const stripUnavailableSuffix = (label) => {
+      const raw = String(label || "");
+      const stripped = raw.replace(unavailableSuffixPattern, "").trim();
+      return stripped || raw;
+    };
+
     selectedActionKind = String(integrationFromTarget(selectedTargets[0])?.data?.action_kind || "").trim();
 
       const actionLabel = (action, target = null) => {
@@ -964,6 +973,7 @@ export function createTargetsFeature({
       const merged = {
         label: (resolved?.label || cached?.label || "Target"),
         icon_data: (resolved?.icon_data ?? cached?.icon_data ?? null),
+        ghost: Boolean(resolved?.ghost),
       };
       targetDisplayCache.set(key, merged);
       return merged;
@@ -973,7 +983,7 @@ export function createTargetsFeature({
       const displayOption = cachedDisplayForTarget(target);
       const chip = document.createElement("span");
       chip.className = "target-chip";
-      if (/\(\s*Unavailable\s*\)\s*$/i.test(String(displayOption?.label || "")) || String(displayOption?.label || "").includes(t("targets.unavailable"))) {
+      if (displayOption?.ghost || hasUnavailableSuffix(displayOption?.label) || String(displayOption?.label || "").includes(t("targets.unavailable"))) {
         chip.classList.add("unavailable");
       }
       chip.dataset.index = String(index);
@@ -988,7 +998,7 @@ export function createTargetsFeature({
         ? [actionLabel(selectedAction, target)]
         : [];
       renderLabelFromRawWithTags(label, {
-        rawLabel: displayOption.label,
+        rawLabel: stripUnavailableSuffix(displayOption.label),
         extraTags: actionTags.filter(Boolean),
         truncateMain: true,
         collapseTags: false,

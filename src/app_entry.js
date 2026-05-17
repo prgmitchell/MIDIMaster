@@ -73,8 +73,8 @@ function getPluginHost() {
   return pluginRuntime?.getPluginHost?.() || null;
 }
 
-async function startPluginHostIfNeeded() {
-  return pluginRuntime?.startPluginHostIfNeeded?.();
+async function startPluginHostIfNeeded(options) {
+  return pluginRuntime?.startPluginHostIfNeeded?.(options);
 }
 
 function extractIntegrationTarget(target) {
@@ -864,6 +864,7 @@ profilesFeature = createProfilesFeature({
   setProfilePluginSettings: (next) => { profilePluginSettings = next; },
   getBindings: () => bindings,
   setBindings: (next) => { bindings = next; },
+  normalizeBinding,
   bindingFallbackName,
   renderBindings,
   getPluginHost,
@@ -1638,9 +1639,9 @@ async function saveBindingsForProfile() {
   }
 }
 
-async function loadProfileByName(name) {
+async function loadProfileByName(name, options) {
   if (profilesFeature && typeof profilesFeature.loadProfileByName === "function") {
-    return profilesFeature.loadProfileByName(name);
+    return profilesFeature.loadProfileByName(name, options);
   }
 }
 
@@ -2012,6 +2013,54 @@ async function attemptAutoConnect(deviceData) {
   return midiFeature?.attemptAutoConnect?.(deviceData);
 }
 
+function getStartupProfileName() {
+  try {
+    return String(
+      localStorage.getItem("activeProfileName")
+      || persistedActiveProfileName
+      || "Default",
+    ).trim() || "Default";
+  } catch {
+    return String(persistedActiveProfileName || "Default").trim() || "Default";
+  }
+}
+
+function applyCurrentOsdAppearance() {
+  document.body.setAttribute("data-anchor", osdSettings.anchor || "top-right");
+  applyOsdAppearanceAttributes(osdSettings);
+}
+
+async function loadStartupProfile(preferredName) {
+  const startupProfileOptions = {
+    applyOsd: false,
+    persistActiveProfile: false,
+    render: true,
+    startPlugins: false,
+    syncMidi: false,
+  };
+  const names = [preferredName, "Default"]
+    .map((name) => String(name || "").trim())
+    .filter(Boolean)
+    .filter((name, index, list) => list.indexOf(name) === index);
+
+  for (const name of names) {
+    try {
+      await loadProfileByName(name, startupProfileOptions);
+      return true;
+    } catch (error) {
+      diagnosticError(`startup_load_profile_failed_${name === "Default" ? "default" : "preferred"}`, error);
+    }
+  }
+
+  try {
+    bindings = [];
+    renderBindings();
+  } catch (error) {
+    diagnosticError("startup_empty_bindings_render_failed", error);
+  }
+  return false;
+}
+
 async function startMainApp() {
   if (appStarted) {
     return;
@@ -2021,51 +2070,27 @@ async function startMainApp() {
   if (!savedDevice && midiStatus) {
     midiStatus.textContent = t("bindings.selectDevicesSentence");
   }
+  const startupProfileName = getStartupProfileName();
+  await refreshProfiles(startupProfileName);
+  await loadStartupProfile(startupProfileName);
+  applyCurrentOsdAppearance();
+  if (activeProfileName) {
+    invoke("set_active_profile_preference", { profileName: activeProfileName }).catch(() => { });
+  }
+
   const deviceData = await loadMidiDevices();
-  
-  // Load monitors and settings
   await loadMonitorOptions();
   await loadOsdSettings();
-  
-  await refreshProfiles();
-  const profile = await invoke("get_active_profile");
-  if (profile) {
-    activeProfileName = profile.name;
-    localStorage.setItem("activeProfileName", profile.name);
-    profilePluginSettings = (profile.plugin_settings && typeof profile.plugin_settings === "object") ? profile.plugin_settings : {};
-    activeProfileMidiPreference = normalizeProfileMidiPreference(profile.midi_device_preference);
-    bindings = (profile.bindings || []).map((binding, index) => {
-      const normalized = normalizeBinding(binding);
-      normalized.name = normalized.name?.trim() || bindingFallbackName(normalized, index);
-      return normalized;
-    });
-    if (profile.osd_settings) {
-      osdSettings = {
-        enabled: Boolean(profile.osd_settings.enabled),
-        monitorIndex: Number(profile.osd_settings.monitor_index ?? 0),
-        monitorName: profile.osd_settings.monitor_name || null,
-        monitorId: profile.osd_settings.monitor_id || null,
-        anchor: profile.osd_settings.anchor || "top-right",
-        style: profile.osd_settings.style || defaultOsdSettings.style,
-        opacity: Number(profile.osd_settings.opacity ?? defaultOsdSettings.opacity),
-        scale: Number(profile.osd_settings.scale ?? defaultOsdSettings.scale),
-      };
-      applyOsdAppearanceAttributes(osdSettings);
+  applyCurrentOsdAppearance();
+
+  try {
+    const pluginStartResult = await startPluginHostIfNeeded({ suppressInitialBindingsInvalidation: true });
+    if (pluginStartResult?.metadataChanged) {
+      requestBindingsRerender("plugin_metadata_hydrated");
     }
-    try {
-      await startPluginHostIfNeeded();
-      renderBindings();
-    } catch (e) {
-      console.error("renderBindings failed", e);
-      diagnosticError("render_bindings_failed", e);
-    }
-    setProfileSelection(profile.name);
-    await applyOsdSettings(osdSettings);
-  } else {
-    const storedProfile = localStorage.getItem("activeProfileName") || persistedActiveProfileName || "Default";
-    await loadProfileByName(storedProfile).catch((error) => {
-      diagnosticError("load_profile_by_name_failed", error);
-    });
+  } catch (error) {
+    console.error("startPluginHostIfNeeded failed", error);
+    diagnosticError("start_plugin_host_failed", error);
   }
 
   await refreshProfiles(activeProfileName || "Default");

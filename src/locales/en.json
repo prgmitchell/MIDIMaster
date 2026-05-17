@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Drag to reorder binding",
   "bindings.doubleClickRename": "Double-click to rename",
   "bindings.unset": "Unset",
+  "bindings.loading": "Loading bindings...",
   "bindings.noBindings": "No bindings yet. Use the button below to add one.",
   "bindings.noSearchResults": "No bindings match your search.",
   "bindings.bindingFallback": "Binding {number}",

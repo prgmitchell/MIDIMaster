@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "再オーダーの結合にドラッグ",
   "bindings.doubleClickRename": "ダブルクリックして名前を変更",
   "bindings.unset": "アンセット",
+  "bindings.loading": "バインディングを読み込み中...",
   "bindings.noBindings": "結合はまだありません。 下のボタンで追加してください.",
   "bindings.noSearchResults": "結合は検索に一致しません.",
   "bindings.bindingFallback": "結合 {number}",

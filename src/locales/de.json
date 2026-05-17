@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Ziehen Sie die Bindung neu ein",
   "bindings.doubleClickRename": "Doppelklicken zum Umbenennen",
   "bindings.unset": "Unmenge",
+  "bindings.loading": "Bindings werden geladen...",
   "bindings.noBindings": "Noch keine Bindungen. Verwenden Sie die Schaltfläche unten, um eine hinzuzufügen.",
   "bindings.noSearchResults": "Keine Bindungen passen zu Ihrer Suche.",
   "bindings.bindingFallback": "Bindung {number}",

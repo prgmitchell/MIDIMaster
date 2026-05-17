@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Przeciągnij do ponownego zamówienia",
   "bindings.doubleClickRename": "Kliknij dwukrotnie, aby zmienić nazwę",
   "bindings.unset": "Rozłącz",
+  "bindings.loading": "Wczytywanie powiązań...",
   "bindings.noBindings": "Nie ma jeszcze powiązań. Aby dodać jeden przycisk, należy użyć poniższego przycisku.",
   "bindings.noSearchResults": "Żadne powiązania nie pasują do twoich poszukiwań.",
   "bindings.bindingFallback": "Wiążące {number}",

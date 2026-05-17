@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Faites glisser pour réorganiser la liaison",
   "bindings.doubleClickRename": "Double-cliquez pour renommer",
   "bindings.unset": "Déconnecté",
+  "bindings.loading": "Chargement des bindings...",
   "bindings.noBindings": "Pas encore de fixations. Utilisez le bouton ci-dessous pour en ajouter un.",
   "bindings.noSearchResults": "Aucune fixation ne correspond à votre recherche.",
   "bindings.bindingFallback": "Reliure {number}",

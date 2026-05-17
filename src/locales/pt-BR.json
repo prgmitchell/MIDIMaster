@@ -79,6 +79,7 @@
   "bindings.dragToReorder": "Arraste para reordenar a ligação",
   "bindings.doubleClickRename": "Clique duas vezes para renomear",
   "bindings.unset": "Desativar",
+  "bindings.loading": "Carregando bindings...",
   "bindings.noBindings": "Sem amarras ainda. Use o botão abaixo para adicionar um.",
   "bindings.noSearchResults": "Nenhuma ligação corresponde à sua busca.",
   "bindings.bindingFallback": "Ligando {number}",
