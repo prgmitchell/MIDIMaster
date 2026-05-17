@@ -10,7 +10,7 @@ use crate::plugin_api::{install_plugin_package, InstalledPluginInfo};
 //
 // By default this points at the official MIDIMaster catalog. Forks can override
 // this at runtime by setting MIDIMASTER_STORE_URL.
-const DEFAULT_OFFICIAL_STORE_URL: &str = "https://midimaster.netlify.app/catalog.json";
+const DEFAULT_OFFICIAL_STORE_URL: &str = "https://store.midimaster.app/catalog.json";
 
 fn official_store_url() -> String {
     std::env::var("MIDIMASTER_STORE_URL").unwrap_or_else(|_| DEFAULT_OFFICIAL_STORE_URL.to_string())
