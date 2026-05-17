@@ -427,7 +427,8 @@ export async function activate(ctx) {
 
   async function setMomentaryFeedback(bindingId, action, active) {
     if (!bindingId) return;
-    await ctx.feedback.set(bindingId, active ? 1.0 : 0.0, action);
+    const value = active ? 1.0 : 0.0;
+    await ctx.feedback.set(bindingId, value, action, { inputValue: value });
   }
 
   async function readStatefulActionValue(action) {

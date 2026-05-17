@@ -185,6 +185,7 @@ Bundled plugins (for example, OBS Studio, Wave Link, and Philips Hue) cannot be 
 5. Click `Connect`.
 
 Once connected, Hue lights and groups appear in the Integrations target picker.
+Faders control Hue brightness. Button bindings let you choose a light or group, then choose `Toggle On/Off`, `Turn On`, or `Turn Off`.
 
 ### Where Plugins Are Stored (Advanced)
 

@@ -52,6 +52,28 @@ export function createOsdFeature({
     return "::unknown::";
   }
 
+  function integrationDataForTarget(target) {
+    const integration = target?.Integration || target?.integration;
+    return integration && typeof integration === "object" && integration.data && typeof integration.data === "object"
+      ? integration.data
+      : {};
+  }
+
+  function displayLabelForTarget(display, target) {
+    const baseLabel = String(display?.label || "Target");
+    const actionLabel = String(integrationDataForTarget(target).action_label || "").trim();
+    if (!actionLabel || baseLabel.toLowerCase().includes(`(${actionLabel.toLowerCase()})`)) {
+      return baseLabel;
+    }
+    return `${baseLabel} (${actionLabel})`;
+  }
+
+  function osdValueTextForTarget(target, options = null) {
+    const fromOptions = String(options?.valueText || "").trim();
+    if (fromOptions) return fromOptions;
+    return String(integrationDataForTarget(target).osd_value_text || "").trim();
+  }
+
   function createOsdCard(_display) {
     const card = document.createElement("div");
     card.className = "osd-card";
@@ -101,7 +123,7 @@ export function createOsdFeature({
     }, 250);
   }
 
-  function showVolumeOsd(target, volume, focusSession) {
+  function showVolumeOsd(target, volume, focusSession, options = null) {
     if (!osd) return;
 
     const display = resolveDisplay(target, focusSession);
@@ -127,7 +149,7 @@ export function createOsdFeature({
       refs.card.classList.add("visible");
     }
 
-    renderLabelWithTags(refs.labelSpan, display.label);
+    renderLabelWithTags(refs.labelSpan, displayLabelForTarget(display, target));
     refs.iconDiv.innerHTML = "";
     const icon = iconFor({ label: display.label, icon_data: display.icon_data });
     refs.iconDiv.appendChild(icon);
@@ -137,10 +159,14 @@ export function createOsdFeature({
     refs.iconDiv.style.marginRight = "";
     refs.valueSpan.style.fontSize = "";
 
-    const clampedVolume = Math.min(1, Math.max(0, Number(volume) || 0));
+    const valueText = osdValueTextForTarget(target, options);
+    const fillSource = typeof options?.inputValue === "number"
+      ? options.inputValue
+      : (valueText ? 1.0 : volume);
+    const clampedVolume = Math.min(1, Math.max(0, Number(fillSource) || 0));
     const percent = Math.round(clampedVolume * 100);
     refs.fillDiv.style.width = `${percent}%`;
-    refs.valueSpan.textContent = `${percent}%`;
+    refs.valueSpan.textContent = valueText || `${percent}%`;
 
     if (!osdDebugAlways) {
       item.timer = setTimeout(() => {
@@ -217,7 +243,9 @@ export function createOsdFeature({
     if (payload.action === "toggle_mute") {
       showMuteOsd(payload.target, payload.muted, payload.focus_session);
     } else {
-      showVolumeOsd(payload.target, payload.volume, payload.focus_session);
+      showVolumeOsd(payload.target, payload.volume, payload.focus_session, {
+        inputValue: typeof payload.input_value === "number" ? payload.input_value : null,
+      });
     }
   }
 

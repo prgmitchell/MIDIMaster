@@ -203,13 +203,18 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
               const silent = (typeof opts === "boolean")
                 ? opts
                 : (opts && typeof opts === "object" ? Boolean(opts.silent) : false);
+              const inputValue = (opts && typeof opts === "object" && typeof opts.inputValue === "number")
+                ? opts.inputValue
+                : ((opts && typeof opts === "object" && typeof opts.input_value === "number") ? opts.input_value : null);
               return invoke("set_binding_feedback", {
                 bindingId,
                 value,
                 action,
                 silent,
+                inputValue,
                 // Compatibility
                 binding_id: bindingId,
+                input_value: inputValue,
               });
             },
           },

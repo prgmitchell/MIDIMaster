@@ -1280,8 +1280,8 @@ function applyMidiUiEvent(payload) {
   }
 }
 
-function showVolumeOsd(target, volume, focusSession) {
-  osdFeature?.showVolumeOsd?.(target, volume, focusSession);
+function showVolumeOsd(target, volume, focusSession, options = null) {
+  osdFeature?.showVolumeOsd?.(target, volume, focusSession, options);
 }
 
 function showMuteOsd(target, muted, focusSession) {
@@ -1935,8 +1935,17 @@ async function setupListeners() {
     }
     updateIntegrationStateFromEventPayload(payload);
 
+    const buttonInputValue = typeof payload.input_value === "number" ? payload.input_value : null;
+    const integration = payload.target?.Integration || payload.target?.integration;
+    const isMomentaryIntegrationFeedback = String(integration?.data?.action_kind || "").toLowerCase() === "momentary";
+    const buttonVisualValue = buttonInputValue == null
+      ? (isMomentaryIntegrationFeedback ? null : payload.volume)
+      : buttonInputValue;
+
     if (payload.binding_id && typeof payload.volume === "number") {
-      bindingLastValues[payload.binding_id] = payload.volume;
+      if (buttonVisualValue != null) {
+        bindingLastValues[payload.binding_id] = buttonVisualValue;
+      }
     }
 
     // Update timestamp to signal that a volume change just happened
@@ -1956,12 +1965,12 @@ async function setupListeners() {
     // 1. Direct update if ID available
     if (payload.binding_id) {
       const momentary = document.querySelector(`.binding-momentary-value[data-binding-id="${payload.binding_id}"]`);
-      if (momentary) {
-        momentary.classList.toggle("is-active", Number(payload.volume) > 0.5);
+      if (momentary && buttonVisualValue != null) {
+        momentary.classList.toggle("is-active", Number(buttonVisualValue) > 0.5);
       }
       const toggle = document.querySelector(`.binding-toggle-value[data-binding-id="${payload.binding_id}"]`);
-      if (toggle) {
-        toggle.classList.toggle("on", Number(payload.volume) > 0.5);
+      if (toggle && buttonVisualValue != null) {
+        toggle.classList.toggle("on", Number(buttonVisualValue) > 0.5);
       }
       const s = findBindingSlider(payload.binding_id);
       if (s) {
@@ -1997,7 +2006,9 @@ async function setupListeners() {
     });
 
     if (!payload.silent) {
-      showVolumeOsd(payload.target, payload.volume, payload.focus_session);
+      showVolumeOsd(payload.target, payload.volume, payload.focus_session, {
+        inputValue: buttonInputValue,
+      });
     }
   });
 

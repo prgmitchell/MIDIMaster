@@ -160,6 +160,50 @@ fn targets_overlap(a: &Binding, b: &Binding) -> bool {
         .any(|t| b_targets.iter().any(|other| other == t))
 }
 
+fn target_is_momentary_integration_action(target: &model::BindingTarget) -> bool {
+    let model::BindingTarget::Integration { data, .. } = target else {
+        return false;
+    };
+
+    data.get("action_kind")
+        .and_then(|value| value.as_str())
+        .map(|value| value.eq_ignore_ascii_case("momentary"))
+        .unwrap_or(false)
+}
+
+fn momentary_integration_button_input_value(
+    binding: &Binding,
+    action: &model::BindingAction,
+    input_value: Option<f32>,
+) -> Option<f32> {
+    if !binding.is_button_binding() || !matches!(action, model::BindingAction::Volume) {
+        return None;
+    }
+
+    if binding
+        .normalized_targets()
+        .iter()
+        .any(target_is_momentary_integration_action)
+    {
+        input_value.map(|value| value.clamp(0.0, 1.0))
+    } else {
+        None
+    }
+}
+
+fn add_momentary_integration_input_value(
+    payload: &mut serde_json::Value,
+    binding: &Binding,
+    action: &model::BindingAction,
+    input_value: Option<f32>,
+) {
+    if let Some(input_value) =
+        momentary_integration_button_input_value(binding, action, input_value)
+    {
+        payload["input_value"] = serde_json::json!(input_value);
+    }
+}
+
 fn emit_integration_binding_triggered(
     app: &AppHandle,
     binding_id: &str,
@@ -762,6 +806,7 @@ pub fn set_binding_feedback(
     value: f32,
     action: Option<model::BindingAction>,
     silent: Option<bool>,
+    input_value: Option<f32>,
 ) -> Result<(), String> {
     let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
     let profile = match profile_guard.as_ref() {
@@ -916,13 +961,19 @@ pub fn set_binding_feedback(
             } else {
                 None
             };
-            let payload = serde_json::json!({
+            let mut payload = serde_json::json!({
               "target": primary_target,
               "volume": feedback_value,
               "focus_session": focus_session,
               "binding_id": binding.id,
               "silent": silent
             });
+            add_momentary_integration_input_value(
+                &mut payload,
+                &binding,
+                &effective_action,
+                input_value,
+            );
             let _ = app.emit("volume_update", payload.clone());
             if settings_enabled {
                 crate::AppState::emit_osd_update(&app, state.inner(), &payload, silent);
@@ -984,6 +1035,7 @@ pub fn apply_binding_action(
             value,
             Some(effective_action),
             silent,
+            None,
         );
     }
 
@@ -1012,6 +1064,7 @@ pub fn apply_binding_action(
         value,
         Some(effective_action),
         silent,
+        None,
     )
 }
 
@@ -1034,6 +1087,40 @@ mod tests {
         }
     }
 
+    fn integration_button_binding(action_kind: &str) -> Binding {
+        Binding {
+            id: "b1".to_string(),
+            name: "Binding 1".to_string(),
+            device_id: "midi-dev".to_string(),
+            control: model::MidiControl {
+                channel: 0,
+                controller: 7,
+                msg_type: model::MidiMessageType::Note,
+            },
+            control_kind: model::BindingControlKind::Button,
+            targets: vec![model::BindingTarget::Integration {
+                integration_id: "hue".to_string(),
+                kind: "light".to_string(),
+                data: serde_json::json!({ "id": "1", "action_kind": action_kind }),
+            }],
+            target: model::BindingTarget::Unset,
+            action: model::BindingAction::Volume,
+            mode: model::MidiMode::Absolute,
+            relative_format: model::RelativeFormat::Auto,
+            fader_curve: model::FaderCurve::Linear,
+            custom_curve: Vec::new(),
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: model::MuteBehavior::ToggleOnPress,
+            button_light_mode: model::ButtonLightMode::Activity,
+            mute_control: None,
+            assign_control: None,
+            assign_mode: model::AssignMode::Add,
+            hotkey: None,
+            open_application: None,
+        }
+    }
+
     #[test]
     fn note_button_is_active_only_while_input_is_pressed() {
         assert!(binding_state_user_active(&binding_state(1.0, 10), true));
@@ -1044,5 +1131,58 @@ mod tests {
     fn continuous_control_activity_uses_recent_update_window() {
         assert!(binding_state_user_active(&binding_state(0.0, 100), false));
         assert!(!binding_state_user_active(&binding_state(0.0, 700), false));
+    }
+
+    #[test]
+    fn momentary_integration_button_feedback_adds_input_value_without_changing_volume() {
+        let binding = integration_button_binding("momentary");
+        let mut payload = serde_json::json!({
+            "volume": 0.0,
+        });
+
+        add_momentary_integration_input_value(
+            &mut payload,
+            &binding,
+            &model::BindingAction::Volume,
+            Some(1.0),
+        );
+
+        assert_eq!(payload["volume"], serde_json::json!(0.0));
+        assert_eq!(payload["input_value"], serde_json::json!(1.0));
+    }
+
+    #[test]
+    fn momentary_integration_button_feedback_without_input_value_does_not_infer_from_volume() {
+        let binding = integration_button_binding("momentary");
+        let mut payload = serde_json::json!({
+            "volume": 0.75,
+        });
+
+        add_momentary_integration_input_value(
+            &mut payload,
+            &binding,
+            &model::BindingAction::Volume,
+            None,
+        );
+
+        assert_eq!(payload["volume"], serde_json::json!(0.75));
+        assert!(payload.get("input_value").is_none());
+    }
+
+    #[test]
+    fn stateful_integration_button_feedback_does_not_add_input_value() {
+        let binding = integration_button_binding("stateful");
+        let mut payload = serde_json::json!({
+            "volume": 0.0,
+        });
+
+        add_momentary_integration_input_value(
+            &mut payload,
+            &binding,
+            &model::BindingAction::Volume,
+            None,
+        );
+
+        assert!(payload.get("input_value").is_none());
     }
 }

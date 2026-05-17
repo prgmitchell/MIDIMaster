@@ -25,6 +25,117 @@ function hueVolumeFromState(entry) {
   return clamp01((Number(entry.bri) || 0) / 254);
 }
 
+const HUE_BUTTON_POWER_ACTIONS = [
+  { button_action: "toggle", label: "Toggle On/Off", action: "ToggleMute", behavior: "stateful" },
+  { button_action: "turn_on", label: "Turn On", action: "Volume", behavior: "momentary", osd_value_text: "ON" },
+  { button_action: "turn_off", label: "Turn Off", action: "Volume", behavior: "momentary", osd_value_text: "OFF" },
+];
+
+function normalizeHueButtonAction(value) {
+  const normalized = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "toggle" || normalized === "turn_on" || normalized === "turn_off") {
+    return normalized;
+  }
+  return "";
+}
+
+function hueButtonActionDefinition(value) {
+  const normalized = normalizeHueButtonAction(value) || "toggle";
+  return HUE_BUTTON_POWER_ACTIONS.find((action) => action.button_action === normalized) || HUE_BUTTON_POWER_ACTIONS[0];
+}
+
+function huePowerWriteBody(buttonAction, bri = 254) {
+  const normalized = normalizeHueButtonAction(buttonAction);
+  if (normalized === "turn_on") {
+    return { on: true, bri: savedHueBriValue(bri), transitiontime: 0 };
+  }
+  if (normalized === "turn_off") {
+    return { on: false, transitiontime: 0 };
+  }
+  return null;
+}
+
+function savedHueBriValue(value) {
+  return Math.max(1, Math.min(254, clampHueBri(value) || 254));
+}
+
+function createHueButtonActionOption(target, buttonAction, fallbackIconData = null) {
+  const def = hueButtonActionDefinition(buttonAction);
+  const kind = String(target?.kind || "");
+  const id = String(target?.id || "");
+  const name = String(target?.name || target?.label || `${kind} ${id}`);
+  const iconData = target?.icon_data || fallbackIconData || null;
+  return {
+    label: def.label,
+    icon_data: iconData,
+    target: {
+      Integration: {
+        integration_id: "hue",
+        kind,
+        data: {
+          id,
+          name,
+          label: name,
+          ...(iconData ? { icon_data: iconData } : {}),
+          button_action: def.button_action,
+          action_kind: def.behavior,
+          ...(def.osd_value_text ? { osd_value_text: def.osd_value_text } : {}),
+        },
+      },
+    },
+    buttonActions: [{
+      label: def.label,
+      value: def.action,
+      behavior: def.behavior,
+    }],
+  };
+}
+
+function firstHueTargetFromBinding(binding) {
+  const targets = Array.isArray(binding?.targets) && binding.targets.length > 0
+    ? binding.targets
+    : (binding?.target ? [binding.target] : []);
+  for (const rawTarget of targets) {
+    const target = rawTarget?.Integration || rawTarget?.integration || rawTarget;
+    if (!target || target.integration_id !== "hue") continue;
+    const data = target.data || {};
+    const kind = String(target.kind || "");
+    const id = String(data.id || "");
+    if (!id || (kind !== "light" && kind !== "group")) continue;
+    return {
+      kind,
+      id,
+      button_action: normalizeHueButtonAction(data.button_action),
+    };
+  }
+  return null;
+}
+
+function hueStateFeedbackForBinding(binding, entry) {
+  if (!binding || !entry) return null;
+  const action = String(binding?.action || "Volume");
+  if (action === "ToggleMute") {
+    return {
+      value: entry.on ? 1.0 : 0.0,
+      action: "ToggleMute",
+    };
+  }
+
+  if (action !== "Volume") return null;
+
+  const target = firstHueTargetFromBinding(binding);
+  if (!target) return null;
+  const buttonAction = normalizeHueButtonAction(target?.button_action);
+  if (buttonAction === "turn_on" || buttonAction === "turn_off") {
+    return null;
+  }
+
+  return {
+    value: hueVolumeFromState(entry),
+    action: "Volume",
+  };
+}
+
 function normalizeHueGroupType(type) {
   return String(type || "").trim().toLowerCase();
 }
@@ -243,6 +354,11 @@ export const hueTestUtils = {
   clampHueBri,
   volumeToHueBri,
   hueVolumeFromState,
+  normalizeHueButtonAction,
+  hueButtonActionDefinition,
+  huePowerWriteBody,
+  createHueButtonActionOption,
+  hueStateFeedbackForBinding,
 };
 
 const ui = {
@@ -471,6 +587,7 @@ export async function activate(ctx) {
       id,
       name: String(data.name || data.label || `${kind} ${id}`),
       icon_data: (typeof data.icon_data === "string" && data.icon_data.trim()) ? data.icon_data : (iconDataUrl || null),
+      button_action: normalizeHueButtonAction(data.button_action),
     };
   }
 
@@ -811,11 +928,9 @@ export async function activate(ctx) {
       if (!bindingHasHueTargetKey(b, key)) continue;
 
       try {
-        if ((b?.action || "Volume") === "ToggleMute") {
-          await ctx.feedback.set(bindingId, entry.on ? 1.0 : 0.0, "ToggleMute", { silent });
-        } else {
-          await ctx.feedback.set(bindingId, hueVolumeFromState(entry), "Volume", { silent });
-        }
+        const feedback = hueStateFeedbackForBinding(b, entry);
+        if (!feedback) continue;
+        await ctx.feedback.set(bindingId, feedback.value, feedback.action, { silent });
       } catch {
         // ignore
       }
@@ -850,11 +965,9 @@ export async function activate(ctx) {
       if (!entry) continue;
 
       try {
-        if ((b?.action || "Volume") === "ToggleMute") {
-          await ctx.feedback.set(bindingId, entry.on ? 1.0 : 0.0, "ToggleMute", { silent });
-        } else {
-          await ctx.feedback.set(bindingId, hueVolumeFromState(entry), "Volume", { silent });
-        }
+        const feedback = hueStateFeedbackForBinding(b, entry);
+        if (!feedback) continue;
+        await ctx.feedback.set(bindingId, feedback.value, feedback.action, { silent });
       } catch {
         // ignore
       }
@@ -1205,6 +1318,14 @@ export async function activate(ctx) {
     queueHueWrite(target.kind, target.id, body, { fanoutGroup: false });
   }
 
+  function queuePowerActionWrite(target, buttonAction) {
+    const key = targetKey(target.kind, target.id);
+    const body = huePowerWriteBody(buttonAction, savedBriForKey(key));
+    if (!body) return null;
+    queueHueWrite(target.kind, target.id, body, { fanoutGroup: false });
+    return body;
+  }
+
   function queueVolumeWrite(target, value, options = null) {
     const key = targetKey(target.kind, target.id);
     const volume = clamp01(value);
@@ -1235,8 +1356,17 @@ export async function activate(ctx) {
         target_index: Number(entry?.target_index ?? index),
         target_count: Number(entry?.target_count ?? rawTargets.length),
         is_primary_target: entry?.is_primary_target === true,
+        button_event: String(entry?.button_event || payload?.button_event || "").toLowerCase(),
       };
     }).filter(Boolean);
+  }
+
+  function hueButtonEvent(payload, entry = null) {
+    const explicit = String(entry?.button_event || payload?.button_event || "").toLowerCase();
+    if (explicit === "press" || explicit === "release") return explicit;
+    if (payload?.momentary_trigger === false) return "release";
+    if (payload?.momentary_trigger === true) return "press";
+    return clamp01(payload?.value) > 0 ? "press" : "release";
   }
 
   async function handleHueToggle(payload) {
@@ -1257,6 +1387,38 @@ export async function activate(ctx) {
       await ctx.feedback.set(bindingId, on ? 1.0 : 0.0, "ToggleMute");
     }
     await syncAffectedFeedback(target, bindingId);
+  }
+
+  async function handleHuePowerAction(payload, entry) {
+    const target = entry?.target || normalizeIntegrationTarget(payload?.target);
+    if (!target || !connected) return false;
+
+    const buttonAction = normalizeHueButtonAction(target.button_action);
+    if (buttonAction !== "turn_on" && buttonAction !== "turn_off") return false;
+
+    const bindingId = String(payload?.binding_id || "");
+    if (hueButtonEvent(payload, entry) === "release") {
+      if (bindingId) {
+        await ctx.feedback.set(bindingId, 0.0, "Volume", { silent: true, inputValue: 0.0 });
+      }
+      return true;
+    }
+
+    const key = targetKey(target.kind, target.id);
+    const on = buttonAction === "turn_on";
+    const bri = on ? savedBriForKey(key) : savedBriForKey(key, stateByKey.get(key)?.bri || 254);
+    const body = queuePowerActionWrite(target, buttonAction);
+    if (!body) return false;
+
+    updateOptimisticState(target, { on, bri });
+    rememberIntentForTargetAndMembers(target, on ? { on, bri } : { on: false });
+    rememberQueuedVolumeForTargetAndMembers(target, on ? clamp01(bri / 254) : 0);
+
+    if (bindingId) {
+      await ctx.feedback.set(bindingId, on ? 1.0 : 0.0, "Volume", { inputValue: 1.0 });
+    }
+    await syncAffectedFeedback(target, bindingId);
+    return true;
   }
 
   async function handleHueVolumeTargets(payload, targets) {
@@ -1299,7 +1461,7 @@ export async function activate(ctx) {
     name: "Philips Hue",
     icon_data: iconDataUrl || null,
     buttonActions: [
-      { label: "Toggle", value: "ToggleMute" },
+      { label: "Toggle On/Off", value: "ToggleMute", behavior: "stateful" },
     ],
     describeTarget: (target) => {
       const t = normalizeIntegrationTarget(target);
@@ -1318,9 +1480,27 @@ export async function activate(ctx) {
         ghost: !connected,
       };
     },
-    getTargetOptions: async () => {
+    getTargetOptions: async (ctx2 = null) => {
       if (!connected) {
         return [];
+      }
+
+      const controlType = ctx2 && typeof ctx2 === "object" ? String(ctx2.controlType || "") : "";
+      const nav = ctx2 && typeof ctx2 === "object" ? ctx2.nav : null;
+
+      if (controlType === "button" && nav?.screen === "hue_power_actions") {
+        const kind = String(nav.kind || "");
+        const id = String(nav.id || "");
+        const key = targetKey(kind, id);
+        const state = stateByKey.get(key);
+        if (!state || (kind !== "light" && kind !== "group")) {
+          return [{ label: "Hue target not found", kind: "placeholder", ghost: true, icon_data: iconDataUrl || null }];
+        }
+        const name = String(state.name || `${kind} ${id}`);
+        const target = { kind, id, name, icon_data: iconDataUrl || null };
+        return HUE_BUTTON_POWER_ACTIONS.map((action) => (
+          createHueButtonActionOption(target, action.button_action, iconDataUrl || null)
+        ));
       }
 
       const opts = [];
@@ -1333,8 +1513,17 @@ export async function activate(ctx) {
         if (kind === "group" && !isHumanFriendlyHueGroupName(state.name)) {
           continue;
         }
-        const entry = {
-          label: String(state.name || `${kind} ${id}`),
+        const label = String(state.name || `${kind} ${id}`);
+        const entry = controlType === "button" ? {
+          label,
+          icon_data: iconDataUrl || null,
+          nav: {
+            screen: "hue_power_actions",
+            kind,
+            id: String(id),
+          },
+        } : {
+          label,
           icon_data: iconDataUrl || null,
           target: {
             Integration: {
@@ -1342,7 +1531,7 @@ export async function activate(ctx) {
               kind,
               data: {
                 id: String(id),
-                name: String(state.name || `${kind} ${id}`),
+                name: label,
               },
             },
           },
@@ -1372,7 +1561,18 @@ export async function activate(ctx) {
     onBindingTriggeredBatch: async (payload) => {
       if (String(payload?.action || "Volume") !== "Volume") return;
       try {
-        await handleHueVolumeTargets(payload, normalizeBatchTargets(payload));
+        const targets = normalizeBatchTargets(payload);
+        const volumeTargets = [];
+        for (const entry of targets) {
+          if (entry.target.button_action === "turn_on" || entry.target.button_action === "turn_off") {
+            await handleHuePowerAction(payload, entry);
+          } else {
+            volumeTargets.push(entry);
+          }
+        }
+        if (volumeTargets.length > 0) {
+          await handleHueVolumeTargets(payload, volumeTargets);
+        }
       } catch {
         transientWriteFailures += 1;
         if (transientWriteFailures >= MAX_TRANSIENT_WRITE_FAILURES) {
@@ -1389,6 +1589,10 @@ export async function activate(ctx) {
         }
         const target = normalizeIntegrationTarget(payload?.target);
         if (!target) return;
+        if (target.button_action === "turn_on" || target.button_action === "turn_off") {
+          await handleHuePowerAction(payload, { target });
+          return;
+        }
         await handleHueVolumeTargets(payload, [{
           target,
           target_index: Number(payload?.target_index ?? 0),

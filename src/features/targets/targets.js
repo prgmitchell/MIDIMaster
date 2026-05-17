@@ -1056,8 +1056,12 @@ export function createTargetsFeature({
               data: { ...(integ.data || {}) },
             },
           };
-          if (option.label) next.Integration.data.label = String(option.label);
-          if (option.icon_data) next.Integration.data.icon_data = option.icon_data;
+          if (option.label && !String(next.Integration.data.label || "").trim()) {
+            next.Integration.data.label = String(option.label);
+          }
+          if (option.icon_data && !String(next.Integration.data.icon_data || "").trim()) {
+            next.Integration.data.icon_data = option.icon_data;
+          }
           if (option.__selectedActionLabel) {
             next.Integration.data.action_label = String(option.__selectedActionLabel);
           }

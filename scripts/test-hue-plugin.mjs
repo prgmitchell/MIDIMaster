@@ -112,10 +112,128 @@ function testBrightnessHelpers() {
   assert.equal(hueTestUtils.hueVolumeFromState({ on: true, bri: 254 }), 1);
 }
 
+function testButtonActionSelectionHelpers() {
+  assert.equal(hueTestUtils.normalizeHueButtonAction("turn-on"), "turn_on");
+  assert.equal(hueTestUtils.normalizeHueButtonAction("Turn_Off"), "turn_off");
+  assert.equal(hueTestUtils.normalizeHueButtonAction("unknown"), "");
+
+  const toggle = hueTestUtils.createHueButtonActionOption(
+    { kind: "light", id: "7", name: "Desk Lamp" },
+    "toggle",
+  );
+  assert.equal(toggle.label, "Toggle On/Off");
+  assert.deepEqual(toggle.buttonActions, [{
+    label: "Toggle On/Off",
+    value: "ToggleMute",
+    behavior: "stateful",
+  }]);
+  assert.deepEqual(toggle.target.Integration.data, {
+    id: "7",
+    name: "Desk Lamp",
+    label: "Desk Lamp",
+    button_action: "toggle",
+    action_kind: "stateful",
+  });
+
+  const turnOn = hueTestUtils.createHueButtonActionOption(
+    { kind: "group", id: "2", name: "Office" },
+    "turn_on",
+  );
+  assert.equal(turnOn.label, "Turn On");
+  assert.deepEqual(turnOn.buttonActions, [{
+    label: "Turn On",
+    value: "Volume",
+    behavior: "momentary",
+  }]);
+  assert.equal(turnOn.target.Integration.data.button_action, "turn_on");
+  assert.equal(turnOn.target.Integration.data.osd_value_text, "ON");
+
+  const turnOff = hueTestUtils.createHueButtonActionOption(
+    { kind: "group", id: "2", name: "Office" },
+    "turn_off",
+  );
+  assert.equal(turnOff.label, "Turn Off");
+  assert.equal(turnOff.target.Integration.data.button_action, "turn_off");
+  assert.equal(turnOff.target.Integration.data.action_kind, "momentary");
+  assert.equal(turnOff.target.Integration.data.osd_value_text, "OFF");
+}
+
+function testPowerWriteBodies() {
+  assert.deepEqual(hueTestUtils.huePowerWriteBody("turn_on", 180), {
+    on: true,
+    bri: 180,
+    transitiontime: 0,
+  });
+  assert.deepEqual(hueTestUtils.huePowerWriteBody("turn_on", 0), {
+    on: true,
+    bri: 254,
+    transitiontime: 0,
+  });
+  assert.deepEqual(hueTestUtils.huePowerWriteBody("turn_off", 180), {
+    on: false,
+    transitiontime: 0,
+  });
+  assert.equal(hueTestUtils.huePowerWriteBody("toggle", 180), null);
+}
+
+function testStateFeedbackClassification() {
+  const entry = { on: true, bri: 127 };
+  const fader = {
+    action: "Volume",
+    targets: [{
+      Integration: {
+        integration_id: "hue",
+        kind: "group",
+        data: { id: "2" },
+      },
+    }],
+  };
+  assert.deepEqual(hueTestUtils.hueStateFeedbackForBinding(fader, entry), {
+    value: 0.5,
+    action: "Volume",
+  });
+
+  const toggle = {
+    action: "ToggleMute",
+    targets: [{
+      Integration: {
+        integration_id: "hue",
+        kind: "group",
+        data: { id: "2", button_action: "toggle" },
+      },
+    }],
+  };
+  assert.deepEqual(hueTestUtils.hueStateFeedbackForBinding(toggle, { on: false, bri: 254 }), {
+    value: 0,
+    action: "ToggleMute",
+  });
+
+  const turnOn = hueTestUtils.createHueButtonActionOption(
+    { kind: "group", id: "2", name: "Office" },
+    "turn_on",
+  );
+  assert.equal(hueTestUtils.hueStateFeedbackForBinding({
+    action: "Volume",
+    targets: [turnOn.target],
+  }, entry), null);
+
+  const turnOff = hueTestUtils.createHueButtonActionOption(
+    { kind: "group", id: "2", name: "Office" },
+    "turn_off",
+  );
+  assert.equal(hueTestUtils.hueStateFeedbackForBinding({
+    action: "Volume",
+    targets: [turnOff.target],
+  }, entry), null);
+}
+
 await testLatestWinsBeforeFirstWrite();
 await testSameTargetWritesDoNotOverlap();
 await testGlobalLightRateLimit();
 await testCancelledPendingWriteIsSkipped();
 testBrightnessHelpers();
+testButtonActionSelectionHelpers();
+testPowerWriteBodies();
+testStateFeedbackClassification();
 
 console.log("Hue plugin tests passed");
