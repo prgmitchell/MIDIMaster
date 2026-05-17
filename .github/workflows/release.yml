@@ -225,18 +225,29 @@ jobs:
           }
 
           $timer = Measure-Command {
+            $latestJsonPath = "src-tauri/target/release/bundle/latest.json"
+            if (-not (Test-Path -LiteralPath $latestJsonPath)) {
+              throw "Updater metadata file not found: $latestJsonPath"
+            }
+
+            $websiteCatalogPath = "midimaster-website/public/catalog.json"
+            if (-not (Test-Path -LiteralPath $websiteCatalogPath)) {
+              throw "Website store catalog not found: $websiteCatalogPath"
+            }
+
             $publishDir = Join-Path $env:RUNNER_TEMP "netlify-bridge"
             if (Test-Path -LiteralPath $publishDir) {
               Remove-Item -LiteralPath $publishDir -Recurse -Force
             }
-            New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+            New-Item -ItemType Directory -Force -Path (Join-Path $publishDir "updates") | Out-Null
+            Copy-Item -LiteralPath $latestJsonPath -Destination (Join-Path $publishDir "updates/latest.json") -Force
+            Copy-Item -LiteralPath $websiteCatalogPath -Destination (Join-Path $publishDir "catalog.json") -Force
 
             $redirects = @(
-              "/updates/latest.json  https://updates.midimaster.app/latest.json  200!"
-              "/catalog.json  https://store.midimaster.app/catalog.json  200!"
-              "/packages/*  https://store.midimaster.app/packages/:splat  200!"
-              "/icons/*  https://store.midimaster.app/icons/:splat  200!"
-              "/*  https://midimaster.app/:splat  301!"
+              "/latest.json  /updates/latest.json  301"
+              "/packages/*  https://store.midimaster.app/packages/:splat  301"
+              "/icons/*  https://store.midimaster.app/icons/:splat  301"
+              "/*  https://midimaster.app/:splat  301"
             ) -join "`n"
             $redirects += "`n"
             $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
