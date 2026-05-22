@@ -206,15 +206,24 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
               const inputValue = (opts && typeof opts === "object" && typeof opts.inputValue === "number")
                 ? opts.inputValue
                 : ((opts && typeof opts === "object" && typeof opts.input_value === "number") ? opts.input_value : null);
+              const forceHardwareFeedback = Boolean(
+                opts && typeof opts === "object" && (
+                  opts.forceHardwareFeedback ||
+                  opts.force_hardware_feedback ||
+                  opts.force === true
+                )
+              );
               return invoke("set_binding_feedback", {
                 bindingId,
                 value,
                 action,
                 silent,
                 inputValue,
+                forceHardwareFeedback,
                 // Compatibility
                 binding_id: bindingId,
                 input_value: inputValue,
+                force_hardware_feedback: forceHardwareFeedback,
               });
             },
           },

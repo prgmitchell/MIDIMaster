@@ -76,13 +76,14 @@ fn send_feedback_to_control(
     control: &FeedbackControlKey,
     value: f32,
     silent: bool,
+    force_hardware_feedback: bool,
     context: &str,
 ) {
     let key = control.to_binding_key();
     let is_note = matches!(control.msg_type, model::MidiMessageType::Note);
     let user_active = binding_user_active(state, &key, is_note);
 
-    if user_active && silent {
+    if user_active && silent && !force_hardware_feedback {
         run_logger::debug(
             "bindings_cmd",
             "set_feedback_silent_ignored_user_active",
@@ -91,7 +92,7 @@ fn send_feedback_to_control(
         return;
     }
 
-    if !update_feedback_cache_if_changed(state, &key, value) {
+    if !update_feedback_cache_if_changed(state, &key, value) && !force_hardware_feedback {
         run_logger::debug(
             "bindings_cmd",
             "set_feedback_skipped_unchanged",
@@ -101,7 +102,7 @@ fn send_feedback_to_control(
     }
 
     // Suppress hardware feedback while the user is actively moving this control.
-    if !user_active {
+    if !user_active || force_hardware_feedback {
         if let Ok(mut midi) = state.midi.lock() {
             let _ = midi.send_feedback(
                 &control.device_id,
@@ -119,6 +120,7 @@ fn send_feedback_to_binding(
     binding: &Binding,
     value: f32,
     silent: bool,
+    force_hardware_feedback: bool,
     context: &str,
 ) {
     let control = FeedbackControlKey::from_binding(binding);
@@ -126,7 +128,7 @@ fn send_feedback_to_binding(
     let is_note = matches!(control.msg_type, model::MidiMessageType::Note);
     let user_active = binding_user_active(state, &key, is_note);
 
-    if user_active && silent {
+    if user_active && silent && !force_hardware_feedback {
         run_logger::debug(
             "bindings_cmd",
             "set_feedback_silent_ignored_user_active",
@@ -135,7 +137,7 @@ fn send_feedback_to_binding(
         return;
     }
 
-    if !update_feedback_cache_if_changed(state, &key, value) {
+    if !update_feedback_cache_if_changed(state, &key, value) && !force_hardware_feedback {
         run_logger::debug(
             "bindings_cmd",
             "set_feedback_skipped_unchanged",
@@ -145,7 +147,7 @@ fn send_feedback_to_binding(
     }
 
     // Suppress hardware feedback while the user is actively moving this control.
-    if !user_active {
+    if !user_active || force_hardware_feedback {
         if let Ok(mut midi) = state.midi.lock() {
             let _ = midi.send_binding_feedback(binding, value);
         }
@@ -807,6 +809,7 @@ pub fn set_binding_feedback(
     action: Option<model::BindingAction>,
     silent: Option<bool>,
     input_value: Option<f32>,
+    force_hardware_feedback: Option<bool>,
 ) -> Result<(), String> {
     let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
     let profile = match profile_guard.as_ref() {
@@ -828,12 +831,14 @@ pub fn set_binding_feedback(
         .unwrap_or(value);
 
     let silent = silent.unwrap_or(false);
+    let force_hardware_feedback = force_hardware_feedback.unwrap_or(false);
     if action_matches_binding {
         send_feedback_to_binding(
             &state,
             &binding,
             feedback_value,
             silent,
+            force_hardware_feedback,
             &format!("primary:{}", binding.id),
         );
     } else {
@@ -875,6 +880,7 @@ pub fn set_binding_feedback(
                         &aux_key,
                         value,
                         silent,
+                        force_hardware_feedback,
                         &format!("mute_aux:{}", candidate.id),
                     );
                 }
@@ -888,6 +894,7 @@ pub fn set_binding_feedback(
                         candidate,
                         value,
                         silent,
+                        force_hardware_feedback,
                         &format!("toggle_binding:{}", candidate.id),
                     );
                 }
@@ -917,6 +924,7 @@ pub fn set_binding_feedback(
                     candidate,
                     candidate_value,
                     silent,
+                    force_hardware_feedback,
                     &format!("volume_binding:{}", candidate.id),
                 );
             }
@@ -1036,6 +1044,7 @@ pub fn apply_binding_action(
             Some(effective_action),
             silent,
             None,
+            None,
         );
     }
 
@@ -1064,6 +1073,7 @@ pub fn apply_binding_action(
         value,
         Some(effective_action),
         silent,
+        None,
         None,
     )
 }

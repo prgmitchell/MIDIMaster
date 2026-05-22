@@ -96,19 +96,42 @@ function firstHueTargetFromBinding(binding) {
     ? binding.targets
     : (binding?.target ? [binding.target] : []);
   for (const rawTarget of targets) {
-    const target = rawTarget?.Integration || rawTarget?.integration || rawTarget;
-    if (!target || target.integration_id !== "hue") continue;
-    const data = target.data || {};
-    const kind = String(target.kind || "");
-    const id = String(data.id || "");
-    if (!id || (kind !== "light" && kind !== "group")) continue;
-    return {
-      kind,
-      id,
-      button_action: normalizeHueButtonAction(data.button_action),
-    };
+    const target = hueTargetFromRawTarget(rawTarget);
+    if (target) return target;
   }
   return null;
+}
+
+function hueTargetFromRawTarget(rawTarget) {
+  const target = rawTarget?.Integration || rawTarget?.integration || rawTarget;
+  if (!target || target.integration_id !== "hue") return null;
+  const data = target.data || {};
+  const kind = String(target.kind || "");
+  const id = String(data.id || "");
+  if (!id || (kind !== "light" && kind !== "group")) return null;
+  return {
+    kind,
+    id,
+    button_action: normalizeHueButtonAction(data.button_action),
+  };
+}
+
+function hueTargetKey(kind, id) {
+  return `${String(kind || "")}::${String(id || "")}`;
+}
+
+function hueBindingTargets(binding) {
+  return Array.isArray(binding?.targets) && binding.targets.length > 0
+    ? binding.targets
+    : (binding?.target ? [binding.target] : []);
+}
+
+function hueBindingHasTargetKey(binding, key) {
+  for (const rawTarget of hueBindingTargets(binding)) {
+    const target = hueTargetFromRawTarget(rawTarget);
+    if (target && hueTargetKey(target.kind, target.id) === key) return true;
+  }
+  return false;
 }
 
 function hueStateFeedbackForBinding(binding, entry) {
@@ -134,6 +157,46 @@ function hueStateFeedbackForBinding(binding, entry) {
     value: hueVolumeFromState(entry),
     action: "Volume",
   };
+}
+
+function hueFeedbackSetOptions(opts = null) {
+  const silent = (opts && typeof opts === "object") ? Boolean(opts.silent) : true;
+  const forceHardwareFeedback = Boolean(
+    opts && typeof opts === "object" && (
+      opts.forceHardwareFeedback ||
+      opts.force_hardware_feedback ||
+      opts.force === true
+    )
+  );
+  if (!forceHardwareFeedback) return { silent };
+  return {
+    silent,
+    forceHardwareFeedback: true,
+    force_hardware_feedback: true,
+  };
+}
+
+function hueFeedbackUpdatesForKey(bindings, stateByKey, key, opts = null) {
+  const skipBindingId = String(opts?.skipBindingId || "");
+  const entry = stateByKey?.get?.(key);
+  if (!entry) return [];
+
+  const updates = [];
+  for (const b of (Array.isArray(bindings) ? bindings : [])) {
+    const bindingId = String(b?.id || "");
+    if (!bindingId || bindingId === skipBindingId) continue;
+    if (!hueBindingHasTargetKey(b, key)) continue;
+
+    const feedback = hueStateFeedbackForBinding(b, entry);
+    if (!feedback) continue;
+    updates.push({
+      bindingId,
+      value: feedback.value,
+      action: feedback.action,
+      options: hueFeedbackSetOptions(opts),
+    });
+  }
+  return updates;
 }
 
 function normalizeHueGroupType(type) {
@@ -359,6 +422,8 @@ export const hueTestUtils = {
   huePowerWriteBody,
   createHueButtonActionOption,
   hueStateFeedbackForBinding,
+  hueFeedbackUpdatesForKey,
+  hueTargetKey,
 };
 
 const ui = {
@@ -501,7 +566,7 @@ export async function activate(ctx) {
   }
 
   function targetKey(kind, id) {
-    return `${String(kind || "")}::${String(id || "")}`;
+    return hueTargetKey(kind, id);
   }
 
   function bindingTargets(binding) {
@@ -908,29 +973,10 @@ export async function activate(ctx) {
     return null;
   }
 
-  function bindingHasHueTargetKey(binding, key) {
-    for (const rawTarget of bindingTargets(binding)) {
-      const target = normalizeIntegrationTarget(rawTarget);
-      if (target && targetKey(target.kind, target.id) === key) return true;
-    }
-    return false;
-  }
-
   async function syncFeedbackForKey(key, opts = null) {
-    const silent = (opts && typeof opts === "object") ? Boolean(opts.silent) : true;
-    const skipBindingId = String(opts?.skipBindingId || "");
-    const entry = stateByKey.get(key);
-    if (!entry) return;
-
-    for (const b of bindings) {
-      const bindingId = String(b?.id || "");
-      if (!bindingId || bindingId === skipBindingId) continue;
-      if (!bindingHasHueTargetKey(b, key)) continue;
-
+    for (const update of hueFeedbackUpdatesForKey(bindings, stateByKey, key, opts)) {
       try {
-        const feedback = hueStateFeedbackForBinding(b, entry);
-        if (!feedback) continue;
-        await ctx.feedback.set(bindingId, feedback.value, feedback.action, { silent });
+        await ctx.feedback.set(update.bindingId, update.value, update.action, update.options);
       } catch {
         // ignore
       }
@@ -1301,12 +1347,16 @@ export async function activate(ctx) {
 
   async function syncAffectedFeedback(target, skipBindingId = "") {
     const key = targetKey(target.kind, target.id);
-    await syncFeedbackForKey(key, { silent: true, skipBindingId });
+    await syncFeedbackForKey(key, { silent: true, skipBindingId, forceHardwareFeedback: true });
 
     if (target.kind !== "group") return;
     const lightIds = groupLightIdsByKey.get(key) || [];
     for (const lightId of lightIds) {
-      await syncFeedbackForKey(targetKey("light", lightId), { silent: true, skipBindingId });
+      await syncFeedbackForKey(targetKey("light", lightId), {
+        silent: true,
+        skipBindingId,
+        forceHardwareFeedback: true,
+      });
     }
   }
 

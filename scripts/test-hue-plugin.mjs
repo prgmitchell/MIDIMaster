@@ -227,6 +227,86 @@ function testStateFeedbackClassification() {
   }, entry), null);
 }
 
+function hueBinding(id, action, target) {
+  return {
+    id,
+    action,
+    targets: [target],
+  };
+}
+
+function hueTarget(kind, id, data = {}) {
+  return {
+    Integration: {
+      integration_id: "hue",
+      kind,
+      data: { id, ...data },
+    },
+  };
+}
+
+function testSameTargetButtonOffSyncsVolumeFeedbackToZero() {
+  const volumeBinding = hueBinding("volume-binding", "Volume", hueTarget("group", "2"));
+  const toggleBinding = hueBinding(
+    "toggle-binding",
+    "ToggleMute",
+    hueTarget("group", "2", { button_action: "toggle" }),
+  );
+  const stateByKey = new Map([
+    [hueTestUtils.hueTargetKey("group", "2"), { on: false, bri: 200 }],
+  ]);
+
+  assert.deepEqual(
+    hueTestUtils.hueFeedbackUpdatesForKey(
+      [volumeBinding, toggleBinding],
+      stateByKey,
+      hueTestUtils.hueTargetKey("group", "2"),
+      { silent: true, skipBindingId: "toggle-binding", forceHardwareFeedback: true },
+    ),
+    [{
+      bindingId: "volume-binding",
+      value: 0,
+      action: "Volume",
+      options: {
+        silent: true,
+        forceHardwareFeedback: true,
+        force_hardware_feedback: true,
+      },
+    }],
+  );
+}
+
+function testSameTargetTurnOffSyncsVolumeFeedbackToZero() {
+  const volumeBinding = hueBinding("volume-binding", "Volume", hueTarget("light", "7"));
+  const turnOffTarget = hueTestUtils.createHueButtonActionOption(
+    { kind: "light", id: "7", name: "Desk Lamp" },
+    "turn_off",
+  ).target;
+  const turnOffBinding = hueBinding("turn-off-binding", "Volume", turnOffTarget);
+  const stateByKey = new Map([
+    [hueTestUtils.hueTargetKey("light", "7"), { on: false, bri: 180 }],
+  ]);
+
+  assert.deepEqual(
+    hueTestUtils.hueFeedbackUpdatesForKey(
+      [volumeBinding, turnOffBinding],
+      stateByKey,
+      hueTestUtils.hueTargetKey("light", "7"),
+      { silent: true, skipBindingId: "turn-off-binding", forceHardwareFeedback: true },
+    ),
+    [{
+      bindingId: "volume-binding",
+      value: 0,
+      action: "Volume",
+      options: {
+        silent: true,
+        forceHardwareFeedback: true,
+        force_hardware_feedback: true,
+      },
+    }],
+  );
+}
+
 await testLatestWinsBeforeFirstWrite();
 await testSameTargetWritesDoNotOverlap();
 await testGlobalLightRateLimit();
@@ -235,5 +315,7 @@ testBrightnessHelpers();
 testButtonActionSelectionHelpers();
 testPowerWriteBodies();
 testStateFeedbackClassification();
+testSameTargetButtonOffSyncsVolumeFeedbackToZero();
+testSameTargetTurnOffSyncsVolumeFeedbackToZero();
 
 console.log("Hue plugin tests passed");
