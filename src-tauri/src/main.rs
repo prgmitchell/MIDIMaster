@@ -404,6 +404,7 @@ fn main() {
                             let state = app.state::<AppState>();
                             run_logger::info("app", "tray_quit", "shutdown requested from tray");
                             shutdown_lights(&state);
+                            run_logger::flush_pending_repeats();
                             app.exit(0);
                         }
                         _ => {}
@@ -444,12 +445,14 @@ fn main() {
                         let state = app_handle.state::<AppState>();
                         run_logger::info("app", "window_close", "main window close requested");
                         shutdown_lights(&state);
+                        run_logger::flush_pending_repeats();
                         app_handle.exit(0);
                     }
                     tauri::WindowEvent::Destroyed => {
                         let state = app_handle.state::<AppState>();
                         run_logger::info("app", "window_destroyed", "main window destroyed");
                         shutdown_lights(&state);
+                        run_logger::flush_pending_repeats();
                         app_handle.exit(0);
                     }
                     tauri::WindowEvent::Resized(_) => {
