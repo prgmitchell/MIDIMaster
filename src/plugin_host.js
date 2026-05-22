@@ -245,6 +245,15 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
               return () => wsMessageHandlers.get(id)?.delete(handler);
             },
           },
+          http: {
+            postJson: (url, body, opts = null) => invoke("plugin_http_post_json", {
+              url,
+              body: (body && typeof body === "object") ? body : {},
+              timeoutMs: (opts && typeof opts === "object" && Number.isFinite(Number(opts.timeoutMs)))
+                ? Number(opts.timeoutMs)
+                : null,
+            }),
+          },
         };
 
         const api = await activate(ctx);

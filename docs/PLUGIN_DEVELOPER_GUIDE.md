@@ -406,7 +406,40 @@ Message handler receives:
 - `{ id, type: "text", data: string }`
 - `{ id, type: "binary", data: base64String }`
 
-### 6.7 `ctx.assets` (Read plugin assets)
+### 6.7 `ctx.http` (HTTPS JSON requests)
+
+Use this when a plugin needs reliable JSON POST requests that are not blocked by
+browser CORS limits.
+
+```js
+const response = await ctx.http.postJson(
+  "https://example.com/webhook",
+  { hello: "world" },
+  { timeoutMs: 4500 }
+);
+
+if (!response.ok) {
+  console.warn("Webhook failed", response.status, response.bodyText);
+}
+```
+
+Response shape:
+
+- `status`: HTTP status code
+- `ok`: `true` for HTTP 2xx
+- `bodyText`: response body as text
+- `json`: parsed JSON response when the body is valid JSON, otherwise `null`
+
+Constraints:
+
+- Only `https://` URLs are allowed.
+- URL credentials are rejected.
+- Obvious local/private targets such as localhost, loopback, link-local, and
+  private IP literals are rejected.
+- Request and response bodies are size-limited.
+- `timeoutMs` defaults to `4500` and cannot exceed `10000`.
+
+### 6.8 `ctx.assets` (Read plugin assets)
 
 - `await ctx.assets.readBase64(relPath)` -> base64 string
 - `await ctx.assets.readDataUrl(relPath, mime)` -> `data:<mime>;base64,...`
@@ -417,7 +450,7 @@ Example:
 const icon = await ctx.assets.readDataUrl("icon.svg", "image/svg+xml");
 ```
 
-### 6.8 `ctx.tauri` (Low-level)
+### 6.9 `ctx.tauri` (Low-level)
 
 Advanced escape hatch:
 
@@ -426,7 +459,7 @@ Advanced escape hatch:
 
 Prefer stable APIs (`ws`, `feedback`, etc.) when possible.
 
-### 6.9 `ctx.app.invalidateBindingsUI()`
+### 6.10 `ctx.app.invalidateBindingsUI()`
 
 If your plugin's connection/availability state changes, call:
 

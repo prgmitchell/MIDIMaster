@@ -4,11 +4,13 @@ use std::{
     collections::HashSet,
     fs,
     io::Cursor,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::{Path, PathBuf},
     process::Command,
     time::Duration,
 };
 use tauri::AppHandle;
+use url::Url;
 
 use crate::app_paths::app_data_root_dir;
 use crate::run_logger;
@@ -16,6 +18,10 @@ use crate::run_logger;
 const BUNDLED_PLUGIN_IDS: &[&str] = &["hue", "obs", "wavelink"];
 const HUE_API_TIMEOUT_MS: u64 = 4500;
 const HUE_PAIR_TIMEOUT_MS: u64 = 3500;
+const PLUGIN_HTTP_DEFAULT_TIMEOUT_MS: u64 = 4500;
+const PLUGIN_HTTP_MAX_TIMEOUT_MS: u64 = 10_000;
+const PLUGIN_HTTP_MAX_REQUEST_BYTES: usize = 1_000_000;
+const PLUGIN_HTTP_MAX_RESPONSE_BYTES: usize = 1_000_000;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -212,6 +218,15 @@ pub struct InstalledPluginInfo {
     pub replaced_existing: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct PluginHttpResponse {
+    pub status: u16,
+    pub ok: bool,
+    #[serde(rename = "bodyText")]
+    pub body_text: String,
+    pub json: Option<serde_json::Value>,
+}
+
 fn validate_plugin_id(id: &str) -> Result<(), String> {
     if id.trim().is_empty() {
         return Err("Plugin id is required".to_string());
@@ -241,6 +256,133 @@ fn safe_rel_path(rel: &str) -> Result<PathBuf, String> {
         }
     }
     Ok(p.to_path_buf())
+}
+
+fn blocked_ipv4(ip: Ipv4Addr) -> bool {
+    ip.is_private()
+        || ip.is_loopback()
+        || ip.is_link_local()
+        || ip.is_unspecified()
+        || ip.is_multicast()
+        || ip.octets() == [255, 255, 255, 255]
+}
+
+fn blocked_ipv6(ip: Ipv6Addr) -> bool {
+    let first = ip.segments()[0];
+    let unique_local = (first & 0xfe00) == 0xfc00;
+    let link_local = (first & 0xffc0) == 0xfe80;
+    ip.is_loopback() || ip.is_unspecified() || ip.is_multicast() || unique_local || link_local
+}
+
+fn blocked_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => blocked_ipv4(v4),
+        IpAddr::V6(v6) => blocked_ipv6(v6),
+    }
+}
+
+fn validate_plugin_http_url(raw_url: &str) -> Result<Url, String> {
+    let trimmed = raw_url.trim();
+    if trimmed.is_empty() {
+        return Err("URL is required".to_string());
+    }
+
+    let url = Url::parse(trimmed).map_err(|_| "Invalid URL".to_string())?;
+    if url.scheme() != "https" {
+        return Err("Only https:// URLs are allowed".to_string());
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err("URL credentials are not allowed".to_string());
+    }
+
+    let Some(host) = url.host() else {
+        return Err("URL host is required".to_string());
+    };
+    match host {
+        url::Host::Domain(domain) => {
+            let lower = domain.trim_end_matches('.').to_ascii_lowercase();
+            if lower == "localhost" || lower.ends_with(".localhost") {
+                return Err("Localhost URLs are not allowed".to_string());
+            }
+        }
+        url::Host::Ipv4(ip) => {
+            if blocked_ip(IpAddr::V4(ip)) {
+                return Err("Local/private IP URLs are not allowed".to_string());
+            }
+        }
+        url::Host::Ipv6(ip) => {
+            if blocked_ip(IpAddr::V6(ip)) {
+                return Err("Local/private IP URLs are not allowed".to_string());
+            }
+        }
+    }
+
+    Ok(url)
+}
+
+fn plugin_http_timeout(timeout_ms: Option<u64>) -> Result<u64, String> {
+    let timeout = timeout_ms.unwrap_or(PLUGIN_HTTP_DEFAULT_TIMEOUT_MS);
+    if timeout == 0 {
+        return Ok(PLUGIN_HTTP_DEFAULT_TIMEOUT_MS);
+    }
+    if timeout > PLUGIN_HTTP_MAX_TIMEOUT_MS {
+        return Err(format!(
+            "Timeout exceeds maximum of {}ms",
+            PLUGIN_HTTP_MAX_TIMEOUT_MS
+        ));
+    }
+    Ok(timeout)
+}
+
+fn read_plugin_http_response(response: ureq::Response) -> Result<PluginHttpResponse, String> {
+    use std::io::Read;
+
+    let status = response.status();
+    let mut reader = response
+        .into_reader()
+        .take((PLUGIN_HTTP_MAX_RESPONSE_BYTES + 1) as u64);
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    if bytes.len() > PLUGIN_HTTP_MAX_RESPONSE_BYTES {
+        return Err("HTTP response is too large".to_string());
+    }
+
+    let body_text = String::from_utf8_lossy(&bytes).to_string();
+    let json = serde_json::from_str::<serde_json::Value>(&body_text).ok();
+    Ok(PluginHttpResponse {
+        status,
+        ok: (200..300).contains(&status),
+        body_text,
+        json,
+    })
+}
+
+#[tauri::command]
+pub fn plugin_http_post_json(
+    url: String,
+    body: serde_json::Value,
+    timeout_ms: Option<u64>,
+) -> Result<PluginHttpResponse, String> {
+    let url = validate_plugin_http_url(&url)?;
+    let timeout = plugin_http_timeout(timeout_ms)?;
+    let body_text = serde_json::to_string(&body).map_err(|e| e.to_string())?;
+    if body_text.as_bytes().len() > PLUGIN_HTTP_MAX_REQUEST_BYTES {
+        return Err("HTTP request body is too large".to_string());
+    }
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_millis(timeout))
+        .build();
+    let request = agent
+        .post(url.as_str())
+        .set("Content-Type", "application/json")
+        .set("Accept", "application/json, text/plain, */*");
+
+    match request.send_string(&body_text) {
+        Ok(response) => read_plugin_http_response(response),
+        Err(ureq::Error::Status(_, response)) => read_plugin_http_response(response),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 fn validate_hue_bridge_addr(addr: &str) -> Result<String, String> {
@@ -691,4 +833,72 @@ pub fn install_plugin_package(
         manifest,
         replaced_existing,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_url_error(raw: &str, expected: &str) {
+        let err = validate_plugin_http_url(raw).expect_err("expected URL validation to fail");
+        assert!(
+            err.contains(expected),
+            "expected error containing `{expected}`, got `{err}`"
+        );
+    }
+
+    #[test]
+    fn plugin_http_url_allows_public_https_domain() {
+        let url = validate_plugin_http_url(
+            "https://maker.ifttt.com/trigger/example/json/with/key/test-key",
+        )
+        .expect("public HTTPS URL should be allowed");
+
+        assert_eq!(url.scheme(), "https");
+        assert_eq!(url.host_str(), Some("maker.ifttt.com"));
+    }
+
+    #[test]
+    fn plugin_http_url_rejects_non_https() {
+        assert_url_error("http://maker.ifttt.com/trigger/example", "Only https://");
+    }
+
+    #[test]
+    fn plugin_http_url_rejects_credentials() {
+        assert_url_error("https://user:pass@example.com/hook", "credentials");
+    }
+
+    #[test]
+    fn plugin_http_url_rejects_localhost_names() {
+        assert_url_error("https://localhost/hook", "Localhost");
+        assert_url_error("https://app.localhost/hook", "Localhost");
+    }
+
+    #[test]
+    fn plugin_http_url_rejects_private_or_local_ip_literals() {
+        assert_url_error("https://127.0.0.1/hook", "Local/private");
+        assert_url_error("https://10.0.0.1/hook", "Local/private");
+        assert_url_error("https://192.168.1.10/hook", "Local/private");
+        assert_url_error("https://169.254.1.10/hook", "Local/private");
+        assert_url_error("https://[::1]/hook", "Local/private");
+        assert_url_error("https://[fe80::1]/hook", "Local/private");
+        assert_url_error("https://[fc00::1]/hook", "Local/private");
+    }
+
+    #[test]
+    fn plugin_http_timeout_uses_default_and_caps_maximum() {
+        assert_eq!(
+            plugin_http_timeout(None).expect("default timeout"),
+            PLUGIN_HTTP_DEFAULT_TIMEOUT_MS
+        );
+        assert_eq!(
+            plugin_http_timeout(Some(0)).expect("zero timeout uses default"),
+            PLUGIN_HTTP_DEFAULT_TIMEOUT_MS
+        );
+        assert_eq!(
+            plugin_http_timeout(Some(PLUGIN_HTTP_MAX_TIMEOUT_MS)).expect("max timeout"),
+            PLUGIN_HTTP_MAX_TIMEOUT_MS
+        );
+        assert!(plugin_http_timeout(Some(PLUGIN_HTTP_MAX_TIMEOUT_MS + 1)).is_err());
+    }
 }

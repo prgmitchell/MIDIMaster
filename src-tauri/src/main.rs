@@ -46,8 +46,8 @@ use tokio::time::sleep;
 pub(crate) use monitors::collect_monitor_descriptors;
 use plugin_api::{
     ensure_builtin_plugin, get_plugins_dir, hue_api_get, hue_api_put, hue_discover_bridges,
-    hue_pair_bridge, install_plugin_package, list_plugins, read_plugin_base64, read_plugin_text,
-    set_plugin_enabled, uninstall_plugin,
+    hue_pair_bridge, install_plugin_package, list_plugins, plugin_http_post_json,
+    read_plugin_base64, read_plugin_text, set_plugin_enabled, uninstall_plugin,
 };
 use store_api::{fetch_store_catalog, install_store_plugin};
 use ws_bridge::{get_wavelink_ws_port, ws_close, ws_open, ws_send, WsHub};
@@ -650,6 +650,7 @@ fn main() {
             list_plugins,
             read_plugin_text,
             read_plugin_base64,
+            plugin_http_post_json,
             install_plugin_package,
             uninstall_plugin,
             set_plugin_enabled,
