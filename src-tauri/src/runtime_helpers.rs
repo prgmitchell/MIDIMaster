@@ -17,7 +17,6 @@ fn normalize_process_name(value: &str) -> String {
         .to_string()
 }
 
-#[cfg(target_os = "windows")]
 fn key_name_to_vk(name: &str) -> Option<u16> {
     let upper = name.trim().to_uppercase();
     match upper.as_str() {
@@ -60,6 +59,51 @@ fn key_name_to_vk(name: &str) -> Option<u16> {
             }
             None
         }
+    }
+}
+
+fn hotkey_vk_is_modifier(vk: u16) -> bool {
+    matches!(vk, 0x10 | 0x11 | 0x12 | 0x5B)
+}
+
+fn normalize_hotkey_vks(keys: &[String]) -> (Vec<u16>, Vec<String>) {
+    let mut modifiers: Vec<u16> = Vec::new();
+    let mut primaries: Vec<u16> = Vec::new();
+    let mut unmapped: Vec<String> = Vec::new();
+
+    for key in keys {
+        match key_name_to_vk(key) {
+            Some(vk) if hotkey_vk_is_modifier(vk) => {
+                if !modifiers.contains(&vk) {
+                    modifiers.push(vk);
+                }
+            }
+            Some(vk) => {
+                if !modifiers.contains(&vk) && !primaries.contains(&vk) {
+                    primaries.push(vk);
+                }
+            }
+            None => {
+                let trimmed = key.trim();
+                if !trimmed.is_empty() {
+                    unmapped.push(trimmed.to_string());
+                }
+            }
+        }
+    }
+
+    modifiers.extend(primaries);
+    (modifiers, unmapped)
+}
+
+fn hotkey_input_vk(vk: u16) -> u16 {
+    match vk {
+        // Prefer left-side modifiers when a browser-captured hotkey stores
+        // generic modifier names. Some global listeners distinguish them.
+        0x10 => 0xA0, // VK_LSHIFT
+        0x11 => 0xA2, // VK_LCONTROL
+        0x12 => 0xA4, // VK_LMENU
+        _ => vk,
     }
 }
 
@@ -206,56 +250,153 @@ pub(crate) fn send_media_key(vk: u16) {
 
 #[cfg(target_os = "windows")]
 pub(crate) fn send_hotkey(keys: &[String]) {
+    use crate::run_logger;
+    use std::thread;
+    use std::time::Duration;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+        MapVirtualKeyW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+        KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, MAPVK_VK_TO_VSC_EX,
         VIRTUAL_KEY,
     };
 
-    let mut vks: Vec<u16> = Vec::new();
-    for key in keys {
-        if let Some(vk) = key_name_to_vk(key) {
-            if !vks.contains(&vk) {
-                vks.push(vk);
+    #[derive(Clone, Copy)]
+    struct HotkeyInputKey {
+        vk: u16,
+        scan: u16,
+        extended: bool,
+    }
+
+    fn scan_key_for_vk(vk: u16) -> Option<HotkeyInputKey> {
+        let input_vk = hotkey_input_vk(vk);
+        let scan = unsafe { MapVirtualKeyW(input_vk as u32, MAPVK_VK_TO_VSC_EX) };
+        if scan == 0 {
+            return None;
+        }
+        Some(HotkeyInputKey {
+            vk,
+            scan: (scan & 0xFF) as u16,
+            extended: (scan & 0xFF00) != 0,
+        })
+    }
+
+    fn key_input(key: HotkeyInputKey, key_up: bool) -> INPUT {
+        let mut flags = KEYEVENTF_SCANCODE.0;
+        if key_up {
+            flags |= KEYEVENTF_KEYUP.0;
+        }
+        if key.extended {
+            flags |= KEYEVENTF_EXTENDEDKEY.0;
+        }
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0),
+                    wScan: key.scan,
+                    dwFlags: KEYBD_EVENT_FLAGS(flags),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }
+    }
+
+    fn send_input_batch(inputs: &[INPUT], event_name: &str) {
+        if inputs.is_empty() {
+            return;
+        }
+        unsafe {
+            let sent = SendInput(inputs, std::mem::size_of::<INPUT>() as i32);
+            if sent != inputs.len() as u32 {
+                run_logger::warn(
+                    "bindings",
+                    event_name,
+                    &format!("sent={} expected={}", sent, inputs.len()),
+                );
             }
         }
     }
+
+    const HOTKEY_STAGE_MS: u64 = 12;
+    const HOTKEY_HOLD_MS: u64 = 80;
+
+    let (vks, unmapped) = normalize_hotkey_vks(keys);
+    if !unmapped.is_empty() {
+        run_logger::warn(
+            "bindings",
+            "hotkey_unmapped_keys",
+            &format!("keys={}", unmapped.join("+")),
+        );
+    }
     if vks.is_empty() {
+        run_logger::warn("bindings", "hotkey_no_mapped_keys", "");
         return;
     }
 
-    let mut events: Vec<INPUT> = Vec::with_capacity(vks.len() * 2);
-    for vk in &vks {
-        events.push(INPUT {
-            r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 {
-                ki: KEYBDINPUT {
-                    wVk: VIRTUAL_KEY(*vk),
-                    wScan: 0,
-                    dwFlags: KEYBD_EVENT_FLAGS(0),
-                    time: 0,
-                    dwExtraInfo: 0,
-                },
-            },
-        });
+    let mut scan_unmapped = Vec::new();
+    let input_keys = vks
+        .iter()
+        .filter_map(|vk| match scan_key_for_vk(*vk) {
+            Some(key) => Some(key),
+            None => {
+                scan_unmapped.push(vk.to_string());
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if !scan_unmapped.is_empty() {
+        run_logger::warn(
+            "bindings",
+            "hotkey_unmapped_scancodes",
+            &format!("vks={}", scan_unmapped.join("+")),
+        );
     }
-    for vk in vks.iter().rev() {
-        events.push(INPUT {
-            r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 {
-                ki: KEYBDINPUT {
-                    wVk: VIRTUAL_KEY(*vk),
-                    wScan: 0,
-                    dwFlags: KEYEVENTF_KEYUP,
-                    time: 0,
-                    dwExtraInfo: 0,
-                },
-            },
-        });
+    if input_keys.is_empty() {
+        run_logger::warn("bindings", "hotkey_no_mapped_scancodes", "");
+        return;
     }
 
-    unsafe {
-        SendInput(&events, std::mem::size_of::<INPUT>() as i32);
-    }
+    let modifiers = input_keys
+        .iter()
+        .copied()
+        .filter(|key| hotkey_vk_is_modifier(key.vk))
+        .collect::<Vec<_>>();
+    let primaries = input_keys
+        .iter()
+        .copied()
+        .filter(|key| !hotkey_vk_is_modifier(key.vk))
+        .collect::<Vec<_>>();
+
+    let modifier_down_events = modifiers
+        .iter()
+        .copied()
+        .map(|key| key_input(key, false))
+        .collect::<Vec<_>>();
+    let primary_down_events = primaries
+        .iter()
+        .copied()
+        .map(|key| key_input(key, false))
+        .collect::<Vec<_>>();
+    let primary_up_events = primaries
+        .iter()
+        .rev()
+        .copied()
+        .map(|key| key_input(key, true))
+        .collect::<Vec<_>>();
+    let modifier_up_events = modifiers
+        .iter()
+        .rev()
+        .copied()
+        .map(|key| key_input(key, true))
+        .collect::<Vec<_>>();
+
+    send_input_batch(&modifier_down_events, "hotkey_modifier_down_partial");
+    thread::sleep(Duration::from_millis(HOTKEY_STAGE_MS));
+    send_input_batch(&primary_down_events, "hotkey_primary_down_partial");
+    thread::sleep(Duration::from_millis(HOTKEY_HOLD_MS));
+    send_input_batch(&primary_up_events, "hotkey_primary_up_partial");
+    thread::sleep(Duration::from_millis(HOTKEY_STAGE_MS));
+    send_input_batch(&modifier_up_events, "hotkey_modifier_up_partial");
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -286,4 +427,48 @@ pub(crate) fn classify_learned_control(candidate: &LearnCandidate) -> LearnedCon
         model::MidiMessageType::PitchBend => model::BindingControlKind::Continuous,
     };
     learned
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn keys(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn normalizes_hotkey_modifiers_before_primary_keys() {
+        let (vks, unmapped) = normalize_hotkey_vks(&keys(&["P", "Shift", "Ctrl", "Alt"]));
+
+        assert_eq!(vks, vec![0x10, 0x11, 0x12, b'P' as u16]);
+        assert!(unmapped.is_empty());
+    }
+
+    #[test]
+    fn normalizes_hotkey_aliases_and_removes_duplicates() {
+        let (vks, unmapped) = normalize_hotkey_vks(&keys(&[
+            "Control", "Ctrl", "Option", "Alt", "Windows", "Meta", "F13",
+        ]));
+
+        assert_eq!(vks, vec![0x11, 0x12, 0x5B, 0x7C]);
+        assert!(unmapped.is_empty());
+    }
+
+    #[test]
+    fn normalizes_hotkey_reports_unmapped_keys() {
+        let (vks, unmapped) = normalize_hotkey_vks(&keys(&["Ctrl", "Launch Mail", "P"]));
+
+        assert_eq!(vks, vec![0x11, b'P' as u16]);
+        assert_eq!(unmapped, vec!["Launch Mail".to_string()]);
+    }
+
+    #[test]
+    fn hotkey_input_vk_prefers_left_modifiers_for_generic_names() {
+        assert_eq!(hotkey_input_vk(0x10), 0xA0);
+        assert_eq!(hotkey_input_vk(0x11), 0xA2);
+        assert_eq!(hotkey_input_vk(0x12), 0xA4);
+        assert_eq!(hotkey_input_vk(0x5B), 0x5B);
+        assert_eq!(hotkey_input_vk(b'P' as u16), b'P' as u16);
+    }
 }
