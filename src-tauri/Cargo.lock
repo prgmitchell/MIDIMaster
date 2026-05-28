@@ -2191,7 +2191,7 @@ dependencies = [
 
 [[package]]
 name = "midimaster"
-version = "3.6.3"
+version = "3.7.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
