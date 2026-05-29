@@ -12,6 +12,7 @@ const STATE_REFRESH_DEBOUNCE_MS = 120;
 const LOCAL_WRITE_QUIET_MS = 1200;
 const FEEDBACK_INTENT_HOLD_MS = 1200;
 const FEEDBACK_INTENT_MATCH_EPSILON = 0.02;
+const RPC_TIMEOUT_MS = 1200;
 let rpcSequence = 10;
 
 function sleep(ms) {
@@ -24,11 +25,32 @@ function clamp01(v) {
   return Math.max(0, Math.min(1, n));
 }
 
+function boolFromUnknown(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+  if (typeof value === "string") {
+    const text = value.trim().toLowerCase();
+    if (["true", "on", "enabled", "active", "1"].includes(text)) return true;
+    if (["false", "off", "disabled", "inactive", "0"].includes(text)) return false;
+  }
+  return null;
+}
+
+function pickFirstString(obj, keys) {
+  if (!obj || typeof obj !== "object") return "";
+  for (const key of keys) {
+    const value = obj[key];
+    if (value != null && String(value).trim()) return String(value).trim();
+  }
+  return "";
+}
+
 // Connection UI refs (mounted by the plugin).
 const ui = {
   statusText: null,
   statusDot: null,
   connectBtn: null,
+  appInfoText: null,
   autoConnectInput: null,
   invalidateBindingsUI: null,
 };
@@ -63,7 +85,6 @@ function setStatus(connected, detail = "", opts = null) {
     ui.connectBtn.classList.toggle("danger", Boolean(connected));
     ui.connectBtn.textContent = connected ? "Disconnect" : "Connect";
   }
-
   const sig = `${Boolean(connected)}:${Boolean(lastStatus.connecting)}:${Boolean(disconnectedByUser)}`;
   if (sig !== lastUiSig) {
     lastUiSig = sig;
@@ -159,8 +180,10 @@ export async function activate(ctx) {
   } catch {
     // ignore
   }
+  let applicationInfo = null;
   let mixes = [];
   let channels = [];
+  let outputDevicesState = { mainOutput: null, outputDevices: [] };
 
   let bindings = [];
 
@@ -175,6 +198,7 @@ export async function activate(ctx) {
   const primaryFeedbackIntentByBinding = new Map(); // binding_id -> { value, at, source, endpoint_key }
   const localVolumeIntentByEndpoint = new Map(); // endpoint_key -> { value, at, source, endpoint_key }
   const pendingAppInfoByWsId = new Map();
+  const pendingRpcById = new Map();
 
   function endpointKey(endpoint) {
     if (!endpoint) return "";
@@ -268,6 +292,7 @@ export async function activate(ctx) {
       connectedPort = null;
       mixes = [];
       channels = [];
+      outputDevicesState = { mainOutput: null, outputDevices: [] };
       localVolumeIntentByEndpoint.clear();
       offlineFeedbackSent = false;
       syncOfflineFeedback().catch(() => {});
@@ -325,6 +350,11 @@ export async function activate(ctx) {
     }, STATE_REFRESH_DEBOUNCE_MS);
   }
 
+  function scheduleOutputDevicesRefresh() {
+    if (!wsId) return;
+    sendJsonRpc("getOutputDevices", {}, 4).catch(() => {});
+  }
+
   function readBindings() {
     try {
       const all = ctx.bindings?.getAll?.();
@@ -336,6 +366,29 @@ export async function activate(ctx) {
 
   function setBindings(next) {
     bindings = Array.isArray(next) ? next : [];
+  }
+
+  function formatApplicationInfo() {
+    if (!applicationInfo || typeof applicationInfo !== "object") {
+      return "Wave Link app info unavailable.";
+    }
+    const name = String(applicationInfo.name || "Wave Link");
+    const version = String(applicationInfo.version || "").trim();
+    const build = applicationInfo.build != null ? String(applicationInfo.build) : "";
+    const os = String(applicationInfo.operatingSystem || "").trim();
+    const revision = applicationInfo.interfaceRevision != null ? String(applicationInfo.interfaceRevision) : "";
+    const parts = [];
+    if (version) parts.push(`v${version}`);
+    if (build) parts.push(`build ${build}`);
+    if (revision) parts.push(`API ${revision}`);
+    if (os) parts.push(os);
+    return `${name}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+  }
+
+  function updateAppInfoUi() {
+    if (ui.appInfoText) {
+      ui.appInfoText.textContent = formatApplicationInfo();
+    }
   }
 
   function integrationFromBindingTarget(target) {
@@ -363,8 +416,8 @@ export async function activate(ctx) {
       try {
         if (action === "Volume") {
           await ctx.feedback.set(b.id, 0.0, "Volume", { silent: true });
-        } else if (action === "ToggleMute") {
-          await ctx.feedback.set(b.id, 0.0, "ToggleMute", { silent: true });
+        } else if (action === "ToggleMute" || action === "ToggleEffect" || action === "SetMainOutputDevice") {
+          await ctx.feedback.set(b.id, 0.0, action, { silent: true });
         }
       } catch {
         // ignore
@@ -419,6 +472,164 @@ export async function activate(ctx) {
     if (typeof entry.isMuted === "boolean") return entry.isMuted;
     if (typeof entry.muted === "boolean") return entry.muted;
     return null;
+  }
+
+  function normalizeEffectState(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const directKeys = ["isEnabled", "enabled", "isActive", "active", "on"];
+    for (const key of directKeys) {
+      const value = boolFromUnknown(raw[key]);
+      if (value != null) return { enabled: value, key, inverted: false };
+    }
+    const invertedKeys = ["isBypassed", "bypassed", "disabled", "isDisabled"];
+    for (const key of invertedKeys) {
+      const value = boolFromUnknown(raw[key]);
+      if (value != null) return { enabled: !value, key, inverted: true };
+    }
+    return null;
+  }
+
+  function channelEffectCollections(ch) {
+    if (!ch || typeof ch !== "object") return [];
+    const fields = [
+      "effects",
+      "audioEffects",
+      "audio_effects",
+      "channelEffects",
+      "channel_effects",
+      "plugins",
+      "filters",
+      "vstEffects",
+      "vst_effects",
+    ];
+    return fields
+      .filter((field) => Array.isArray(ch[field]))
+      .map((field) => ({ field, items: ch[field] }));
+  }
+
+  function getChannelEffects(ch) {
+    const out = [];
+    for (const collection of channelEffectCollections(ch)) {
+      for (const raw of collection.items) {
+        if (!raw || typeof raw !== "object") continue;
+        const state = normalizeEffectState(raw);
+        if (!state) continue;
+        const id = pickFirstString(raw, [
+          "id",
+          "identifier",
+          "effect_id",
+          "effectId",
+          "plugin_id",
+          "pluginId",
+          "uuid",
+          "name",
+        ]);
+        if (!id) continue;
+        out.push({
+          id,
+          name: pickFirstString(raw, ["name", "displayName", "display_name", "title"]) || id,
+          enabled: state.enabled,
+          enabled_key: state.key,
+          enabled_inverted: state.inverted,
+          collection_field: collection.field,
+        });
+      }
+    }
+    return out;
+  }
+
+  function findChannelById(channelId) {
+    return Array.isArray(channels)
+      ? channels.find((c) => c && String(c.id) === String(channelId)) || null
+      : null;
+  }
+
+  function findEffectState(data) {
+    const ch = findChannelById(data.identifier || data.channel_id);
+    if (!ch) return null;
+    if (data.effect_id) {
+      return getChannelEffects(ch).find((effect) => String(effect.id) === String(data.effect_id)) || null;
+    }
+    return null;
+  }
+
+  function outputDeviceName(device) {
+    return String(device?.name || device?.displayName || device?.id || "Output Device");
+  }
+
+  function outputDeviceId(deviceOrData) {
+    return String(
+      deviceOrData?.output_device_id
+      || deviceOrData?.outputDeviceId
+      || deviceOrData?.id
+      || "",
+    );
+  }
+
+  function outputId(deviceOrData) {
+    return String(
+      deviceOrData?.output_id
+      || deviceOrData?.outputId
+      || deviceOrData?.outputs?.[0]?.id
+      || outputDeviceId(deviceOrData)
+      || "",
+    );
+  }
+
+  function mainOutputDeviceId() {
+    return String(
+      outputDevicesState?.mainOutput?.outputDeviceId
+      || outputDevicesState?.mainOutput?.outputId
+      || outputDevicesState?.mainOutput?.id
+      || "",
+    );
+  }
+
+  function targetIsMainOutputDevice(data) {
+    const id = outputDeviceId(data);
+    return Boolean(id) && id === mainOutputDeviceId();
+  }
+
+  async function setChannelEffectEnabled(data, enabled) {
+    const channelId = String(data.identifier || data.channel_id || "");
+    const effectId = String(data.effect_id || "");
+    if (!channelId || !effectId) return false;
+    const collectionField = String(data.collection_field || "effects");
+    const enabledKey = String(data.enabled_key || "isEnabled");
+    const inverted = Boolean(data.enabled_inverted);
+    const entry = {
+      id: effectId,
+      [enabledKey]: inverted ? !enabled : enabled,
+    };
+    await sendJsonRpc(
+      "setChannel",
+      { id: channelId, [collectionField]: [entry] },
+      401,
+    );
+    scheduleChannelsRefresh();
+    return true;
+  }
+
+  async function setMainOutputDevice(data) {
+    const deviceId = outputDeviceId(data);
+    const nextOutputId = outputId(data) || deviceId;
+    if (!deviceId || !nextOutputId) return false;
+    const response = await requestJsonRpc("setOutputDevice", {
+      mainOutput: {
+        outputDeviceId: deviceId,
+        outputId: nextOutputId,
+      },
+    });
+    if (response?.ok) {
+      outputDevicesState = {
+        ...outputDevicesState,
+        mainOutput: { outputDeviceId: deviceId, outputId: nextOutputId },
+      };
+      scheduleOutputDevicesRefresh();
+      return true;
+    }
+    const message = response?.error?.message || (response?.timeout ? "timed out" : "unknown error");
+    throw new Error(`Wave Link rejected main output change: ${String(message)}`);
   }
 
   async function syncAllFeedback() {
@@ -505,6 +716,13 @@ export async function activate(ctx) {
           if (typeof muted === "boolean") {
             await ctx.feedback.set(b.id, muted ? 1.0 : 0.0, "ToggleMute", { silent: true });
           }
+        } else if (action === "ToggleEffect") {
+          const state = findEffectState(data);
+          if (state && typeof state.enabled === "boolean") {
+            await ctx.feedback.set(b.id, state.enabled ? 1.0 : 0.0, action, { silent: true });
+          }
+        } else if (action === "SetMainOutputDevice" && t.kind === "main_output_device") {
+          await ctx.feedback.set(b.id, targetIsMainOutputDevice(data) ? 1.0 : 0.0, action, { silent: true });
         }
       } catch {
         // ignore
@@ -556,12 +774,41 @@ export async function activate(ctx) {
     }
     const payload = JSON.stringify(req);
     await ctx.ws.send(wsId, payload);
+    return requestId;
+  }
+
+  function clearPendingRpc(id) {
+    const pending = pendingRpcById.get(id);
+    if (!pending) return;
+    try { clearTimeout(pending.timer); } catch { }
+    pendingRpcById.delete(id);
+  }
+
+  async function requestJsonRpc(method, params = {}, timeoutMs = RPC_TIMEOUT_MS) {
+    if (!wsId) throw new Error("Wave Link not connected");
+    rpcSequence += 1;
+    if (rpcSequence > 2_000_000_000) rpcSequence = 10;
+    const requestId = rpcSequence;
+    const wait = new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pendingRpcById.delete(requestId);
+        resolve({ ok: false, timeout: true });
+      }, timeoutMs);
+      pendingRpcById.set(requestId, { resolve, timer });
+    });
+    const req = { jsonrpc: "2.0", method, id: requestId };
+    if (params && typeof params === "object" && Object.keys(params).length > 0) {
+      req.params = params;
+    }
+    await ctx.ws.send(wsId, JSON.stringify(req));
+    return wait;
   }
 
   async function requestFullState() {
     try {
       await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getMixes", id: 2 }));
       await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getChannels", id: 3 }));
+      await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getOutputDevices", id: 4 }));
     } catch (e) {
       // ignore
     }
@@ -607,6 +854,17 @@ export async function activate(ctx) {
     if (!json || typeof json !== "object") return;
 
     const id = json.id;
+    if (id != null && pendingRpcById.has(id)) {
+      const pending = pendingRpcById.get(id);
+      try { clearTimeout(pending.timer); } catch { }
+      pendingRpcById.delete(id);
+      pending.resolve({
+        ok: !json.error,
+        result: json.result ?? null,
+        error: json.error ?? null,
+      });
+      return;
+    }
     if (id === 1) {
       const key = sourceWsId || wsId;
       if (key) {
@@ -614,7 +872,9 @@ export async function activate(ctx) {
         if (pending && typeof pending.resolve === "function") {
           try { clearTimeout(pending.timer); } catch { }
           pendingAppInfoByWsId.delete(key);
-          pending.resolve(json.result || null);
+          applicationInfo = json.result || null;
+          updateAppInfoUi();
+          pending.resolve(applicationInfo);
         }
       }
       return;
@@ -637,6 +897,17 @@ export async function activate(ctx) {
       }
       return;
     }
+    if (id === 4) {
+      const result = json.result;
+      if (result && typeof result === "object") {
+        outputDevicesState = {
+          mainOutput: result.mainOutput || null,
+          outputDevices: Array.isArray(result.outputDevices) ? result.outputDevices : [],
+        };
+        syncAllFeedback().catch(() => {});
+      }
+      return;
+    }
 
     // Notifications (no id)
     if (json.method) {
@@ -649,6 +920,14 @@ export async function activate(ctx) {
         if (Date.now() - lastLocalVolumeWriteAt >= LOCAL_WRITE_QUIET_MS) {
           scheduleMixesRefresh();
         }
+      }
+      if (
+        json.method === "outputDevicesChanged"
+        || json.method === "outputDeviceChanged"
+        || json.method === "mainOutputChanged"
+        || json.method === "outputsChanged"
+      ) {
+        scheduleOutputDevicesRefresh();
       }
     }
   }
@@ -747,6 +1026,7 @@ export async function activate(ctx) {
       pendingVolumeWrites.clear();
       mixes = [];
       channels = [];
+      outputDevicesState = { mainOutput: null, outputDevices: [] };
       localVolumeIntentByEndpoint.clear();
       offlineFeedbackSent = false;
       syncOfflineFeedback().catch(() => {});
@@ -777,6 +1057,7 @@ export async function activate(ctx) {
           <div class="connection-description">
             <p>Control Elgato Wave Link inputs, outputs, and monitor mix directly from your MIDI device.</p>
             <p>Ensure Wave Link is running. Use auto connect to reconnect on startup.</p>
+            <p data-role="app-info">Wave Link app info unavailable.</p>
           </div>
         </div>
         <div class="connection-footer">
@@ -790,8 +1071,10 @@ export async function activate(ctx) {
       ui.statusText = container.querySelector('[data-role="text"]');
       ui.statusDot = container.querySelector('[data-role="dot"]');
       ui.connectBtn = container.querySelector('[data-role="connect"]');
+      ui.appInfoText = container.querySelector('[data-role="app-info"]');
       ui.autoConnectInput = container.querySelector('[data-role="auto"]');
       ui.invalidateBindingsUI = ctx.app?.invalidateBindingsUI;
+      updateAppInfoUi();
 
       applyProfileSettings(ctx.profile?.get?.());
       if (ui.autoConnectInput) {
@@ -819,6 +1102,7 @@ export async function activate(ctx) {
             pendingVolumeWrites.clear();
             mixes = [];
             channels = [];
+            outputDevicesState = { mainOutput: null, outputDevices: [] };
             localVolumeIntentByEndpoint.clear();
             offlineFeedbackSent = false;
             syncOfflineFeedback().catch(() => {});
@@ -886,6 +1170,17 @@ export async function activate(ctx) {
         if (channelName && mixName && (!label || !label.includes("("))) {
           label = `${channelName} (${mixName})`;
         }
+      } else if (t.kind === "channel_effect") {
+        const channelName = String(data.channel_name || data.identifier || "").trim();
+        const effectName = String(data.effect_name || data.effect_id || "").trim();
+        if (channelName && effectName && (!label || !label.includes(":"))) {
+          label = `${channelName}: ${effectName}`;
+        }
+      } else if (t.kind === "main_output_device") {
+        const deviceName = String(data.output_device_name || data.name || data.output_device_id || "").trim();
+        if (deviceName && !label) {
+          label = `Main Output: ${deviceName}`;
+        }
       }
 
       // Back-compat: reconstruct label if older targets didn't store it.
@@ -898,6 +1193,13 @@ export async function activate(ctx) {
           const ch = data.channel_name || data.identifier;
           const mix = data.mix_name || data.mixer_id;
           label = (ch && mix) ? `${ch} (${mix})` : "Wave Link";
+        } else if (t.kind === "channel_effect") {
+          const ch = data.channel_name || data.identifier;
+          const effect = data.effect_name || data.effect_id;
+          label = (ch && effect) ? `${ch}: ${effect}` : "Wave Link Effect";
+        } else if (t.kind === "main_output_device") {
+          const deviceName = data.output_device_name || data.name || data.output_device_id;
+          label = deviceName ? `Main Output: ${deviceName}` : "Wave Link Main Output";
         } else {
           const endpoint = normalizeEndpoint(target);
           const fromCache = describeFromCache(endpoint);
@@ -909,72 +1211,199 @@ export async function activate(ctx) {
       const isConnected = Boolean(wsId) && Boolean(lastStatus.connected);
       return { label: String(label), icon_data, ghost: !isConnected };
     },
-    getTargetOptions: () => {
-      const opts = [];
-      if (Array.isArray(mixes)) {
-        for (const mix of mixes) {
-          if (!mix || !mix.id) continue;
-          const mixName = mix.name ? String(mix.name) : String(mix.id);
-          opts.push({
-            label: mix.name ? String(mix.name) : `Mix ${mix.id}`,
-            icon_data: iconDataUrl || null,
-            target: {
-              Integration: {
-                integration_id: "wavelink",
-                kind: "mix",
-                data: { mixer_id: String(mix.id), mix_name: mixName },
-              },
-            },
-          });
-        }
-      }
-      if (Array.isArray(channels)) {
-        for (const ch of channels) {
-          if (!ch || !ch.id) continue;
-          const channelName = ch.name ? String(ch.name) : String(ch.id);
-          opts.push({
-            label: ch.name ? String(ch.name) : `Channel ${ch.id}`,
-            icon_data: iconDataUrl || null,
-            target: {
-              Integration: {
-                integration_id: "wavelink",
-                kind: "channel",
-                data: { identifier: String(ch.id), channel_name: channelName },
-              },
-            },
-          });
+    getTargetOptions: ({ controlType, nav } = {}) => {
+      const isButton = controlType === "button";
+      const section = String(nav?.section || "");
+      const isConnected = Boolean(wsId) && Boolean(lastStatus.connected);
 
-          // Channel-in-mix targets
-          // Only expose mixes that the channel actually has entries for.
-          if (Array.isArray(ch.mixes)) {
-            for (const entry of ch.mixes) {
-              const mixId = entry?.id;
-              if (!mixId) continue;
-              const mix = Array.isArray(mixes)
-                ? mixes.find((m) => m && String(m.id) === String(mixId))
-                : null;
-              const mixName = mix?.name ? String(mix.name) : String(mixId);
-              opts.push({
-                label: `${channelName} (${mixName})`,
-                icon_data: iconDataUrl || null,
-                target: {
-                  Integration: {
-                    integration_id: "wavelink",
-                    kind: "channel_mix",
-                    data: {
-                      identifier: String(ch.id),
-                      mixer_id: String(mixId),
-                      channel_name: channelName,
-                      mix_name: mixName,
+      const placeholder = (label) => [{
+        label,
+        kind: "placeholder",
+        ghost: true,
+        icon_data: iconDataUrl || null,
+        suppressUnavailableTag: true,
+      }];
+
+      if (!isConnected) {
+        return [];
+      }
+
+      const levelOptions = () => {
+        const opts = [];
+        if (Array.isArray(mixes)) {
+          for (const mix of mixes) {
+            if (!mix || !mix.id) continue;
+            const mixName = mix.name ? String(mix.name) : String(mix.id);
+            opts.push({
+              label: mix.name ? String(mix.name) : `Mix ${mix.id}`,
+              icon_data: iconDataUrl || null,
+              target: {
+                Integration: {
+                  integration_id: "wavelink",
+                  kind: "mix",
+                  data: { mixer_id: String(mix.id), mix_name: mixName },
+                },
+              },
+            });
+          }
+        }
+        if (Array.isArray(channels)) {
+          for (const ch of channels) {
+            if (!ch || !ch.id) continue;
+            const channelName = ch.name ? String(ch.name) : String(ch.id);
+            opts.push({
+              label: ch.name ? String(ch.name) : `Channel ${ch.id}`,
+              icon_data: iconDataUrl || null,
+              target: {
+                Integration: {
+                  integration_id: "wavelink",
+                  kind: "channel",
+                  data: { identifier: String(ch.id), channel_name: channelName },
+                },
+              },
+            });
+
+            if (Array.isArray(ch.mixes)) {
+              for (const entry of ch.mixes) {
+                const mixId = entry?.id;
+                if (!mixId) continue;
+                const mix = Array.isArray(mixes)
+                  ? mixes.find((m) => m && String(m.id) === String(mixId))
+                  : null;
+                const mixName = mix?.name ? String(mix.name) : String(mixId);
+                opts.push({
+                  label: `${channelName} (${mixName})`,
+                  icon_data: iconDataUrl || null,
+                  target: {
+                    Integration: {
+                      integration_id: "wavelink",
+                      kind: "channel_mix",
+                      data: {
+                        identifier: String(ch.id),
+                        mixer_id: String(mixId),
+                        channel_name: channelName,
+                        mix_name: mixName,
+                      },
                     },
                   },
-                },
-              });
+                });
+              }
             }
           }
         }
+        return opts;
+      };
+
+      const effectOptions = () => {
+        const opts = [];
+        if (!isButton || !Array.isArray(channels)) return opts;
+        for (const ch of channels) {
+          if (!ch || !ch.id) continue;
+          const channelName = ch.name ? String(ch.name) : String(ch.id);
+          for (const effect of getChannelEffects(ch)) {
+            opts.push({
+              label: `${channelName}: ${effect.name}`,
+              icon_data: iconDataUrl || null,
+              buttonActions: [
+                { label: "Toggle Effect", value: "ToggleEffect", behavior: "stateful" },
+              ],
+              target: {
+                Integration: {
+                  integration_id: "wavelink",
+                  kind: "channel_effect",
+                  data: {
+                    identifier: String(ch.id),
+                    channel_name: channelName,
+                    effect_id: String(effect.id),
+                    effect_name: String(effect.name),
+                    collection_field: effect.collection_field,
+                    enabled_key: effect.enabled_key,
+                    enabled_inverted: Boolean(effect.enabled_inverted),
+                  },
+                },
+              },
+            });
+          }
+        }
+        return opts;
+      };
+
+      const outputDeviceOptions = () => {
+        const opts = [];
+        if (!isButton || !Array.isArray(outputDevicesState.outputDevices)) return opts;
+        for (const device of outputDevicesState.outputDevices) {
+          const id = outputDeviceId(device);
+          if (!id) continue;
+          const name = outputDeviceName(device);
+          const nextOutputId = outputId(device) || id;
+          opts.push({
+            label: `Main Output: ${name}`,
+            icon_data: iconDataUrl || null,
+            buttonActions: [
+              { label: "Set Main Output", value: "SetMainOutputDevice", behavior: "momentary" },
+            ],
+            target: {
+              Integration: {
+                integration_id: "wavelink",
+                kind: "main_output_device",
+                data: {
+                  output_device_id: id,
+                  output_id: nextOutputId,
+                  output_device_name: name,
+                  device_type: String(device.deviceType || device.type || ""),
+                },
+              },
+            },
+          });
+        }
+        return opts;
+      };
+
+      if (section === "levels") {
+        const opts = levelOptions();
+        return opts.length > 0 ? opts : placeholder("No Wave Link level targets exposed");
       }
-      return opts;
+      if (section === "effects") {
+        const opts = effectOptions();
+        return opts.length > 0 ? opts : placeholder("No Wave Link effects exposed");
+      }
+      if (section === "outputs") {
+        const opts = outputDeviceOptions();
+        return opts.length > 0 ? opts : placeholder("No Wave Link output devices exposed");
+      }
+
+      const groups = [
+        {
+          label: "Levels",
+          nav: { section: "levels" },
+          description: "Channels, mixes, and channel-in-mix levels.",
+          tags: [String(levelOptions().length)],
+          icon_data: iconDataUrl || null,
+        },
+      ];
+      if (isButton) {
+        groups.push(
+          {
+            label: "Effects",
+            nav: { section: "effects" },
+            description: "Channel audio effects.",
+            tags: [String(effectOptions().length)],
+            icon_data: iconDataUrl || null,
+          },
+          {
+            label: "Output Devices",
+            nav: { section: "outputs" },
+            description: "Set the Wave Link main output device.",
+            tags: [String(outputDeviceOptions().length)],
+            icon_data: iconDataUrl || null,
+          },
+        );
+      }
+
+      if (groups.length === 0) {
+        return placeholder("No compatible Wave Link targets exposed");
+      }
+      return groups;
     },
     onBindingTriggered: async (payload) => {
       const bindingId = payload?.binding_id;
@@ -984,6 +1413,52 @@ export async function activate(ctx) {
       const isPrimaryTarget = payload?.is_primary_target !== false;
       const targetIndex = Number(payload?.target_index ?? 0);
       const targetCount = Number(payload?.target_count ?? 1);
+      const target = payload?.target || {};
+      const targetData = target?.data || {};
+      if (action === "ToggleEffect") {
+        const enabled = clamp01(value) > 0.5;
+        if (!wsId) return;
+        try {
+          const applied = await setChannelEffectEnabled(targetData, enabled);
+          if (applied && bindingId && isPrimaryTarget) {
+            await ctx.feedback.set(bindingId, enabled ? 1.0 : 0.0, action);
+          }
+        } catch {
+          wsId = null;
+          connectedPort = null;
+          pendingVolumeWrites.clear();
+          mixes = [];
+          channels = [];
+          localVolumeIntentByEndpoint.clear();
+          offlineFeedbackSent = false;
+          syncOfflineFeedback().catch(() => {});
+          wasConnected = false;
+          setStatus(false, "Disconnected");
+        }
+        return;
+      }
+      if (action === "SetMainOutputDevice") {
+        if (!wsId) return;
+        try {
+          const applied = await setMainOutputDevice(targetData);
+          if (applied && bindingId && isPrimaryTarget) {
+            await ctx.feedback.set(bindingId, 1.0, action);
+          }
+        } catch {
+          wsId = null;
+          connectedPort = null;
+          pendingVolumeWrites.clear();
+          mixes = [];
+          channels = [];
+          outputDevicesState = { mainOutput: null, outputDevices: [] };
+          localVolumeIntentByEndpoint.clear();
+          offlineFeedbackSent = false;
+          syncOfflineFeedback().catch(() => {});
+          wasConnected = false;
+          setStatus(false, "Disconnected");
+        }
+        return;
+      }
       const endpoint = normalizeEndpoint({ Integration: payload?.target });
       if (!endpoint) return;
 
@@ -1048,6 +1523,7 @@ export async function activate(ctx) {
         pendingVolumeWrites.clear();
         mixes = [];
         channels = [];
+        outputDevicesState = { mainOutput: null, outputDevices: [] };
         localVolumeIntentByEndpoint.clear();
         offlineFeedbackSent = false;
         syncOfflineFeedback().catch(() => {});

@@ -61,6 +61,14 @@ fn integration_volume_button_action_kind(
     None
 }
 
+fn action_is_stateful_integration_toggle(action: &model::BindingAction) -> bool {
+    matches!(action, model::BindingAction::ToggleEffect)
+}
+
+fn action_is_momentary_integration_action(action: &model::BindingAction) -> bool {
+    matches!(action, model::BindingAction::SetMainOutputDevice)
+}
+
 fn resolve_integration_button_event(
     state: &AppState,
     key: &BindingKey,
@@ -576,6 +584,164 @@ pub(crate) fn apply_midi_event(
             }
         }
 
+        return Ok(());
+    }
+
+    if action_is_stateful_integration_toggle(&binding.action) {
+        if let Ok(mut states) = state.binding_state.lock() {
+            if let Some(state) = states.get_mut(&key) {
+                state.last_update = Instant::now();
+            }
+        }
+
+        if event.value == 0 && binding.mute_behavior == model::MuteBehavior::ToggleOnPress {
+            let key_clone = key.clone();
+            let feedback_arc = state.feedback_values.clone();
+            let midi_arc = state.midi.clone();
+            let binding_for_feedback = binding.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                if let Ok(feedback) = feedback_arc.lock() {
+                    let current_val = feedback.get(&key_clone).cloned().unwrap_or(0.0);
+                    if let Ok(mut midi) = midi_arc.lock() {
+                        let _ = midi.send_binding_feedback(&binding_for_feedback, current_val);
+                    }
+                }
+            });
+            return Ok(());
+        }
+
+        let current_val = state
+            .feedback_values
+            .lock()
+            .ok()
+            .and_then(|fb| fb.get(&key).cloned())
+            .unwrap_or(0.0);
+        let current_enabled = current_val > 0.5;
+        let previous_input_active = if binding.mute_behavior == model::MuteBehavior::SetFromValue {
+            state
+                .last_mute_input_active
+                .lock()
+                .ok()
+                .and_then(|inputs| inputs.get(&key).copied())
+        } else {
+            None
+        };
+        let Some(next_enabled) = AppState::resolve_target_mute_state(
+            event.value,
+            current_enabled,
+            binding.mute_behavior.clone(),
+            previous_input_active,
+        ) else {
+            if binding.mute_behavior == model::MuteBehavior::SetFromValue {
+                if let Ok(mut inputs) = state.last_mute_input_active.lock() {
+                    inputs.insert(key.clone(), event.value > 0);
+                }
+            }
+            return Ok(());
+        };
+        if binding.mute_behavior == model::MuteBehavior::SetFromValue {
+            if let Ok(mut inputs) = state.last_mute_input_active.lock() {
+                inputs.insert(key.clone(), event.value > 0);
+            }
+        }
+
+        let mut any_applied = false;
+        for (target_index, target) in targets.iter().enumerate() {
+            if let model::BindingTarget::Integration {
+                integration_id,
+                kind,
+                data,
+            } = target
+            {
+                let payload = serde_json::json!({
+                  "binding_id": binding.id,
+                  "action": format!("{:?}", binding.action),
+                  "value": if next_enabled { 1.0 } else { 0.0 },
+                  "target_index": target_index,
+                  "target_count": targets.len(),
+                  "is_primary_target": target_index == 0,
+                  "target": {
+                    "integration_id": integration_id,
+                    "kind": kind,
+                    "data": data,
+                  }
+                });
+                let _ = app.emit("integration_binding_triggered", payload);
+                any_applied = true;
+            }
+        }
+
+        if !any_applied {
+            run_logger::warn(
+                "bindings",
+                "stateful_integration_toggle_no_target_applied",
+                &format!("binding_id={} targets={}", binding.id, targets.len()),
+            );
+            return Ok(());
+        }
+
+        let feedback_value = if next_enabled { 1.0 } else { 0.0 };
+        if let Ok(mut feedback) = state.feedback_values.lock() {
+            feedback.insert(key.clone(), feedback_value);
+        }
+        if let Ok(mut midi) = state.midi.lock() {
+            let _ = midi.send_binding_feedback(&binding, feedback_value);
+        }
+        return Ok(());
+    }
+
+    if action_is_momentary_integration_action(&binding.action) {
+        if event.value <= 0 {
+            update_activity_button_light_hold_feedback(state, &binding, key.clone(), false);
+            return Ok(());
+        }
+
+        let mut any_applied = false;
+        for (target_index, target) in targets.iter().enumerate() {
+            if let model::BindingTarget::Integration {
+                integration_id,
+                kind,
+                data,
+            } = target
+            {
+                let payload = serde_json::json!({
+                  "binding_id": binding.id,
+                  "action": format!("{:?}", binding.action),
+                  "value": 1.0,
+                  "target_index": target_index,
+                  "target_count": targets.len(),
+                  "is_primary_target": target_index == 0,
+                  "target": {
+                    "integration_id": integration_id,
+                    "kind": kind,
+                    "data": data,
+                  }
+                });
+                let _ = app.emit("integration_binding_triggered", payload);
+                any_applied = true;
+            }
+        }
+
+        if !any_applied {
+            run_logger::warn(
+                "bindings",
+                "momentary_integration_no_target_applied",
+                &format!("binding_id={} targets={}", binding.id, targets.len()),
+            );
+            return Ok(());
+        }
+
+        let feedback_value = binding
+            .activity_button_light_feedback_value(true)
+            .unwrap_or(1.0);
+        if let Ok(mut feedback) = state.feedback_values.lock() {
+            feedback.insert(key.clone(), feedback_value);
+        }
+        if let Ok(mut midi) = state.midi.lock() {
+            let _ = midi.send_binding_feedback(&binding, feedback_value);
+        }
+        update_activity_button_light_hold_feedback(state, &binding, key.clone(), true);
         return Ok(());
     }
 

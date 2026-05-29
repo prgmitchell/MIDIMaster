@@ -108,6 +108,8 @@ pub struct FaderCurvePoint {
 pub enum BindingAction {
     Volume,
     ToggleMute,
+    ToggleEffect,
+    SetMainOutputDevice,
     SetDefaultDevice,
     OpenApplication,
     FocusWindow,
@@ -617,19 +619,24 @@ impl Binding {
                     BindingTarget::Device { device_id } if !device_id.trim().is_empty()
                 )
             }),
+            BindingAction::SetMainOutputDevice => targets
+                .iter()
+                .any(Self::target_is_complete_for_mapped_light),
             BindingAction::Volume => targets
                 .iter()
                 .any(Self::target_is_complete_for_mapped_light),
-            BindingAction::ToggleMute => false,
+            BindingAction::ToggleMute | BindingAction::ToggleEffect => false,
         }
     }
 
     fn uses_stateful_toggle_feedback(&self) -> bool {
-        self.action == BindingAction::ToggleMute
-            || self
-                .normalized_targets()
-                .iter()
-                .any(Self::target_uses_stateful_toggle_feedback)
+        matches!(
+            self.action,
+            BindingAction::ToggleMute | BindingAction::ToggleEffect
+        ) || self
+            .normalized_targets()
+            .iter()
+            .any(Self::target_uses_stateful_toggle_feedback)
     }
 
     fn target_uses_stateful_toggle_feedback(target: &BindingTarget) -> bool {

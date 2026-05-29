@@ -241,6 +241,17 @@ fn emit_integration_binding_triggered(
     let _ = app.emit("integration_binding_triggered", payload);
 }
 
+fn action_is_stateful_integration_toggle(action: &model::BindingAction) -> bool {
+    matches!(
+        action,
+        model::BindingAction::ToggleMute | model::BindingAction::ToggleEffect
+    )
+}
+
+fn action_is_momentary_integration_action(action: &model::BindingAction) -> bool {
+    matches!(action, model::BindingAction::SetMainOutputDevice)
+}
+
 fn emit_integration_binding_triggered_batch(
     app: &AppHandle,
     binding_id: &str,
@@ -545,13 +556,36 @@ fn apply_binding_action_internal(
                 }
             }
             (
-                model::BindingAction::ToggleMute,
+                action,
                 model::BindingTarget::Integration {
                     integration_id,
                     kind,
                     data,
                 },
-            ) => {
+            ) if action_is_stateful_integration_toggle(action) => {
+                emit_integration_binding_triggered(
+                    app,
+                    &binding.id,
+                    &action,
+                    value,
+                    target_index,
+                    targets.len(),
+                    integration_id,
+                    kind,
+                    data,
+                    source,
+                    source_sequence,
+                );
+                any_applied = true;
+            }
+            (
+                action,
+                model::BindingTarget::Integration {
+                    integration_id,
+                    kind,
+                    data,
+                },
+            ) if action_is_momentary_integration_action(action) => {
                 emit_integration_binding_triggered(
                     app,
                     &binding.id,
@@ -1021,6 +1055,8 @@ pub fn apply_binding_action(
         effective_action,
         model::BindingAction::Volume
             | model::BindingAction::ToggleMute
+            | model::BindingAction::ToggleEffect
+            | model::BindingAction::SetMainOutputDevice
             | model::BindingAction::SetDefaultDevice
             | model::BindingAction::FocusWindow
             | model::BindingAction::FullScreenshot
