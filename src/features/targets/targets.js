@@ -1556,6 +1556,14 @@ export function createTargetsFeature({
     if (d.targetPanelClose) {
       d.targetPanelClose.addEventListener("click", closeTargetPanel);
     }
+    window.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !d.targetPanel || d.targetPanel.classList.contains("hidden")) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      closeTargetPanel();
+    }, true);
     window.addEventListener("midimaster:integration-targets-changed", (event) => {
       const integrationId = String(event?.detail?.integrationId || event?.detail?.integration_id || "");
       if (!integrationId || integrationId !== activeTargetPanelIntegrationId) return;
