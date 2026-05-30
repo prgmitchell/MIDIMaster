@@ -202,7 +202,7 @@ pub fn list_plugins(app: AppHandle) -> Result<Vec<PluginManifest>, String> {
 
         plugins.push(manifest);
     }
-    plugins.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    plugins.sort_by_key(|a| a.name.to_lowercase());
     Ok(plugins)
 }
 
