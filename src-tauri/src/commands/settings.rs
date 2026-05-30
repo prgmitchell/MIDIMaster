@@ -71,6 +71,7 @@ pub fn get_osd_settings(state: State<AppState>) -> Result<OsdSettings, String> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn update_osd_settings(
     app: AppHandle,
     state: State<AppState>,
@@ -179,6 +180,7 @@ pub fn get_app_version(app: AppHandle) -> String {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn update_app_settings(
     app: AppHandle,
     state: State<AppState>,
@@ -361,6 +363,9 @@ pub fn reset_app_data(app: AppHandle, state: State<AppState>) -> Result<(), Stri
     if let Ok(mut feedback) = state.feedback_values.lock() {
         feedback.clear();
     }
+    if let Ok(mut values) = state.binding_action_values.lock() {
+        values.clear();
+    }
 
     if let Ok(mut settings) = state.osd_settings.lock() {
         *settings = OsdSettings::default();
@@ -435,11 +440,11 @@ pub fn pick_executable_path() -> Result<Option<PickExecutableResult>, String> {
 
         let icon_data = crate::audio::windows::extract_executable_icon_base64(&path_string);
 
-        return Ok(Some(PickExecutableResult {
+        Ok(Some(PickExecutableResult {
             path: path_string,
             display,
             icon_data,
-        }));
+        }))
     }
 
     #[cfg(not(target_os = "windows"))]

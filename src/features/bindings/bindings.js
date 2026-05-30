@@ -7,6 +7,7 @@ import {
   applyCurveToNormalized,
   assignModeTooltip,
   buttonModeValue,
+  buttonVisualBehavior,
   cloneBindingDraft,
   curveDisplayName,
   curveEditorPoints,
@@ -29,6 +30,7 @@ import {
   normalizeMuteBehavior,
   normalizeRelativeFormat,
   presetCurvePoints,
+  resolveButtonVisualActive,
   setTargets,
 } from "./shape_helpers.js";
 
@@ -177,37 +179,66 @@ export function createBindingsFeature({
     return binding?.mode === "Relative" ? "Relative" : "Absolute";
   }
 
-  function isMomentaryButtonBinding(binding) {
-    if (!effectiveIsButton(binding)) return false;
-    const target = getPrimaryTarget(binding);
-    const integration = target?.Integration || target?.integration;
-    const data = integration?.data || {};
-    if (
-      String(integration?.integration_id || "").toLowerCase() === "obs"
-      && String(integration?.kind || "").toLowerCase() === "action"
-      && String(data.action || "").startsWith("Toggle")
-    ) {
-      return false;
-    }
-    const actionKind = String(data.action_kind || "").toLowerCase();
-    if (actionKind === "momentary") return true;
-    if (actionKind === "stateful") return false;
-    return binding?.action !== "ToggleMute";
+  function buttonVisualOptions(binding, overrides = {}) {
+    const behavior = buttonVisualBehavior(binding);
+    const bindingId = binding?.id;
+    const storedValue = bindingId != null && bindingLastValues[bindingId] != null
+      ? Number(bindingLastValues[bindingId])
+      : null;
+    const mappedMuteValue = bindingId != null && bindingMuteValues[bindingId] != null
+      ? Boolean(bindingMuteValues[bindingId])
+      : null;
+    const muted = typeof overrides.muted === "boolean" ? overrides.muted : mappedMuteValue;
+    return {
+      inputValue: Object.prototype.hasOwnProperty.call(overrides, "inputValue")
+        ? overrides.inputValue
+        : (behavior === "momentary" ? storedValue : null),
+      stateValue: Object.prototype.hasOwnProperty.call(overrides, "stateValue")
+        ? overrides.stateValue
+        : (behavior === "stateful" && binding?.action !== "ToggleMute" ? storedValue : null),
+      muted,
+      fallbackMuted: Object.prototype.hasOwnProperty.call(overrides, "fallbackMuted")
+        ? overrides.fallbackMuted
+        : (muted == null ? Boolean(getMuted(getPrimaryTarget(binding))) : null),
+    };
   }
 
-  function obsButtonBehavior(binding) {
-    if (!effectiveIsButton(binding)) return null;
+  function buttonVisualActive(binding, overrides = {}) {
+    return resolveButtonVisualActive(binding, buttonVisualOptions(binding, overrides));
+  }
+
+  function setButtonVisualState(bindingId, active) {
+    if (bindingId == null) return false;
+    const selector = `[data-binding-id="${CSS.escape(String(bindingId))}"]`;
+    let updated = false;
+    document.querySelectorAll(`.binding-momentary-value${selector}`).forEach((fill) => {
+      fill.classList.toggle("is-active", Boolean(active));
+      updated = true;
+    });
+    document.querySelectorAll(`.binding-toggle-value${selector}`).forEach((toggle) => {
+      toggle.classList.toggle("on", Boolean(active));
+      updated = true;
+    });
+    return updated;
+  }
+
+  function syncButtonVisualState(bindingOrId, overrides = {}) {
+    const binding = typeof bindingOrId === "object" && bindingOrId
+      ? bindingOrId
+      : getBindingById(bindingOrId);
+    if (!binding) return false;
+    const active = buttonVisualActive(binding, overrides);
+    setButtonVisualState(binding.id, active);
+    return active;
+  }
+
+  function buttonUsesPressReleaseCommand(binding) {
+    if (buttonVisualBehavior(binding) !== "momentary") return false;
     const target = getPrimaryTarget(binding);
     const integration = target?.Integration || target?.integration;
-    if (String(integration?.integration_id || "").toLowerCase() !== "obs") return null;
+    if (String(integration?.integration_id || "").toLowerCase() !== "obs") return false;
     const kind = String(integration?.kind || "").toLowerCase();
-    const data = integration?.data || {};
-    const actionKind = String(data.action_kind || "").toLowerCase();
-    if (actionKind === "stateful" || actionKind === "momentary") return actionKind;
-    if (binding?.action === "ToggleMute") return "stateful";
-    if (kind === "action" && String(data.action || "").startsWith("Toggle")) return "stateful";
-    if (kind === "action" || kind === "scene" || kind === "media") return "momentary";
-    return null;
+    return kind === "action" || kind === "scene" || kind === "media";
   }
 
   function targetIsNonUnset(target) {
@@ -220,7 +251,6 @@ export function createBindingsFeature({
 
   function targetIsCompleteForMappedLight(target) {
     if (!targetIsNonUnset(target)) return false;
-    if (targetUsesStatefulToggleFeedback(target)) return false;
     if (
       target === "Master"
       || target === "Focus"
@@ -241,22 +271,6 @@ export function createBindingsFeature({
         && Boolean(String(integration.kind || "").trim());
     }
     return false;
-  }
-
-  function targetUsesStatefulToggleFeedback(target) {
-    const integration = integrationFromTarget(target);
-    if (!integration) return false;
-    const data = integration.data || {};
-    const actionKind = String(data.action_kind || "").toLowerCase();
-    if (actionKind === "stateful") return true;
-    return String(integration.integration_id || "").toLowerCase() === "obs"
-      && String(integration.kind || "").toLowerCase() === "action"
-      && String(data.action || "").startsWith("Toggle");
-  }
-
-  function bindingUsesStatefulToggleFeedback(binding) {
-    return String(binding?.action || "") === "ToggleMute"
-      || getTargets(binding).some(targetUsesStatefulToggleFeedback);
   }
 
   function mappedButtonLightTargetComplete(binding) {
@@ -301,7 +315,6 @@ export function createBindingsFeature({
     if (
       !effectiveIsButton(binding)
       || normalizeButtonLightMode(binding?.button_light_mode) !== "MappedWhenAssigned"
-      || bindingUsesStatefulToggleFeedback(binding)
     ) {
       return null;
     }
@@ -316,19 +329,6 @@ export function createBindingsFeature({
     return normalizeButtonLightMode(binding?.button_light_mode) === "MappedWhenAssigned"
       ? t("bindings.mapped")
       : t("bindings.activity");
-  }
-
-  function buttonFillActive(binding, fallbackMuted = false) {
-    if (!binding) return false;
-    const mappedLight = mappedButtonLightFeedbackValue(binding);
-    if (mappedLight != null) return mappedLight > 0.5;
-    if (binding.action === "ToggleMute") {
-      if (bindingMuteValues[binding.id] != null) return Boolean(bindingMuteValues[binding.id]);
-      return Boolean(fallbackMuted);
-    }
-    if (bindingLastValues[binding.id] != null) return Number(bindingLastValues[binding.id]) > 0.5;
-    if (bindingMuteValues[binding.id] != null) return Boolean(bindingMuteValues[binding.id]);
-    return Boolean(fallbackMuted);
   }
 
   function pulseMomentaryValue(button) {
@@ -388,9 +388,12 @@ export function createBindingsFeature({
       toggle.title = label;
       toggle.setAttribute("aria-label", label);
     }
-    const fill = row?.querySelector(".binding-momentary-value");
-    if (fill) {
-      fill.classList.toggle("is-active", nextMuted);
+    const bindingId = button.dataset?.bindingId;
+    if (bindingId != null) {
+      const binding = getBindingById(bindingId);
+      syncButtonVisualState(binding || bindingId, binding?.action === "ToggleMute"
+        ? { muted: nextMuted, stateValue: nextMuted ? 1 : 0 }
+        : { muted: nextMuted });
     }
   }
 
@@ -969,23 +972,27 @@ export function createBindingsFeature({
     const target = getPrimaryTarget(binding);
     const liveMidiValue = getLiveMidiValue(binding.device_id, binding.control);
     const mappedLightValue = mappedButtonLightFeedbackValue(binding);
+    const storedBindingValue = bindingId != null && bindingLastValues[bindingId] != null
+      ? Number(bindingLastValues[bindingId])
+      : null;
     const liveValue = liveMidiValue != null
       ? applyCurveToNormalized(binding, liveMidiValue)
-      : (bindingId != null && bindingLastValues[bindingId] != null
-          ? Number(bindingLastValues[bindingId])
-          : (getVol(target) ?? 0));
+      : (storedBindingValue != null ? storedBindingValue : (getVol(target) ?? 0));
     const muted = bindingId != null && bindingMuteValues[bindingId] != null
       ? Boolean(bindingMuteValues[bindingId])
       : Boolean(getMuted(target));
-    const statefulToggleFeedback = isButton && bindingUsesStatefulToggleFeedback(binding);
+    const visualBehavior = buttonVisualBehavior(binding);
     const buttonActive = isButton
-      ? (
-          statefulToggleFeedback
-            ? buttonFillActive(binding, muted)
-            : liveMidiValue != null
-            ? liveMidiValue > 0.5
-            : (mappedLightValue != null ? mappedLightValue > 0.5 : buttonFillActive(binding, muted))
-        )
+      ? resolveButtonVisualActive(binding, {
+          inputValue: visualBehavior === "momentary"
+            ? (liveMidiValue != null ? liveMidiValue : storedBindingValue)
+            : null,
+          stateValue: visualBehavior === "stateful" && binding.action !== "ToggleMute"
+            ? storedBindingValue
+            : null,
+          muted,
+          fallbackMuted: muted,
+        })
       : false;
     const previewValue = isButton
       ? (buttonActive ? 1 : 0)
@@ -1304,13 +1311,28 @@ export function createBindingsFeature({
     }
   }
 
-  async function persistBinding(binding) {
+  async function persistBindingBackend(binding) {
     ensureBindingShape(binding);
     await invoke("add_binding", { binding });
-    await saveProfile();
+  }
+
+  function syncPluginHostBindings() {
     try {
       getHost()?.setBindings?.(getB());
     } catch { }
+  }
+
+  function scheduleProfileSave(reason = "binding update") {
+    const promise = saveProfile();
+    promise.catch((err) => {
+      console.error(`Failed to save profile after ${reason}:`, err);
+    });
+    return promise;
+  }
+
+  function finishBindingUiMutation(reason = "binding update") {
+    syncPluginHostBindings();
+    scheduleProfileSave(reason);
   }
 
   function findMappingConflict(bindingId, field, mapping) {
@@ -1490,7 +1512,7 @@ export function createBindingsFeature({
       nextConflictBinding[conflict.field] = null;
       nextBindings[conflictIndex] = nextConflictBinding;
       setB(nextBindings);
-      await persistBinding(nextConflictBinding);
+      await persistBindingBackend(nextConflictBinding);
     }
 
     const bindingIndex = nextBindings.findIndex((binding) => binding.id === configBindingId);
@@ -1498,9 +1520,10 @@ export function createBindingsFeature({
     const nextBinding = cloneBindingDraft(draft);
     nextBindings[bindingIndex] = nextBinding;
     setB(nextBindings);
-    await persistBinding(nextBinding);
+    await persistBindingBackend(nextBinding);
     renderBindings();
     closeConfigModal();
+    finishBindingUiMutation("config save");
   }
 
   function beginBindingEdit(bindingId, forceInline = false) {
@@ -1689,8 +1712,8 @@ export function createBindingsFeature({
             setEditingId(null);
             setPendingFocusId(null);
             await invoke("add_binding", { binding });
-            await saveProfile();
             flushPendingRerender({ fallbackRender: true });
+            finishBindingUiMutation("rename binding");
           });
           nameField = nameInput;
         } else {
@@ -1783,18 +1806,18 @@ export function createBindingsFeature({
           } else if (nextModeValue === "fader_rel") {
             binding.control_kind = "Continuous";
             binding.mode = "Relative";
-            binding.relative_format = "Auto";
+            binding.relative_format = normalizeRelativeFormat(binding.relative_format);
             binding.action = "Volume";
           } else {
             binding.control_kind = "Continuous";
             binding.mode = "Absolute";
-            binding.relative_format = "Auto";
+            binding.relative_format = normalizeRelativeFormat(binding.relative_format);
             binding.action = "Volume";
           }
 
           await invoke("add_binding", { binding });
-          await saveProfile();
           renderBindings();
+          finishBindingUiMutation("mode change");
         };
 
         modeOptions.forEach((option) => {
@@ -1901,8 +1924,8 @@ export function createBindingsFeature({
               binding.hotkey = previousHotkey;
               binding.open_application = previousOpenApplication;
               await invoke("add_binding", { binding });
-              await saveProfile();
               renderBindings();
+              finishBindingUiMutation("target rollback");
               return;
             }
             binding.hotkey = learnedHotkey;
@@ -1923,8 +1946,8 @@ export function createBindingsFeature({
             binding.hotkey = previousHotkey;
             binding.open_application = previousOpenApplication;
             await invoke("add_binding", { binding });
-            await saveProfile();
             renderBindings();
+            finishBindingUiMutation("target rollback");
             return;
           }
 
@@ -1953,17 +1976,8 @@ export function createBindingsFeature({
           }
 
           await invoke("add_binding", { binding });
-          await saveProfile();
-
-          try {
-            getHost()?.setBindings?.(getB());
-          } catch { }
-
-          // Hotkey target UX: force a fresh row render so the chip label updates
-          // immediately from "Not Set" to the learned combo.
-          if (isButton && hasHotkeyTarget) {
-            renderBindings();
-          }
+          renderBindings();
+          finishBindingUiMutation("target change");
         });
 
         const volumeSlider = document.createElement("input");
@@ -2008,8 +2022,7 @@ export function createBindingsFeature({
         const isMuted = (bindingMuteValues[binding.id] != null)
           ? Boolean(bindingMuteValues[binding.id])
           : Boolean(getMuted(primaryTarget));
-        const obsBehavior = obsButtonBehavior(binding);
-        const isMomentaryButton = obsBehavior ? obsBehavior === "momentary" : isMomentaryButtonBinding(binding);
+        const visualBehavior = buttonVisualBehavior(binding);
         setMuteButtonState(muteButton, isMuted);
         muteButton.dataset.targetJson = JSON.stringify(primaryTarget);
         muteButton.dataset.bindingId = binding.id;
@@ -2072,8 +2085,8 @@ export function createBindingsFeature({
             const next = getB();
             next.splice(index, 1);
             setB(next);
-            await saveProfile();
             renderBindings();
+            finishBindingUiMutation("delete binding");
           } catch (err) {
             console.error("Failed to remove binding:", err);
           }
@@ -2089,15 +2102,14 @@ export function createBindingsFeature({
           const pulse = document.createElement("button");
           pulse.type = "button";
           pulse.className = "binding-momentary-value";
-          const isObsStateful = obsBehavior === "stateful";
-          const isObsMomentary = obsBehavior === "momentary";
-          const isStatefulButton = isObsStateful || (!obsBehavior && !isMomentaryButton);
-          const isMomentaryPress = isObsMomentary || (!obsBehavior && isMomentaryButton);
+          const isStatefulButton = visualBehavior === "stateful";
+          const isMomentaryPress = visualBehavior === "momentary";
+          const usesPressReleaseCommand = buttonUsesPressReleaseCommand(binding);
           pulse.classList.add(
             "binding-button-value",
             isStatefulButton ? "binding-button-value--stateful" : "binding-button-value--momentary",
           );
-          pulse.classList.toggle("is-active", isStatefulButton && buttonFillActive(binding, isMuted));
+          pulse.classList.toggle("is-active", buttonVisualActive(binding, { fallbackMuted: isMuted }));
           pulse.dataset.bindingId = binding.id;
           pulse.title = isStatefulButton ? t("bindings.toggleBinding") : t("bindings.triggerBinding");
           pulse.setAttribute("aria-label", pulse.title);
@@ -2116,7 +2128,7 @@ export function createBindingsFeature({
             if (!pulse.__buttonPressed) return;
             pulse.__buttonPressed = false;
             pulse.classList.remove("is-active");
-            if (!isObsMomentary) return;
+            if (!usesPressReleaseCommand) return;
             try {
               await invokeButtonValue(0.0);
             } catch (err) {
@@ -2142,7 +2154,7 @@ export function createBindingsFeature({
                 console.error("Failed to trigger toggle action:", err);
               }
             });
-          } else if (isObsMomentary) {
+          } else if (usesPressReleaseCommand) {
             pulse.addEventListener("pointerdown", async (event) => {
               event.preventDefault();
               if (pulse.__buttonPressed) return;
@@ -2176,7 +2188,7 @@ export function createBindingsFeature({
           }
           pulse.addEventListener("keydown", async (event) => {
             if (event.key !== " " && event.key !== "Enter") return;
-            if (!isObsMomentary || pulse.__buttonPressed) return;
+            if (!usesPressReleaseCommand || pulse.__buttonPressed) return;
             event.preventDefault();
             bindingInteractionTimes[binding.id] = Date.now();
             pulse.__buttonPressed = true;
@@ -2191,7 +2203,7 @@ export function createBindingsFeature({
           });
           pulse.addEventListener("keyup", async (event) => {
             if (event.key !== " " && event.key !== "Enter") return;
-            if (!isObsMomentary) return;
+            if (!usesPressReleaseCommand) return;
             event.preventDefault();
             await releaseMomentary();
           });
@@ -2262,8 +2274,8 @@ export function createBindingsFeature({
           try {
             await invoke("remove_binding", { binding });
           } catch { }
-          await saveProfile();
           renderBindings();
+          finishBindingUiMutation("delete broken binding");
         };
         errorItem.appendChild(delBtn);
 
@@ -2382,7 +2394,7 @@ export function createBindingsFeature({
       next.splice(insertIndex, 0, moved);
       setB(next);
       renderBindings();
-      await saveProfile();
+      finishBindingUiMutation("reorder bindings");
     }
 
     flushPendingRerender();
@@ -2682,6 +2694,8 @@ export function createBindingsFeature({
     flushPendingRerender,
     updateBindingValues,
     setMuteButtonState,
+    syncButtonVisualState,
+    setButtonVisualState,
     beginBindingEdit,
     renderBindings,
     startBindingDrag,

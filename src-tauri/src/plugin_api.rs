@@ -91,15 +91,8 @@ fn is_bundled_plugin(id: &str) -> bool {
 }
 
 fn plugin_file_path(root: &Path, plugin_id: &str, rel_path: &str) -> Result<PathBuf, String> {
-    let rel = Path::new(rel_path);
-    if rel.is_absolute() {
-        return Err("Absolute paths are not allowed".to_string());
-    }
-    for c in rel.components() {
-        if matches!(c, std::path::Component::ParentDir) {
-            return Err("Parent path components are not allowed".to_string());
-        }
-    }
+    validate_plugin_id(plugin_id)?;
+    let rel = safe_rel_path(rel_path)?;
     Ok(root.join(plugin_id).join(rel))
 }
 
@@ -167,14 +160,40 @@ pub fn list_plugins(app: AppHandle) -> Result<Vec<PluginManifest>, String> {
             Ok(t) => t,
             Err(_) => continue,
         };
+        let Some(dir_name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if validate_plugin_id(dir_name).is_err() {
+            run_logger::warn(
+                "plugins",
+                "list_skipped_invalid_dir_id",
+                &format!("dir={}", dir_name),
+            );
+            continue;
+        }
+
         let mut manifest: PluginManifest = match serde_json::from_str(&text) {
             Ok(m) => m,
             Err(_) => continue,
         };
         if manifest.id.trim().is_empty() {
-            if let Some(dir_name) = path.file_name().and_then(|s| s.to_str()) {
-                manifest.id = dir_name.to_string();
-            }
+            manifest.id = dir_name.to_string();
+        }
+        if let Err(err) = validate_plugin_id(&manifest.id) {
+            run_logger::warn(
+                "plugins",
+                "list_skipped_invalid_manifest_id",
+                &format!("dir={} id={} error={}", dir_name, manifest.id, err),
+            );
+            continue;
+        }
+        if manifest.id != dir_name {
+            run_logger::warn(
+                "plugins",
+                "list_skipped_manifest_dir_mismatch",
+                &format!("dir={} id={}", dir_name, manifest.id),
+            );
+            continue;
         }
 
         // Compute augmented fields.
@@ -366,7 +385,7 @@ pub fn plugin_http_post_json(
     let url = validate_plugin_http_url(&url)?;
     let timeout = plugin_http_timeout(timeout_ms)?;
     let body_text = serde_json::to_string(&body).map_err(|e| e.to_string())?;
-    if body_text.as_bytes().len() > PLUGIN_HTTP_MAX_REQUEST_BYTES {
+    if body_text.len() > PLUGIN_HTTP_MAX_REQUEST_BYTES {
         return Err("HTTP request body is too large".to_string());
     }
 
@@ -661,6 +680,7 @@ pub fn hue_api_put(
 
 #[tauri::command]
 pub fn set_plugin_enabled(app: AppHandle, plugin_id: String, enabled: bool) -> Result<(), String> {
+    validate_plugin_id(&plugin_id)?;
     let mut state = load_plugins_state(&app);
     state.disabled.retain(|id| id != &plugin_id);
     if !enabled {
@@ -673,6 +693,7 @@ pub fn set_plugin_enabled(app: AppHandle, plugin_id: String, enabled: bool) -> R
 
 #[tauri::command]
 pub fn uninstall_plugin(app: AppHandle, plugin_id: String) -> Result<(), String> {
+    validate_plugin_id(&plugin_id)?;
     if is_bundled_plugin(&plugin_id) {
         return Err("Bundled plugins cannot be uninstalled".to_string());
     }
@@ -900,5 +921,13 @@ mod tests {
             PLUGIN_HTTP_MAX_TIMEOUT_MS
         );
         assert!(plugin_http_timeout(Some(PLUGIN_HTTP_MAX_TIMEOUT_MS + 1)).is_err());
+    }
+
+    #[test]
+    fn plugin_file_path_validates_plugin_id_and_relative_path() {
+        let root = Path::new("C:\\MIDIMaster\\plugins");
+        assert!(plugin_file_path(root, "..\\bad", "plugin.mjs").is_err());
+        assert!(plugin_file_path(root, "good-plugin", "..\\secret.txt").is_err());
+        assert!(plugin_file_path(root, "good-plugin", "nested\\asset.png").is_ok());
     }
 }

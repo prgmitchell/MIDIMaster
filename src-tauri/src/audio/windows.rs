@@ -1,3 +1,4 @@
+use crate::audio::target_match::application_name_matches;
 use crate::audio::AudioBackend;
 use crate::device_target::{parse_device_target, DeviceTargetKind};
 use crate::model::{PlaybackDeviceInfo, SessionInfo};
@@ -799,13 +800,29 @@ fn set_session_mute_for_process(
     Ok(updated)
 }
 
+fn session_matches_application_name(
+    target_name: &str,
+    process_path: Option<&str>,
+    process_name: Option<&str>,
+    display_name: Option<&str>,
+) -> bool {
+    let friendly = process_path.and_then(friendly_process_label);
+    let humanized = process_name.map(humanize_label);
+    application_name_matches(
+        target_name,
+        process_path,
+        process_name,
+        display_name,
+        friendly.as_deref(),
+        humanized.as_deref(),
+    )
+}
+
 fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Result<bool> {
     let session_manager = get_session_manager(device)?;
     let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
     let count = unsafe { enumerator.GetCount() }?;
     let mut updated = false;
-
-    let target_name = name.to_lowercase();
 
     for index in 0..count {
         let control = unsafe { enumerator.GetSession(index) }?;
@@ -823,53 +840,14 @@ fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Re
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
             .and_then(pwstr_to_string)
-            .map(|n| n.trim().to_lowercase());
+            .map(|n| n.trim().to_string());
 
-        let mut matches = false;
-
-        if let Some(path) = &process_path {
-            if let Some(stem) = Path::new(&path).file_stem().and_then(|s| s.to_str()) {
-                if stem.to_lowercase() == target_name {
-                    matches = true;
-                }
-            }
-        }
-
-        if !matches {
-            if let Some(name) = &process_name {
-                let stem = name.strip_suffix(".exe").unwrap_or(&name);
-                if stem.to_lowercase() == target_name {
-                    matches = true;
-                }
-            }
-        }
-
-        if !matches {
-            if let Some(name) = display_name {
-                if name == target_name {
-                    matches = true;
-                }
-            }
-        }
-
-        if !matches {
-            if let Some(path) = &process_path {
-                if let Some(friendly) = friendly_process_label(path) {
-                    if friendly.to_lowercase() == target_name {
-                        matches = true;
-                    }
-                }
-            }
-        }
-
-        if !matches {
-            if let Some(name) = &process_name {
-                let humanized = humanize_label(name);
-                if humanized.to_lowercase() == target_name {
-                    matches = true;
-                }
-            }
-        }
+        let matches = session_matches_application_name(
+            name,
+            process_path.as_deref(),
+            process_name.as_deref(),
+            display_name.as_deref(),
+        );
 
         if matches {
             unsafe { simple.SetMasterVolume(volume, std::ptr::null()) }?;
@@ -907,8 +885,6 @@ fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Resu
     let count = unsafe { enumerator.GetCount() }?;
     let mut updated = false;
 
-    let target_name = name.to_lowercase();
-
     for index in 0..count {
         let control = unsafe { enumerator.GetSession(index) }?;
         let control2: IAudioSessionControl2 = control.cast()?;
@@ -925,34 +901,14 @@ fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Resu
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
             .and_then(pwstr_to_string)
-            .map(|n| n.trim().to_lowercase());
+            .map(|n| n.trim().to_string());
 
-        let mut matches = false;
-
-        if let Some(path) = &process_path {
-            if let Some(stem) = Path::new(&path).file_stem().and_then(|s| s.to_str()) {
-                if stem.to_lowercase() == target_name {
-                    matches = true;
-                }
-            }
-        }
-
-        if !matches {
-            if let Some(name) = &process_name {
-                let stem = name.strip_suffix(".exe").unwrap_or(&name);
-                if stem.to_lowercase() == target_name {
-                    matches = true;
-                }
-            }
-        }
-
-        if !matches {
-            if let Some(name) = display_name {
-                if name == target_name {
-                    matches = true;
-                }
-            }
-        }
+        let matches = session_matches_application_name(
+            name,
+            process_path.as_deref(),
+            process_name.as_deref(),
+            display_name.as_deref(),
+        );
 
         if matches {
             unsafe { simple.SetMute(muted, std::ptr::null()) }?;

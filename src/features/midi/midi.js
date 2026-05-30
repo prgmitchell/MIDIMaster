@@ -38,6 +38,7 @@ export function createMidiFeature({
   const MIDI_AVAILABILITY_INTERVAL_MS = 15000;
   const MIDI_AUTO_REFRESH_INTERVAL_MS = 10000;
   const MIDI_OUTPUT_ENUM_DELAY_MS = 250;
+  const LEARN_POLL_MS = 50;
 
   let autoRefreshTimer = null;
   let sessionRefreshTimer = null;
@@ -752,7 +753,7 @@ export function createMidiFeature({
         if (typeof addBindingFromLearn === "function") {
           await addBindingFromLearn(learned);
         }
-      }, 200);
+      }, LEARN_POLL_MS);
     } catch (error) {
       closeLearnPanel();
       if (d.learnPanelMessage && d.learnPanel && !d.learnPanel.classList.contains("hidden")) {

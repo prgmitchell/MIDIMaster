@@ -29,17 +29,12 @@ pub struct PlaybackDeviceInfo {
     pub is_default: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum MidiMessageType {
+    #[default]
     ControlChange,
     Note,
     PitchBend,
-}
-
-impl Default for MidiMessageType {
-    fn default() -> Self {
-        MidiMessageType::ControlChange
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]

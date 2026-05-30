@@ -9,6 +9,7 @@ import {
   applyCustomFaderCurve,
   applyFaderCurve,
   bindingHasIntegrationTarget,
+  buttonVisualBehavior,
   decodeRelativeDelta,
   getBindingTargets,
   getPrimaryBindingTarget,
@@ -1100,11 +1101,12 @@ midiFeature = createMidiFeature({
       const binding = createBindingFromLearn(learned);
       bindings.push(binding);
       await invoke("add_binding", { binding });
-      await saveBindingsForProfile();
       hideCreateLearnPanel();
       editingBindingId = binding.id;
       pendingFocusBindingId = binding.id;
       renderBindings();
+      syncPluginHostBindings();
+      scheduleBindingsSave("add binding learn");
     } catch (error) {
       hideCreateLearnPanel();
       showAlert(t("bindings.createFailedTitle"), String(error));
@@ -1232,6 +1234,52 @@ function resolveOsdVolume(binding, payload) {
     : applyFaderCurve(binding.fader_curve, normalized);
 }
 
+function syncButtonValueVisual(bindingId, options = {}) {
+  bindingsFeature?.syncButtonVisualState?.(bindingId, options);
+}
+
+function updateButtonVisualFromMidiEvent(binding, payload, inputValue) {
+  const behavior = buttonVisualBehavior(binding);
+  if (!behavior || !binding?.id) {
+    return false;
+  }
+
+  const bindingId = binding.id;
+  if (behavior === "momentary") {
+    bindingLastValues[bindingId] = inputValue;
+    syncButtonValueVisual(bindingId, { inputValue });
+    return true;
+  }
+
+  if ((Number(payload?.value) || 0) <= 0) {
+    syncButtonValueVisual(bindingId);
+    return true;
+  }
+
+  if (binding.action === "ToggleMute") {
+    const muteButton = findInlineMuteButton(bindingId);
+    const currentlyMuted = bindingMuteValues[bindingId] != null
+      ? Boolean(bindingMuteValues[bindingId])
+      : Boolean(muteButton?.classList?.contains("muted"));
+    const nextMuted = !currentlyMuted;
+    bindingMuteValues[bindingId] = nextMuted;
+    if (muteButton) {
+      setInlineMuteButtonState(muteButton, nextMuted);
+    } else {
+      syncButtonValueVisual(bindingId, { muted: nextMuted, stateValue: nextMuted ? 1 : 0 });
+    }
+    return true;
+  }
+
+  const currentlyOn = bindingLastValues[bindingId] != null
+    ? Number(bindingLastValues[bindingId]) > 0.5
+    : false;
+  const nextValue = currentlyOn ? 0.0 : 1.0;
+  bindingLastValues[bindingId] = nextValue;
+  syncButtonValueVisual(bindingId, { stateValue: nextValue });
+  return true;
+}
+
 function applyMidiUiEvent(payload) {
   const normalizedLiveValue = payload.controller === 224 && payload.value_14 != null
     ? payload.value_14 / 16383
@@ -1247,18 +1295,12 @@ function applyMidiUiEvent(payload) {
     return;
   }
   flashBindingTrigger(binding.id);
+  const handledButtonVisual = updateButtonVisualFromMidiEvent(binding, payload, normalizedLiveValue);
   if (binding.action === "ToggleMute") {
-    if ((Number(payload.value) || 0) > 0) {
-      const muteButton = findInlineMuteButton(binding.id);
-      if (muteButton) {
-        const currentlyMuted = bindingMuteValues[binding.id] != null
-          ? Boolean(bindingMuteValues[binding.id])
-          : muteButton.classList.contains("muted");
-        const nextMuted = !currentlyMuted;
-        bindingMuteValues[binding.id] = nextMuted;
-        setInlineMuteButtonState(muteButton, nextMuted);
-      }
-    }
+    return;
+  }
+
+  if (handledButtonVisual && buttonVisualBehavior(binding) === "stateful") {
     return;
   }
 
@@ -1639,6 +1681,18 @@ async function saveBindingsForProfile() {
   }
 }
 
+function scheduleBindingsSave(reason = "binding update") {
+  saveBindingsForProfile()?.catch((error) => {
+    console.error(`Failed to save profile after ${reason}:`, error);
+  });
+}
+
+function syncPluginHostBindings() {
+  try {
+    getPluginHost()?.setBindings?.(bindings);
+  } catch { }
+}
+
 async function loadProfileByName(name, options) {
   if (profilesFeature && typeof profilesFeature.loadProfileByName === "function") {
     return profilesFeature.loadProfileByName(name, options);
@@ -1888,10 +1942,10 @@ async function setupListeners() {
 
     if (payload.binding_id != null && typeof payload.muted === "boolean") {
       bindingMuteValues[payload.binding_id] = payload.muted;
-      const fill = document.querySelector(`.binding-momentary-value[data-binding-id="${payload.binding_id}"]`);
-      if (fill) {
-        fill.classList.toggle("is-active", payload.muted);
-      }
+      syncButtonValueVisual(payload.binding_id, {
+        muted: payload.muted,
+        stateValue: payload.muted ? 1 : 0,
+      });
     }
 
     // Update inline mute buttons.
@@ -1936,15 +1990,20 @@ async function setupListeners() {
     updateIntegrationStateFromEventPayload(payload);
 
     const buttonInputValue = typeof payload.input_value === "number" ? payload.input_value : null;
-    const integration = payload.target?.Integration || payload.target?.integration;
-    const isMomentaryIntegrationFeedback = String(integration?.data?.action_kind || "").toLowerCase() === "momentary";
-    const buttonVisualValue = buttonInputValue == null
-      ? (isMomentaryIntegrationFeedback ? null : payload.volume)
-      : buttonInputValue;
+    const feedbackBinding = payload.binding_id
+      ? bindings.find((b) => b && String(b.id) === String(payload.binding_id))
+      : null;
+    const feedbackButtonBehavior = feedbackBinding ? buttonVisualBehavior(feedbackBinding) : null;
 
-    if (payload.binding_id && typeof payload.volume === "number") {
-      if (buttonVisualValue != null) {
-        bindingLastValues[payload.binding_id] = buttonVisualValue;
+    if (payload.binding_id && feedbackButtonBehavior) {
+      if (feedbackButtonBehavior === "momentary") {
+        if (buttonInputValue != null) {
+          bindingLastValues[payload.binding_id] = buttonInputValue;
+          syncButtonValueVisual(payload.binding_id, { inputValue: buttonInputValue });
+        }
+      } else if (typeof payload.volume === "number") {
+        bindingLastValues[payload.binding_id] = payload.volume;
+        syncButtonValueVisual(payload.binding_id, { stateValue: payload.volume });
       }
     }
 
@@ -1964,14 +2023,6 @@ async function setupListeners() {
 
     // 1. Direct update if ID available
     if (payload.binding_id) {
-      const momentary = document.querySelector(`.binding-momentary-value[data-binding-id="${payload.binding_id}"]`);
-      if (momentary && buttonVisualValue != null) {
-        momentary.classList.toggle("is-active", Number(buttonVisualValue) > 0.5);
-      }
-      const toggle = document.querySelector(`.binding-toggle-value[data-binding-id="${payload.binding_id}"]`);
-      if (toggle && buttonVisualValue != null) {
-        toggle.classList.toggle("on", Number(buttonVisualValue) > 0.5);
-      }
       const s = findBindingSlider(payload.binding_id);
       if (s) {
         const lastMidi = Number(s.dataset.lastMidiUpdate || 0);

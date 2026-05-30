@@ -252,10 +252,24 @@ fn mapped_button_light_requires_hotkey_keys() {
 }
 
 #[test]
-fn mapped_button_light_does_not_override_toggle_mute_state() {
-    let binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
-    assert_eq!(binding.mapped_button_light_feedback_value(), None);
-    assert_eq!(binding.idle_button_light_feedback_value(), None);
+fn mapped_button_light_marks_toggle_mute_application_targets_as_mapped() {
+    let binding = mapped_button_binding(
+        BindingAction::ToggleMute,
+        vec![BindingTarget::Application {
+            name: "firefox".to_string(),
+            display_name: Some("Firefox".to_string()),
+            icon_data: None,
+        }],
+    );
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+    assert_eq!(binding.idle_button_light_feedback_value(), Some(1.0));
+}
+
+#[test]
+fn mapped_button_light_keeps_toggle_mute_unset_targets_dark() {
+    let binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Unset]);
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(0.0));
+    assert_eq!(binding.idle_button_light_feedback_value(), Some(0.0));
 }
 
 #[test]
@@ -272,7 +286,7 @@ fn mapped_button_light_supports_momentary_integration_actions() {
 }
 
 #[test]
-fn mapped_button_light_does_not_override_stateful_integration_actions() {
+fn mapped_button_light_marks_stateful_integration_actions_as_mapped() {
     let binding = mapped_button_binding(
         BindingAction::Volume,
         vec![BindingTarget::Integration {
@@ -281,12 +295,12 @@ fn mapped_button_light_does_not_override_stateful_integration_actions() {
             data: serde_json::json!({ "action_kind": "stateful", "action": "ToggleMute" }),
         }],
     );
-    assert_eq!(binding.mapped_button_light_feedback_value(), None);
-    assert_eq!(binding.idle_button_light_feedback_value(), None);
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+    assert_eq!(binding.idle_button_light_feedback_value(), Some(1.0));
 }
 
 #[test]
-fn mapped_button_light_does_not_override_obs_toggle_actions() {
+fn mapped_button_light_marks_obs_toggle_actions_as_mapped() {
     let binding = mapped_button_binding(
         BindingAction::Volume,
         vec![BindingTarget::Integration {
@@ -295,8 +309,8 @@ fn mapped_button_light_does_not_override_obs_toggle_actions() {
             data: serde_json::json!({ "action": "ToggleVirtualCam" }),
         }],
     );
-    assert_eq!(binding.mapped_button_light_feedback_value(), None);
-    assert_eq!(binding.idle_button_light_feedback_value(), None);
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+    assert_eq!(binding.idle_button_light_feedback_value(), Some(1.0));
 }
 
 #[test]

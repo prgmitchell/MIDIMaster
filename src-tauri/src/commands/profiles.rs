@@ -75,6 +75,10 @@ fn set_active_profile_state(
         .lock()
         .map_err(|_| "Lock poisoned".to_string())? = Some(profile.clone());
 
+    if let Ok(mut values) = state.binding_action_values.lock() {
+        values.clear();
+    }
+
     if let Ok(mut settings) = state.osd_settings.lock() {
         *settings = profile.osd_settings.clone();
         crate::AppState::apply_osd_settings(app, &settings);

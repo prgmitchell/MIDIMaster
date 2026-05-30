@@ -98,7 +98,7 @@ impl WsHub {
                   outgoing = rx.recv() => {
                     match outgoing {
                       Some(msg) => {
-                        if let Err(_) = write.send(msg).await {
+                        if write.send(msg).await.is_err() {
                           break;
                         }
                       }

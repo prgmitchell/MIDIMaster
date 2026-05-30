@@ -1,4 +1,5 @@
 use crate::app_settings::{AppSettings, AppSettingsStore};
+use crate::audio::target_match::application_name_matches;
 use crate::audio::AudioBackend;
 use crate::bindings::{BindingKey, BindingState};
 use crate::device_target::{parse_device_target, DeviceTargetKind};
@@ -82,6 +83,7 @@ pub(crate) struct AppState {
     pub(crate) active_profile: Mutex<Option<Profile>>,
     pub(crate) binding_state: Arc<Mutex<HashMap<BindingKey, BindingState>>>,
     pub(crate) feedback_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
+    pub(crate) binding_action_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
     pub(crate) activity_button_light_generations: Arc<Mutex<HashMap<BindingKey, u64>>>,
     pub(crate) last_mute_input_active: Mutex<HashMap<BindingKey, bool>>,
     pub(crate) focus_volume_failure_logs: Mutex<HashMap<String, Instant>>,
@@ -221,6 +223,95 @@ impl AppState {
             .unwrap_or(false)
     }
 
+    pub(crate) fn set_binding_action_value(&self, key: &BindingKey, value: f32) {
+        if let Ok(mut values) = self.binding_action_values.lock() {
+            values.insert(key.clone(), value.clamp(0.0, 1.0));
+        }
+    }
+
+    pub(crate) fn binding_action_value(&self, key: &BindingKey) -> Option<f32> {
+        self.binding_action_values
+            .lock()
+            .ok()
+            .and_then(|values| values.get(key).copied())
+    }
+
+    pub(crate) fn current_target_mute_state(&self, target: &model::BindingTarget) -> Option<bool> {
+        match target {
+            model::BindingTarget::Master => self
+                .audio
+                .list_sessions()
+                .ok()
+                .and_then(|sessions| sessions.into_iter().find(|s| s.is_master))
+                .map(|s| s.is_muted)
+                .or(Some(false)),
+            model::BindingTarget::Focus => self
+                .audio
+                .focused_session()
+                .ok()
+                .flatten()
+                .map(|s| s.is_muted)
+                .or(Some(false)),
+            model::BindingTarget::Session { session_id } => self
+                .audio
+                .list_sessions()
+                .ok()
+                .and_then(|sessions| sessions.into_iter().find(|s| s.id == *session_id))
+                .map(|s| s.is_muted)
+                .or(Some(false)),
+            model::BindingTarget::Application { name, .. } => self
+                .audio
+                .list_sessions()
+                .ok()
+                .and_then(|sessions| {
+                    sessions.into_iter().find(|s| {
+                        application_name_matches(
+                            name,
+                            s.process_path.as_deref(),
+                            s.process_name.as_deref(),
+                            Some(s.display_name.as_str()),
+                            None,
+                            None,
+                        )
+                    })
+                })
+                .map(|s| s.is_muted),
+            model::BindingTarget::Device { device_id } => {
+                let (kind, raw_id) = parse_device_target(device_id);
+                match kind {
+                    DeviceTargetKind::Playback => self
+                        .audio
+                        .list_playback_devices()
+                        .ok()
+                        .and_then(|devices| devices.into_iter().find(|d| d.id == raw_id))
+                        .map(|d| d.is_muted)
+                        .or(Some(false)),
+                    DeviceTargetKind::Recording => self
+                        .audio
+                        .list_recording_devices()
+                        .ok()
+                        .and_then(|devices| devices.into_iter().find(|d| d.id == raw_id))
+                        .map(|d| d.is_muted)
+                        .or(Some(false)),
+                }
+            }
+            model::BindingTarget::Integration { .. } => None,
+            _ => Some(false),
+        }
+    }
+
+    pub(crate) fn current_binding_toggle_state(
+        &self,
+        targets: &[model::BindingTarget],
+        key: &BindingKey,
+    ) -> bool {
+        targets
+            .first()
+            .and_then(|target| self.current_target_mute_state(target))
+            .or_else(|| self.binding_action_value(key).map(|value| value > 0.5))
+            .unwrap_or(false)
+    }
+
     pub(crate) fn cancel_activity_button_light_holds(&self) {
         if let Ok(mut generations) = self.activity_button_light_generations.lock() {
             generations.clear();
@@ -250,17 +341,15 @@ impl AppState {
 
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
-            if let Some(value) = binding.idle_button_light_feedback_value() {
-                let value = if binding.activity_button_light_feedback_value(true) == Some(1.0)
+            let idle_feedback_value = binding.idle_button_light_feedback_value().map(|value| {
+                if binding.activity_button_light_feedback_value(true) == Some(1.0)
                     && self.activity_button_light_input_active(&key)
                 {
                     1.0
                 } else {
                     value
-                };
-                feedback.insert(key, value);
-                continue;
-            }
+                }
+            });
 
             let primary_target = binding.primary_target();
             if matches!(
@@ -273,6 +362,9 @@ impl AppState {
                     | model::BindingAction::OpenApplication
                     | model::BindingAction::SetDefaultDevice
             ) {
+                if let Some(value) = idle_feedback_value {
+                    feedback.insert(key, value);
+                }
                 continue;
             }
 
@@ -293,31 +385,19 @@ impl AppState {
                         .iter()
                         .find(|session| session.id == *session_id)
                         .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
-                    model::BindingTarget::Application { name, .. } => {
-                        let target = name.to_lowercase();
-                        sessions
-                            .iter()
-                            .find(|session| {
-                                if let Some(path) = &session.process_path {
-                                    if let Some(stem) = Path::new(path)
-                                        .file_stem()
-                                        .and_then(|s: &std::ffi::OsStr| s.to_str())
-                                    {
-                                        if stem.to_lowercase() == target {
-                                            return true;
-                                        }
-                                    }
-                                }
-                                if let Some(name) = &session.process_name {
-                                    let stem = name.strip_suffix(".exe").unwrap_or(name);
-                                    if stem.to_lowercase() == target {
-                                        return true;
-                                    }
-                                }
-                                session.display_name.to_lowercase() == target
-                            })
-                            .map(|session| if session.is_muted { 1.0 } else { 0.0 })
-                    }
+                    model::BindingTarget::Application { name, .. } => sessions
+                        .iter()
+                        .find(|session| {
+                            application_name_matches(
+                                name,
+                                session.process_path.as_deref(),
+                                session.process_name.as_deref(),
+                                Some(session.display_name.as_str()),
+                                None,
+                                None,
+                            )
+                        })
+                        .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
                     model::BindingTarget::Device { device_id } => {
                         let (kind, raw_id) = parse_device_target(device_id);
                         match kind {
@@ -355,34 +435,22 @@ impl AppState {
                             current_target_muted = Some(session.is_muted);
                             session.volume
                         }),
-                    model::BindingTarget::Application { name, .. } => {
-                        let target = name.to_lowercase();
-                        sessions
-                            .iter()
-                            .find(|session| {
-                                if let Some(path) = &session.process_path {
-                                    if let Some(stem) = Path::new(path)
-                                        .file_stem()
-                                        .and_then(|s: &std::ffi::OsStr| s.to_str())
-                                    {
-                                        if stem.to_lowercase() == target {
-                                            return true;
-                                        }
-                                    }
-                                }
-                                if let Some(name) = &session.process_name {
-                                    let stem = name.strip_suffix(".exe").unwrap_or(name);
-                                    if stem.to_lowercase() == target {
-                                        return true;
-                                    }
-                                }
-                                session.display_name.to_lowercase() == target
-                            })
-                            .map(|session| {
-                                current_target_muted = Some(session.is_muted);
-                                session.volume
-                            })
-                    }
+                    model::BindingTarget::Application { name, .. } => sessions
+                        .iter()
+                        .find(|session| {
+                            application_name_matches(
+                                name,
+                                session.process_path.as_deref(),
+                                session.process_name.as_deref(),
+                                Some(session.display_name.as_str()),
+                                None,
+                                None,
+                            )
+                        })
+                        .map(|session| {
+                            current_target_muted = Some(session.is_muted);
+                            session.volume
+                        }),
                     model::BindingTarget::Device { device_id } => {
                         let (kind, raw_id) = parse_device_target(device_id);
                         match kind {
@@ -412,6 +480,7 @@ impl AppState {
             };
 
             if let Some(mut val) = value {
+                self.set_binding_action_value(&key, val);
                 if binding.action != model::BindingAction::ToggleMute {
                     if let Some(muted) = current_target_muted {
                         if let Some(previous_muted) = last_target_mute_state.get(&key).cloned() {
@@ -432,9 +501,13 @@ impl AppState {
                             mute_transition_until.remove(&key);
                         }
                     }
+                } else {
+                    last_target_mute_state.insert(key.clone(), val > 0.5);
                 }
 
-                feedback.insert(key, val);
+                feedback.insert(key, idle_feedback_value.unwrap_or(val));
+            } else if let Some(value) = idle_feedback_value {
+                feedback.insert(key, value);
             }
         }
     }

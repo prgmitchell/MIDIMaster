@@ -1,6 +1,7 @@
 import {
   applyCustomFaderCurve,
   applyFaderCurve,
+  buttonVisualBehavior as coreButtonVisualBehavior,
   getBindingTargets,
   getPrimaryBindingTarget,
   normalizeButtonLightMode as normalizeCoreButtonLightMode,
@@ -8,6 +9,7 @@ import {
   normalizeFaderCurve as normalizeCoreFaderCurve,
   normalizeRelativeFormat as normalizeCoreRelativeFormat,
   presetCurvePoints as corePresetCurvePoints,
+  resolveButtonVisualActive as coreResolveButtonVisualActive,
   setBindingTargets,
 } from "../../core/binding_model.js";
 
@@ -29,6 +31,14 @@ export function normalizeMuteBehavior(raw) {
 
 export function normalizeButtonLightMode(raw) {
   return normalizeCoreButtonLightMode(raw);
+}
+
+export function buttonVisualBehavior(binding) {
+  return coreButtonVisualBehavior(binding);
+}
+
+export function resolveButtonVisualActive(binding, options = {}) {
+  return coreResolveButtonVisualActive(binding, options);
 }
 
 export function muteBehaviorLabel(raw) {
@@ -140,8 +150,7 @@ export function ensureBindingShape(binding) {
   if (!binding.mode || (binding.mode !== "Absolute" && binding.mode !== "Relative")) {
     binding.mode = "Absolute";
   }
-  // Backend auto-detect is always used for relative controls.
-  binding.relative_format = "Auto";
+  binding.relative_format = normalizeRelativeFormat(binding.relative_format);
   binding.fader_curve = normalizeFaderCurve(binding.fader_curve);
   binding.custom_curve = customCurvePoints(binding);
   binding.mute_behavior = normalizeMuteBehavior(binding.mute_behavior);

@@ -161,8 +161,10 @@ fn interpolate_custom_curve(points: &[crate::model::FaderCurvePoint], normalized
 }
 
 fn relative_delta(binding: &Binding, value: u8, state: &mut BindingState) -> Option<i8> {
-    // Relative format is backend-auto-detected only for now.
-    let _ = binding;
+    if binding.relative_format != RelativeFormat::Auto {
+        return decode_relative_delta(&binding.relative_format, value);
+    }
+
     if state.relative_auto_format.is_none() {
         update_auto_relative_detection(value, state);
     }
@@ -333,6 +335,16 @@ mod tests {
         let mut state = sample_state(0.5);
         let next = apply_midi_event(&binding, &sample_event(65), &mut state).expect("value");
         assert!((next - 0.48).abs() < 0.0001);
+    }
+
+    #[test]
+    fn configured_relative_format_does_not_mutate_auto_detection_state() {
+        let binding = sample_binding(MidiMode::Relative, RelativeFormat::BinaryOffset);
+        let mut state = sample_state(0.5);
+        let next = apply_midi_event(&binding, &sample_event(65), &mut state).expect("value");
+
+        assert!((next - 0.52).abs() < 0.0001);
+        assert_eq!(state.relative_auto_format, None);
     }
 
     #[test]

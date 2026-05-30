@@ -1,6 +1,6 @@
 use crate::model::{self, LearnedControl, MidiEvent};
 use crate::run_logger;
-use crate::runtime_helpers::LearnCandidate;
+use crate::runtime_helpers::{cc_learn_value_is_definitely_continuous, LearnCandidate};
 use crate::AppState;
 use std::time::Instant;
 
@@ -49,6 +49,30 @@ pub(super) fn handle_learn_event(state: &AppState, event: &MidiEvent) -> Result<
             &format!(
                 "device_id={} channel={} controller={} control_kind={:?}",
                 learned.device_id, learned.channel, learned.controller, learned.control_kind
+            ),
+        );
+        *learn_pending = false;
+        drop(learn_pending);
+        if let Ok(mut candidate) = state.learn_candidate.lock() {
+            *candidate = None;
+        }
+        *state.learned_control.lock().map_err(|_| "Lock poisoned")? = Some(learned);
+        return Ok(true);
+    }
+
+    if cc_learn_value_is_definitely_continuous(event.value) {
+        let mut learned = base_learned.clone();
+        learned.control_kind = model::BindingControlKind::Continuous;
+        run_logger::info(
+            "learn",
+            "cc_continuous_classified",
+            &format!(
+                "device_id={} channel={} controller={} value={} control_kind={:?}",
+                learned.device_id,
+                learned.channel,
+                learned.controller,
+                event.value,
+                learned.control_kind
             ),
         );
         *learn_pending = false;

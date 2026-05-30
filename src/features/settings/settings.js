@@ -46,7 +46,19 @@ export function createSettingsFeature({
     opacity: 0.96,
     scale: 1,
   };
+  const defaultOsdAnchor = "top-right";
   const osdStyles = new Set(["midnight", "glass", "neon", "studio"]);
+  const osdAnchors = new Set([
+    "top-left",
+    "top-center",
+    "top-right",
+    "center-left",
+    "center",
+    "center-right",
+    "bottom-left",
+    "bottom-center",
+    "bottom-right",
+  ]);
   const languageOptions = Array.isArray(i18n?.supportedLocales) ? i18n.supportedLocales : [
     { code: "en", label: "English" },
   ];
@@ -81,6 +93,11 @@ export function createSettingsFeature({
   function normalizeOsdStyle(style) {
     const value = String(style || defaultOsdAppearance.style).trim().toLowerCase();
     return osdStyles.has(value) ? value : defaultOsdAppearance.style;
+  }
+
+  function normalizeOsdAnchor(anchor) {
+    const value = String(anchor || defaultOsdAnchor).trim().toLowerCase();
+    return osdAnchors.has(value) ? value : defaultOsdAnchor;
   }
 
   function normalizeOsdAppearance(settings = {}) {
@@ -120,7 +137,8 @@ export function createSettingsFeature({
       const screenRect = previewScreen?.getBoundingClientRect?.();
       const cardWidth = 154;
       const cardHeight = 54;
-      const maxPreviewScale = screenRect
+      const hasMeasuredScreen = Boolean(screenRect && screenRect.width > 0 && screenRect.height > 0);
+      const maxPreviewScale = hasMeasuredScreen
         ? Math.min(
             appearance.scale,
             Math.max(0.65, ((screenRect.width / 3) - 12) / cardWidth),
@@ -135,7 +153,7 @@ export function createSettingsFeature({
     const appearance = normalizeOsdAppearance(settings);
     if (typeof setOsdSettings === "function") {
       const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
-      setOsdSettings({ ...current, ...appearance });
+      setOsdSettings({ ...current, ...(settings || {}), ...appearance });
     }
     applyOsdAppearanceAttributes(appearance);
     if (d.osdStyleSelect) {
@@ -492,26 +510,30 @@ export function createSettingsFeature({
 
   function updateOsdPositionSelection(anchor) {
     if (!d.osdPositionPicker) return;
-    const selectedAnchor = anchor || "top-right";
+    const selectedAnchor = normalizeOsdAnchor(anchor);
     d.osdPositionPicker.dataset.anchor = selectedAnchor;
     d.osdPositionPicker.querySelectorAll(".osd-position-dot").forEach((dot) => {
       dot.classList.toggle("selected", dot.dataset.anchor === selectedAnchor);
     });
   }
 
-  async function applyOsdSettings(nextSettings) {
+  function syncOsdPositionUi(settings = {}) {
     const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
-    const requestedEnabledChange = Boolean(
-      nextSettings
-      && Object.prototype.hasOwnProperty.call(nextSettings, "enabled")
-    );
-    const shouldPreviewAfterSave = requestedEnabledChange
-      && !Boolean(current.enabled)
-      && Boolean(nextSettings.enabled);
-    const merged = { ...current, ...(nextSettings || {}) };
+    const anchor = normalizeOsdAnchor(settings.anchor ?? current.anchor);
     if (typeof setOsdSettings === "function") {
-      setOsdSettings(merged);
+      setOsdSettings({ ...current, ...(settings || {}), anchor });
     }
+    updateOsdPositionSelection(anchor);
+    document.body.setAttribute("data-anchor", anchor);
+  }
+
+  function syncOsdSettingsUi(settings = {}) {
+    const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
+    const merged = {
+      ...current,
+      ...(settings || {}),
+      anchor: normalizeOsdAnchor(settings.anchor ?? current.anchor),
+    };
 
     if (d.osdEnabledToggle) {
       if (d.osdEnabledToggle.type === "checkbox") {
@@ -525,9 +547,30 @@ export function createSettingsFeature({
     if (d.osdMonitorSelect) {
       d.osdMonitorSelect.value = String(merged.monitorIndex ?? 0);
     }
+
     syncOsdAppearanceUi(merged);
-    updateOsdPositionSelection(merged.anchor);
-    document.body.setAttribute("data-anchor", merged.anchor || "top-right");
+    syncOsdPositionUi(merged);
+  }
+
+  async function applyOsdSettings(nextSettings) {
+    const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
+    const requestedEnabledChange = Boolean(
+      nextSettings
+      && Object.prototype.hasOwnProperty.call(nextSettings, "enabled")
+    );
+    const shouldPreviewAfterSave = requestedEnabledChange
+      && !Boolean(current.enabled)
+      && Boolean(nextSettings.enabled);
+    const merged = {
+      ...current,
+      ...(nextSettings || {}),
+      anchor: normalizeOsdAnchor(nextSettings?.anchor ?? current.anchor),
+    };
+    if (typeof setOsdSettings === "function") {
+      setOsdSettings(merged);
+    }
+
+    syncOsdSettingsUi(merged);
 
     try {
       const appearance = normalizeOsdAppearance(merged);
@@ -558,15 +601,12 @@ export function createSettingsFeature({
           monitorIndex: Number(settings.monitor_index ?? settings.monitorIndex ?? 0),
           monitorName: settings.monitor_name ?? settings.monitorName ?? null,
           monitorId: settings.monitor_id ?? settings.monitorId ?? null,
-          anchor: settings.anchor || "top-right",
+          anchor: normalizeOsdAnchor(settings.anchor),
           style: normalizeOsdStyle(settings.style),
           opacity: clampNumber(settings.opacity, 0.35, 1, defaultOsdAppearance.opacity),
           scale: clampNumber(settings.scale, 0.75, 1.5, defaultOsdAppearance.scale),
         };
-        if (typeof setOsdSettings === "function") {
-          setOsdSettings(next);
-        }
-        syncOsdAppearanceUi(next);
+        syncOsdSettingsUi(next);
       }
     } catch (error) {
       console.error("Failed to load OSD settings", error);
@@ -663,7 +703,7 @@ export function createSettingsFeature({
 
   function syncOsdAppearanceControls() {
     const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
-    syncOsdAppearanceUi(current);
+    syncOsdSettingsUi(current);
   }
 
   function renderMonitorDisplay(option) {

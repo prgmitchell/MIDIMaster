@@ -104,11 +104,11 @@ pub fn start_midi_device(
             .map_err(|_| "Lock poisoned".to_string())?
             .start_device(&input_device_id, &output_device_id, move |event| {
                 let state = app_handle.state::<AppState>();
-                {
-                    if let Ok(mut queue) = state.midi_event_queue.lock() {
-                        queue.enqueue(event);
-                    } else {
-                        run_logger::error("midi_queue", "enqueue_failed", "queue lock poisoned");
+                let enqueue_result = state.midi_event_queue.lock();
+                match enqueue_result {
+                    Ok(mut queue) => queue.enqueue(event),
+                    Err(_) => {
+                        run_logger::error("midi_queue", "enqueue_failed", "queue lock poisoned")
                     }
                 };
             })
@@ -163,6 +163,9 @@ pub fn start_midi_device(
         }
         if let Ok(mut feedback) = state.feedback_values.lock() {
             feedback.clear();
+        }
+        if let Ok(mut values) = state.binding_action_values.lock() {
+            values.clear();
         }
         state.sync_feedback_values(&profile);
         let _ = app.emit(

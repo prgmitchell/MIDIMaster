@@ -17,8 +17,10 @@ use windows::Win32::System::Registry::{
 
 #[cfg(target_os = "windows")]
 fn enum_display_device(raw_name: &str) -> Option<DISPLAY_DEVICEW> {
-    let mut device = DISPLAY_DEVICEW::default();
-    device.cb = size_of::<DISPLAY_DEVICEW>() as u32;
+    let mut device = DISPLAY_DEVICEW {
+        cb: size_of::<DISPLAY_DEVICEW>() as u32,
+        ..Default::default()
+    };
     let wide: Vec<u16> = raw_name.encode_utf16().chain(Some(0)).collect();
     let success =
         unsafe { EnumDisplayDevicesW(PCWSTR(wide.as_ptr()), 0, &mut device, 0) }.as_bool();

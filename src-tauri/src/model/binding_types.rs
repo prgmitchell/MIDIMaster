@@ -20,82 +20,52 @@ pub struct AuxiliaryControl {
     pub mute_behavior: MuteBehavior,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum BindingControlKind {
+    #[default]
     Auto,
     Button,
     Continuous,
 }
 
-impl Default for BindingControlKind {
-    fn default() -> Self {
-        BindingControlKind::Auto
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum MidiMode {
+    #[default]
     Absolute,
     Relative,
 }
 
-impl Default for MidiMode {
-    fn default() -> Self {
-        MidiMode::Absolute
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum MuteBehavior {
+    #[default]
     ToggleOnPress,
     SetFromValue,
 }
 
-impl Default for MuteBehavior {
-    fn default() -> Self {
-        MuteBehavior::ToggleOnPress
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ButtonLightMode {
+    #[default]
     Activity,
     MappedWhenAssigned,
 }
 
-impl Default for ButtonLightMode {
-    fn default() -> Self {
-        ButtonLightMode::Activity
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum RelativeFormat {
+    #[default]
     Auto,
     TwosComplement,
     BinaryOffset,
     SignMagnitude,
 }
 
-impl Default for RelativeFormat {
-    fn default() -> Self {
-        RelativeFormat::Auto
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum FaderCurve {
+    #[default]
     Linear,
     Exponential,
     Logarithmic,
     SCurve,
     Custom,
-}
-
-impl Default for FaderCurve {
-    fn default() -> Self {
-        FaderCurve::Linear
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -104,8 +74,9 @@ pub struct FaderCurvePoint {
     pub y: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum BindingAction {
+    #[default]
     Volume,
     ToggleMute,
     ToggleEffect,
@@ -121,12 +92,6 @@ pub enum BindingAction {
     MediaPrevTrack,
     MediaStop,
     Hotkey,
-}
-
-impl Default for BindingAction {
-    fn default() -> Self {
-        BindingAction::Volume
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -147,19 +112,14 @@ pub struct OpenApplicationMapping {
     pub icon_data: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum AssignMode {
+    #[default]
     Add,
     Replace,
 }
 
-impl Default for AssignMode {
-    fn default() -> Self {
-        AssignMode::Add
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub enum BindingTarget {
     Master,
     Focus,
@@ -194,6 +154,7 @@ pub enum BindingTarget {
     CaptureControl,
     Hotkey,
     OpenApplication,
+    #[default]
     Unset,
 }
 
@@ -232,12 +193,6 @@ impl PartialEq for BindingTarget {
             ) => a_id == b_id && a_kind == b_kind && a_data == b_data,
             _ => false,
         }
-    }
-}
-
-impl Default for BindingTarget {
-    fn default() -> Self {
-        BindingTarget::Unset
     }
 }
 
@@ -514,7 +469,6 @@ impl Binding {
     pub fn mapped_button_light_feedback_value(&self) -> Option<f32> {
         if !self.is_button_binding()
             || !matches!(self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
-            || self.uses_stateful_toggle_feedback()
         {
             return None;
         }
@@ -622,14 +576,15 @@ impl Binding {
             BindingAction::SetMainOutputDevice => targets
                 .iter()
                 .any(Self::target_is_complete_for_mapped_light),
-            BindingAction::Volume => targets
-                .iter()
-                .any(Self::target_is_complete_for_mapped_light),
-            BindingAction::ToggleMute | BindingAction::ToggleEffect => false,
+            BindingAction::Volume | BindingAction::ToggleMute | BindingAction::ToggleEffect => {
+                targets
+                    .iter()
+                    .any(Self::target_is_complete_for_mapped_light)
+            }
         }
     }
 
-    fn uses_stateful_toggle_feedback(&self) -> bool {
+    pub fn uses_stateful_toggle_feedback(&self) -> bool {
         matches!(
             self.action,
             BindingAction::ToggleMute | BindingAction::ToggleEffect
@@ -680,17 +635,8 @@ impl Binding {
             BindingTarget::Integration {
                 integration_id,
                 kind,
-                data,
-            } => {
-                !integration_id.trim().is_empty()
-                    && !kind.trim().is_empty()
-                    && !Self::target_uses_stateful_toggle_feedback(target)
-                    && data
-                        .get("action_kind")
-                        .and_then(|value| value.as_str())
-                        .map(|value| !value.eq_ignore_ascii_case("stateful"))
-                        .unwrap_or(true)
-            }
+                ..
+            } => !integration_id.trim().is_empty() && !kind.trim().is_empty(),
             BindingTarget::Hotkey | BindingTarget::OpenApplication => false,
         }
     }

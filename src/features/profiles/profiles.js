@@ -42,6 +42,10 @@ export function createProfilesFeature({
 
   let pendingProfileDeleteName = null;
   let saveProfileTimer = null;
+  let saveProfilePromise = null;
+  let runningSaveProfilePromise = null;
+  let resolveSaveProfile = null;
+  let rejectSaveProfile = null;
 
   function normalizeProfileName(name) {
     return String(name || "").trim();
@@ -149,6 +153,7 @@ export function createProfilesFeature({
     } = (options && typeof options === "object") ? options : {};
     const n = String(name || "").trim();
     if (!n) return;
+    await flushProfileSave();
     const profile = await invoke("load_profile", { name: n });
 
     if (typeof setActiveProfileName === "function") {
@@ -581,43 +586,98 @@ export function createProfilesFeature({
     return currentProfileSelection("Default");
   }
 
-  async function saveBindingsForProfile() {
+  function ensureSaveProfilePromise() {
+    if (!saveProfilePromise) {
+      saveProfilePromise = new Promise((resolve, reject) => {
+        resolveSaveProfile = resolve;
+        rejectSaveProfile = reject;
+      });
+    }
+    return saveProfilePromise;
+  }
+
+  async function persistCurrentProfile() {
+    const name = getProfileNameForSave();
+    if (!name) return;
+
+    if (typeof setActiveProfileName === "function") {
+      setActiveProfileName(name);
+    }
+    try { localStorage.setItem("activeProfileName", name); } catch { }
+    await invoke("set_active_profile_preference", { profileName: name }).catch(() => { });
+    setProfileSelection(name);
+
+    const bindings = (typeof getBindings === "function") ? (getBindings() || []) : [];
+    const osd = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
+    const plugin_settings = (typeof getProfilePluginSettings === "function") ? (getProfilePluginSettings() || {}) : {};
+
+    const host = (typeof getPluginHost === "function") ? getPluginHost() : null;
+    if (host) {
+      try { host.setBindings(bindings); } catch { }
+    }
+
+    await invoke("save_profile", {
+      profile: {
+        name,
+        bindings,
+        osd_settings: buildPersistedOsdSettings(osd),
+        plugin_settings,
+        midi_device_preference: buildPersistedMidiDevicePreference(
+          (typeof getActiveProfileMidiPreference === "function") ? getActiveProfileMidiPreference() : null
+        ),
+      },
+    });
+  }
+
+  async function settleScheduledProfileSave() {
+    const resolve = resolveSaveProfile;
+    const reject = rejectSaveProfile;
+    const promise = saveProfilePromise;
+    if (!promise) return;
+
+    saveProfilePromise = null;
+    resolveSaveProfile = null;
+    rejectSaveProfile = null;
+
+    try {
+      if (runningSaveProfilePromise) {
+        await runningSaveProfilePromise;
+      }
+      runningSaveProfilePromise = persistCurrentProfile();
+      await runningSaveProfilePromise;
+      if (typeof resolve === "function") resolve();
+    } catch (error) {
+      if (typeof reject === "function") reject(error);
+      throw error;
+    } finally {
+      runningSaveProfilePromise = null;
+    }
+  }
+
+  function saveBindingsForProfile() {
+    const promise = ensureSaveProfilePromise();
     if (saveProfileTimer) {
       clearTimeout(saveProfileTimer);
     }
 
-    saveProfileTimer = setTimeout(async () => {
-      const name = getProfileNameForSave();
-      if (!name) return;
-
-      if (typeof setActiveProfileName === "function") {
-        setActiveProfileName(name);
-      }
-      try { localStorage.setItem("activeProfileName", name); } catch { }
-      await invoke("set_active_profile_preference", { profileName: name }).catch(() => { });
-      setProfileSelection(name);
-
-      const bindings = (typeof getBindings === "function") ? (getBindings() || []) : [];
-      const osd = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
-      const plugin_settings = (typeof getProfilePluginSettings === "function") ? (getProfilePluginSettings() || {}) : {};
-
-      const host = (typeof getPluginHost === "function") ? getPluginHost() : null;
-      if (host) {
-        try { host.setBindings(bindings); } catch { }
-      }
-
-      await invoke("save_profile", {
-        profile: {
-          name,
-          bindings,
-          osd_settings: buildPersistedOsdSettings(osd),
-          plugin_settings,
-          midi_device_preference: buildPersistedMidiDevicePreference(
-            (typeof getActiveProfileMidiPreference === "function") ? getActiveProfileMidiPreference() : null
-          ),
-        },
-      });
+    saveProfileTimer = setTimeout(() => {
+      saveProfileTimer = null;
+      settleScheduledProfileSave().catch(() => { });
     }, 500);
+    return promise;
+  }
+
+  async function flushProfileSave() {
+    if (saveProfilePromise) {
+      if (saveProfileTimer) {
+        clearTimeout(saveProfileTimer);
+        saveProfileTimer = null;
+      }
+      await settleScheduledProfileSave();
+    }
+    if (runningSaveProfilePromise) {
+      await runningSaveProfilePromise;
+    }
   }
 
   async function updateProfilePluginSettings(pluginId, nextSettings) {
@@ -810,6 +870,7 @@ export function createProfilesFeature({
     setProfileSelection,
     closeProfileDropdown,
     saveBindingsForProfile,
+    flushProfileSave,
     updateProfilePluginSettings,
     updateProfileMidiPreference,
     exportProfileByName,

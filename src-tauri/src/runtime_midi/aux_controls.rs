@@ -1,5 +1,4 @@
 use crate::bindings::BindingKey;
-use crate::device_target::{parse_device_target, DeviceTargetKind};
 use crate::model::{self, MidiEvent, Profile};
 use crate::run_logger;
 use crate::{app_state::focused_application_name, AppState};
@@ -15,12 +14,12 @@ pub(super) fn handle_aux_or_unmatched(
 ) -> Result<(), String> {
     let aux_match = profile.bindings.iter().find_map(|candidate| {
         if let Some(mapping) = candidate.mute_control.as_ref() {
-            if AppState::binding_matches_aux(mapping, &event) {
+            if AppState::binding_matches_aux(mapping, event) {
                 return Some((candidate.clone(), "mute", mapping.clone()));
             }
         }
         if let Some(mapping) = candidate.assign_control.as_ref() {
-            if AppState::binding_matches_aux(mapping, &event) {
+            if AppState::binding_matches_aux(mapping, event) {
                 return Some((candidate.clone(), "assign", mapping.clone()));
             }
         }
@@ -34,66 +33,6 @@ pub(super) fn handle_aux_or_unmatched(
             return Ok(());
         }
 
-        let resolve_target_muted = |target: &model::BindingTarget| -> Option<bool> {
-            match target {
-                model::BindingTarget::Master => state
-                    .audio
-                    .list_sessions()
-                    .ok()
-                    .and_then(|sessions| sessions.iter().find(|s| s.is_master).cloned())
-                    .map(|s| s.is_muted)
-                    .or(Some(false)),
-                model::BindingTarget::Focus => state
-                    .audio
-                    .focused_session()
-                    .ok()
-                    .flatten()
-                    .map(|s| s.is_muted)
-                    .or(Some(false)),
-                model::BindingTarget::Session { session_id } => state
-                    .audio
-                    .list_sessions()
-                    .ok()
-                    .and_then(|sessions| sessions.into_iter().find(|s| s.id == *session_id))
-                    .map(|s| s.is_muted)
-                    .or(Some(false)),
-                model::BindingTarget::Application { name, .. } => state
-                    .audio
-                    .list_sessions()
-                    .ok()
-                    .and_then(|sessions| {
-                        sessions.into_iter().find(|s| {
-                            let base = s.process_name.as_deref().unwrap_or_default();
-                            let stem = base.strip_suffix(".exe").unwrap_or(base);
-                            stem.eq_ignore_ascii_case(name)
-                                || s.display_name.eq_ignore_ascii_case(name)
-                        })
-                    })
-                    .map(|s| s.is_muted),
-                model::BindingTarget::Device { device_id } => {
-                    let (kind, raw_id) = parse_device_target(device_id);
-                    match kind {
-                        DeviceTargetKind::Playback => state
-                            .audio
-                            .list_playback_devices()
-                            .ok()
-                            .and_then(|devices| devices.into_iter().find(|d| d.id == raw_id))
-                            .map(|d| d.is_muted)
-                            .or(Some(false)),
-                        DeviceTargetKind::Recording => state
-                            .audio
-                            .list_recording_devices()
-                            .ok()
-                            .and_then(|devices| devices.into_iter().find(|d| d.id == raw_id))
-                            .map(|d| d.is_muted)
-                            .or(Some(false)),
-                    }
-                }
-                model::BindingTarget::Integration { .. } => None,
-                _ => Some(false),
-            }
-        };
-
         if event.value == 0
             && (role != "mute" || aux_mapping.mute_behavior == model::MuteBehavior::ToggleOnPress)
         {
@@ -102,12 +41,12 @@ pub(super) fn handle_aux_or_unmatched(
                     .feedback_values
                     .lock()
                     .ok()
-                    .and_then(|feedback| feedback.get(&key).cloned())
+                    .and_then(|feedback| feedback.get(key).cloned())
                     .map(|v| v > 0.5)
                     .unwrap_or(false);
                 let muted_now = targets
                     .first()
-                    .and_then(&resolve_target_muted)
+                    .and_then(|target| state.current_target_mute_state(target))
                     .unwrap_or(fallback_muted);
                 let midi_arc = state.midi.clone();
                 let device_id = aux_mapping.device_id.clone();
@@ -165,7 +104,7 @@ pub(super) fn handle_aux_or_unmatched(
                     display_name: app_display_name,
                     icon_data: app_icon_data,
                 };
-                let already_present = targets.iter().any(|t| *t == new_target);
+                let already_present = targets.contains(&new_target);
                 let should_replace = matches!(owner.assign_mode, model::AssignMode::Replace);
                 if should_replace || !already_present {
                     if !should_replace && targets.len() >= 8 {
@@ -194,7 +133,7 @@ pub(super) fn handle_aux_or_unmatched(
                                     stored.targets = vec![new_target.clone()];
                                     stored.ensure_targets();
                                     updated_targets = Some(stored.normalized_targets());
-                                } else if !stored.targets.iter().any(|t| *t == new_target) {
+                                } else if !stored.targets.contains(&new_target) {
                                     stored.targets.push(new_target.clone());
                                     stored.ensure_targets();
                                     updated_targets = Some(stored.normalized_targets());
@@ -238,12 +177,12 @@ pub(super) fn handle_aux_or_unmatched(
             .feedback_values
             .lock()
             .ok()
-            .and_then(|feedback| feedback.get(&key).cloned())
+            .and_then(|feedback| feedback.get(key).cloned())
             .map(|v| v > 0.5)
             .unwrap_or(false);
         let current_muted = targets
             .first()
-            .and_then(&resolve_target_muted)
+            .and_then(|target| state.current_target_mute_state(target))
             .unwrap_or(fallback_muted);
         let previous_input_active =
             if aux_mapping.mute_behavior == model::MuteBehavior::SetFromValue {
@@ -251,7 +190,7 @@ pub(super) fn handle_aux_or_unmatched(
                     .last_mute_input_active
                     .lock()
                     .ok()
-                    .and_then(|inputs| inputs.get(&key).copied())
+                    .and_then(|inputs| inputs.get(key).copied())
             } else {
                 None
             };
@@ -316,6 +255,10 @@ pub(super) fn handle_aux_or_unmatched(
         if let Ok(mut feedback) = state.feedback_values.lock() {
             feedback.insert(key.clone(), if next_muted { 1.0 } else { 0.0 });
         }
+        state.set_binding_action_value(
+            &BindingKey::from_binding(&owner),
+            if next_muted { 1.0 } else { 0.0 },
+        );
         if let Ok(mut midi) = state.midi.lock() {
             let _ = midi.send_feedback(
                 &aux_mapping.device_id,
@@ -374,5 +317,5 @@ pub(super) fn handle_aux_or_unmatched(
             event.device_id, event.channel, event.controller, event.value, event.msg_type
         ),
     );
-    return Ok(());
+    Ok(())
 }

@@ -29,12 +29,90 @@ export function bindingHasIntegrationTarget(binding) {
   });
 }
 
+function normalizeControlKind(raw) {
+  const value = String(raw || "Auto");
+  return value === "Button" || value === "Continuous" ? value : "Auto";
+}
+
+function bindingLooksLikeButton(binding) {
+  const controlKind = normalizeControlKind(binding?.control_kind);
+  if (controlKind === "Button") return true;
+  if (controlKind === "Continuous") return false;
+  return binding?.control?.msg_type === "Note";
+}
+
+function integrationFromTarget(target) {
+  return target?.Integration || target?.integration || null;
+}
+
+function integrationVisualBehavior(integration) {
+  if (!integration || typeof integration !== "object") return null;
+  const integrationId = String(integration.integration_id || "").toLowerCase();
+  const kind = String(integration.kind || "").toLowerCase();
+  const data = integration.data || {};
+  const actionKind = String(data.action_kind || "").toLowerCase();
+  if (actionKind === "stateful") return "stateful";
+  if (actionKind === "momentary") return "momentary";
+  if (integrationId === "obs" && kind === "action") {
+    return String(data.action || "").startsWith("Toggle") ? "stateful" : "momentary";
+  }
+  if (integrationId === "obs" && (kind === "scene" || kind === "media")) {
+    return "momentary";
+  }
+  return null;
+}
+
+export function buttonVisualBehavior(binding) {
+  if (!bindingLooksLikeButton(binding)) return null;
+
+  const action = String(binding?.action || "");
+  if (action === "ToggleMute" || action === "ToggleEffect") return "stateful";
+
+  let momentaryIntegration = false;
+  for (const target of getBindingTargets(binding)) {
+    const behavior = integrationVisualBehavior(integrationFromTarget(target));
+    if (behavior === "stateful") return "stateful";
+    if (behavior === "momentary") momentaryIntegration = true;
+  }
+  if (momentaryIntegration) return "momentary";
+
+  if (action === "SetMainOutputDevice") return "momentary";
+  return "momentary";
+}
+
+function activeFromNumeric(value) {
+  if (value == null) return null;
+  const next = Number(value);
+  if (!Number.isFinite(next)) return null;
+  return next > 0.5;
+}
+
+function activeFromStateValue(value) {
+  if (typeof value === "boolean") return value;
+  return activeFromNumeric(value);
+}
+
+export function resolveButtonVisualActive(binding, options = {}) {
+  const behavior = buttonVisualBehavior(binding);
+  if (!behavior) return false;
+
+  if (behavior === "momentary") {
+    return activeFromNumeric(options.inputValue) === true;
+  }
+
+  const stateActive = activeFromStateValue(options.stateValue);
+  if (stateActive != null) return stateActive;
+  if (typeof options.muted === "boolean") return options.muted;
+  if (typeof options.fallbackMuted === "boolean") return options.fallbackMuted;
+  return false;
+}
+
 export function normalizeBinding(binding) {
   if (!binding || typeof binding !== "object") return binding;
   const out = { ...binding };
   setBindingTargets(out, getBindingTargets(out));
   out.mode = (out.mode === "Relative") ? "Relative" : "Absolute";
-  out.relative_format = "Auto";
+  out.relative_format = normalizeRelativeFormat(out.relative_format);
   out.fader_curve = normalizeFaderCurve(out.fader_curve);
   out.custom_curve = normalizeCustomCurvePoints(out.custom_curve);
   if (out.custom_curve.length < 2) {
@@ -101,32 +179,80 @@ export function decodeRelativeSignMagnitude(value) {
   return null;
 }
 
-export function detectRelativeFormatAuto(value, previousFormat) {
-  if (previousFormat && previousFormat !== "Auto") {
-    return previousFormat;
+function coerceRelativeAutoState(previousState) {
+  if (previousState && typeof previousState === "object") {
+    const previousFormat = normalizeRelativeFormat(previousState.format);
+    return {
+      format: previousFormat === "Auto" ? null : previousFormat,
+      seenMidpoint: Boolean(previousState.seenMidpoint),
+      seenSignBand: Boolean(previousState.seenSignBand),
+      seenHighNegative: Boolean(previousState.seenHighNegative),
+      seenLowNegativeHint: Boolean(previousState.seenLowNegativeHint),
+    };
   }
-  if (value >= 96 && value <= 127) return "TwosComplement";
-  if (value === 63) return "BinaryOffset";
-  if (value >= 65 && value <= 95) return "SignMagnitude";
+  const previousFormat = normalizeRelativeFormat(previousState);
+  return {
+    format: previousFormat === "Auto" ? null : previousFormat,
+    seenMidpoint: false,
+    seenSignBand: false,
+    seenHighNegative: false,
+    seenLowNegativeHint: false,
+  };
+}
+
+export function updateRelativeAutoDetection(value, previousState = null) {
+  const state = coerceRelativeAutoState(previousState);
+  if (!state.format) {
+    if (value === 63) state.seenLowNegativeHint = true;
+    if (value === 64) state.seenMidpoint = true;
+    if (value >= 65 && value <= 95) state.seenSignBand = true;
+    if (value >= 96 && value <= 127) state.seenHighNegative = true;
+
+    if (state.seenHighNegative) {
+      state.format = "TwosComplement";
+    } else if (state.seenLowNegativeHint) {
+      state.format = "BinaryOffset";
+    } else if (state.seenMidpoint && state.seenSignBand) {
+      state.format = "BinaryOffset";
+    } else if (state.seenSignBand) {
+      state.format = "SignMagnitude";
+    }
+  }
+  return state;
+}
+
+export function detectRelativeFormatAuto(value, previousState) {
+  return updateRelativeAutoDetection(value, previousState).format;
+}
+
+export function decodeRelativeDeltaAutoFallback(value, sawMidpoint = false) {
+  if (value === 0 || value === 64) return 0;
+  if (value >= 1 && value <= 62) return value;
+  if (value === 63) return -1;
+  if (value >= 96 && value <= 127) return value - 128;
+  if (value >= 65 && value <= 95 && sawMidpoint) return value - 64;
+  if (value >= 65 && value <= 95) return -(value - 64);
   return null;
 }
 
 export function decodeRelativeDelta(binding, value, autoFormatByBinding = null) {
   const configured = normalizeRelativeFormat(binding?.relative_format);
   let format = configured;
+  let autoState = null;
   if (format === "Auto") {
     const key = String(binding?.id || "");
-    const previouslyDetected = key && autoFormatByBinding ? autoFormatByBinding.get(key) : null;
-    const detected = detectRelativeFormatAuto(value, previouslyDetected);
-    if (detected && key && autoFormatByBinding) {
-      autoFormatByBinding.set(key, detected);
+    const previousState = key && autoFormatByBinding ? autoFormatByBinding.get(key) : null;
+    autoState = updateRelativeAutoDetection(value, previousState);
+    if (key && autoFormatByBinding) {
+      autoFormatByBinding.set(key, autoState);
     }
-    format = detected || previouslyDetected || "TwosComplement";
+    format = autoState.format || "Auto";
   }
 
   if (format === "TwosComplement") return decodeRelativeTwosComplement(value);
   if (format === "BinaryOffset") return decodeRelativeBinaryOffset(value);
   if (format === "SignMagnitude") return decodeRelativeSignMagnitude(value);
+  if (format === "Auto") return decodeRelativeDeltaAutoFallback(value, autoState?.seenMidpoint);
   return null;
 }
 

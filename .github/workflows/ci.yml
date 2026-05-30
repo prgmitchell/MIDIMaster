@@ -13,7 +13,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
 
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
@@ -31,6 +31,19 @@ jobs:
       - name: Scan unlocalized frontend strings
         run: node scripts/i18n/scan-unlocalized.mjs
 
+      - name: Check frontend JavaScript syntax
+        run: |
+          $files = Get-ChildItem src,src-tauri/builtin_plugins,plugin-example,scripts -Recurse -Include *.js,*.mjs
+          foreach ($file in $files) {
+            node --check $file.FullName
+          }
+
+      - name: Test frontend binding model
+        run: node scripts/test-binding-model.mjs
+
+      - name: Test bundled Hue plugin
+        run: node scripts/test-hue-plugin.mjs
+
       - name: Format (rustfmt)
         working-directory: src-tauri
         run: cargo fmt --all -- --check
@@ -38,6 +51,10 @@ jobs:
       - name: Check
         working-directory: src-tauri
         run: cargo check
+
+      - name: Lint (clippy)
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Test
         working-directory: src-tauri

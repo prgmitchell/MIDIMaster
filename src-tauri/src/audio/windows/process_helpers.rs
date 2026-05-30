@@ -168,14 +168,16 @@ pub(super) fn icon_to_png_base64(icon: HICON) -> Option<String> {
         return None;
     }
 
-    let mut info = BITMAPINFO::default();
-    info.bmiHeader = BITMAPINFOHEADER {
-        biSize: size_of::<BITMAPINFOHEADER>() as u32,
-        biWidth: width,
-        biHeight: -height,
-        biPlanes: 1,
-        biBitCount: 32,
-        biCompression: BI_RGB.0 as u32,
+    let mut info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: width,
+            biHeight: -height,
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
         ..Default::default()
     };
 

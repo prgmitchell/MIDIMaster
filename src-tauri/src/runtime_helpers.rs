@@ -417,6 +417,10 @@ fn classify_cc_candidate(saw_zero: bool, saw_max: bool) -> model::BindingControl
     }
 }
 
+pub(crate) fn cc_learn_value_is_definitely_continuous(value: u8) -> bool {
+    value != 0 && value != 127
+}
+
 pub(crate) fn classify_learned_control(candidate: &LearnCandidate) -> LearnedControl {
     let mut learned = candidate.control.clone();
     learned.control_kind = match learned.msg_type {
