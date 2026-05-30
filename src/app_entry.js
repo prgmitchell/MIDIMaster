@@ -38,6 +38,7 @@ import {
   supportedLocales,
   t,
 } from "./app/i18n.js";
+import { setupUpdateNotificationWindow } from "./update_notification.js";
 
 const startupLogger = window.__MIDIMASTER_DIAG__;
 
@@ -251,7 +252,9 @@ const mediaNextTrackIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w
 const mediaPrevTrackIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><path d='M14 4L9 9l5 5zM9 4L4 9l5 5z' fill='white'/><rect x='2.5' y='4' width='1.5' height='10' fill='white'/></svg>";
 const mediaStopIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><rect x='5' y='5' width='8' height='8' rx='1.2' fill='white'/></svg>";
 const osdDebugAlways = false;
-const isOsdWindow = new URLSearchParams(window.location.search).has("osd");
+const startupSearchParams = new URLSearchParams(window.location.search);
+const isOsdWindow = startupSearchParams.has("osd");
+const isUpdateWindow = startupSearchParams.has("update");
 const themeStorageKey = "uiTheme";
 const sidebarCollapsedStorageKey = "sidebarCollapsed";
 const midiInputStorageKey = "midiDeviceId";
@@ -548,6 +551,51 @@ if (isOsdWindow) {
   document.body.classList.add("osd-only");
 }
 
+function renderUpdateNotificationWindow() {
+  diagnosticInfo("update_window_render_start", window.location.search);
+  const updateTheme = loadStoredTheme();
+  document.title = "MIDIMaster Update";
+  document.documentElement.classList.add("update-notification-document");
+  document.documentElement.style.colorScheme = updateTheme;
+  if (!document.querySelector('link[href="update_notification.css"]')) {
+    const style = document.createElement("link");
+    style.rel = "stylesheet";
+    style.href = "update_notification.css";
+    document.head.appendChild(style);
+  }
+  document.body.className = updateTheme === "dark"
+    ? "update-notification-body dark-mode"
+    : "update-notification-body";
+  document.body.dataset.theme = updateTheme;
+  document.body.innerHTML = `
+    <main class="update-card" data-tauri-drag-region role="dialog" aria-labelledby="update-title">
+      <button id="close-button" class="window-close" type="button" aria-label="Close" title="Close">x</button>
+      <div class="update-icon" aria-hidden="true" data-tauri-drag-region>
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M12 4v10" />
+          <path d="M8 10l4 4 4-4" />
+          <path d="M5 19h14" />
+        </svg>
+      </div>
+      <section class="update-copy" data-tauri-drag-region>
+        <h1 id="update-title" data-tauri-drag-region>Update Available</h1>
+        <p id="update-message" data-tauri-drag-region>A new MIDIMaster update is available.</p>
+        <p id="update-status" class="update-status" data-tauri-drag-region>Ready to download and install.</p>
+      </section>
+      <div class="update-actions">
+        <button id="skip-button" type="button" class="secondary">Skip Update</button>
+        <button id="install-button" type="button" class="primary">Download and Install</button>
+      </div>
+    </main>
+  `;
+  setupUpdateNotificationWindow({
+    params: startupSearchParams,
+    invoke,
+    listen,
+  });
+  diagnosticInfo("update_window_render_done");
+}
+
 function applyOsdAppearanceAttributes(settings = {}) {
   const style = String(settings.style || defaultOsdSettings.style).trim() || defaultOsdSettings.style;
   const opacity = Math.min(1, Math.max(0.35, Number(settings.opacity ?? defaultOsdSettings.opacity)));
@@ -610,7 +658,7 @@ const {
   switchAppPage,
 } = appShellRuntime;
 
-if (!isOsdWindow) {
+if (!isOsdWindow && !isUpdateWindow) {
   applyTheme(loadStoredTheme());
   applySidebarCollapsed(true);
 }
@@ -1453,11 +1501,12 @@ const showAlert = (title, message = "") => alertsController.showAlert(message, t
 const showChoices = (options = {}) => alertsController.showChoices(options);
 const closeAlert = (...args) => alertsController.closeAlert(...args);
 
-function showUpdateAvailableDialog(info = {}) {
+function showUpdateAvailableDialog(info = {}, { standaloneIfMainHidden = false } = {}) {
   const latest = String(info.latestVersion || info.version || "").trim();
   const current = String(info.currentVersion || info.current_version || "").trim();
   if (!latest) return Promise.resolve("close");
-  return showChoices({
+
+  const showInlineDialog = () => showChoices({
     title: "Update Available",
     message: `MIDIMaster ${latest} is available (current: ${current || "unknown"})`,
     options: [
@@ -1477,6 +1526,20 @@ function showUpdateAvailableDialog(info = {}) {
       settingsFeature?.installAvailableUpdate?.();
     }
     return choice;
+  });
+
+  if (!standaloneIfMainHidden) {
+    return showInlineDialog();
+  }
+
+  return invoke("show_update_notification_window_if_main_hidden", {
+    currentVersion: current || null,
+    latestVersion: latest,
+  }).then((shownStandalone) => (
+    shownStandalone ? "standalone" : showInlineDialog()
+  )).catch((error) => {
+    diagnosticError("update_notification_window_failed", error);
+    return showInlineDialog();
   });
 }
 
@@ -2186,6 +2249,11 @@ async function init() {
     scheduleRetry(() => init(), 200);
     return;
   }
+  if (isUpdateWindow) {
+    diagnosticInfo("update_window_start");
+    renderUpdateNotificationWindow();
+    return;
+  }
   diagnosticInfo("setup_listeners_start");
   await setupListeners().catch((error) => {
     diagnosticError("setup_listeners_failed", error);
@@ -2253,7 +2321,10 @@ async function init() {
       } catch {
         // ignore storage failures
       }
-      showUpdateAvailableDialog({ latestVersion: latest, currentVersion: current });
+      showUpdateAvailableDialog(
+        { latestVersion: latest, currentVersion: current },
+        { standaloneIfMainHidden: true },
+      );
     }).catch((error) => {
       diagnosticError("auto_update_check_failed", error);
     });

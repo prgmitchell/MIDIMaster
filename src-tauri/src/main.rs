@@ -174,6 +174,24 @@ fn main() {
                     .build()?;
             let _ = osd_window.set_ignore_cursor_events(true);
             let _ = osd_window.hide();
+
+            let update_window = WebviewWindowBuilder::new(
+                app,
+                "update",
+                WebviewUrl::App("index.html?update=1".into()),
+            )
+            .title("MIDIMaster Update")
+            .inner_size(420.0, 230.0)
+            .min_inner_size(420.0, 230.0)
+            .resizable(false)
+            .maximizable(false)
+            .always_on_top(true)
+            .focused(false)
+            .decorations(false)
+            .visible(false)
+            .build()?;
+            let _ = update_window.hide();
+
             if let Ok(settings) = app.state::<AppState>().osd_settings.lock() {
                 AppState::apply_osd_settings(app.handle(), &settings);
             }
@@ -363,6 +381,9 @@ fn main() {
             get_wavelink_ws_port,
             fetch_store_catalog,
             install_store_plugin,
+            show_update_notification_window_if_main_hidden,
+            close_update_notification_window,
+            start_update_notification_window_drag,
             check_for_updates,
             download_and_install_update,
         ])

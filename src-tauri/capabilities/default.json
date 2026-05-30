@@ -2,7 +2,7 @@
   "identifier": "default",
   "description": "Default permissions for MIDIMaster",
   "local": true,
-  "windows": ["main", "osd"],
+  "windows": ["main", "osd", "update"],
   "permissions": [
     "core:default",
     "core:event:default",

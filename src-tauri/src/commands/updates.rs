@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Clone, Serialize)]
@@ -21,6 +21,12 @@ struct UpdateStatusEvent {
     content_length: Option<u64>,
 }
 
+#[derive(Clone, Serialize)]
+struct UpdateNotificationPayload {
+    current_version: Option<String>,
+    latest_version: String,
+}
+
 fn emit_status(app: &AppHandle, event: UpdateStatusEvent) {
     let _ = app.emit("updater_status", event);
 }
@@ -37,6 +43,126 @@ fn emit_failed(app: &AppHandle, message: String) {
             content_length: None,
         },
     );
+}
+
+fn encode_query_component(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            encoded.push(byte as char);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+
+fn show_update_notification_window(
+    app: &AppHandle,
+    payload: UpdateNotificationPayload,
+) -> Result<(), String> {
+    if payload.latest_version.trim().is_empty() {
+        return Ok(());
+    }
+
+    if let Some(window) = app.get_webview_window("update") {
+        send_update_notification_payload(&window, &payload);
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.center();
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let mut query = format!(
+        "update=1&latestVersion={}",
+        encode_query_component(payload.latest_version.trim())
+    );
+    if let Some(current_version) = payload.current_version.as_deref() {
+        if !current_version.trim().is_empty() {
+            query.push_str("&currentVersion=");
+            query.push_str(&encode_query_component(current_version.trim()));
+        }
+    }
+
+    let window = WebviewWindowBuilder::new(
+        app,
+        "update",
+        WebviewUrl::App(format!("index.html?{query}").into()),
+    )
+    .title("MIDIMaster Update")
+    .inner_size(420.0, 230.0)
+    .min_inner_size(420.0, 230.0)
+    .resizable(false)
+    .maximizable(false)
+    .always_on_top(true)
+    .focused(true)
+    .decorations(false)
+    .build()
+    .map_err(|err| format!("Unable to show update notification: {err}"))?;
+
+    let _ = window.center();
+    send_update_notification_payload(&window, &payload);
+    let _ = window.set_focus();
+    Ok(())
+}
+
+fn send_update_notification_payload(window: &WebviewWindow, payload: &UpdateNotificationPayload) {
+    let _ = window.emit("update_notification_payload", payload.clone());
+    if let Ok(payload_json) = serde_json::to_string(payload) {
+        let script =
+            format!("window.__MIDIMASTER_UPDATE_NOTIFICATION__?.setPayload({payload_json});");
+        let _ = window.eval(script);
+    }
+}
+
+#[tauri::command]
+pub fn show_update_notification_window_if_main_hidden(
+    app: AppHandle,
+    current_version: Option<String>,
+    latest_version: String,
+) -> Result<bool, String> {
+    let should_show_standalone = app
+        .get_webview_window("main")
+        .map(|window| {
+            let hidden = !window.is_visible().unwrap_or(true);
+            let minimized = window.is_minimized().unwrap_or(false);
+            hidden || minimized
+        })
+        .unwrap_or(true);
+
+    if !should_show_standalone {
+        return Ok(false);
+    }
+
+    show_update_notification_window(
+        &app,
+        UpdateNotificationPayload {
+            current_version,
+            latest_version,
+        },
+    )?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn close_update_notification_window(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("update") {
+        window
+            .hide()
+            .map_err(|err| format!("Unable to hide update notification: {err}"))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_update_notification_window_drag(app: AppHandle) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("update") else {
+        return Ok(());
+    };
+    window
+        .start_dragging()
+        .map_err(|err| format!("Unable to drag update notification: {err}"))
 }
 
 #[tauri::command]

@@ -1,0 +1,167 @@
+.update-notification-document {
+  color-scheme: dark light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.update-notification-document,
+.update-notification-body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--app-bg);
+  color: var(--text-primary);
+  font-family:
+    Bahnschrift,
+    Aptos,
+    Segoe UI,
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.update-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--control-border);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 9%, transparent);
+  cursor: move;
+}
+
+.window-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.window-close:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+.update-icon {
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--control-border-strong);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.update-icon svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.update-copy {
+  min-width: 0;
+  padding-right: 28px;
+}
+
+.update-copy h1 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.update-copy p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.update-copy .update-status {
+  margin-top: 10px;
+  color: var(--text-secondary);
+}
+
+.update-copy .update-status.error {
+  color: var(--danger);
+}
+
+.update-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.update-actions button {
+  min-width: 132px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 4px;
+  border: 1px solid var(--control-border);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.update-actions button:disabled {
+  cursor: default;
+  opacity: 0.64;
+}
+
+.update-actions .secondary {
+  background: var(--control-bg);
+  color: var(--text-primary);
+}
+
+.update-actions .secondary:not(:disabled):hover {
+  border-color: var(--control-border-strong);
+  background: var(--control-bg-hover);
+}
+
+.update-actions .primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.update-actions .primary:not(:disabled):hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+body[data-theme="light"].update-notification-body .update-actions .primary {
+  color: #fff;
+}
+
+body[data-theme="light"].update-notification-body .update-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
