@@ -1104,6 +1104,7 @@ midiFeature = createMidiFeature({
       hideCreateLearnPanel();
       editingBindingId = binding.id;
       pendingFocusBindingId = binding.id;
+      bindingsFeature?.queueBindingReveal?.(binding.id);
       renderBindings();
       syncPluginHostBindings();
       scheduleBindingsSave("add binding learn");

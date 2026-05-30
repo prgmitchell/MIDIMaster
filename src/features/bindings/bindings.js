@@ -131,6 +131,7 @@ export function createBindingsFeature({
   const bindingsCard = d.bindingsContainer.closest?.(".bindings-card") || null;
   let bindingsScrollbarWidth = 0;
   let bindingsLayoutSyncQueued = false;
+  let pendingRevealBindingId = null;
 
   function measureScrollbarWidth() {
     const probe = document.createElement("div");
@@ -169,6 +170,42 @@ export function createBindingsFeature({
     if (bindingsLayoutSyncQueued) return;
     bindingsLayoutSyncQueued = true;
     requestAnimationFrame(syncBindingsScrollLayout);
+  }
+
+  function queueBindingReveal(bindingId) {
+    const nextId = String(bindingId || "").trim();
+    pendingRevealBindingId = nextId || null;
+  }
+
+  function findRenderedBindingItem(bindingId) {
+    const targetId = String(bindingId || "");
+    if (!targetId || !d.bindingsContainer) return null;
+    return Array.from(d.bindingsContainer.querySelectorAll(".binding-item"))
+      .find((item) => String(item.dataset?.bindingId || "") === targetId) || null;
+  }
+
+  function flushQueuedBindingReveal() {
+    const bindingId = pendingRevealBindingId;
+    if (!bindingId) return;
+    pendingRevealBindingId = null;
+
+    requestAnimationFrame(() => {
+      const item = findRenderedBindingItem(bindingId);
+      if (!item) return;
+      const reduceMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+      item.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+      item.classList.remove("binding-item-revealed");
+      void item.offsetWidth;
+      item.classList.add("binding-item-revealed");
+      clearTimeout(item.__bindingRevealTimer);
+      item.__bindingRevealTimer = setTimeout(() => {
+        item.classList.remove("binding-item-revealed");
+      }, reduceMotion ? 700 : 1800);
+    });
   }
 
   function displayModeName(binding) {
@@ -2291,6 +2328,7 @@ export function createBindingsFeature({
     }
 
     queueBindingsScrollLayoutSync();
+    flushQueuedBindingReveal();
   }
 
   function startBindingDrag(item, index, event) {
@@ -2696,6 +2734,7 @@ export function createBindingsFeature({
     setMuteButtonState,
     syncButtonVisualState,
     setButtonVisualState,
+    queueBindingReveal,
     beginBindingEdit,
     renderBindings,
     startBindingDrag,
