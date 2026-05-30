@@ -58,8 +58,29 @@
   outline: none;
 }
 
+.binding-type-filter {
+  order: 0;
+  flex: 0 0 auto;
+  min-width: 112px;
+}
+
+.binding-type-filter .target-menu {
+  min-width: 160px;
+}
+
 .binding-filter-button {
-  padding: 0 18px;
+  width: 112px;
+  min-width: 112px;
+  justify-content: space-between;
+  padding: 0 14px;
+  font-weight: 650;
+}
+
+.binding-type-filter-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bindings-card {
@@ -1187,7 +1208,13 @@ body[data-theme] .binding-add-button:hover {
 }
 
 body[data-theme] .binding-filter-button {
-  display: none !important;
+  display: inline-flex;
+  width: 112px;
+  min-width: 112px;
+  justify-content: space-between;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 body[data-theme] .binding-value-cell {

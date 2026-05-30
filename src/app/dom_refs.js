@@ -13,6 +13,10 @@ export function createDomRefs() {
   const profilePageImportButton = document.getElementById("profile-page-import");
   const profilePageExportCurrentButton = document.getElementById("profile-page-export-current");
   const bindingsContainer = document.getElementById("bindings");
+  const bindingTypeFilter = document.getElementById("binding-type-filter");
+  const bindingTypeFilterButton = document.getElementById("binding-type-filter-button");
+  const bindingTypeFilterCurrent = document.getElementById("binding-type-filter-current");
+  const bindingTypeFilterMenu = document.getElementById("binding-type-filter-menu");
   const bindingSearchInput = document.getElementById("binding-search");
   const mainScreen = document.getElementById("main-screen");
   const appShell = document.querySelector(".app-shell");
@@ -182,6 +186,10 @@ export function createDomRefs() {
     profilePageImportButton,
     profilePageExportCurrentButton,
     bindingsContainer,
+    bindingTypeFilter,
+    bindingTypeFilterButton,
+    bindingTypeFilterCurrent,
+    bindingTypeFilterMenu,
     bindingSearchInput,
     mainScreen,
     appShell,

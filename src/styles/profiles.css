@@ -20,7 +20,7 @@ body[data-theme] .bindings-toolbar {
   width: 100%;
   margin-left: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
 }
@@ -40,8 +40,19 @@ body[data-theme] #main-screen > .page-heading-row {
   border-radius: 5px 5px 0 0;
 }
 
-body[data-theme] .binding-search-field {
+body[data-theme] .binding-type-filter {
   grid-column: 1;
+}
+
+body[data-theme] .bindings-toolbar .binding-filter-button {
+  height: 40px;
+  min-height: 40px;
+  width: 112px;
+  min-width: 112px;
+}
+
+body[data-theme] .binding-search-field {
+  grid-column: 2;
   width: 100%;
   min-width: 0;
 }
@@ -53,7 +64,7 @@ body[data-theme] .binding-search-field:focus-within {
 }
 
 body[data-theme] .binding-add-button {
-  grid-column: 2;
+  grid-column: 3;
   justify-self: end;
 }
 

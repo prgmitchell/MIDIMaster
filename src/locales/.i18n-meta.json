@@ -347,7 +347,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -697,7 +702,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1047,7 +1057,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1397,7 +1412,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1747,7 +1767,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2097,7 +2122,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2447,7 +2477,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -2797,7 +2832,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -3147,7 +3187,12 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -3497,6 +3542,11 @@
     "targets.noRunningApplications": "bc990e5447f9c91c2bd525e5e0701643dedb9a59bacd473a0932fa4e37e9eccf",
     "dialogs.focusWindowUnavailableTitle": "e5c87c3973819c0a91e4c998efd874b3a37206dc17befdbe86e37c142571c5a7",
     "dialogs.focusWindowUnavailableMessage": "372f4be068248688fbaac3412119e2f0de4c7fd9b1df0d5d90d789d4af732f1e",
-    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6"
+    "dialogs.focusWindowMissingTargetMessage": "b38be8e660a6512851dcdee35197b7c80c31ea93bb8d54e7ac52c6c4d25762b6",
+    "bindings.typeFilterLabel": "a589896a729003fa6344ba68c23669ee7a97cd89424b447b78ea420f0157f5c5",
+    "bindings.filterAll": "a52ace420f2175d08b1577a1bea5445e36801229c074ef9ed6c55a73401fd9c2",
+    "bindings.filterFaders": "da28dde2b2e53f282b6c1fa028415faf111d948002a9757f9f25d6e7ac5626a7",
+    "bindings.filterButtons": "d452583a74d0e772db89d8f783831098869148222427750bedecc4a1b50380b5",
+    "bindings.noFilterResults": "4ce4c9a2940178d408e30e3dd25abede448c9e14ec32360b986f5dcdcafe76e3"
   }
 }

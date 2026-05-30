@@ -128,10 +128,99 @@ export function createBindingsFeature({
   const getDrag = (typeof getDragState === "function") ? getDragState : (() => null);
   const setDrag = (typeof setDragState === "function") ? setDragState : (() => { });
   const getSearchQuery = () => String(d.bindingSearchInput?.value || "").trim().toLowerCase();
+  const bindingTypeFilterValues = new Set(["all", "faders", "buttons"]);
+  let bindingTypeFilter = "all";
   const bindingsCard = d.bindingsContainer.closest?.(".bindings-card") || null;
   let bindingsScrollbarWidth = 0;
   let bindingsLayoutSyncQueued = false;
   let pendingRevealBindingId = null;
+
+  function normalizeBindingTypeFilter(value) {
+    const normalized = String(value || "all").toLowerCase();
+    return bindingTypeFilterValues.has(normalized) ? normalized : "all";
+  }
+
+  function getBindingTypeFilter() {
+    return normalizeBindingTypeFilter(bindingTypeFilter);
+  }
+
+  function bindingTypeFilterOptions() {
+    return [
+      { value: "all", label: t("bindings.filterAll") },
+      { value: "faders", label: t("bindings.filterFaders") },
+      { value: "buttons", label: t("bindings.filterButtons") },
+    ];
+  }
+
+  function bindingMatchesTypeFilter(binding, filterValue = getBindingTypeFilter()) {
+    const normalized = normalizeBindingTypeFilter(filterValue);
+    if (normalized === "all") return true;
+    const isButton = effectiveIsButton(binding);
+    return normalized === "buttons" ? isButton : !isButton;
+  }
+
+  function updateBindingTypeFilterUi() {
+    const currentFilter = getBindingTypeFilter();
+    const options = bindingTypeFilterOptions();
+    const active = options.find((option) => option.value === currentFilter) || options[0];
+
+    if (d.bindingTypeFilterCurrent) {
+      d.bindingTypeFilterCurrent.textContent = active.label;
+    }
+    if (d.bindingTypeFilterButton) {
+      const label = t("bindings.typeFilterLabel");
+      d.bindingTypeFilterButton.title = label;
+      d.bindingTypeFilterButton.setAttribute("aria-label", `${label}: ${active.label}`);
+    }
+    d.bindingTypeFilterMenu?.querySelectorAll("[data-filter]").forEach((optionButton) => {
+      const selected = normalizeBindingTypeFilter(optionButton.dataset?.filter) === currentFilter;
+      optionButton.classList.toggle("selected", selected);
+      optionButton.setAttribute("aria-selected", selected ? "true" : "false");
+    });
+  }
+
+  function setBindingTypeFilter(value) {
+    const next = normalizeBindingTypeFilter(value);
+    const changed = next !== bindingTypeFilter;
+    bindingTypeFilter = next;
+    updateBindingTypeFilterUi();
+    if (changed) {
+      renderBindings();
+    }
+  }
+
+  function bindBindingTypeFilterUi() {
+    const root = d.bindingTypeFilter;
+    const trigger = d.bindingTypeFilterButton;
+    const menu = d.bindingTypeFilterMenu;
+    if (!root || !trigger || !menu) return;
+
+    root.__positionDropdownMenu = () => {
+      positionFloatingDropdownMenu({
+        menu,
+        trigger,
+        minHeight: 118,
+        maxHeight: 180,
+      });
+      const menuWidth = Math.max(160, Math.min(220, (window.innerWidth || 220) - 28));
+      menu.style.width = `${menuWidth}px`;
+      menu.style.minWidth = `${menuWidth}px`;
+    };
+    wireDropdownToggle({ root, menu, trigger });
+
+    menu.querySelectorAll("[data-filter]").forEach((optionButton) => {
+      optionButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        root.classList.remove("open");
+        menu.classList.add("hidden");
+        trigger.setAttribute("aria-expanded", "false");
+        setBindingTypeFilter(optionButton.dataset?.filter);
+      });
+    });
+
+    updateBindingTypeFilterUi();
+  }
 
   function measureScrollbarWidth() {
     const probe = document.createElement("div");
@@ -1646,6 +1735,7 @@ export function createBindingsFeature({
     const bindings = getB();
     d.bindingsContainer.innerHTML = "";
     const searchQuery = getSearchQuery();
+    const typeFilter = getBindingTypeFilter();
     let renderedCount = 0;
 
     if (!Array.isArray(bindings) || bindings.length === 0) {
@@ -1663,6 +1753,9 @@ export function createBindingsFeature({
         setTargets(binding, getTargets(binding));
         binding.hotkey = normalizeHotkeyMapping(binding.hotkey);
         binding.open_application = normalizeOpenApplicationMapping(binding.open_application);
+        if (!bindingMatchesTypeFilter(binding, typeFilter)) {
+          return;
+        }
         if (searchQuery && !bindingSearchText(binding, index).includes(searchQuery)) {
           return;
         }
@@ -2323,7 +2416,9 @@ export function createBindingsFeature({
     if (renderedCount === 0) {
       const empty = document.createElement("div");
       empty.className = "bindings-empty";
-      empty.textContent = t("bindings.noSearchResults");
+      empty.textContent = searchQuery
+        ? t("bindings.noSearchResults")
+        : (typeFilter === "all" ? t("bindings.noSearchResults") : t("bindings.noFilterResults"));
       d.bindingsContainer.appendChild(empty);
     }
 
@@ -2706,6 +2801,7 @@ export function createBindingsFeature({
   }, true);
 
   bindConfigModalUi();
+  bindBindingTypeFilterUi();
   if (d.bindingSearchInput) {
     d.bindingSearchInput.addEventListener("input", () => {
       renderBindings();
@@ -2716,6 +2812,7 @@ export function createBindingsFeature({
     queueBindingsScrollLayoutSync();
   });
   window.addEventListener("midimaster:locale-changed", () => {
+    updateBindingTypeFilterUi();
     renderBindings();
     resetLearnPanelUi();
     renderConfigModal();
