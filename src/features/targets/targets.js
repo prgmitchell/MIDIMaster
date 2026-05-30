@@ -1396,7 +1396,7 @@ export function createTargetsFeature({
             }
 
             if (isBindingButton && targetOption.kind !== "hotkey-target") {
-              return chooseButtonTarget(targetOption);
+              return chooseButtonTarget(targetOption, openRootTargetPanel);
             }
 
             selectOption(targetOption);
@@ -1406,16 +1406,16 @@ export function createTargetsFeature({
         );
       };
 
-      const chooseButtonTarget = (targetOption) => {
+      const chooseButtonTarget = (targetOption, onBack = openRootTargetPanel) => {
         const actionOptions = buildButtonActionOptions(targetOption);
-        if (actionOptions.length === 1) {
-          selectOption(targetOption, actionOptions[0]);
+        if (actionOptions.length === 0) {
+          selectOption(targetOption);
           return true;
         }
         setTimeout(() => {
           openTargetPanel(actionOptions, selectedAction, "action", (actionOption) => {
             selectOption(targetOption, actionOption);
-          }, t("targets.selectAction"));
+          }, t("targets.selectAction"), { onBack });
         }, 10);
         return false;
       };
@@ -1508,7 +1508,9 @@ export function createTargetsFeature({
             }
 
             if (isBindingButton) {
-              return chooseButtonTarget(opt);
+              return chooseButtonTarget(opt, () => {
+                showIntegrationSubmenu(integrationId, navStack, navState).catch(() => { });
+              });
             }
 
             selectOption(opt);
