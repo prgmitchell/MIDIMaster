@@ -278,6 +278,7 @@
   "targets.captureControls": "캡처 컨트롤",
   "targets.hotkey": "핫키",
   "targets.openApplication": "공지사항",
+  "targets.autoHotkeyScript": "AutoHotkey Script",
   "targets.integrationTarget": "통합 대상",
   "targets.selectApplicationOrDevice": "신청 또는 장치를 선택",
   "targets.unavailable": "이용안내",
@@ -306,6 +307,7 @@
   "targets.description.captureAction": "Trigger 이 캡처 작업에서 버튼 바인딩.",
   "targets.description.hotkey": "단추 바인딩에서 키보드 단축키를 트리거하십시오.",
   "targets.description.openApplication": "버튼 바인딩에서 선택한 응용 프로그램을 시작합니다.",
+  "targets.description.autoHotkeyScript": "Run a selected .ahk script from a button binding.",
   "targets.description.savedApplicationUnavailable": "Saved 애플리케이션 대상은 현재 사용할 수 없습니다.",
   "targets.description.applicationSession": "신청 오디오 회의.",
   "targets.description.savedDeviceUnavailable": "저장된 장치 대상은 현재 사용할 수 없습니다.",
@@ -368,5 +370,13 @@
   "dialogs.actionFailedMessage": "MIDIMaster는이 작업을 완료 할 수 없습니다.",
   "dialogs.focusWindowUnavailableTitle": "창 찾을 수 없음",
   "dialogs.focusWindowUnavailableMessage": "MIDIMaster는 \"{name}\"의 실행 창을 찾을 수 없습니다.",
-  "dialogs.focusWindowMissingTargetMessage": "이 창 초점 바인딩을 위한 실행 신청을 선택하십시오."
+  "dialogs.focusWindowMissingTargetMessage": "이 창 초점 바인딩을 위한 실행 신청을 선택하십시오.",
+  "dialogs.autoHotkeyNotConfiguredTitle": "AutoHotkey Script Not Configured",
+  "dialogs.autoHotkeyNotConfiguredMessage": "Choose a .ahk file for this binding's AutoHotkey Script action.",
+  "dialogs.autoHotkeyScriptNotFoundTitle": "AutoHotkey Script Not Found",
+  "dialogs.autoHotkeyScriptNotFoundMessage": "MIDIMaster couldn't find \"{name}\". Re-select the .ahk file in this binding.",
+  "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey Not Configured",
+  "dialogs.autoHotkeyNoAssociationMessage": "Windows doesn't have an app associated with .ahk files. Install AutoHotkey or choose a default app for .ahk files.",
+  "dialogs.autoHotkeyLaunchFailedTitle": "Script Launch Failed",
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster couldn't run this AutoHotkey script: {message}"
 }

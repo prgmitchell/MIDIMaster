@@ -92,6 +92,7 @@ pub enum BindingAction {
     MediaPrevTrack,
     MediaStop,
     Hotkey,
+    RunAutoHotkeyScript,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -110,6 +111,14 @@ pub struct OpenApplicationMapping {
     pub display: String,
     #[serde(default)]
     pub icon_data: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AutoHotkeyScriptMapping {
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub display: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -154,6 +163,7 @@ pub enum BindingTarget {
     CaptureControl,
     Hotkey,
     OpenApplication,
+    AutoHotkeyScript,
     #[default]
     Unset,
 }
@@ -167,6 +177,7 @@ impl PartialEq for BindingTarget {
             | (BindingTarget::CaptureControl, BindingTarget::CaptureControl)
             | (BindingTarget::Hotkey, BindingTarget::Hotkey)
             | (BindingTarget::OpenApplication, BindingTarget::OpenApplication)
+            | (BindingTarget::AutoHotkeyScript, BindingTarget::AutoHotkeyScript)
             | (BindingTarget::Unset, BindingTarget::Unset) => true,
             (
                 BindingTarget::Session { session_id: a },
@@ -221,6 +232,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
             "CaptureControl" => Ok(BindingTarget::CaptureControl),
             "Hotkey" => Ok(BindingTarget::Hotkey),
             "OpenApplication" => Ok(BindingTarget::OpenApplication),
+            "AutoHotkeyScript" => Ok(BindingTarget::AutoHotkeyScript),
             "Unset" => Ok(BindingTarget::Unset),
             other => Err(format!("Unknown BindingTarget string: {}", other)),
         };
@@ -303,6 +315,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
         "CaptureControl" => Ok(BindingTarget::CaptureControl),
         "Hotkey" => Ok(BindingTarget::Hotkey),
         "OpenApplication" => Ok(BindingTarget::OpenApplication),
+        "AutoHotkeyScript" => Ok(BindingTarget::AutoHotkeyScript),
 
         // New generic integration target
         "Integration" => {
@@ -457,6 +470,8 @@ pub struct Binding {
     pub hotkey: Option<HotkeyMapping>,
     #[serde(default)]
     pub open_application: Option<OpenApplicationMapping>,
+    #[serde(default)]
+    pub autohotkey_script: Option<AutoHotkeyScriptMapping>,
 }
 
 impl Binding {
@@ -550,6 +565,16 @@ impl Binding {
                         .map(|mapping| !mapping.keys.is_empty())
                         .unwrap_or(false)
             }
+            BindingAction::RunAutoHotkeyScript => {
+                targets
+                    .iter()
+                    .any(|target| matches!(target, BindingTarget::AutoHotkeyScript))
+                    && self
+                        .autohotkey_script
+                        .as_ref()
+                        .map(|mapping| !mapping.path.trim().is_empty())
+                        .unwrap_or(false)
+            }
             BindingAction::MediaPlayPause
             | BindingAction::MediaNextTrack
             | BindingAction::MediaPrevTrack
@@ -638,6 +663,7 @@ impl Binding {
                 ..
             } => !integration_id.trim().is_empty() && !kind.trim().is_empty(),
             BindingTarget::Hotkey | BindingTarget::OpenApplication => false,
+            BindingTarget::AutoHotkeyScript => false,
         }
     }
 

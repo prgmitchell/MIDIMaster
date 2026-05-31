@@ -701,6 +701,7 @@ pub fn apply_binding_action(
             | model::BindingAction::FullScreenshot
             | model::BindingAction::SnipScreenshot
             | model::BindingAction::ToggleScreenRecording
+            | model::BindingAction::RunAutoHotkeyScript
     ) {
         run_logger::warn(
             "bindings_cmd",
@@ -809,6 +810,7 @@ mod tests {
             assign_mode: model::AssignMode::Add,
             hotkey: None,
             open_application: None,
+            autohotkey_script: None,
         }
     }
 

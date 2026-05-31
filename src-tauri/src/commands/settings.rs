@@ -25,6 +25,12 @@ pub struct PickExecutableResult {
     pub icon_data: Option<String>,
 }
 
+#[derive(Clone, Serialize)]
+pub struct PickAutoHotkeyScriptResult {
+    pub path: String,
+    pub display: String,
+}
+
 #[tauri::command]
 pub fn frontend_log(level: String, component: String, event: String, details: String) {
     const MAX_DETAILS_LEN: usize = 4096;
@@ -450,5 +456,49 @@ pub fn pick_executable_path() -> Result<Option<PickExecutableResult>, String> {
     #[cfg(not(target_os = "windows"))]
     {
         Err("Open Application is currently supported only on Windows".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn pick_autohotkey_script_path() -> Result<Option<PickAutoHotkeyScriptResult>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let picked = rfd::FileDialog::new()
+            .add_filter("AutoHotkey Scripts", &["ahk"])
+            .pick_file();
+        let Some(path) = picked else {
+            return Ok(None);
+        };
+
+        if !path.is_file() {
+            return Err("Selected path is not a file".to_string());
+        }
+
+        let ext_ok = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("ahk"))
+            .unwrap_or(false);
+        if !ext_ok {
+            return Err("Selected file must be a .ahk script".to_string());
+        }
+
+        let path_string = path.to_string_lossy().to_string();
+        let display = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| path_string.clone());
+
+        Ok(Some(PickAutoHotkeyScriptResult {
+            path: path_string,
+            display,
+        }))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("AutoHotkey Script is currently supported only on Windows".to_string())
     }
 }

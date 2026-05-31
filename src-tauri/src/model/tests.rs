@@ -122,6 +122,7 @@ fn serialize_binding_uses_targets_not_target() {
         assign_mode: AssignMode::Add,
         hotkey: None,
         open_application: None,
+        autohotkey_script: None,
     };
 
     let json = serde_json::to_value(binding).expect("binding should serialize");
@@ -149,6 +150,39 @@ fn deserialize_open_application_action() {
 
     let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
     assert_eq!(binding.action, BindingAction::OpenApplication);
+}
+
+#[test]
+fn deserialize_run_autohotkey_script_action() {
+    let mut json = binding_base_json();
+    json.as_object_mut().unwrap().insert(
+        "action".to_string(),
+        serde_json::json!("RunAutoHotkeyScript"),
+    );
+    json.as_object_mut().unwrap().insert(
+        "targets".to_string(),
+        serde_json::json!(["AutoHotkeyScript"]),
+    );
+    json.as_object_mut().unwrap().insert(
+        "autohotkey_script".to_string(),
+        serde_json::json!({
+            "path": "C:\\Users\\Test\\Scripts\\mute-toggle.ahk",
+            "display": "mute-toggle.ahk"
+        }),
+    );
+
+    let mut binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+    binding.ensure_targets();
+
+    assert_eq!(binding.action, BindingAction::RunAutoHotkeyScript);
+    assert_eq!(binding.targets, vec![BindingTarget::AutoHotkeyScript]);
+    assert_eq!(
+        binding.autohotkey_script,
+        Some(AutoHotkeyScriptMapping {
+            path: "C:\\Users\\Test\\Scripts\\mute-toggle.ahk".to_string(),
+            display: "mute-toggle.ahk".to_string(),
+        })
+    );
 }
 
 #[test]
@@ -247,6 +281,21 @@ fn mapped_button_light_requires_hotkey_keys() {
     binding.hotkey = Some(HotkeyMapping {
         keys: vec!["Ctrl".to_string(), "Shift".to_string(), "S".to_string()],
         display: "Ctrl+Shift+S".to_string(),
+    });
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+}
+
+#[test]
+fn mapped_button_light_requires_autohotkey_script_path() {
+    let mut binding = mapped_button_binding(
+        BindingAction::RunAutoHotkeyScript,
+        vec![BindingTarget::AutoHotkeyScript],
+    );
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(0.0));
+
+    binding.autohotkey_script = Some(AutoHotkeyScriptMapping {
+        path: "C:\\Users\\Test\\Scripts\\mute-toggle.ahk".to_string(),
+        display: "mute-toggle.ahk".to_string(),
     });
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
 }

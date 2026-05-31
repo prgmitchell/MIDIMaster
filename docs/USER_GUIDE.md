@@ -12,6 +12,7 @@ MIDIMaster binds controls on your MIDI device (faders, knobs, buttons) to target
 - `Focus` (the currently focused application/session)
 - Per-application audio sessions
 - Playback / recording devices
+- Utility actions such as hotkeys, application launch, and AutoHotkey scripts
 - Integrations provided by plugins (OBS Studio, Wave Link, Philips Hue, and third-party integrations)
 
 When a target changes, MIDIMaster can send feedback back to your MIDI controller (for motorized faders, LEDs, etc.).
@@ -71,6 +72,9 @@ Buttons typically support:
 
 - `Trigger` (sends a value to the target)
 - `Toggle Mute`
+- `Hotkey`
+- `Open Application`
+- `AutoHotkey Script` (runs a selected `.ahk` file through Windows' configured AutoHotkey association)
 
 Integrations may interpret actions differently depending on the plugin.
 
@@ -82,6 +86,7 @@ Integrations may interpret actions differently depending on the plugin.
 - `Focus`: the currently focused session
 - `Applications`: discovered audio sessions
 - `Playback Devices` / `Recording Devices`
+- `Utilities`: media controls, hotkeys, window focus, capture controls, application launch, and AutoHotkey scripts
 
 If an application or device disappears, MIDIMaster will show an unavailable entry (greyed).
 

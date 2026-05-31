@@ -1608,6 +1608,7 @@ function buildTargetSelect(
   currentAction = "Volume",
   currentHotkeyDisplay = "",
   currentOpenApplication = null,
+  currentAutoHotkeyScript = null,
 ) {
   return targetsFeature?.buildTargetSelect?.(
     currentTarget,
@@ -1615,6 +1616,7 @@ function buildTargetSelect(
     currentAction,
     currentHotkeyDisplay,
     currentOpenApplication,
+    currentAutoHotkeyScript,
   );
 }
 

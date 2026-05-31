@@ -467,7 +467,8 @@ pub(crate) fn apply_midi_event(
                 | model::BindingTarget::MediaControl
                 | model::BindingTarget::CaptureControl
                 | model::BindingTarget::Hotkey
-                | model::BindingTarget::OpenApplication => {}
+                | model::BindingTarget::OpenApplication
+                | model::BindingTarget::AutoHotkeyScript => {}
             }
         }
 
@@ -806,7 +807,8 @@ pub(crate) fn apply_midi_event(
             | model::BindingTarget::MediaControl
             | model::BindingTarget::CaptureControl
             | model::BindingTarget::Hotkey
-            | model::BindingTarget::OpenApplication => {}
+            | model::BindingTarget::OpenApplication
+            | model::BindingTarget::AutoHotkeyScript => {}
         }
     }
 

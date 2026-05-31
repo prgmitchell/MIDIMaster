@@ -278,6 +278,7 @@
   "targets.captureControls": "キャプチャコントロール",
   "targets.hotkey": "ホットキー",
   "targets.openApplication": "オープンアプリケーション",
+  "targets.autoHotkeyScript": "AutoHotkey Script",
   "targets.integrationTarget": "統合ターゲット",
   "targets.selectApplicationOrDevice": "アプリケーションまたはデバイスを選択する",
   "targets.unavailable": "ご利用案内",
@@ -306,6 +307,7 @@
   "targets.description.captureAction": "ボタンバインディングからこのキャプチャアクションをトリガーします.",
   "targets.description.hotkey": "ボタンバインディングからキーボードショートカットをトリガーします.",
   "targets.description.openApplication": "ボタンバインディングから選択したアプリケーションを起動します.",
+  "targets.description.autoHotkeyScript": "Run a selected .ahk script from a button binding.",
   "targets.description.savedApplicationUnavailable": "保存対象は、現在利用できません.",
   "targets.description.applicationSession": "アプリケーションオーディオセッション.",
   "targets.description.savedDeviceUnavailable": "保存されたデバイスターゲットは、現在利用できません.",
@@ -368,5 +370,13 @@
   "dialogs.actionFailedMessage": "MIDIMasterは、このアクションを完了できませんでした.",
   "dialogs.focusWindowUnavailableTitle": "ウィンドウが見つかりません",
   "dialogs.focusWindowUnavailableMessage": "「{name}」の実行画面が見つかりませんでした.",
-  "dialogs.focusWindowMissingTargetMessage": "このウィンドウフォーカスバインディングの実行アプリケーションを選択します."
+  "dialogs.focusWindowMissingTargetMessage": "このウィンドウフォーカスバインディングの実行アプリケーションを選択します.",
+  "dialogs.autoHotkeyNotConfiguredTitle": "AutoHotkey Script Not Configured",
+  "dialogs.autoHotkeyNotConfiguredMessage": "Choose a .ahk file for this binding's AutoHotkey Script action.",
+  "dialogs.autoHotkeyScriptNotFoundTitle": "AutoHotkey Script Not Found",
+  "dialogs.autoHotkeyScriptNotFoundMessage": "MIDIMaster couldn't find \"{name}\". Re-select the .ahk file in this binding.",
+  "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey Not Configured",
+  "dialogs.autoHotkeyNoAssociationMessage": "Windows doesn't have an app associated with .ahk files. Install AutoHotkey or choose a default app for .ahk files.",
+  "dialogs.autoHotkeyLaunchFailedTitle": "Script Launch Failed",
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster couldn't run this AutoHotkey script: {message}"
 }

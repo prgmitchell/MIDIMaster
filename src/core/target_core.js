@@ -100,6 +100,9 @@ export function createTargetCore({
       if (target === "MediaControl") {
         return { label: "Media Controls", icon_data: mediaPlayPauseIconData || null };
       }
+      if (target === "AutoHotkeyScript") {
+        return { label: "AutoHotkey Script", icon_data: null };
+      }
       if (target === "Unset") {
         return null;
       }
@@ -208,6 +211,7 @@ export function createTargetCore({
     if (target === "Master" || target.Master !== undefined) return "::master::";
     if (target === "Focus" || target.Focus !== undefined) return "::focus::";
     if (target === "MediaControl") return "::media-control::";
+    if (target === "AutoHotkeyScript") return "::autohotkey-script::";
 
     const integration = getIntegrationTarget(target);
     if (integration && integration.integration_id) {

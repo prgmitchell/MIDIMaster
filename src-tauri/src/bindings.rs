@@ -285,6 +285,7 @@ mod tests {
             assign_mode: crate::model::AssignMode::Add,
             hotkey: None,
             open_application: None,
+            autohotkey_script: None,
         }
     }
 

@@ -339,6 +339,7 @@ fn main() {
             reset_app_data,
             open_logs_folder,
             pick_executable_path,
+            pick_autohotkey_script_path,
             list_playback_devices,
             list_recording_devices,
             set_master_volume,

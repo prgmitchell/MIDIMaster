@@ -1019,6 +1019,7 @@ mod tests {
             assign_mode: AssignMode::Add,
             hotkey: None,
             open_application: None,
+            autohotkey_script: None,
         }
     }
 

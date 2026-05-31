@@ -278,6 +278,7 @@
   "targets.captureControls": "Capture Controls",
   "targets.hotkey": "Hotkey",
   "targets.openApplication": "Open Application",
+  "targets.autoHotkeyScript": "AutoHotkey Script",
   "targets.integrationTarget": "Integration Target",
   "targets.selectApplicationOrDevice": "Select an application or device",
   "targets.unavailable": "Unavailable",
@@ -306,6 +307,7 @@
   "targets.description.captureAction": "Trigger this capture action from a button binding.",
   "targets.description.hotkey": "Trigger a keyboard shortcut from a button binding.",
   "targets.description.openApplication": "Launch a selected application from a button binding.",
+  "targets.description.autoHotkeyScript": "Run a selected .ahk script from a button binding.",
   "targets.description.savedApplicationUnavailable": "Saved application target is currently unavailable.",
   "targets.description.applicationSession": "Application audio session.",
   "targets.description.savedDeviceUnavailable": "Saved device target is currently unavailable.",
@@ -368,5 +370,13 @@
   "dialogs.actionFailedMessage": "MIDIMaster could not complete this action.",
   "dialogs.focusWindowUnavailableTitle": "Window Not Found",
   "dialogs.focusWindowUnavailableMessage": "MIDIMaster could not find a running window for \"{name}\".",
-  "dialogs.focusWindowMissingTargetMessage": "Choose a running application for this Window Focus binding."
+  "dialogs.focusWindowMissingTargetMessage": "Choose a running application for this Window Focus binding.",
+  "dialogs.autoHotkeyNotConfiguredTitle": "AutoHotkey Script Not Configured",
+  "dialogs.autoHotkeyNotConfiguredMessage": "Choose a .ahk file for this binding's AutoHotkey Script action.",
+  "dialogs.autoHotkeyScriptNotFoundTitle": "AutoHotkey Script Not Found",
+  "dialogs.autoHotkeyScriptNotFoundMessage": "MIDIMaster couldn't find \"{name}\". Re-select the .ahk file in this binding.",
+  "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey Not Configured",
+  "dialogs.autoHotkeyNoAssociationMessage": "Windows doesn't have an app associated with .ahk files. Install AutoHotkey or choose a default app for .ahk files.",
+  "dialogs.autoHotkeyLaunchFailedTitle": "Script Launch Failed",
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster couldn't run this AutoHotkey script: {message}"
 }

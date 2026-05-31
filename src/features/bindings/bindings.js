@@ -18,6 +18,7 @@ import {
   ensureBindingShape,
   getPrimaryTarget,
   getTargets,
+  isAutoHotkeyScriptTarget,
   isHotkeyTarget,
   isOpenApplicationTarget,
   modeTooltip,
@@ -406,6 +407,10 @@ export function createBindingsFeature({
       return targets.some(isOpenApplicationTarget)
         && Boolean(String(normalizeOpenApplicationMapping(binding?.open_application)?.path || "").trim());
     }
+    if (action === "RunAutoHotkeyScript") {
+      return targets.some(isAutoHotkeyScriptTarget)
+        && Boolean(String(normalizeAutoHotkeyScriptMapping(binding?.autohotkey_script)?.path || "").trim());
+    }
     if (action === "Hotkey") {
       return targets.some(isHotkeyTarget)
         && Boolean(normalizeHotkeyMapping(binding?.hotkey)?.keys?.length);
@@ -787,6 +792,13 @@ export function createBindingsFeature({
       display: display || path,
       icon_data,
     };
+  }
+
+  function normalizeAutoHotkeyScriptMapping(rawScript) {
+    if (!rawScript || typeof rawScript !== "object") return null;
+    const path = String(rawScript.path || "").trim();
+    const display = String(rawScript.display || "").trim();
+    return path ? { path, display: display || path } : null;
   }
 
   function normalizeHotkeyKey(event) {
@@ -1753,6 +1765,7 @@ export function createBindingsFeature({
         setTargets(binding, getTargets(binding));
         binding.hotkey = normalizeHotkeyMapping(binding.hotkey);
         binding.open_application = normalizeOpenApplicationMapping(binding.open_application);
+        binding.autohotkey_script = normalizeAutoHotkeyScriptMapping(binding.autohotkey_script);
         if (!bindingMatchesTypeFilter(binding, typeFilter)) {
           return;
         }
@@ -2003,11 +2016,13 @@ export function createBindingsFeature({
           binding.action,
           binding.hotkey?.display || "",
           binding.open_application,
+          binding.autohotkey_script,
         );
         targetSelect.addEventListener("change", async () => {
           const previousTargets = getTargets(binding);
           const previousHadHotkeyTarget = previousTargets.some(isHotkeyTarget);
           const previousHadOpenApplicationTarget = previousTargets.some(isOpenApplicationTarget);
+          const previousHadAutoHotkeyScriptTarget = previousTargets.some(isAutoHotkeyScriptTarget);
           const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
             ? targetSelect.__selectedTargets
             : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
@@ -2015,9 +2030,11 @@ export function createBindingsFeature({
           const hasSelectedTarget = selectedTargets.some((target) => target && target !== "Unset");
           const hasHotkeyTarget = selectedTargets.some(isHotkeyTarget);
           const hasOpenApplicationTarget = selectedTargets.some(isOpenApplicationTarget);
+          const hasAutoHotkeyScriptTarget = selectedTargets.some(isAutoHotkeyScriptTarget);
           const previousAction = binding.action;
           const previousHotkey = normalizeHotkeyMapping(binding.hotkey);
           const previousOpenApplication = normalizeOpenApplicationMapping(binding.open_application);
+          const previousAutoHotkeyScript = normalizeAutoHotkeyScriptMapping(binding.autohotkey_script);
 
           if (isButton) {
             binding.action = !hasSelectedTarget
@@ -2026,6 +2043,8 @@ export function createBindingsFeature({
               ? "Hotkey"
               : hasOpenApplicationTarget
                 ? "OpenApplication"
+                : hasAutoHotkeyScriptTarget
+                  ? "RunAutoHotkeyScript"
               : (targetSelect.dataset.action || binding.action || "ToggleMute");
           } else {
             binding.action = "Volume";
@@ -2046,6 +2065,13 @@ export function createBindingsFeature({
             }
           }
 
+          if (isButton && !hasAutoHotkeyScriptTarget && previousHadAutoHotkeyScriptTarget) {
+            binding.autohotkey_script = null;
+            if (binding.action === "RunAutoHotkeyScript") {
+              binding.action = targetSelect.dataset.action || "ToggleMute";
+            }
+          }
+
           if (isButton && hasHotkeyTarget && !previousHadHotkeyTarget) {
             const learnedHotkey = await startHotkeyLearn(binding);
             if (!learnedHotkey) {
@@ -2053,6 +2079,7 @@ export function createBindingsFeature({
               binding.action = previousAction || "ToggleMute";
               binding.hotkey = previousHotkey;
               binding.open_application = previousOpenApplication;
+              binding.autohotkey_script = previousAutoHotkeyScript;
               await invoke("add_binding", { binding });
               renderBindings();
               finishBindingUiMutation("target rollback");
@@ -2070,11 +2097,32 @@ export function createBindingsFeature({
             binding.open_application = null;
           }
 
-          if (isButton && !hasHotkeyTarget && !hasOpenApplicationTarget && binding.action === "OpenApplication" && !binding.open_application) {
+          if (isButton && binding.action === "RunAutoHotkeyScript") {
+            binding.autohotkey_script = normalizeAutoHotkeyScriptMapping(
+              targetSelect?.getAutoHotkeyScript?.() || targetSelect?.__autoHotkeyScript,
+            );
+          } else {
+            binding.autohotkey_script = null;
+          }
+
+          if (isButton && !hasHotkeyTarget && !hasOpenApplicationTarget && !hasAutoHotkeyScriptTarget && binding.action === "OpenApplication" && !binding.open_application) {
             setTargets(binding, previousTargets);
             binding.action = previousAction || "ToggleMute";
             binding.hotkey = previousHotkey;
             binding.open_application = previousOpenApplication;
+            binding.autohotkey_script = previousAutoHotkeyScript;
+            await invoke("add_binding", { binding });
+            renderBindings();
+            finishBindingUiMutation("target rollback");
+            return;
+          }
+
+          if (isButton && !hasHotkeyTarget && !hasOpenApplicationTarget && !hasAutoHotkeyScriptTarget && binding.action === "RunAutoHotkeyScript" && !binding.autohotkey_script) {
+            setTargets(binding, previousTargets);
+            binding.action = previousAction || "ToggleMute";
+            binding.hotkey = previousHotkey;
+            binding.open_application = previousOpenApplication;
+            binding.autohotkey_script = previousAutoHotkeyScript;
             await invoke("add_binding", { binding });
             renderBindings();
             finishBindingUiMutation("target rollback");

@@ -1,6 +1,9 @@
 use crate::model::{self, Binding, BindingTarget};
 use crate::run_logger;
-use crate::runtime_helpers::{focus_window_by_process_name, send_hotkey};
+use crate::runtime_helpers::{
+    focus_window_by_process_name, open_path_with_shell_association, send_hotkey,
+};
+use std::path::Path;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -223,6 +226,104 @@ pub fn emit_localized_action_error(
     );
 }
 
+fn autohotkey_script_display(binding: &Binding) -> String {
+    binding
+        .autohotkey_script
+        .as_ref()
+        .map(|mapping| {
+            let display = mapping.display.trim();
+            if display.is_empty() {
+                mapping.path.trim()
+            } else {
+                display
+            }
+            .to_string()
+        })
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "AutoHotkey script".to_string())
+}
+
+pub fn run_autohotkey_script_action(app: &AppHandle, binding: &Binding, log_target: &str) {
+    let Some(script) = binding.autohotkey_script.as_ref() else {
+        run_logger::warn(
+            log_target,
+            "autohotkey_script_missing_config",
+            &format!("binding_id={}", binding.id),
+        );
+        emit_localized_action_error(
+            app,
+            "autohotkey_script_missing_config",
+            &binding.id,
+            "dialogs.autoHotkeyNotConfiguredTitle",
+            "dialogs.autoHotkeyNotConfiguredMessage",
+            serde_json::json!({}),
+        );
+        return;
+    };
+
+    let script_path = script.path.trim();
+    if script_path.is_empty() || !Path::new(script_path).is_file() {
+        let display = autohotkey_script_display(binding);
+        run_logger::warn(
+            log_target,
+            "autohotkey_script_path_missing",
+            &format!("binding_id={} path={}", binding.id, script_path),
+        );
+        emit_localized_action_error(
+            app,
+            "autohotkey_script_path_missing",
+            &binding.id,
+            "dialogs.autoHotkeyScriptNotFoundTitle",
+            "dialogs.autoHotkeyScriptNotFoundMessage",
+            serde_json::json!({ "name": display }),
+        );
+        return;
+    }
+
+    match open_path_with_shell_association(Path::new(script_path)) {
+        Ok(()) => {
+            run_logger::info(
+                log_target,
+                "autohotkey_script_launched",
+                &format!("binding_id={} path={}", binding.id, script_path),
+            );
+        }
+        Err(err) if err.starts_with("no_association:") => {
+            run_logger::warn(
+                log_target,
+                "autohotkey_script_no_association",
+                &format!("binding_id={} path={}", binding.id, script_path),
+            );
+            emit_localized_action_error(
+                app,
+                "autohotkey_script_no_association",
+                &binding.id,
+                "dialogs.autoHotkeyNoAssociationTitle",
+                "dialogs.autoHotkeyNoAssociationMessage",
+                serde_json::json!({}),
+            );
+        }
+        Err(err) => {
+            run_logger::error(
+                log_target,
+                "autohotkey_script_launch_failed",
+                &format!(
+                    "binding_id={} path={} error={}",
+                    binding.id, script_path, err
+                ),
+            );
+            emit_localized_action_error(
+                app,
+                "autohotkey_script_launch_failed",
+                &binding.id,
+                "dialogs.autoHotkeyLaunchFailedTitle",
+                "dialogs.autoHotkeyLaunchFailedMessage",
+                serde_json::json!({ "message": err }),
+            );
+        }
+    }
+}
+
 pub fn binding_focus_target_name(binding: &Binding) -> Option<String> {
     binding.normalized_targets().into_iter().find_map(|target| {
         if let BindingTarget::Application { name, .. } = target {
@@ -310,6 +411,10 @@ pub fn apply_special_button_action(
                 return true;
             }
             send_hotkey(&["META".to_string(), "ALT".to_string(), "R".to_string()]);
+            true
+        }
+        model::BindingAction::RunAutoHotkeyScript => {
+            run_autohotkey_script_action(app, binding, log_target);
             true
         }
         _ => false,

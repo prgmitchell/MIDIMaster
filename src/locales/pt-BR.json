@@ -278,6 +278,7 @@
   "targets.captureControls": "Controles de captura",
   "targets.hotkey": "Hotkey",
   "targets.openApplication": "Abra o aplicativo",
+  "targets.autoHotkeyScript": "AutoHotkey Script",
   "targets.integrationTarget": "Alvo de Integração",
   "targets.selectApplicationOrDevice": "Selecione um aplicativo ou dispositivo",
   "targets.unavailable": "Indisponível",
@@ -306,6 +307,7 @@
   "targets.description.captureAction": "Activar esta acção de captura de uma ligação de botões.",
   "targets.description.hotkey": "Activar um atalho de teclado de uma ligação de botões.",
   "targets.description.openApplication": "Lançar um aplicativo selecionado a partir de uma ligação de botões.",
+  "targets.description.autoHotkeyScript": "Run a selected .ahk script from a button binding.",
   "targets.description.savedApplicationUnavailable": "Alvo de aplicativo salvo não está disponível no momento.",
   "targets.description.applicationSession": "Sessão de áudio da aplicação.",
   "targets.description.savedDeviceUnavailable": "Alvo do dispositivo salvo não está disponível.",
@@ -368,5 +370,13 @@
   "dialogs.actionFailedMessage": "MIDIMaster não pôde completar esta ação.",
   "dialogs.focusWindowUnavailableTitle": "Janela Não Encontrada",
   "dialogs.focusWindowUnavailableMessage": "MIDIMaster não encontrou uma janela para \"{name}\".",
-  "dialogs.focusWindowMissingTargetMessage": "Escolha uma aplicação em execução para esta conexão de Foco na Janela."
+  "dialogs.focusWindowMissingTargetMessage": "Escolha uma aplicação em execução para esta conexão de Foco na Janela.",
+  "dialogs.autoHotkeyNotConfiguredTitle": "AutoHotkey Script Not Configured",
+  "dialogs.autoHotkeyNotConfiguredMessage": "Choose a .ahk file for this binding's AutoHotkey Script action.",
+  "dialogs.autoHotkeyScriptNotFoundTitle": "AutoHotkey Script Not Found",
+  "dialogs.autoHotkeyScriptNotFoundMessage": "MIDIMaster couldn't find \"{name}\". Re-select the .ahk file in this binding.",
+  "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey Not Configured",
+  "dialogs.autoHotkeyNoAssociationMessage": "Windows doesn't have an app associated with .ahk files. Install AutoHotkey or choose a default app for .ahk files.",
+  "dialogs.autoHotkeyLaunchFailedTitle": "Script Launch Failed",
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster couldn't run this AutoHotkey script: {message}"
 }

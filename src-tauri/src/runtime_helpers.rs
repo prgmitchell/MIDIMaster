@@ -211,6 +211,53 @@ pub(crate) fn focus_window_by_process_name(_process_name: &str) -> Result<(), St
 }
 
 #[cfg(target_os = "windows")]
+pub(crate) fn open_path_with_shell_association(path: &std::path::Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let file: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let operation: Vec<u16> = "open".encode_utf16().chain(Some(0)).collect();
+    let directory_path = path.parent().unwrap_or_else(|| std::path::Path::new(""));
+    let directory: Vec<u16> = directory_path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+
+    let result = unsafe {
+        ShellExecuteW(
+            Some(HWND::default()),
+            PCWSTR(operation.as_ptr()),
+            PCWSTR(file.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR(directory.as_ptr()),
+            SW_SHOWNORMAL,
+        )
+    };
+    let code = result.0 as isize;
+    if code > 32 {
+        return Ok(());
+    }
+
+    let reason = match code {
+        2 => "file_not_found",
+        3 => "path_not_found",
+        5 => "access_denied",
+        31 => "no_association",
+        _ => "shell_execute_failed",
+    };
+    Err(format!("{}:{}", reason, code))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn open_path_with_shell_association(_path: &std::path::Path) -> Result<(), String> {
+    Err("unsupported_platform".to_string())
+}
+
+#[cfg(target_os = "windows")]
 pub(crate) fn send_media_key(vk: u16) {
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,

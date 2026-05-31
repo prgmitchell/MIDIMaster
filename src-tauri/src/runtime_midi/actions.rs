@@ -1,4 +1,5 @@
 use super::update_activity_button_light_hold_feedback;
+use crate::binding_actions;
 use crate::bindings::BindingKey;
 use crate::model::{self, Binding, BindingTarget, MidiEvent};
 use crate::run_logger;
@@ -226,6 +227,21 @@ pub(super) fn handle_special_action(
                 );
             }
         }
+        return Ok(true);
+    }
+
+    if binding.action == model::BindingAction::RunAutoHotkeyScript {
+        if event.value == 0 {
+            emit_button_feedback(state, app, binding, event, targets, 0.0);
+            run_logger::debug(
+                "bindings",
+                "autohotkey_script_ignored_release",
+                &format!("binding_id={} action={:?}", binding.id, binding.action),
+            );
+            return Ok(true);
+        }
+        emit_button_feedback(state, app, binding, event, targets, 1.0);
+        binding_actions::run_autohotkey_script_action(app, binding, "bindings");
         return Ok(true);
     }
 

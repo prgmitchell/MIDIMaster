@@ -35,6 +35,7 @@ export function createTargetsFeature({
   let activeTargetPanelRefresh = null;
   const HOTKEY_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2' y='4' width='16' height='12' rx='3' fill='%231a2446' stroke='%2398a6cc' stroke-width='1.2'/><rect x='4' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='7' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='10' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='13' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='5.2' y='10.6' width='9.6' height='2.2' rx='0.8' fill='%23c7d2f3'/></svg>";
   const OPEN_APPLICATION_TARGET_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='3.6' width='15.6' height='12.8' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6.2 7.3h4.9M6.2 10h7.6M6.2 12.7h5.7' stroke='%23c7d2f3' stroke-width='1.3' stroke-linecap='round'/><path d='M12.3 5.2l2.9 2.9-2.9 2.9' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+  const AUTOHOTKEY_SCRIPT_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 2.8h7.1L16 6.7v10.5H5V2.8z' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M12.1 2.8v4h3.9' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M7.3 12.6l1.9-4.2 1.9 4.2M8 11.1h2.4M12.6 9.1v3.5' stroke='%238fd5ff' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const TOGGLE_MUTE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M3 8.2v3.6h2.6l3.3 2.8V5.4L5.6 8.2H3z' fill='%23c7d2f3'/><path d='M12.4 7.1l4.5 5.8M16.9 7.1l-4.5 5.8' stroke='%23f7a7a7' stroke-width='1.5' stroke-linecap='round'/></svg>";
   const SET_DEFAULT_DEVICE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='5' width='15.6' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6 10h4.6M8.6 7.4L11.2 10l-2.6 2.6' stroke='%23c7d2f3' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/><path d='M13.7 8.1v3.8M15.6 10l-1.9 1.9M11.8 10l1.9 1.9' stroke='%2386d6a7' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const WINDOW_FOCUS_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.5' y='4' width='15' height='12' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M2.5 7.5h15' stroke='%2398a6cc' stroke-width='1.2'/><path d='M8 11h4M10 9v4' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round'/></svg>";
@@ -54,6 +55,17 @@ export function createTargetsFeature({
       path,
       display: friendlyAppName(display || path) || display || path,
       icon_data: iconData,
+    };
+  }
+
+  function normalizeAutoHotkeyScript(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const path = String(raw.path || "").trim();
+    const display = String(raw.display || "").trim();
+    if (!path) return null;
+    return {
+      path,
+      display: displayNameFromPath(display || path) || display || path,
     };
   }
 
@@ -113,6 +125,19 @@ export function createTargetsFeature({
       path,
       display: friendlyAppName(display || path),
       icon_data: iconData,
+    };
+  }
+
+  async function pickAutoHotkeyScript() {
+    if (!callInvoke) return null;
+    const picked = await callInvoke("pick_autohotkey_script_path");
+    if (!picked) return null;
+    const path = String(picked.path || "").trim();
+    if (!path) return null;
+    const display = String(picked.display || "").trim();
+    return {
+      path,
+      display: displayNameFromPath(display || path) || display || path,
     };
   }
 
@@ -187,7 +212,7 @@ export function createTargetsFeature({
     if (option.category) return option.category;
     if (option.integrationId || option.integration_id) return "integrations";
     if (option.kind === "master" || option.kind === "focus") return "builtIn";
-    if (option.kind === "media-control" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
+    if (option.kind === "media-control" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
     if (option.kind === "integration-root" || option.kind === "integration-target" || option.kind === "integration-nav") return "integrations";
     if (option.kind === "session") return "applications";
     if (option.kind === "device") {
@@ -208,6 +233,7 @@ export function createTargetsFeature({
     if (option?.kind === "media-control") return t("targets.description.mediaControl");
     if (option?.kind === "hotkey-target") return t("targets.description.hotkey");
     if (option?.kind === "open-application-target") return t("targets.description.openApplication");
+    if (option?.kind === "autohotkey-script-target") return t("targets.description.autoHotkeyScript");
     if (option?.kind === "action-root" && option?.value === "window-focus") return t("targets.description.windowFocus");
     if (option?.kind === "action-root" && option?.value === "capture") return t("targets.description.captureControls");
     if (option?.kind === "capture-action") return t("targets.description.captureAction");
@@ -615,6 +641,7 @@ export function createTargetsFeature({
                   : currentTarget === "CaptureControl" ? "capture-control"
                   : currentTarget === "Hotkey" ? "hotkey-target"
                     : currentTarget === "OpenApplication" ? "open-application-target"
+                      : currentTarget === "AutoHotkeyScript" ? "autohotkey-script-target"
                 : "placeholder"
       );
 
@@ -622,7 +649,7 @@ export function createTargetsFeature({
     if (selectedKind === "integration-target") selectedValue = targetKey(integration);
     else if (selectedKind === "session") selectedValue = selectedAppKey || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
-    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "hotkey-target" || selectedKind === "open-application-target") selectedValue = selectedKind;
+    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
     const options = [
@@ -670,6 +697,12 @@ export function createTargetsFeature({
         label: t("targets.openApplication"),
         icon_data: OPEN_APPLICATION_TARGET_ICON_DATA,
         kind: "open-application-target",
+      });
+      options.push({
+        value: "autohotkey-script-target",
+        label: t("targets.autoHotkeyScript"),
+        icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA,
+        kind: "autohotkey-script-target",
       });
     }
 
@@ -818,6 +851,7 @@ export function createTargetsFeature({
     currentAction = "Volume",
     currentHotkeyDisplay = "",
     currentOpenApplication = null,
+    currentAutoHotkeyScript = null,
   ) {
     const container = document.createElement("div");
     container.className = "target-dropdown binding-target-dropdown";
@@ -854,6 +888,7 @@ export function createTargetsFeature({
       if (target === "CaptureControl") return "capture-control";
       if (target === "Hotkey") return "hotkey-target";
       if (target === "OpenApplication") return "open-application-target";
+      if (target === "AutoHotkeyScript") return "autohotkey-script-target";
       const integration = target?.Integration || target?.integration;
       if (integration) {
         return `integration:${targetKey(integration)}`;
@@ -878,6 +913,9 @@ export function createTargetsFeature({
     let selectedActionKind = "";
     let selectedOpenApplication = isBindingButton
       ? normalizeOpenApplication(currentOpenApplication)
+      : null;
+    let selectedAutoHotkeyScript = isBindingButton
+      ? normalizeAutoHotkeyScript(currentAutoHotkeyScript)
       : null;
 
     const { options, selectedValue, selectedKind, activeIntegrationOption } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
@@ -933,6 +971,7 @@ export function createTargetsFeature({
       if (action === "SnipScreenshot") return t("targets.action.snipScreenshot");
       if (action === "ToggleScreenRecording") return t("targets.action.toggleScreenRecording");
       if (action === "Hotkey") return t("targets.hotkey");
+      if (action === "RunAutoHotkeyScript") return t("targets.autoHotkeyScript");
       if (action === "ToggleMute") return t("targets.action.toggleMute");
       if (action === "SetDefaultDevice") return t("targets.action.setDefault");
       if (action === "OpenApplication") return t("targets.openApplication");
@@ -961,6 +1000,13 @@ export function createTargetsFeature({
             || resolveOpenApplicationIcon(selectedOpenApplication)
             || cached?.icon_data
             || OPEN_APPLICATION_TARGET_ICON_DATA,
+        };
+      }
+      if (target === "AutoHotkeyScript") {
+        const scriptLabel = displayNameFromPath(selectedAutoHotkeyScript?.display || selectedAutoHotkeyScript?.path || "") || t("targets.autoHotkeyScript");
+        return {
+          label: scriptLabel,
+          icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA,
         };
       }
       if (target === "CaptureControl") {
@@ -1093,6 +1139,9 @@ export function createTargetsFeature({
       if (option.kind === "open-application-target") {
         return "OpenApplication";
       }
+      if (option.kind === "autohotkey-script-target") {
+        return "AutoHotkeyScript";
+      }
       if (option.kind === "device") {
         return { Device: { device_id: option.value } };
       }
@@ -1115,6 +1164,7 @@ export function createTargetsFeature({
       container.__selectedTargets = [...selectedTargets];
       container.__selectedTarget = selectedTargets[0] || "Unset";
       container.__openApplication = selectedOpenApplication;
+      container.__autoHotkeyScript = selectedAutoHotkeyScript;
       container.value = selectedTargets.length ? targetIdentity(selectedTargets[0]) : "";
       container.dataset.kind = selectedTargets.length ? "multi" : "placeholder";
       container.classList.toggle("target-unavailable", Boolean(markUnavailable && selectedTargets.length <= 1));
@@ -1139,11 +1189,20 @@ export function createTargetsFeature({
       if (nextActionValue !== "OpenApplication") {
         selectedOpenApplication = null;
       }
+      if (nextActionValue !== "RunAutoHotkeyScript") {
+        selectedAutoHotkeyScript = null;
+      }
       const chosenOpenApplication = normalizeOpenApplication(
         actionChoice?.openApplication || actionChoice?.open_application,
       );
       if (chosenOpenApplication) {
         selectedOpenApplication = chosenOpenApplication;
+      }
+      const chosenAutoHotkeyScript = normalizeAutoHotkeyScript(
+        actionChoice?.autoHotkeyScript || actionChoice?.autohotkey_script,
+      );
+      if (chosenAutoHotkeyScript) {
+        selectedAutoHotkeyScript = chosenAutoHotkeyScript;
       }
       if (nextActionLabel && option && typeof option === "object") {
         option.__selectedActionLabel = nextActionLabel;
@@ -1162,6 +1221,9 @@ export function createTargetsFeature({
       if (mapped === "OpenApplication") {
         selectedAction = "OpenApplication";
       }
+      if (mapped === "AutoHotkeyScript") {
+        selectedAction = "RunAutoHotkeyScript";
+      }
       const key = targetIdentity(mapped);
       const cachedLabel = String(option?.label || "").trim();
       if (cachedLabel || option?.icon_data) {
@@ -1172,7 +1234,9 @@ export function createTargetsFeature({
       }
       const exists = selectedTargets.findIndex((t) => targetIdentity(t) === key);
       const updatesExistingAction = exists >= 0 && nextActionValue && option?.kind === "capture-action";
-      if (updatesExistingAction) {
+      const updatesExistingFileTarget = exists >= 0
+        && (option?.kind === "open-application-target" || option?.kind === "autohotkey-script-target");
+      if (updatesExistingAction || updatesExistingFileTarget) {
         selectedTargets[exists] = mapped;
       } else if (exists >= 0) {
         selectedTargets.splice(exists, 1);
@@ -1395,6 +1459,22 @@ export function createTargetsFeature({
               return false;
             }
 
+            if (isBindingButton && targetOption.kind === "autohotkey-script-target") {
+              (async () => {
+                try {
+                  const autoHotkeyScript = await pickAutoHotkeyScript();
+                  if (!autoHotkeyScript) return;
+                  selectOption(targetOption, {
+                    value: "RunAutoHotkeyScript",
+                    label: t("targets.autoHotkeyScript"),
+                    autoHotkeyScript,
+                  });
+                  closeTargetPanel();
+                } catch { }
+              })();
+              return false;
+            }
+
             if (isBindingButton && targetOption.kind !== "hotkey-target") {
               return chooseButtonTarget(targetOption, openRootTargetPanel);
             }
@@ -1542,6 +1622,7 @@ export function createTargetsFeature({
       setDisplay();
     };
     container.getOpenApplication = () => selectedOpenApplication;
+    container.getAutoHotkeyScript = () => selectedAutoHotkeyScript;
     return container;
   }
 

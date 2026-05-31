@@ -278,6 +278,7 @@
   "targets.captureControls": "捕获控制",
   "targets.hotkey": "热键",
   "targets.openApplication": "打开应用程序",
+  "targets.autoHotkeyScript": "AutoHotkey Script",
   "targets.integrationTarget": "整合目标",
   "targets.selectApplicationOrDevice": "选择应用程序或设备",
   "targets.unavailable": "无法获取",
@@ -306,6 +307,7 @@
   "targets.description.captureAction": "从按钮绑定时触发此抓取动作 .",
   "targets.description.hotkey": "从按钮绑定时触发键盘快捷键 .",
   "targets.description.openApplication": "从按钮绑定中启动一个选中的应用程序 .",
+  "targets.description.autoHotkeyScript": "Run a selected .ahk script from a button binding.",
   "targets.description.savedApplicationUnavailable": "保存的应用程序目标目前无法使用 .",
   "targets.description.applicationSession": "应用程序音频会话 .",
   "targets.description.savedDeviceUnavailable": "保存的设备目标目前无法使用 .",
@@ -368,5 +370,13 @@
   "dialogs.actionFailedMessage": "MIDIMaster 无法完成此操作 .",
   "dialogs.focusWindowUnavailableTitle": "未找到窗口",
   "dialogs.focusWindowUnavailableMessage": "MIDIMaster 找不到 \"{name}\" 的运行窗口。",
-  "dialogs.focusWindowMissingTargetMessage": "选择此窗口焦点绑定的运行中的应用程序 ."
+  "dialogs.focusWindowMissingTargetMessage": "选择此窗口焦点绑定的运行中的应用程序 .",
+  "dialogs.autoHotkeyNotConfiguredTitle": "AutoHotkey Script Not Configured",
+  "dialogs.autoHotkeyNotConfiguredMessage": "Choose a .ahk file for this binding's AutoHotkey Script action.",
+  "dialogs.autoHotkeyScriptNotFoundTitle": "AutoHotkey Script Not Found",
+  "dialogs.autoHotkeyScriptNotFoundMessage": "MIDIMaster couldn't find \"{name}\". Re-select the .ahk file in this binding.",
+  "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey Not Configured",
+  "dialogs.autoHotkeyNoAssociationMessage": "Windows doesn't have an app associated with .ahk files. Install AutoHotkey or choose a default app for .ahk files.",
+  "dialogs.autoHotkeyLaunchFailedTitle": "Script Launch Failed",
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster couldn't run this AutoHotkey script: {message}"
 }

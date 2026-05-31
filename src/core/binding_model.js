@@ -138,6 +138,13 @@ export function normalizeBinding(binding) {
       : null;
     out.open_application = path ? { path, display: display || path, icon_data } : null;
   }
+  if (!out.autohotkey_script || typeof out.autohotkey_script !== "object") {
+    out.autohotkey_script = null;
+  } else {
+    const path = String(out.autohotkey_script.path || "").trim();
+    const display = String(out.autohotkey_script.display || "").trim();
+    out.autohotkey_script = path ? { path, display: display || path } : null;
+  }
   return out;
 }
 

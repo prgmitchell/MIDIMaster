@@ -175,6 +175,10 @@ export function isOpenApplicationTarget(target) {
   return target === "OpenApplication";
 }
 
+export function isAutoHotkeyScriptTarget(target) {
+  return target === "AutoHotkeyScript";
+}
+
 export function getTargets(binding) {
   return getBindingTargets(binding);
 }

@@ -360,6 +360,7 @@ impl AppState {
                     | model::BindingAction::MediaStop
                     | model::BindingAction::Hotkey
                     | model::BindingAction::OpenApplication
+                    | model::BindingAction::RunAutoHotkeyScript
                     | model::BindingAction::SetDefaultDevice
             ) {
                 if let Some(value) = idle_feedback_value {
@@ -416,6 +417,7 @@ impl AppState {
                     model::BindingTarget::CaptureControl => None,
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
+                    model::BindingTarget::AutoHotkeyScript => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             } else {
@@ -475,6 +477,7 @@ impl AppState {
                     model::BindingTarget::CaptureControl => None,
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
+                    model::BindingTarget::AutoHotkeyScript => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             };

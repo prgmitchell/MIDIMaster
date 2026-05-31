@@ -151,6 +151,24 @@ function testIntegrationVisualBehaviorKinds() {
   assert.equal(bindingModel.resolveButtonVisualActive(momentary, { inputValue: 0, stateValue: 1 }), false);
 }
 
+function testNormalizeBindingPreservesAutoHotkeyScriptMapping() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "RunAutoHotkeyScript",
+    target: "AutoHotkeyScript",
+    autohotkey_script: {
+      path: " C:\\Users\\Test\\Scripts\\mute-toggle.ahk ",
+      display: " mute-toggle.ahk ",
+    },
+  }));
+
+  assert.deepEqual(normalized.targets, ["AutoHotkeyScript"]);
+  assert.deepEqual(normalized.autohotkey_script, {
+    path: "C:\\Users\\Test\\Scripts\\mute-toggle.ahk",
+    display: "mute-toggle.ahk",
+  });
+  assert.equal(bindingModel.buttonVisualBehavior(normalized), "momentary");
+}
+
 testNormalizeBindingPreservesExplicitRelativeFormat();
 testExplicitRelativeFormatsDecodeWithoutAutoState();
 testAutoDetectionMatchesBackendMidpointRule();
@@ -161,5 +179,6 @@ testMomentaryButtonFollowsInputValue();
 testMappedLightDoesNotControlButtonVisualState();
 testToggleMuteFollowsMutedState();
 testIntegrationVisualBehaviorKinds();
+testNormalizeBindingPreservesAutoHotkeyScriptMapping();
 
 console.log("Binding model tests passed");
