@@ -136,22 +136,10 @@
           <div class="page-heading-row">
             <h1 data-i18n="bindings.title">Bindings</h1>
             <div class="bindings-toolbar">
-              <div id="binding-type-filter" class="target-dropdown binding-type-filter">
-                <button id="binding-type-filter-button" type="button" class="target-button binding-filter-button" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter bindings" title="Filter bindings" data-i18n-aria-label="bindings.typeFilterLabel" data-i18n-title="bindings.typeFilterLabel">
-                  <span id="binding-type-filter-current" class="binding-type-filter-current">All</span>
-                  <span class="caret" aria-hidden="true">▾</span>
-                </button>
-                <div id="binding-type-filter-menu" class="target-menu hidden" role="listbox" aria-label="Filter bindings" data-i18n-aria-label="bindings.typeFilterLabel">
-                  <button type="button" class="target-option selected" role="option" aria-selected="true" data-filter="all">
-                    <span data-i18n="bindings.filterAll">All</span>
-                  </button>
-                  <button type="button" class="target-option" role="option" aria-selected="false" data-filter="faders">
-                    <span data-i18n="bindings.filterFaders">Faders</span>
-                  </button>
-                  <button type="button" class="target-option" role="option" aria-selected="false" data-filter="buttons">
-                    <span data-i18n="bindings.filterButtons">Buttons</span>
-                  </button>
-                </div>
+              <div id="binding-type-filter" class="binding-type-filter" role="group" aria-label="Filter bindings" title="Filter bindings" data-i18n-aria-label="bindings.typeFilterLabel" data-i18n-title="bindings.typeFilterLabel">
+                <button type="button" class="binding-type-segment selected" aria-pressed="true" data-filter="all" data-i18n="bindings.filterAll">All</button>
+                <button type="button" class="binding-type-segment" aria-pressed="false" data-filter="faders" data-i18n="bindings.filterFaders">Faders</button>
+                <button type="button" class="binding-type-segment" aria-pressed="false" data-filter="buttons" data-i18n="bindings.filterButtons">Buttons</button>
               </div>
               <label class="binding-search-field">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">

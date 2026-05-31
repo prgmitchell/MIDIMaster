@@ -165,18 +165,15 @@ export function createBindingsFeature({
     const options = bindingTypeFilterOptions();
     const active = options.find((option) => option.value === currentFilter) || options[0];
 
-    if (d.bindingTypeFilterCurrent) {
-      d.bindingTypeFilterCurrent.textContent = active.label;
-    }
-    if (d.bindingTypeFilterButton) {
+    if (d.bindingTypeFilter) {
       const label = t("bindings.typeFilterLabel");
-      d.bindingTypeFilterButton.title = label;
-      d.bindingTypeFilterButton.setAttribute("aria-label", `${label}: ${active.label}`);
+      d.bindingTypeFilter.title = `${label}: ${active.label}`;
+      d.bindingTypeFilter.setAttribute("aria-label", label);
     }
-    d.bindingTypeFilterMenu?.querySelectorAll("[data-filter]").forEach((optionButton) => {
+    d.bindingTypeFilter?.querySelectorAll("[data-filter]").forEach((optionButton) => {
       const selected = normalizeBindingTypeFilter(optionButton.dataset?.filter) === currentFilter;
       optionButton.classList.toggle("selected", selected);
-      optionButton.setAttribute("aria-selected", selected ? "true" : "false");
+      optionButton.setAttribute("aria-pressed", selected ? "true" : "false");
     });
   }
 
@@ -192,30 +189,12 @@ export function createBindingsFeature({
 
   function bindBindingTypeFilterUi() {
     const root = d.bindingTypeFilter;
-    const trigger = d.bindingTypeFilterButton;
-    const menu = d.bindingTypeFilterMenu;
-    if (!root || !trigger || !menu) return;
+    if (!root) return;
 
-    root.__positionDropdownMenu = () => {
-      positionFloatingDropdownMenu({
-        menu,
-        trigger,
-        minHeight: 118,
-        maxHeight: 180,
-      });
-      const menuWidth = Math.max(160, Math.min(220, (window.innerWidth || 220) - 28));
-      menu.style.width = `${menuWidth}px`;
-      menu.style.minWidth = `${menuWidth}px`;
-    };
-    wireDropdownToggle({ root, menu, trigger });
-
-    menu.querySelectorAll("[data-filter]").forEach((optionButton) => {
+    root.querySelectorAll("[data-filter]").forEach((optionButton) => {
       optionButton.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        root.classList.remove("open");
-        menu.classList.add("hidden");
-        trigger.setAttribute("aria-expanded", "false");
         setBindingTypeFilter(optionButton.dataset?.filter);
       });
     });

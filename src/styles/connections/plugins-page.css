@@ -1092,7 +1092,7 @@ body[data-theme] .profile-select .dropdown-item button.icon-action:hover {
 }
 
 body[data-theme] .binding-add-button,
-body[data-theme] .binding-filter-button,
+body[data-theme] .binding-type-filter,
 body[data-theme] .binding-search-field,
 body[data-theme] .topbar .midi-device-dropdown .target-button,
 body[data-theme] .profile-select .select-button {
@@ -1111,7 +1111,6 @@ body[data-theme] .binding-add-button:focus-visible {
 }
 
 body[data-theme] .binding-add-button:hover,
-body[data-theme] .binding-filter-button:hover,
 body[data-theme] .binding-search-field:focus-within,
 body[data-theme] .topbar .midi-device-dropdown .target-button:hover,
 body[data-theme] .profile-select .select-button:hover {

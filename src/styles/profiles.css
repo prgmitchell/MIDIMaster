@@ -44,11 +44,9 @@ body[data-theme] .binding-type-filter {
   grid-column: 1;
 }
 
-body[data-theme] .bindings-toolbar .binding-filter-button {
+body[data-theme] .bindings-toolbar .binding-type-filter {
   height: 40px;
   min-height: 40px;
-  width: 112px;
-  min-width: 112px;
 }
 
 body[data-theme] .binding-search-field {

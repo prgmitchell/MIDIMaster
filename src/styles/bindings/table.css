@@ -14,7 +14,6 @@
 }
 
 .binding-add-button,
-.binding-filter-button,
 .binding-search-field {
   height: 42px;
   border: 1px solid var(--line-strong);
@@ -60,27 +59,63 @@
 
 .binding-type-filter {
   order: 0;
-  flex: 0 0 auto;
-  min-width: 112px;
-}
-
-.binding-type-filter .target-menu {
-  min-width: 160px;
-}
-
-.binding-filter-button {
-  width: 112px;
-  min-width: 112px;
-  justify-content: space-between;
-  padding: 0 14px;
-  font-weight: 650;
-}
-
-.binding-type-filter-current {
+  flex: 0 0 clamp(190px, 22vw, 232px);
+  width: clamp(190px, 22vw, 232px);
   min-width: 0;
+  height: 42px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--control-bg);
+}
+
+.binding-type-segment {
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.binding-type-segment:hover {
+  background: var(--control-bg-hover);
+  color: var(--text);
+}
+
+.binding-type-segment.selected {
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+@media (max-width: 760px) {
+  .bindings-toolbar {
+    gap: 10px;
+  }
+
+  .binding-type-filter {
+    flex-basis: 168px;
+    width: 168px;
+  }
+
+  .binding-type-segment {
+    padding: 0 4px;
+    font-size: 11px;
+  }
+
+  .binding-add-button {
+    padding: 0 12px;
+  }
 }
 
 .bindings-card {
@@ -1207,14 +1242,24 @@ body[data-theme] .binding-add-button:hover {
   color: #fff;
 }
 
-body[data-theme] .binding-filter-button {
-  display: inline-flex;
-  width: 112px;
-  min-width: 112px;
-  justify-content: space-between;
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 700;
+body[data-theme] .binding-type-filter {
+  border-color: var(--control-border);
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface-raised) 28%);
+}
+
+body[data-theme] .binding-type-segment {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-type-segment:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-type-segment.selected {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 54%, transparent);
 }
 
 body[data-theme] .binding-value-cell {

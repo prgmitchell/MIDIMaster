@@ -61,7 +61,8 @@ body.dark-mode:not([data-theme]) main {
 .topbar-icon-button,
 .binding-add-button,
 .binding-search-field,
-.binding-filter-button,
+.binding-type-filter,
+.binding-type-segment,
 .binding-action {
   color: inherit;
 }
@@ -79,7 +80,6 @@ body.dark-mode:not([data-theme]) main {
 .topbar-icon-button svg,
 .binding-add-button svg,
 .binding-search-field svg,
-.binding-filter-button svg,
 .binding-action svg {
   width: 18px;
   height: 18px;
@@ -137,7 +137,7 @@ body.dark-mode:not([data-theme]) .topbar-icon-button:hover {
 }
 
 body.dark-mode:not([data-theme]) .binding-add-button,
-body.dark-mode:not([data-theme]) .binding-filter-button,
+body.dark-mode:not([data-theme]) .binding-type-filter,
 body.dark-mode:not([data-theme]) .binding-search-field {
   height: 42px;
   border: 1px solid #303945;
@@ -180,17 +180,23 @@ body.dark-mode:not([data-theme]) .binding-search-field input::placeholder {
   color: #8d96a3;
 }
 
-body.dark-mode:not([data-theme]) .binding-filter-button {
-  min-width: 150px;
-  justify-content: center;
+body.dark-mode:not([data-theme]) .binding-type-filter {
   color: #d3dbe5;
-  padding: 0 16px;
 }
 
-body.dark-mode:not([data-theme]) .binding-filter-button:disabled {
-  opacity: 1;
+body.dark-mode:not([data-theme]) .binding-type-segment {
   color: #d3dbe5;
-  background: #111820;
+}
+
+body.dark-mode:not([data-theme]) .binding-type-segment:hover {
+  background: #162130;
+  color: #edf3fa;
+}
+
+body.dark-mode:not([data-theme]) .binding-type-segment.selected {
+  background: rgba(90, 169, 255, 0.18);
+  color: #edf3fa;
+  box-shadow: inset 0 0 0 1px rgba(90, 169, 255, 0.56);
 }
 
 body.dark-mode:not([data-theme]) .bindings-card {
