@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  TAURI_CLI_VERSION: 2.11.2
+
 jobs:
   build-and-release-windows:
     runs-on: windows-latest
@@ -16,8 +19,6 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
 
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
@@ -25,6 +26,15 @@ jobs:
           workspaces: |
             src-tauri -> target
           shared-key: windows-rust-v1
+
+      - name: Restore Tauri CLI cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-tauri.exe
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-tauri-cli-${{ env.TAURI_CLI_VERSION }}-v1
 
       - name: Validate tag matches app version
         shell: pwsh
@@ -46,15 +56,20 @@ jobs:
         shell: pwsh
         run: |
           $timer = Measure-Command {
-            & cargo tauri --version *> $null
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "Tauri CLI already available from cache."
-            } else {
-              Push-Location "src-tauri"
-              try {
-                cargo install tauri-cli --version "^2" --locked
-              } finally {
-                Pop-Location
+            $expectedVersion = [regex]::Escape($env:TAURI_CLI_VERSION)
+            $versionOutput = (& cargo tauri --version 2>$null)
+            $hasExpectedVersion = $LASTEXITCODE -eq 0 -and $versionOutput -match "tauri-cli\s+$expectedVersion\b"
+
+            if ($hasExpectedVersion) {
+              Write-Host "Tauri CLI $env:TAURI_CLI_VERSION already available from cache."
+            }
+            else {
+              cargo install tauri-cli --version $env:TAURI_CLI_VERSION --locked --force
+              if ($LASTEXITCODE -ne 0) { throw "Failed to install Tauri CLI $env:TAURI_CLI_VERSION." }
+
+              $versionOutput = (& cargo tauri --version).Trim()
+              if ($versionOutput -notmatch "tauri-cli\s+$expectedVersion\b") {
+                throw "Expected Tauri CLI $env:TAURI_CLI_VERSION, got '$versionOutput'."
               }
             }
           }
@@ -64,7 +79,13 @@ jobs:
         shell: pwsh
         run: |
           $timer = Measure-Command {
-            choco install nsis --no-progress -y
+            $makensis = Get-Command makensis -ErrorAction SilentlyContinue
+            if ($makensis) {
+              Write-Host "NSIS already available at $($makensis.Source)."
+            }
+            else {
+              choco install nsis --no-progress -y
+            }
           }
           Write-Host ("NSIS setup completed in {0:N1}s" -f $timer.TotalSeconds)
 
@@ -274,7 +295,6 @@ jobs:
           $includeSig = @("1", "true", "yes", "on") -contains $includeSigRaw.Trim().ToLowerInvariant()
 
           $files = @(
-            "src-tauri/target/release/midimaster.exe"
             "src-tauri/target/release/bundle/nsis/*.exe"
           )
 
