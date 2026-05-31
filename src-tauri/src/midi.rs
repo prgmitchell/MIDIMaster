@@ -576,9 +576,7 @@ fn build_feedback_message(
 ) -> FeedbackMessage {
     let logical = build_direct_feedback_bytes(channel, controller, value, msg_type);
     if let Some(binding) = binding {
-        if let Some(physical) =
-            build_xtouch_mini_mc_vpot_feedback(binding, value, output_device_name)
-        {
+        if let Some(physical) = build_xtouch_mc_vpot_feedback(binding, value, output_device_name) {
             return FeedbackMessage {
                 logical_bytes: logical.bytes,
                 logical_raw_midi_value: logical.raw_midi_value,
@@ -588,7 +586,7 @@ fn build_feedback_message(
                 physical_msg_type: physical.msg_type,
                 physical_raw_midi_value: physical.raw_midi_value,
                 normalized_value: logical.normalized_value,
-                protocol: "xtouch_mini_mc_vpot_fan",
+                protocol: "xtouch_mc_vpot_fan",
             };
         }
     }
@@ -666,12 +664,12 @@ fn build_direct_feedback_bytes(
     }
 }
 
-fn build_xtouch_mini_mc_vpot_feedback(
+fn build_xtouch_mc_vpot_feedback(
     binding: &Binding,
     value: f32,
     output_device_name: &str,
 ) -> Option<FeedbackBytes> {
-    if !is_xtouch_mini_output(output_device_name)
+    if !is_xtouch_mc_vpot_output(output_device_name)
         || binding.action != BindingAction::Volume
         || binding.mode != MidiMode::Relative
         || binding.control.msg_type != MidiMessageType::ControlChange
@@ -684,7 +682,7 @@ fn build_xtouch_mini_mc_vpot_feedback(
     let normalized_value = value.clamp(0.0, 1.0);
     let knob_index = binding.control.controller - 16;
     let physical_controller = 48 + knob_index;
-    let raw_midi_value = xtouch_mini_mc_vpot_fan_value(normalized_value);
+    let raw_midi_value = xtouch_mc_vpot_fan_value(normalized_value);
     Some(FeedbackBytes {
         bytes: vec![0xB0, physical_controller, raw_midi_value as u8],
         channel: 0,
@@ -695,13 +693,14 @@ fn build_xtouch_mini_mc_vpot_feedback(
     })
 }
 
-fn is_xtouch_mini_output(output_device_name: &str) -> bool {
-    output_device_name
-        .to_ascii_uppercase()
-        .contains("X-TOUCH MINI")
+fn is_xtouch_mc_vpot_output(output_device_name: &str) -> bool {
+    let normalized_name = output_device_name.to_ascii_uppercase();
+    normalized_name.contains("X-TOUCH MINI")
+        || normalized_name.contains("X-TOUCH-EXT")
+        || normalized_name.contains("X-TOUCH EXTENDER")
 }
 
-fn xtouch_mini_mc_vpot_fan_value(normalized_value: f32) -> u16 {
+fn xtouch_mc_vpot_fan_value(normalized_value: f32) -> u16 {
     let value = normalized_value.clamp(0.0, 1.0);
     if value <= 0.0 {
         return 0;
@@ -1143,7 +1142,7 @@ mod tests {
             Some(&binding),
             "X-TOUCH MINI",
         );
-        assert_eq!(off.protocol, "xtouch_mini_mc_vpot_fan");
+        assert_eq!(off.protocol, "xtouch_mc_vpot_fan");
         assert_eq!(off.logical_bytes, vec![0xB0, 0x10, 0x00]);
         assert_eq!(off.physical_bytes, vec![0xB0, 0x30, 0x00]);
 
@@ -1182,7 +1181,39 @@ mod tests {
             "X-TOUCH MINI",
         );
 
-        assert_eq!(feedback.protocol, "xtouch_mini_mc_vpot_fan");
+        assert_eq!(feedback.protocol, "xtouch_mc_vpot_fan");
+        assert_eq!(feedback.physical_bytes, vec![0xB0, 0x37, 0x2B]);
+    }
+
+    #[test]
+    fn xtouch_ext_knob_one_relative_volume_maps_to_vpot_fan_feedback() {
+        let binding = xtouch_mini_mc_volume_binding(16);
+        let feedback = build_feedback_message(
+            0,
+            16,
+            0.5,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-Touch-Ext",
+        );
+
+        assert_eq!(feedback.protocol, "xtouch_mc_vpot_fan");
+        assert_eq!(feedback.physical_bytes, vec![0xB0, 0x30, 0x26]);
+    }
+
+    #[test]
+    fn xtouch_ext_knob_eight_relative_volume_maps_to_vpot_eight() {
+        let binding = xtouch_mini_mc_volume_binding(23);
+        let feedback = build_feedback_message(
+            0,
+            23,
+            1.0,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-Touch-Ext",
+        );
+
+        assert_eq!(feedback.protocol, "xtouch_mc_vpot_fan");
         assert_eq!(feedback.physical_bytes, vec![0xB0, 0x37, 0x2B]);
     }
 
