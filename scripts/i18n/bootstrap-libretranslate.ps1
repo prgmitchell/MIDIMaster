@@ -40,14 +40,19 @@ if ($UpdateModels) {
   $args += "--update-models"
 }
 
-$process = Start-Process `
-  -FilePath $libreTranslateExe `
-  -ArgumentList $args `
-  -WorkingDirectory $toolRoot `
-  -RedirectStandardOutput $stdoutLogPath `
-  -RedirectStandardError $stderrLogPath `
-  -WindowStyle Hidden `
-  -PassThru
+$startArgs = @{
+  FilePath = $libreTranslateExe
+  WorkingDirectory = $toolRoot
+  RedirectStandardOutput = $stdoutLogPath
+  RedirectStandardError = $stderrLogPath
+  WindowStyle = "Hidden"
+  PassThru = $true
+}
+if ($args.Count -gt 0) {
+  $startArgs.ArgumentList = $args
+}
+
+$process = Start-Process @startArgs
 
 Write-Host "Started LibreTranslate process $($process.Id). Waiting for $readyUri ..."
 
