@@ -613,7 +613,9 @@ function stripDeviceStateSuffix(label) {
 }
 
 function showMain(inputName, outputName, options = {}) {
-  mainScreen?.classList?.remove?.("hidden");
+  if (mainScreen?.classList?.contains?.("active")) {
+    mainScreen.classList.remove("hidden");
+  }
   const input = stripDeviceStateSuffix(inputName) || t("midi.notSelected");
   const output = stripDeviceStateSuffix(outputName) || t("midi.notSelected");
   midiStatus.textContent = t("midi.statusConnected", { input, output });
