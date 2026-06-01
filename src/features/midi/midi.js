@@ -7,9 +7,10 @@ import {
 } from "../ui/dropdown_select.js";
 import {
   findConnectedAliveDevice,
-  findDeviceMatch,
   findPreferredDevice,
   normalizeMidiPreference,
+  resolveMidiDeviceDropdownState,
+  resolvePreferredMidiDevicePair,
   stripUnavailableSuffix,
   unavailableDeviceLabel,
 } from "./device_preferences.js";
@@ -35,8 +36,8 @@ export function createMidiFeature({
   const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   const MIDI_ENUM_MIN_INTERVAL_MS = 5000;
   const MIDI_ENUM_STALE_MS = 3000;
-  const MIDI_AVAILABILITY_INTERVAL_MS = 15000;
-  const MIDI_AUTO_REFRESH_INTERVAL_MS = 10000;
+  const MIDI_AVAILABILITY_INTERVAL_MS = 3000;
+  const MIDI_AUTO_REFRESH_INTERVAL_MS = 3000;
   const MIDI_OUTPUT_ENUM_DELAY_MS = 250;
   const LEARN_POLL_MS = 50;
 
@@ -163,7 +164,7 @@ export function createMidiFeature({
     }
   }
 
-  function renderDeviceDropdownForSelect(selectEl, menuEl, displayEl, fallbackText) {
+  function renderDeviceDropdownForSelect(selectEl, menuEl, displayEl, fallbackText, connectedDeviceId = "") {
     if (!selectEl || !menuEl || !displayEl) return;
     renderNativeSelectDropdown({
       entry: { menu: menuEl, display: displayEl },
@@ -181,17 +182,32 @@ export function createMidiFeature({
 
     const root = menuEl.closest(".midi-device-dropdown");
     const selected = selectEl.selectedOptions?.[0] || null;
-    const hasValue = Boolean(String(selectEl.value || "").trim());
-    const unavailable = hasValue && selected?.dataset?.unavailable === "true";
-    root?.classList.toggle("device-connected", hasValue && !unavailable);
-    root?.classList.toggle("device-unavailable", unavailable);
-    root?.classList.toggle("device-empty", !hasValue);
+    const state = resolveMidiDeviceDropdownState({
+      selectedValue: selectEl.value,
+      selectedUnavailable: selected?.dataset?.unavailable === "true",
+      connectedDeviceId,
+    });
+    root?.classList.toggle("device-connected", state.connected);
+    root?.classList.toggle("device-unavailable", state.unavailable);
+    root?.classList.toggle("device-empty", state.empty);
   }
 
   function renderDeviceDropdowns() {
     ensureDeviceDropdowns();
-    renderDeviceDropdownForSelect(d.midiSelect, inputMenuEl, inputDisplayEl, t("midi.selectInputDevice"));
-    renderDeviceDropdownForSelect(d.midiOutputSelect, outputMenuEl, outputDisplayEl, t("midi.selectOutputDevice"));
+    renderDeviceDropdownForSelect(
+      d.midiSelect,
+      inputMenuEl,
+      inputDisplayEl,
+      t("midi.selectInputDevice"),
+      connectedInputId,
+    );
+    renderDeviceDropdownForSelect(
+      d.midiOutputSelect,
+      outputMenuEl,
+      outputDisplayEl,
+      t("midi.selectOutputDevice"),
+      connectedOutputId,
+    );
   }
 
   function hasPreference(pref) {
@@ -327,7 +343,10 @@ export function createMidiFeature({
     if (d.midiSelect) d.midiSelect.value = nextInputId;
     if (d.midiOutputSelect) d.midiOutputSelect.value = nextOutputId;
 
+    stopSessionRefresh();
     await invoke("stop_midi_device").catch(() => { });
+    setConnectedState("", "", "", "");
+    renderDeviceDropdowns();
     await invoke("start_midi_device", { inputDeviceId: nextInputId, outputDeviceId: nextOutputId });
 
     const resolvedInputName = inputName
@@ -418,16 +437,13 @@ export function createMidiFeature({
       const currentlyConnected = Boolean(connectedInputId && connectedOutputId);
       if (!prefAvailable && !currentlyConnected) return;
 
-      const deviceSnapshot = await enumerateMidiDevices({ reason: "availability" });
+      const deviceSnapshot = await enumerateMidiDevices({ force: true, reason: "availability" });
       const devices = deviceSnapshot.inputs;
       const outputDevices = deviceSnapshot.outputs;
-      const inputMatch = prefAvailable
-        ? findPreferredDevice(devices, pref.inputDeviceId, pref.inputDeviceName)
-        : null;
-      const outputMatch = prefAvailable
-        ? findPreferredDevice(outputDevices, pref.outputDeviceId, pref.outputDeviceName)
-        : null;
-      const preferredNowAvailable = Boolean(inputMatch && outputMatch);
+      const preferredPair = resolvePreferredMidiDevicePair(deviceSnapshot, pref);
+      let inputMatch = preferredPair.inputMatch;
+      let outputMatch = preferredPair.outputMatch;
+      let preferredNowAvailable = preferredPair.available;
 
       if (currentlyConnected) {
         const activeInputAlive = findConnectedAliveDevice(devices, connectedInputId, connectedInputName);
@@ -444,12 +460,20 @@ export function createMidiFeature({
           if (d.midiStatus) {
             d.midiStatus.textContent = t("midi.disconnected");
           }
-          refreshDevicesIfStale("disconnect");
+          await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "disconnect" });
           return;
         }
       }
 
       if (prefAvailable && !currentlyConnected && preferredNowAvailable && !suspendProfileAutoReconnect) {
+        const refreshed = await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "reconnect_available" });
+        const refreshedPair = resolvePreferredMidiDevicePair(refreshed, pref);
+        inputMatch = refreshedPair.inputMatch;
+        outputMatch = refreshedPair.outputMatch;
+        preferredNowAvailable = refreshedPair.available;
+        if (!preferredNowAvailable) {
+          return;
+        }
         try {
           await startWithResolvedDevice(inputMatch, outputMatch, {
             inputName: pref.inputDeviceName,
@@ -562,10 +586,12 @@ export function createMidiFeature({
 
   async function refreshMidiDevices(options = {}) {
     try {
-      const snapshot = await enumerateMidiDevices({
-        force: Boolean(options.force),
-        reason: options.reason || "refresh",
-      });
+      const snapshot = options.snapshot && typeof options.snapshot === "object"
+        ? options.snapshot
+        : await enumerateMidiDevices({
+          force: Boolean(options.force),
+          reason: options.reason || "refresh",
+        });
       const devices = snapshot.inputs;
       const outputDevices = snapshot.outputs;
 

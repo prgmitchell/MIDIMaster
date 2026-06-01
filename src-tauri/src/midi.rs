@@ -7,13 +7,16 @@ use midir::{
 };
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const MIDI_PORT_PREFIX: &str = "midi:";
 const LOG_MIDI_MESSAGES: bool = false;
 const MIDI_DIAGNOSTIC_MIN_INTERVAL_MS: u128 = 250;
+const EMPTY_INPUT_ENUMERATION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 static INPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
 static OUTPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
+static EMPTY_INPUT_ENUMERATION_LOG_STATE: OnceLock<Mutex<EmptyEnumerationLogState>> =
+    OnceLock::new();
 static INPUT_DIAGNOSTICS: OnceLock<Mutex<HashMap<MidiDiagnosticKey, MidiDiagnosticState>>> =
     OnceLock::new();
 static FEEDBACK_DIAGNOSTICS: OnceLock<Mutex<HashMap<MidiDiagnosticKey, MidiDiagnosticState>>> =
@@ -32,6 +35,12 @@ struct MidiDiagnosticState {
     last_seen_value: u16,
     last_logged_value: u16,
     last_logged_at: Instant,
+}
+
+#[derive(Debug, Default)]
+struct EmptyEnumerationLogState {
+    empty_since_last_non_empty: bool,
+    last_logged_at: Option<Instant>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -84,11 +93,7 @@ impl MidiManager {
             });
         }
         if devices.is_empty() {
-            run_logger::warn(
-                "midi",
-                "input_enumeration_empty",
-                "retrying input enumeration",
-            );
+            log_empty_input_enumeration_if_needed();
             let midi_in_retry = MidiInput::new("MIDIMaster")?;
             let ports = midi_in_retry.ports();
             for (index, port) in ports.iter().enumerate() {
@@ -100,6 +105,9 @@ impl MidiManager {
                     name,
                 });
             }
+        }
+        if !devices.is_empty() {
+            note_non_empty_input_enumeration();
         }
         log_inventory_if_changed("input", &devices);
         Ok(devices)
@@ -861,6 +869,61 @@ fn format_midi_bytes(bytes: &[u8]) -> String {
         .join("-")
 }
 
+fn should_log_empty_enumeration(
+    state: &mut EmptyEnumerationLogState,
+    now: Instant,
+    interval: Duration,
+) -> bool {
+    if !state.empty_since_last_non_empty {
+        state.empty_since_last_non_empty = true;
+        state.last_logged_at = Some(now);
+        return true;
+    }
+
+    let elapsed = state
+        .last_logged_at
+        .map(|last| now.duration_since(last))
+        .unwrap_or(interval);
+    if elapsed >= interval {
+        state.last_logged_at = Some(now);
+        return true;
+    }
+
+    false
+}
+
+fn note_non_empty_enumeration(state: &mut EmptyEnumerationLogState) {
+    state.empty_since_last_non_empty = false;
+    state.last_logged_at = None;
+}
+
+fn log_empty_input_enumeration_if_needed() {
+    let slot = EMPTY_INPUT_ENUMERATION_LOG_STATE
+        .get_or_init(|| Mutex::new(EmptyEnumerationLogState::default()));
+    let Ok(mut state) = slot.lock() else {
+        return;
+    };
+    if should_log_empty_enumeration(
+        &mut state,
+        Instant::now(),
+        EMPTY_INPUT_ENUMERATION_LOG_INTERVAL,
+    ) {
+        run_logger::warn(
+            "midi",
+            "input_enumeration_empty",
+            "retrying input enumeration",
+        );
+    }
+}
+
+fn note_non_empty_input_enumeration() {
+    let slot = EMPTY_INPUT_ENUMERATION_LOG_STATE
+        .get_or_init(|| Mutex::new(EmptyEnumerationLogState::default()));
+    if let Ok(mut state) = slot.lock() {
+        note_non_empty_enumeration(&mut state);
+    }
+}
+
 fn log_inventory_if_changed(kind: &str, devices: &[DeviceInfo]) {
     let signature = devices
         .iter()
@@ -1021,6 +1084,40 @@ mod tests {
             open_application: None,
             autohotkey_script: None,
         }
+    }
+
+    #[test]
+    fn empty_enumeration_logging_is_rate_limited() {
+        let mut state = EmptyEnumerationLogState::default();
+        let start = Instant::now();
+        let interval = Duration::from_secs(60);
+
+        assert!(should_log_empty_enumeration(&mut state, start, interval));
+        assert!(!should_log_empty_enumeration(
+            &mut state,
+            start + Duration::from_secs(3),
+            interval
+        ));
+        assert!(should_log_empty_enumeration(
+            &mut state,
+            start + Duration::from_secs(61),
+            interval
+        ));
+    }
+
+    #[test]
+    fn empty_enumeration_logging_resets_after_devices_return() {
+        let mut state = EmptyEnumerationLogState::default();
+        let start = Instant::now();
+        let interval = Duration::from_secs(60);
+
+        assert!(should_log_empty_enumeration(&mut state, start, interval));
+        note_non_empty_enumeration(&mut state);
+        assert!(should_log_empty_enumeration(
+            &mut state,
+            start + Duration::from_secs(3),
+            interval
+        ));
     }
 
     #[test]

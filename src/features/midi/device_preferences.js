@@ -45,6 +45,44 @@ export function findConnectedAliveDevice(devices, expectedId, expectedName) {
   return findDeviceMatch(list, expectedId, expectedName);
 }
 
+export function resolvePreferredMidiDevicePair(deviceSnapshot, preference) {
+  const pref = normalizeMidiPreference(preference);
+  const inputs = Array.isArray(deviceSnapshot?.inputs) ? deviceSnapshot.inputs : [];
+  const outputs = Array.isArray(deviceSnapshot?.outputs) ? deviceSnapshot.outputs : [];
+  const hasPairPreference = Boolean(pref.inputDeviceId && pref.outputDeviceId);
+  const inputMatch = hasPairPreference
+    ? findPreferredDevice(inputs, pref.inputDeviceId, pref.inputDeviceName)
+    : null;
+  const outputMatch = hasPairPreference
+    ? findPreferredDevice(outputs, pref.outputDeviceId, pref.outputDeviceName)
+    : null;
+
+  return {
+    preference: pref,
+    inputMatch,
+    outputMatch,
+    available: Boolean(inputMatch && outputMatch),
+  };
+}
+
+export function resolveMidiDeviceDropdownState({
+  selectedValue = "",
+  selectedUnavailable = false,
+  connectedDeviceId = "",
+} = {}) {
+  const value = String(selectedValue || "").trim();
+  const connectedId = String(connectedDeviceId || "").trim();
+  const unavailable = Boolean(value && selectedUnavailable);
+  const connected = Boolean(value && !unavailable && connectedId && value === connectedId);
+
+  return {
+    empty: !value,
+    unavailable,
+    connected,
+    available: Boolean(value && !unavailable),
+  };
+}
+
 export function unavailableDeviceLabel(name, id, kind) {
   const base = String(name || id || `${kind} device`).trim();
   return `${base} (Unavailable)`;
