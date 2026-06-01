@@ -97,6 +97,10 @@ pub(crate) struct AppState {
     pub(crate) app_settings: Mutex<AppSettings>,
 }
 
+pub(crate) struct FeedbackSyncSnapshot {
+    pub(crate) focused_session: Option<model::SessionInfo>,
+}
+
 impl AppState {
     fn clear_focus_volume_failure_log(&self, binding_id: &str) {
         if let Ok(mut logs) = self.focus_volume_failure_logs.lock() {
@@ -236,6 +240,45 @@ impl AppState {
             .and_then(|values| values.get(key).copied())
     }
 
+    pub(crate) fn sync_relative_volume_binding_state(&self, binding: &model::Binding, value: f32) {
+        if binding.action != model::BindingAction::Volume
+            || binding.mode != model::MidiMode::Relative
+        {
+            return;
+        }
+
+        let key = BindingKey::from_binding(binding);
+        let normalized = value.clamp(0.0, 1.0);
+        let now = Instant::now();
+        let idle_update = now.checked_sub(Duration::from_secs(1)).unwrap_or(now);
+
+        if let Ok(mut states) = self.binding_state.lock() {
+            match states.entry(key.clone()) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    let state = entry.get_mut();
+                    let user_active = match key.msg_type {
+                        model::MidiMessageType::Note => state.last_value > 0.5,
+                        _ => state.last_update.elapsed().as_millis() < 500,
+                    };
+                    if !user_active {
+                        state.last_value = normalized;
+                    }
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(BindingState {
+                        last_value: normalized,
+                        last_update: idle_update,
+                        relative_auto_format: None,
+                        relative_seen_midpoint: false,
+                        relative_seen_sign_band: false,
+                        relative_seen_high_negative: false,
+                        relative_seen_low_negative_hint: false,
+                    });
+                }
+            }
+        }
+    }
+
     pub(crate) fn current_target_mute_state(&self, target: &model::BindingTarget) -> Option<bool> {
         match target {
             model::BindingTarget::Master => self
@@ -318,26 +361,44 @@ impl AppState {
         }
     }
 
-    pub(crate) fn sync_feedback_values(&self, profile: &Profile) {
+    pub(crate) fn sync_feedback_values(&self, profile: &Profile) -> FeedbackSyncSnapshot {
         let sessions = match self.audio.list_sessions() {
             Ok(sessions) => sessions,
-            Err(_) => return,
+            Err(_) => {
+                return FeedbackSyncSnapshot {
+                    focused_session: None,
+                }
+            }
         };
+        let focused_session = self.audio.focused_session().ok().flatten();
         let playback_devices = self.audio.list_playback_devices().unwrap_or_default();
         let recording_devices = self.audio.list_recording_devices().unwrap_or_default();
         let mut feedback = match self.feedback_values.lock() {
             Ok(feedback) => feedback,
-            Err(_) => return,
+            Err(_) => {
+                return FeedbackSyncSnapshot {
+                    focused_session: None,
+                }
+            }
         };
         let mut mute_transition_until = match self.mute_transition_until.lock() {
             Ok(map) => map,
-            Err(_) => return,
+            Err(_) => {
+                return FeedbackSyncSnapshot {
+                    focused_session: None,
+                }
+            }
         };
         let mut last_target_mute_state = match self.last_target_mute_state.lock() {
             Ok(map) => map,
-            Err(_) => return,
+            Err(_) => {
+                return FeedbackSyncSnapshot {
+                    focused_session: None,
+                }
+            }
         };
         let now = Instant::now();
+        let mut relative_volume_state_updates = Vec::new();
 
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
@@ -376,12 +437,11 @@ impl AppState {
                         .iter()
                         .find(|session| session.is_master)
                         .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
-                    model::BindingTarget::Focus => self
-                        .audio
-                        .focused_session()
-                        .ok()
-                        .flatten()
-                        .map(|s| if s.is_muted { 1.0 } else { 0.0 }),
+                    model::BindingTarget::Focus => {
+                        focused_session
+                            .as_ref()
+                            .map(|session| if session.is_muted { 1.0 } else { 0.0 })
+                    }
                     model::BindingTarget::Session { session_id } => sessions
                         .iter()
                         .find(|session| session.id == *session_id)
@@ -429,7 +489,10 @@ impl AppState {
                             current_target_muted = Some(session.is_muted);
                             session.volume
                         }),
-                    model::BindingTarget::Focus => None,
+                    model::BindingTarget::Focus => focused_session.as_ref().map(|session| {
+                        current_target_muted = Some(session.is_muted);
+                        session.volume
+                    }),
                     model::BindingTarget::Session { session_id } => sessions
                         .iter()
                         .find(|session| session.id == *session_id)
@@ -484,6 +547,11 @@ impl AppState {
 
             if let Some(mut val) = value {
                 self.set_binding_action_value(&key, val);
+                if binding.action == model::BindingAction::Volume
+                    && binding.mode == model::MidiMode::Relative
+                {
+                    relative_volume_state_updates.push((binding.clone(), val));
+                }
                 if binding.action != model::BindingAction::ToggleMute {
                     if let Some(muted) = current_target_muted {
                         if let Some(previous_muted) = last_target_mute_state.get(&key).cloned() {
@@ -513,6 +581,16 @@ impl AppState {
                 feedback.insert(key, value);
             }
         }
+
+        drop(last_target_mute_state);
+        drop(mute_transition_until);
+        drop(feedback);
+
+        for (binding, value) in relative_volume_state_updates {
+            self.sync_relative_volume_binding_state(&binding, value);
+        }
+
+        FeedbackSyncSnapshot { focused_session }
     }
 
     pub(crate) fn send_idle_button_light_feedback_values(&self, profile: &Profile) {

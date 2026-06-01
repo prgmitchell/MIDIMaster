@@ -66,12 +66,14 @@ export function createTargetCore({
   getSessions,
   getPlaybackDevices,
   getRecordingDevices,
+  getFocusedSession,
   getPluginHost,
   getIntegrationTargetState,
 }) {
   const getSess = (typeof getSessions === "function") ? getSessions : (() => []);
   const getPlayback = (typeof getPlaybackDevices === "function") ? getPlaybackDevices : (() => []);
   const getRecording = (typeof getRecordingDevices === "function") ? getRecordingDevices : (() => []);
+  const getFocus = (typeof getFocusedSession === "function") ? getFocusedSession : (() => null);
   const getHost = (typeof getPluginHost === "function") ? getPluginHost : (() => null);
   const getIntegrationState = (typeof getIntegrationTargetState === "function")
     ? getIntegrationTargetState
@@ -82,11 +84,12 @@ export function createTargetCore({
     const playbackDevices = getPlayback();
     const recordingDevices = getRecording();
     const pluginHost = getHost();
+    const currentFocusSession = focusSession || getFocus();
 
     if (!target) {
       return { label: "Volume", icon_data: masterIconData };
     }
-    const focusName = focusSession?.display_name?.trim();
+    const focusName = currentFocusSession?.display_name?.trim();
     if (typeof target === "string") {
       if (target === "Master") {
         return { label: "Master", icon_data: masterIconData };
@@ -94,7 +97,7 @@ export function createTargetCore({
       if (target === "Focus") {
         return {
           label: focusName ? `Focused: ${focusName}` : "Focused App",
-          icon_data: focusSession?.icon_data ?? focusIconData,
+          icon_data: currentFocusSession?.icon_data ?? focusIconData,
         };
       }
       if (target === "MediaControl") {
@@ -114,7 +117,7 @@ export function createTargetCore({
     if (targetType === "Focus" || target?.Focus != null) {
       return {
         label: focusName ? `Focused: ${focusName}` : "Focused App",
-        icon_data: focusSession?.icon_data ?? focusIconData,
+        icon_data: currentFocusSession?.icon_data ?? focusIconData,
       };
     }
 
@@ -298,6 +301,7 @@ export function createTargetCore({
     const sessions = getSess();
     const playbackDevices = getPlayback();
     const recordingDevices = getRecording();
+    const currentFocusSession = getFocus();
 
     if (!target) return null;
     if (target === "Master") {
@@ -305,7 +309,7 @@ export function createTargetCore({
       return master?.volume ?? null;
     }
     if (target === "Focus" || target?.Focus != null) {
-      return null;
+      return currentFocusSession?.volume ?? null;
     }
     if (target === "MediaControl") {
       return null;
@@ -364,6 +368,7 @@ export function createTargetCore({
     const sessions = getSess();
     const playbackDevices = getPlayback();
     const recordingDevices = getRecording();
+    const currentFocusSession = getFocus();
 
     if (!target) return null;
 
@@ -373,7 +378,7 @@ export function createTargetCore({
     }
 
     if (target === "Focus" || target?.Focus != null) {
-      return null;
+      return currentFocusSession?.volume ?? null;
     }
 
     if (target === "MediaControl") {
@@ -428,6 +433,7 @@ export function createTargetCore({
     const sessions = getSess();
     const playbackDevices = getPlayback();
     const recordingDevices = getRecording();
+    const currentFocusSession = getFocus();
 
     if (!target) return false;
 
@@ -437,7 +443,7 @@ export function createTargetCore({
     }
 
     if (target === "Focus" || target?.Focus != null) {
-      return false;
+      return Boolean(currentFocusSession?.is_muted ?? currentFocusSession?.muted ?? false);
     }
 
     if (target === "MediaControl") {

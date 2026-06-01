@@ -7,6 +7,11 @@ pub fn list_sessions(state: State<AppState>) -> Result<Vec<SessionInfo>, String>
 }
 
 #[tauri::command]
+pub fn focused_session(state: State<AppState>) -> Result<Option<SessionInfo>, String> {
+    state.audio.focused_session().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn list_playback_devices(state: State<AppState>) -> Result<Vec<PlaybackDeviceInfo>, String> {
     state
         .audio

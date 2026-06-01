@@ -230,6 +230,7 @@ function bindTauriApi() {
 }
 
 let sessions = [];
+let focusedSession = null;
 let playbackDevices = [];
 let recordingDevices = [];
 let bindings = [];
@@ -514,6 +515,7 @@ const targetCore = createTargetCore({
   focusIconData,
   mediaPlayPauseIconData,
   getSessions: () => sessions,
+  getFocusedSession: () => focusedSession,
   getPlaybackDevices: () => playbackDevices,
   getRecordingDevices: () => recordingDevices,
   getPluginHost,
@@ -751,16 +753,32 @@ function updateBindingValues() {
   bindingsFeature?.updateBindingValues?.();
 }
 
+function updateFocusedSessionState(nextFocusedSession) {
+  const normalized = nextFocusedSession && typeof nextFocusedSession === "object"
+    ? nextFocusedSession
+    : null;
+  if (JSON.stringify(normalized) === JSON.stringify(focusedSession ?? null)) {
+    return;
+  }
+  focusedSession = normalized;
+  bindingsFeature?.updateBindingTargetDisplays?.();
+  if (!isBindingInteractionActive()) {
+    bindingsFeature?.updateBindingValues?.();
+  }
+}
+
 const sessionRefresher = createSessionRefresher({
   invoke,
   getState: () => ({
     sessions,
+    focusedSession,
     playbackDevices,
     recordingDevices,
     sessionsContainer,
   }),
   setState: (next) => {
     if (Object.prototype.hasOwnProperty.call(next, "sessions")) sessions = next.sessions;
+    if (Object.prototype.hasOwnProperty.call(next, "focusedSession")) focusedSession = next.focusedSession;
     if (Object.prototype.hasOwnProperty.call(next, "playbackDevices")) playbackDevices = next.playbackDevices;
     if (Object.prototype.hasOwnProperty.call(next, "recordingDevices")) recordingDevices = next.recordingDevices;
   },
@@ -768,6 +786,7 @@ const sessionRefresher = createSessionRefresher({
     isBindingInteractionActive,
     renderBindings,
     updateBindingValues,
+    updateBindingTargetDisplays: () => bindingsFeature?.updateBindingTargetDisplays?.(),
   },
 });
 
@@ -1993,6 +2012,18 @@ async function setupListeners() {
     }
   });
 
+  await listen("focused_session_update", (event) => {
+    let payload = event.payload ?? null;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        payload = null;
+      }
+    }
+    updateFocusedSessionState(payload);
+  });
+
   await listen("mute_update", (event) => {
     if (!osdSettings.enabled && isOsdWindow) {
       return;
@@ -2007,6 +2038,9 @@ async function setupListeners() {
     }
     if (!payload) return;
     updateIntegrationStateFromEventPayload(payload);
+    if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
+      updateFocusedSessionState(payload.focus_session);
+    }
 
     if (payload.binding_id != null && typeof payload.muted === "boolean") {
       bindingMuteValues[payload.binding_id] = payload.muted;
@@ -2056,6 +2090,9 @@ async function setupListeners() {
       return;
     }
     updateIntegrationStateFromEventPayload(payload);
+    if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
+      updateFocusedSessionState(payload.focus_session);
+    }
 
     const buttonInputValue = typeof payload.input_value === "number" ? payload.input_value : null;
     const feedbackBinding = payload.binding_id

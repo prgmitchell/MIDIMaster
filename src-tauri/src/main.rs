@@ -340,6 +340,7 @@ fn main() {
             open_logs_folder,
             pick_executable_path,
             pick_autohotkey_script_path,
+            focused_session,
             list_playback_devices,
             list_recording_devices,
             set_master_volume,
@@ -395,17 +396,19 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bindings::{BindingKey, BindingState};
     use crate::model::LearnedControl;
     use crate::runtime_helpers::{
         cc_learn_value_is_definitely_continuous, classify_learned_control, LearnCandidate,
     };
     use anyhow::Result;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
 
     struct TestAudioBackend {
         sessions: Vec<model::SessionInfo>,
         playback_devices: Vec<model::PlaybackDeviceInfo>,
         recording_devices: Vec<model::PlaybackDeviceInfo>,
+        focused_session: Option<model::SessionInfo>,
     }
 
     impl TestAudioBackend {
@@ -414,7 +417,13 @@ mod tests {
                 sessions,
                 playback_devices: Vec::new(),
                 recording_devices: Vec::new(),
+                focused_session: None,
             }
+        }
+
+        fn with_focused_session(mut self, focused_session: model::SessionInfo) -> Self {
+            self.focused_session = Some(focused_session);
+            self
         }
     }
 
@@ -452,7 +461,7 @@ mod tests {
         }
 
         fn focused_session(&self) -> Result<Option<model::SessionInfo>> {
-            Ok(None)
+            Ok(self.focused_session.clone())
         }
 
         fn set_master_mute(&self, _muted: bool) -> Result<()> {
@@ -529,6 +538,111 @@ mod tests {
             last_seen_at: now,
             saw_zero,
             saw_max,
+        }
+    }
+
+    fn session_info(name: &str, volume: f32, is_muted: bool) -> model::SessionInfo {
+        model::SessionInfo {
+            id: format!("session-{}", name.to_lowercase()),
+            display_name: name.to_string(),
+            process_name: Some(format!("{}.exe", name.to_lowercase())),
+            process_path: Some(format!("C:\\Program Files\\{}\\{}.exe", name, name)),
+            icon_data: None,
+            volume,
+            is_muted,
+            is_master: false,
+        }
+    }
+
+    fn relative_application_volume_binding(app_name: &str) -> model::Binding {
+        model::Binding {
+            id: "binding-relative-app".to_string(),
+            name: "Relative App".to_string(),
+            device_id: "device".to_string(),
+            control: model::MidiControl {
+                channel: 0,
+                controller: 42,
+                msg_type: model::MidiMessageType::ControlChange,
+            },
+            control_kind: model::BindingControlKind::Continuous,
+            targets: vec![model::BindingTarget::Application {
+                name: app_name.to_string(),
+                display_name: Some("Firefox".to_string()),
+                icon_data: None,
+            }],
+            target: model::BindingTarget::Application {
+                name: app_name.to_string(),
+                display_name: Some("Firefox".to_string()),
+                icon_data: None,
+            },
+            action: model::BindingAction::Volume,
+            mode: model::MidiMode::Relative,
+            relative_format: model::RelativeFormat::Auto,
+            fader_curve: model::FaderCurve::Linear,
+            custom_curve: Vec::new(),
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: model::MuteBehavior::ToggleOnPress,
+            button_light_mode: model::ButtonLightMode::Activity,
+            mute_control: None,
+            assign_control: None,
+            assign_mode: model::AssignMode::Add,
+            hotkey: None,
+            open_application: None,
+            autohotkey_script: None,
+        }
+    }
+
+    fn focus_volume_binding(mode: model::MidiMode) -> model::Binding {
+        model::Binding {
+            id: "binding-focus".to_string(),
+            name: "Focused App".to_string(),
+            device_id: "device".to_string(),
+            control: model::MidiControl {
+                channel: 0,
+                controller: 43,
+                msg_type: model::MidiMessageType::ControlChange,
+            },
+            control_kind: model::BindingControlKind::Continuous,
+            targets: vec![model::BindingTarget::Focus],
+            target: model::BindingTarget::Focus,
+            action: model::BindingAction::Volume,
+            mode,
+            relative_format: model::RelativeFormat::Auto,
+            fader_curve: model::FaderCurve::Linear,
+            custom_curve: Vec::new(),
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: model::MuteBehavior::ToggleOnPress,
+            button_light_mode: model::ButtonLightMode::Activity,
+            mute_control: None,
+            assign_control: None,
+            assign_mode: model::AssignMode::Add,
+            hotkey: None,
+            open_application: None,
+            autohotkey_script: None,
+        }
+    }
+
+    fn profile_with_binding(binding: model::Binding) -> model::Profile {
+        model::Profile {
+            name: "Default".to_string(),
+            bindings: vec![binding],
+            osd_settings: model::OsdSettings::default(),
+            plugin_settings: HashMap::new(),
+            midi_device_preference: model::MidiDevicePreference::default(),
+        }
+    }
+
+    fn binding_state_with_update(last_value: f32, last_update: Instant) -> BindingState {
+        BindingState {
+            last_value,
+            last_update,
+            relative_auto_format: None,
+            relative_seen_midpoint: false,
+            relative_seen_sign_band: false,
+            relative_seen_high_negative: false,
+            relative_seen_low_negative_hint: false,
         }
     }
 
@@ -657,6 +771,183 @@ mod tests {
                 Some(true)
             ),
             Some(false)
+        );
+    }
+
+    #[test]
+    fn relative_volume_state_syncs_from_live_application_volume() {
+        let state = test_app_state(TestAudioBackend::new(vec![model::SessionInfo {
+            id: "session-firefox".to_string(),
+            display_name: "Firefox".to_string(),
+            process_name: Some("firefox.exe".to_string()),
+            process_path: Some("C:\\Program Files\\Mozilla Firefox\\firefox.exe".to_string()),
+            icon_data: None,
+            volume: 1.0,
+            is_muted: false,
+            is_master: false,
+        }]));
+        let binding = relative_application_volume_binding("firefox");
+        let key = BindingKey::from_binding(&binding);
+        state.binding_state.lock().unwrap().insert(
+            key.clone(),
+            binding_state_with_update(
+                0.5,
+                Instant::now()
+                    .checked_sub(Duration::from_secs(1))
+                    .unwrap_or_else(Instant::now),
+            ),
+        );
+
+        state.sync_feedback_values(&profile_with_binding(binding));
+
+        let synced = state
+            .binding_state
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|value| value.last_value)
+            .unwrap();
+        assert!((synced - 1.0).abs() < f32::EPSILON);
+        assert!((state.binding_action_value(&key).unwrap() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn relative_volume_state_sync_preserves_active_user_input() {
+        let state = test_app_state(TestAudioBackend::new(vec![model::SessionInfo {
+            id: "session-firefox".to_string(),
+            display_name: "Firefox".to_string(),
+            process_name: Some("firefox.exe".to_string()),
+            process_path: Some("C:\\Program Files\\Mozilla Firefox\\firefox.exe".to_string()),
+            icon_data: None,
+            volume: 1.0,
+            is_muted: false,
+            is_master: false,
+        }]));
+        let binding = relative_application_volume_binding("firefox");
+        let key = BindingKey::from_binding(&binding);
+        state
+            .binding_state
+            .lock()
+            .unwrap()
+            .insert(key.clone(), binding_state_with_update(0.5, Instant::now()));
+
+        state.sync_feedback_values(&profile_with_binding(binding));
+
+        let synced = state
+            .binding_state
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|value| value.last_value)
+            .unwrap();
+        assert!((synced - 0.5).abs() < f32::EPSILON);
+        assert!((state.binding_action_value(&key).unwrap() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn focus_volume_feedback_syncs_from_focused_session() {
+        let focused = session_info("Firefox", 0.76, false);
+        let state = test_app_state(TestAudioBackend::new(vec![]).with_focused_session(focused));
+        let binding = focus_volume_binding(model::MidiMode::Absolute);
+        let key = BindingKey::from_binding(&binding);
+
+        state.sync_feedback_values(&profile_with_binding(binding));
+
+        assert!((state.binding_action_value(&key).unwrap() - 0.76).abs() < f32::EPSILON);
+        assert!(
+            (state
+                .feedback_values
+                .lock()
+                .unwrap()
+                .get(&key)
+                .copied()
+                .unwrap()
+                - 0.76)
+                .abs()
+                < f32::EPSILON
+        );
+    }
+
+    #[test]
+    fn relative_focus_volume_state_syncs_from_focused_session_when_idle() {
+        let focused = session_info("Firefox", 0.76, false);
+        let state = test_app_state(TestAudioBackend::new(vec![]).with_focused_session(focused));
+        let binding = focus_volume_binding(model::MidiMode::Relative);
+        let key = BindingKey::from_binding(&binding);
+        state.binding_state.lock().unwrap().insert(
+            key.clone(),
+            binding_state_with_update(
+                0.5,
+                Instant::now()
+                    .checked_sub(Duration::from_secs(1))
+                    .unwrap_or_else(Instant::now),
+            ),
+        );
+
+        state.sync_feedback_values(&profile_with_binding(binding));
+
+        let synced = state
+            .binding_state
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|value| value.last_value)
+            .unwrap();
+        assert!((synced - 0.76).abs() < f32::EPSILON);
+        assert!((state.binding_action_value(&key).unwrap() - 0.76).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn relative_focus_volume_state_preserves_active_user_input() {
+        let focused = session_info("Firefox", 0.76, false);
+        let state = test_app_state(TestAudioBackend::new(vec![]).with_focused_session(focused));
+        let binding = focus_volume_binding(model::MidiMode::Relative);
+        let key = BindingKey::from_binding(&binding);
+        state
+            .binding_state
+            .lock()
+            .unwrap()
+            .insert(key.clone(), binding_state_with_update(0.5, Instant::now()));
+
+        state.sync_feedback_values(&profile_with_binding(binding));
+
+        let synced = state
+            .binding_state
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|value| value.last_value)
+            .unwrap();
+        assert!((synced - 0.5).abs() < f32::EPSILON);
+        assert!((state.binding_action_value(&key).unwrap() - 0.76).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn focus_volume_without_focused_session_preserves_existing_feedback() {
+        let state = test_app_state(TestAudioBackend::new(vec![]));
+        let binding = focus_volume_binding(model::MidiMode::Absolute);
+        let key = BindingKey::from_binding(&binding);
+        state
+            .feedback_values
+            .lock()
+            .unwrap()
+            .insert(key.clone(), 0.33);
+        state.set_binding_action_value(&key, 0.44);
+
+        state.sync_feedback_values(&profile_with_binding(binding));
+
+        assert!((state.binding_action_value(&key).unwrap() - 0.44).abs() < f32::EPSILON);
+        assert!(
+            (state
+                .feedback_values
+                .lock()
+                .unwrap()
+                .get(&key)
+                .copied()
+                .unwrap()
+                - 0.33)
+                .abs()
+                < f32::EPSILON
         );
     }
 

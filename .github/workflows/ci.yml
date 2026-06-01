@@ -47,6 +47,12 @@ jobs:
       - name: Test frontend binding model
         run: node scripts/test-binding-model.mjs
 
+      - name: Test frontend binding value sync
+        run: node scripts/test-binding-value-sync.mjs
+
+      - name: Test frontend focus target core
+        run: node scripts/test-target-core-focus.mjs
+
       - name: Test bundled Hue plugin
         run: node scripts/test-hue-plugin.mjs
 

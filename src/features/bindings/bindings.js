@@ -34,6 +34,10 @@ import {
   resolveButtonVisualActive,
   setTargets,
 } from "./shape_helpers.js";
+import {
+  resolveBindingVolumeValue,
+  resolveTargetChangeVolumeValue,
+} from "./value_sync.js";
 
 export function createBindingsFeature({
   invoke,
@@ -538,6 +542,15 @@ export function createBindingsFeature({
     }
   }
 
+  function resolveRenderedBindingVolume(bindingId, target) {
+    return resolveBindingVolumeValue({
+      bindingId,
+      targetVolume: getVol(target),
+      cachedVolume: bindingId != null ? bindingLastValues[bindingId] : null,
+      interactionTimes: bindingInteractionTimes,
+    });
+  }
+
   function scheduleSliderActionFlush(bindingId) {
     const entry = pendingSliderActionsByBinding.get(bindingId);
     if (!entry || entry.timer || entry.inFlight) return;
@@ -629,6 +642,8 @@ export function createBindingsFeature({
   }
 
   function updateBindingValues() {
+    updateBindingTargetDisplays();
+
     const sliders = document.querySelectorAll(".binding-volume-slider");
     sliders.forEach((slider) => {
       const lastMidiUpdate = Number(slider.dataset.lastMidiUpdate || 0);
@@ -641,10 +656,16 @@ export function createBindingsFeature({
         return;
       }
 
-      const vol = getVol(target);
-      if (vol !== null && Math.abs(Number(slider.value) - vol) > 0.01) {
-        setSliderVolume(slider, vol);
-        invoke("update_midi_feedback", { target, value: vol, action: "Volume" });
+      const bindingId = slider.dataset.bindingId;
+      const resolved = resolveRenderedBindingVolume(bindingId, target);
+      if (resolved.source === "target") {
+        if (bindingId) {
+          bindingLastValues[bindingId] = resolved.value;
+        }
+        if (Math.abs(Number(slider.value) - resolved.value) > 0.01) {
+          setSliderVolume(slider, resolved.value, { bindingId });
+          invoke("update_midi_feedback", { target, value: resolved.value, action: "Volume" });
+        }
       }
     });
 
@@ -667,6 +688,21 @@ export function createBindingsFeature({
         setMuteButtonState(btn, nextMuted);
       }
     });
+  }
+
+  function updateBindingTargetDisplays() {
+    document.querySelectorAll(".binding-target-dropdown").forEach((targetDropdown) => {
+      if (typeof targetDropdown.refreshTargetDisplay === "function") {
+        targetDropdown.refreshTargetDisplay();
+      }
+    });
+
+    if (configBindingId) {
+      const binding = getConfigBinding();
+      if (binding) {
+        renderPreviewTarget(binding);
+      }
+    }
   }
 
   let configBindingId = null;
@@ -1092,9 +1128,16 @@ export function createBindingsFeature({
     const storedBindingValue = bindingId != null && bindingLastValues[bindingId] != null
       ? Number(bindingLastValues[bindingId])
       : null;
+    const targetVolume = getVol(target);
+    const resolvedVolume = resolveBindingVolumeValue({
+      bindingId,
+      targetVolume,
+      cachedVolume: storedBindingValue,
+      interactionTimes: bindingInteractionTimes,
+    });
     const liveValue = liveMidiValue != null
       ? applyCurveToNormalized(binding, liveMidiValue)
-      : (storedBindingValue != null ? storedBindingValue : (getVol(target) ?? 0));
+      : (resolvedVolume.value ?? 0);
     const muted = bindingId != null && bindingMuteValues[bindingId] != null
       ? Boolean(bindingMuteValues[bindingId])
       : Boolean(getMuted(target));
@@ -2110,9 +2153,10 @@ export function createBindingsFeature({
 
           if (!isButton) {
             const primaryTarget = getPrimaryTarget(binding);
-            const newVolume = (bindingLastValues[binding.id] != null)
-              ? Number(bindingLastValues[binding.id])
-              : getVol(primaryTarget);
+            const newVolume = resolveTargetChangeVolumeValue({
+              targetVolume: getVol(primaryTarget),
+              cachedVolume: bindingLastValues[binding.id],
+            });
             if (volumeSlider) {
               // Keep current slider position if the new primary target cannot report
               // a concrete volume (common for some integration targets).
@@ -2150,12 +2194,13 @@ export function createBindingsFeature({
           volumeSlider.style.visibility = "hidden";
         } else {
           const primaryTarget = getPrimaryTarget(binding);
-          const v = (bindingLastValues[binding.id] != null)
-            ? Number(bindingLastValues[binding.id])
-            : getVol(primaryTarget);
+          const resolvedVolume = resolveRenderedBindingVolume(binding.id, primaryTarget);
+          const v = resolvedVolume.value;
 
-          if (v !== null) bindingLastValues[binding.id] = v;
-          volumeSlider.value = v ?? bindingLastValues[binding.id] ?? 0;
+          if (v !== null && resolvedVolume.source === "target") {
+            bindingLastValues[binding.id] = v;
+          }
+          volumeSlider.value = v ?? 0;
           updateSliderFill(volumeSlider);
 
           const targetJson = JSON.stringify(primaryTarget);
@@ -2855,6 +2900,7 @@ export function createBindingsFeature({
     requestSafeRerender,
     flushPendingRerender,
     updateBindingValues,
+    updateBindingTargetDisplays,
     setMuteButtonState,
     syncButtonVisualState,
     setButtonVisualState,

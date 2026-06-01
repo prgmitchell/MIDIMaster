@@ -492,6 +492,9 @@ pub fn set_binding_feedback(
     {
         state.set_binding_action_value(&BindingKey::from_binding(&binding), value);
     }
+    if matches!(effective_action, model::BindingAction::Volume) {
+        state.sync_relative_volume_binding_state(&binding, value);
+    }
 
     let silent = silent.unwrap_or(false);
     let force_hardware_feedback = force_hardware_feedback.unwrap_or(false);
@@ -583,6 +586,7 @@ pub fn set_binding_feedback(
             if !feedback::targets_overlap(candidate, &binding) {
                 continue;
             }
+            state.sync_relative_volume_binding_state(candidate, value);
             let primary_key = FeedbackControlKey::from_binding(candidate);
             if emitted_controls.insert(primary_key.clone()) {
                 let candidate_value = candidate

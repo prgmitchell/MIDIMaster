@@ -16,6 +16,7 @@ export function createSessionRefresher({ invoke, getState, setState, actions }) 
   async function refreshSessions() {
     let sessionsChanged = false;
     let sessionsStructureChanged = false;
+    let focusedSessionChanged = false;
 
     const stateBefore = getState();
     try {
@@ -31,14 +32,25 @@ export function createSessionRefresher({ invoke, getState, setState, actions }) 
       console.warn("Failed to refresh sessions, keeping previous state:", error);
     }
 
+    const stateAfterSessions = getState();
+    try {
+      const nextFocusedSession = await invoke("focused_session");
+      if (JSON.stringify(nextFocusedSession) !== JSON.stringify(stateAfterSessions.focusedSession ?? null)) {
+        setState({ focusedSession: nextFocusedSession ?? null });
+        focusedSessionChanged = true;
+      }
+    } catch (error) {
+      console.warn("Failed to refresh focused session, keeping previous state:", error);
+    }
+
     let devicesChanged = false;
     let devicesStructureChanged = false;
 
-    const stateAfterSessions = getState();
+    const stateAfterFocus = getState();
     try {
       const nextPlayback = await invoke("list_playback_devices");
-      if (JSON.stringify(nextPlayback) !== JSON.stringify(stateAfterSessions.playbackDevices)) {
-        if (!structurallyEqual(nextPlayback, stateAfterSessions.playbackDevices)) {
+      if (JSON.stringify(nextPlayback) !== JSON.stringify(stateAfterFocus.playbackDevices)) {
+        if (!structurallyEqual(nextPlayback, stateAfterFocus.playbackDevices)) {
           devicesStructureChanged = true;
         }
         setState({ playbackDevices: nextPlayback });
@@ -82,9 +94,13 @@ export function createSessionRefresher({ invoke, getState, setState, actions }) 
       });
     }
 
+    if (focusedSessionChanged) {
+      actions.updateBindingTargetDisplays?.();
+    }
+
     if ((sessionsStructureChanged || devicesStructureChanged) && !actions.isBindingInteractionActive()) {
       actions.renderBindings();
-    } else if ((sessionsChanged || devicesChanged) && !actions.isBindingInteractionActive()) {
+    } else if ((sessionsChanged || devicesChanged || focusedSessionChanged) && !actions.isBindingInteractionActive()) {
       actions.updateBindingValues();
     }
   }

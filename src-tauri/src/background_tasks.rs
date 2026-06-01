@@ -1,11 +1,38 @@
 use crate::bindings::BindingKey;
 use crate::midi_event_queue::log_queue_stats;
+use crate::model::{BindingTarget, SessionInfo};
 use crate::run_logger;
 use crate::runtime_helpers::classify_learned_control;
 use crate::AppState;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::time::sleep;
+
+fn focused_sessions_match(left: &Option<SessionInfo>, right: &Option<SessionInfo>) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => {
+            left.id == right.id
+                && left.display_name == right.display_name
+                && left.process_name == right.process_name
+                && left.process_path == right.process_path
+                && left.icon_data == right.icon_data
+                && left.is_muted == right.is_muted
+                && left.is_master == right.is_master
+                && (left.volume - right.volume).abs() < 0.0005
+        }
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn profile_has_focus_target(profile: &crate::model::Profile) -> bool {
+    profile.bindings.iter().any(|binding| {
+        binding
+            .normalized_targets()
+            .iter()
+            .any(|target| matches!(target, BindingTarget::Focus))
+    })
+}
 
 pub(crate) fn spawn_midi_event_queue_loop(app_handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
@@ -41,6 +68,7 @@ pub(crate) fn spawn_midi_event_queue_loop(app_handle: AppHandle) {
 
 pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
+        let mut last_focused_session: Option<SessionInfo> = None;
         loop {
             let state = app_handle.state::<AppState>();
 
@@ -82,7 +110,16 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                 .ok()
                 .and_then(|profile| profile.clone());
             if let Some(profile) = profile {
-                state.sync_feedback_values(&profile);
+                let feedback_snapshot = state.sync_feedback_values(&profile);
+                if profile_has_focus_target(&profile)
+                    && !focused_sessions_match(
+                        &last_focused_session,
+                        &feedback_snapshot.focused_session,
+                    )
+                {
+                    last_focused_session = feedback_snapshot.focused_session.clone();
+                    let _ = app_handle.emit("focused_session_update", &last_focused_session);
+                }
                 let feedback = state
                     .feedback_values
                     .lock()

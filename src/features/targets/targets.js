@@ -1621,6 +1621,9 @@ export function createTargetsFeature({
       hotkeyDisplay = String(nextDisplay || "");
       setDisplay();
     };
+    container.refreshTargetDisplay = () => {
+      setDisplay();
+    };
     container.getOpenApplication = () => selectedOpenApplication;
     container.getAutoHotkeyScript = () => selectedAutoHotkeyScript;
     return container;
