@@ -13,6 +13,9 @@ const LOCAL_WRITE_QUIET_MS = 1200;
 const FEEDBACK_INTENT_HOLD_MS = 1200;
 const FEEDBACK_INTENT_MATCH_EPSILON = 0.02;
 const RPC_TIMEOUT_MS = 1200;
+const RECONNECT_INITIAL_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 15000;
+const RECONNECT_IDLE_DELAY_MS = 5000;
 let rpcSequence = 10;
 
 function sleep(ms) {
@@ -156,6 +159,15 @@ export async function activate(ctx) {
   let autoConnect = DEFAULT_AUTO_CONNECT;
   let manualConnectRequested = false;
   let disconnectedByUser = false;
+  let reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+
+  function resetReconnectBackoff() {
+    reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+  }
+
+  function growReconnectBackoff() {
+    reconnectDelayMs = Math.min(RECONNECT_MAX_DELAY_MS, reconnectDelayMs * 2);
+  }
 
   function applyProfileSettings(settings) {
     const next = (settings && typeof settings === "object" && ("auto_connect" in settings))
@@ -172,6 +184,7 @@ export async function activate(ctx) {
     if (next && !wsId && !connecting) {
       manualConnectRequested = true;
       disconnectedByUser = false;
+      resetReconnectBackoff();
     }
   }
 
@@ -1225,16 +1238,26 @@ export async function activate(ctx) {
   // Background reconnect loop
   (async () => {
     while (!disposed) {
+      let delay = RECONNECT_IDLE_DELAY_MS;
       if (!wsId && !connecting && !disconnectedByUser && (autoConnect || manualConnectRequested)) {
         try {
-          await connectOnce();
+          const connectedNow = await connectOnce();
+          if (connectedNow || wsId) {
+            resetReconnectBackoff();
+          } else {
+            growReconnectBackoff();
+          }
         } catch {
           if (disposed) return;
           connecting = false;
           // ignore
+          growReconnectBackoff();
         }
+        delay = reconnectDelayMs;
+      } else {
+        resetReconnectBackoff();
       }
-      await sleep(1000);
+      await sleep(delay);
     }
   })();
 

@@ -106,7 +106,10 @@ pub fn start_midi_device(
                 let state = app_handle.state::<AppState>();
                 let enqueue_result = state.midi_event_queue.lock();
                 match enqueue_result {
-                    Ok(mut queue) => queue.enqueue(event),
+                    Ok(mut queue) => {
+                        queue.enqueue(event);
+                        crate::background_tasks::notify_midi_event_queued();
+                    }
                     Err(_) => {
                         run_logger::error("midi_queue", "enqueue_failed", "queue lock poisoned")
                     }

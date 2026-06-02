@@ -13,6 +13,9 @@ const FEEDBACK_INTENT_HOLD_MS = 1200;
 const FEEDBACK_INTENT_MATCH_EPSILON = 0.02;
 const VOLUME_WRITE_INTERVAL_MS = 16;
 const VOLUME_WRITE_EPSILON = 0.002;
+const RECONNECT_INITIAL_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 15000;
+const RECONNECT_IDLE_DELAY_MS = 5000;
 function isOsdWindow() {
   try {
     return new URLSearchParams(window.location.search).get("osd") === "1";
@@ -897,6 +900,15 @@ export async function activate(ctx) {
   let autoConnect = DEFAULT_AUTO_CONNECT;
   let manualConnectRequested = false;
   let disconnectedByUser = false;
+  let reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+
+  function resetReconnectBackoff() {
+    reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+  }
+
+  function growReconnectBackoff() {
+    reconnectDelayMs = Math.min(RECONNECT_MAX_DELAY_MS, reconnectDelayMs * 2);
+  }
 
   function applyProfileSettings(settings) {
     const next = (settings && typeof settings === "object" && ("auto_connect" in settings))
@@ -915,6 +927,7 @@ export async function activate(ctx) {
     if (next && !connected && !connecting) {
       manualConnectRequested = true;
       disconnectedByUser = false;
+      resetReconnectBackoff();
     }
   }
 
@@ -931,16 +944,26 @@ export async function activate(ctx) {
   // Reconnect loop (auto-connect or manual connect)
   (async () => {
     while (!disposed) {
+      let delay = RECONNECT_IDLE_DELAY_MS;
       if (!connected && !connecting && !disconnectedByUser && (autoConnect || manualConnectRequested)) {
         try {
           await connectOnce();
+          if (connected) {
+            resetReconnectBackoff();
+          } else {
+            growReconnectBackoff();
+          }
         } catch {
           if (disposed) return;
           connecting = false;
           setStatus(false, "Not connected", { disconnectedByUser });
+          growReconnectBackoff();
         }
+        delay = reconnectDelayMs;
+      } else {
+        resetReconnectBackoff();
       }
-      await sleep(1000);
+      await sleep(delay);
     }
   })();
 

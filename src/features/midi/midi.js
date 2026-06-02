@@ -36,13 +36,19 @@ export function createMidiFeature({
   const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   const MIDI_ENUM_MIN_INTERVAL_MS = 5000;
   const MIDI_ENUM_STALE_MS = 3000;
-  const MIDI_AVAILABILITY_INTERVAL_MS = 3000;
+  const MIDI_AVAILABILITY_DISCONNECTED_INTERVAL_MS = 3000;
+  const MIDI_AVAILABILITY_CONNECTED_INTERVAL_MS = 10000;
   const MIDI_AUTO_REFRESH_INTERVAL_MS = 3000;
   const MIDI_OUTPUT_ENUM_DELAY_MS = 250;
   const LEARN_POLL_MS = 50;
+  const SESSION_REFRESH_VISIBLE_INTERVAL_MS = 3000;
+  const SESSION_REFRESH_HIDDEN_INTERVAL_MS = 15000;
 
   let autoRefreshTimer = null;
   let sessionRefreshTimer = null;
+  let sessionRefreshFn = null;
+  let sessionRefreshMainScreenEl = null;
+  let sessionVisibilityListenerBound = false;
   let learnTimer = null;
   let availabilityTimer = null;
   let availabilityCheckInFlight = false;
@@ -495,9 +501,14 @@ export function createMidiFeature({
 
   function startAvailabilityMonitor() {
     if (availabilityTimer) return;
-    availabilityTimer = setInterval(() => {
-      checkAvailabilityLoop().catch(() => { });
-    }, MIDI_AVAILABILITY_INTERVAL_MS);
+    const delay = (connectedInputId && connectedOutputId)
+      ? MIDI_AVAILABILITY_CONNECTED_INTERVAL_MS
+      : MIDI_AVAILABILITY_DISCONNECTED_INTERVAL_MS;
+    availabilityTimer = setTimeout(async () => {
+      availabilityTimer = null;
+      await checkAvailabilityLoop().catch(() => { });
+      startAvailabilityMonitor();
+    }, delay);
   }
 
   function startAutoRefresh(refreshFn) {
@@ -522,23 +533,61 @@ export function createMidiFeature({
     }
   }
 
-  function startSessionRefresh(refreshFn, mainScreenEl) {
-    if (sessionRefreshTimer) {
-      return;
-    }
-    sessionRefreshTimer = setInterval(async () => {
-      if (mainScreenEl && mainScreenEl.classList.contains("hidden")) {
-        return;
+  function sessionRefreshIsHidden(mainScreenEl) {
+    return Boolean(document.hidden || (mainScreenEl && mainScreenEl.classList.contains("hidden")));
+  }
+
+  function sessionRefreshDelay(mainScreenEl) {
+    return sessionRefreshIsHidden(mainScreenEl)
+      ? SESSION_REFRESH_HIDDEN_INTERVAL_MS
+      : SESSION_REFRESH_VISIBLE_INTERVAL_MS;
+  }
+
+  function scheduleSessionRefresh(delayMs) {
+    if (!sessionRefreshFn) return;
+    sessionRefreshTimer = setTimeout(async () => {
+      sessionRefreshTimer = null;
+      if (!sessionRefreshIsHidden(sessionRefreshMainScreenEl)) {
+        await sessionRefreshFn();
       }
-      await refreshFn();
-    }, 2000);
+      scheduleSessionRefresh(sessionRefreshDelay(sessionRefreshMainScreenEl));
+    }, delayMs);
+  }
+
+  function restartSessionRefresh(delayMs = 0) {
+    if (!sessionRefreshFn) return;
+    if (sessionRefreshTimer) {
+      clearTimeout(sessionRefreshTimer);
+      sessionRefreshTimer = null;
+    }
+    scheduleSessionRefresh(delayMs);
+  }
+
+  function ensureSessionVisibilityListener() {
+    if (sessionVisibilityListenerBound) return;
+    sessionVisibilityListenerBound = true;
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        restartSessionRefresh(0);
+      }
+    });
+  }
+
+  function startSessionRefresh(refreshFn, mainScreenEl) {
+    sessionRefreshFn = refreshFn;
+    sessionRefreshMainScreenEl = mainScreenEl;
+    ensureSessionVisibilityListener();
+    if (sessionRefreshTimer) return;
+    scheduleSessionRefresh(sessionRefreshDelay(mainScreenEl));
   }
 
   function stopSessionRefresh() {
     if (sessionRefreshTimer) {
-      clearInterval(sessionRefreshTimer);
+      clearTimeout(sessionRefreshTimer);
       sessionRefreshTimer = null;
     }
+    sessionRefreshFn = null;
+    sessionRefreshMainScreenEl = null;
   }
 
   function closeLearnPanel() {

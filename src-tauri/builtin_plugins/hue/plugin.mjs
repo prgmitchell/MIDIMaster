@@ -221,6 +221,8 @@ function isSelectableHueGroup(entry) {
 }
 
 const POLL_INTERVAL_MS = 5000;
+const IDLE_POLL_INTERVAL_MS = 15000;
+const RECONNECT_MAX_DELAY_MS = 30000;
 const REQUEST_TIMEOUT_MS = 4000;
 const LOCAL_WRITE_QUIET_MS = 1200;
 const DEFAULT_AUTO_CONNECT = true;
@@ -501,6 +503,7 @@ export async function activate(ctx) {
   let manualConnectRequested = false;
   let disconnectedByUser = false;
   let disposed = false;
+  let reconnectDelayMs = POLL_INTERVAL_MS;
 
   let discovering = false;
   let discoveredBridges = [];
@@ -519,6 +522,14 @@ export async function activate(ctx) {
   const groupWriteGenerationByKey = new Map();
   let postWriteRefreshTimer = null;
   let transientWriteFailures = 0;
+
+  function resetReconnectBackoff() {
+    reconnectDelayMs = POLL_INTERVAL_MS;
+  }
+
+  function growReconnectBackoff() {
+    reconnectDelayMs = Math.min(RECONNECT_MAX_DELAY_MS, reconnectDelayMs * 2);
+  }
 
   function ensurePairPanel() {
     let panel = document.getElementById("hue-pair-panel");
@@ -991,6 +1002,7 @@ export async function activate(ctx) {
     if (username && autoConnect && !connected && !connecting) {
       manualConnectRequested = true;
       disconnectedByUser = false;
+      resetReconnectBackoff();
     }
   }
 
@@ -1328,17 +1340,32 @@ export async function activate(ctx) {
 
   (async () => {
     while (!disposed) {
+      let delay = IDLE_POLL_INTERVAL_MS;
       if (!connected && !connecting && !pairing && !disconnectedByUser && (autoConnect || manualConnectRequested)) {
-        await connectOnce();
+        if (effectiveBridgeIp() && username) {
+          const connectedNow = await connectOnce();
+          if (connectedNow) {
+            resetReconnectBackoff();
+          } else {
+            growReconnectBackoff();
+          }
+          delay = reconnectDelayMs;
+        }
       } else if (connected && !connecting) {
         try {
           await refreshHueState({ silent: true });
+          resetReconnectBackoff();
+          delay = POLL_INTERVAL_MS;
         } catch {
           if (disposed) return;
           markDisconnected("Disconnected");
+          growReconnectBackoff();
+          delay = reconnectDelayMs;
         }
+      } else {
+        resetReconnectBackoff();
       }
-      await sleep(POLL_INTERVAL_MS);
+      await sleep(delay);
     }
   })();
 

@@ -101,6 +101,54 @@ pub(crate) struct FeedbackSyncSnapshot {
     pub(crate) focused_session: Option<model::SessionInfo>,
 }
 
+#[derive(Default)]
+struct FeedbackSyncNeeds {
+    sessions: bool,
+    focused_session: bool,
+    playback_devices: bool,
+    recording_devices: bool,
+}
+
+fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
+    let mut needs = FeedbackSyncNeeds::default();
+
+    for binding in &profile.bindings {
+        if !matches!(
+            binding.action,
+            model::BindingAction::Volume | model::BindingAction::ToggleMute
+        ) {
+            continue;
+        }
+
+        match binding.primary_target() {
+            model::BindingTarget::Master
+            | model::BindingTarget::Session { .. }
+            | model::BindingTarget::Application { .. } => {
+                needs.sessions = true;
+            }
+            model::BindingTarget::Focus => {
+                needs.focused_session = true;
+            }
+            model::BindingTarget::Device { device_id } => {
+                let (kind, _) = parse_device_target(&device_id);
+                match kind {
+                    DeviceTargetKind::Playback => needs.playback_devices = true,
+                    DeviceTargetKind::Recording => needs.recording_devices = true,
+                }
+            }
+            model::BindingTarget::Unset
+            | model::BindingTarget::MediaControl
+            | model::BindingTarget::CaptureControl
+            | model::BindingTarget::Hotkey
+            | model::BindingTarget::OpenApplication
+            | model::BindingTarget::AutoHotkeyScript
+            | model::BindingTarget::Integration { .. } => {}
+        }
+    }
+
+    needs
+}
+
 impl AppState {
     fn clear_focus_volume_failure_log(&self, binding_id: &str) {
         if let Ok(mut logs) = self.focus_volume_failure_logs.lock() {
@@ -362,17 +410,34 @@ impl AppState {
     }
 
     pub(crate) fn sync_feedback_values(&self, profile: &Profile) -> FeedbackSyncSnapshot {
-        let sessions = match self.audio.list_sessions() {
-            Ok(sessions) => sessions,
-            Err(_) => {
-                return FeedbackSyncSnapshot {
-                    focused_session: None,
+        let needs = feedback_sync_needs(profile);
+        let sessions = if needs.sessions {
+            match self.audio.list_sessions() {
+                Ok(sessions) => sessions,
+                Err(_) => {
+                    return FeedbackSyncSnapshot {
+                        focused_session: None,
+                    }
                 }
             }
+        } else {
+            Vec::new()
         };
-        let focused_session = self.audio.focused_session().ok().flatten();
-        let playback_devices = self.audio.list_playback_devices().unwrap_or_default();
-        let recording_devices = self.audio.list_recording_devices().unwrap_or_default();
+        let focused_session = if needs.focused_session {
+            self.audio.focused_session().ok().flatten()
+        } else {
+            None
+        };
+        let playback_devices = if needs.playback_devices {
+            self.audio.list_playback_devices().unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let recording_devices = if needs.recording_devices {
+            self.audio.list_recording_devices().unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         let mut feedback = match self.feedback_values.lock() {
             Ok(feedback) => feedback,
             Err(_) => {

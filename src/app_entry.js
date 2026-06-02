@@ -65,6 +65,10 @@ let bindingsFeature = null;
 let targetsFeature = null;
 let osdFeature = null;
 let midiFeature = null;
+const OSD_SESSION_REFRESH_MIN_MS = 5000;
+const OSD_IDLE_SESSION_REFRESH_MS = 15000;
+let lastOsdDataRefreshAt = 0;
+let osdDataRefreshInFlight = null;
 
 // Keep the app feeling native by disabling the default browser context menu.
 document.addEventListener("contextmenu", (event) => {
@@ -795,6 +799,28 @@ const sessionRefresher = createSessionRefresher({
 async function refreshSessions() {
   return sessionRefresher.refreshSessions();
 }
+
+async function refreshOsdDataIfStale(force = false) {
+  if (!isOsdWindow) return;
+  const now = Date.now();
+  if (!force && now - lastOsdDataRefreshAt < OSD_SESSION_REFRESH_MIN_MS) {
+    return;
+  }
+  if (osdDataRefreshInFlight) {
+    return osdDataRefreshInFlight;
+  }
+
+  osdDataRefreshInFlight = refreshSessions()
+    .then((result) => {
+      lastOsdDataRefreshAt = Date.now();
+      return result;
+    })
+    .finally(() => {
+      osdDataRefreshInFlight = null;
+    });
+  return osdDataRefreshInFlight;
+}
+
 async function refreshProfiles(preferredName = "") {
   if (profilesFeature && typeof profilesFeature.refreshProfiles === "function") {
     return profilesFeature.refreshProfiles(preferredName);
@@ -2039,6 +2065,11 @@ async function setupListeners() {
       }
     }
     if (!payload) return;
+    if (isOsdWindow) {
+      refreshOsdDataIfStale().catch((error) => {
+        diagnosticError("osd_event_refresh_sessions_failed", error);
+      });
+    }
     updateIntegrationStateFromEventPayload(payload);
     if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
       updateFocusedSessionState(payload.focus_session);
@@ -2090,6 +2121,11 @@ async function setupListeners() {
     }
     if (!payload || typeof payload !== "object") {
       return;
+    }
+    if (isOsdWindow) {
+      refreshOsdDataIfStale().catch((error) => {
+        diagnosticError("osd_event_refresh_sessions_failed", error);
+      });
     }
     updateIntegrationStateFromEventPayload(payload);
     if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
@@ -2298,14 +2334,14 @@ async function init() {
     await initI18n("en").catch(() => {});
     await loadOsdSettings();
     document.body.setAttribute("data-anchor", osdSettings.anchor || "top-right");
-    await refreshSessions().catch((error) => {
+    await refreshOsdDataIfStale(true).catch((error) => {
       diagnosticError("osd_refresh_sessions_failed", error);
     });
     setInterval(() => {
-      refreshSessions().catch((error) => {
+      refreshOsdDataIfStale(true).catch((error) => {
         diagnosticError("osd_interval_refresh_sessions_failed", error);
       });
-    }, 2000);
+    }, OSD_IDLE_SESSION_REFRESH_MS);
     if (osdDebugAlways) {
       showVolumeOsd("Master", 0.5);
     }
