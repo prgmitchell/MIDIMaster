@@ -350,28 +350,6 @@ pub(super) fn friendly_process_label(path: &str) -> Option<String> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::ptr;
-    use windows::Win32::System::Com::CoTaskMemAlloc;
-
-    #[test]
-    fn owned_pwstr_to_string_copies_and_frees_com_allocated_memory() {
-        let text: Vec<u16> = "MIDIMaster".encode_utf16().chain(Some(0)).collect();
-        let byte_len = text.len() * std::mem::size_of::<u16>();
-        let raw = unsafe { CoTaskMemAlloc(byte_len) } as *mut u16;
-        assert!(!raw.is_null());
-
-        unsafe {
-            ptr::copy_nonoverlapping(text.as_ptr(), raw, text.len());
-        }
-
-        let output = owned_pwstr_to_string(PWSTR(raw));
-        assert_eq!(output.as_deref(), Some("MIDIMaster"));
-    }
-}
-
 pub(super) fn humanize_label(label: &str) -> String {
     let cleaned = label.replace(['_', '-'], " ");
     cleaned
@@ -417,4 +395,26 @@ pub(super) fn query_process_path(process_id: u32) -> Option<String> {
     }
     buffer.truncate(size as usize);
     Some(OsString::from_wide(&buffer).to_string_lossy().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr;
+    use windows::Win32::System::Com::CoTaskMemAlloc;
+
+    #[test]
+    fn owned_pwstr_to_string_copies_and_frees_com_allocated_memory() {
+        let text: Vec<u16> = "MIDIMaster".encode_utf16().chain(Some(0)).collect();
+        let byte_len = text.len() * std::mem::size_of::<u16>();
+        let raw = unsafe { CoTaskMemAlloc(byte_len) } as *mut u16;
+        assert!(!raw.is_null());
+
+        unsafe {
+            ptr::copy_nonoverlapping(text.as_ptr(), raw, text.len());
+        }
+
+        let output = owned_pwstr_to_string(PWSTR(raw));
+        assert_eq!(output.as_deref(), Some("MIDIMaster"));
+    }
 }
