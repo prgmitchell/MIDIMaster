@@ -208,8 +208,9 @@ fn main() {
             }
 
             let show_item = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let restart_item = MenuItem::with_id(app, "restart", "Restart", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let tray_menu = Menu::with_items(app, &[&show_item, &restart_item, &quit_item])?;
             let mut tray_builder = TrayIconBuilder::new()
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false);
@@ -240,6 +241,13 @@ fn main() {
                                 let _ = window.unminimize();
                                 let _ = window.set_focus();
                             }
+                        }
+                        "restart" => {
+                            let state = app.state::<AppState>();
+                            run_logger::info("app", "tray_restart", "restart requested from tray");
+                            shutdown_lights(&state);
+                            run_logger::flush_pending_repeats();
+                            app.restart();
                         }
                         "quit" => {
                             let state = app.state::<AppState>();
