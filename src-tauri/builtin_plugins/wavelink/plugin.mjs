@@ -150,6 +150,7 @@ export async function activate(ctx) {
   let connecting = false;
   let wasConnected = false;
   let offlineFeedbackSent = false;
+  let disposed = false;
 
   const DEFAULT_AUTO_CONNECT = true;
   let autoConnect = DEFAULT_AUTO_CONNECT;
@@ -176,7 +177,10 @@ export async function activate(ctx) {
 
   try {
     applyProfileSettings(ctx.profile?.get?.());
-    ctx.profile?.onChanged?.((ev) => applyProfileSettings(ev?.settings || ev));
+    ctx.profile?.onChanged?.((ev) => {
+      if (disposed) return;
+      applyProfileSettings(ev?.settings || ev);
+    });
   } catch {
     // ignore
   }
@@ -199,6 +203,51 @@ export async function activate(ctx) {
   const localVolumeIntentByEndpoint = new Map(); // endpoint_key -> { value, at, source, endpoint_key }
   const pendingAppInfoByWsId = new Map();
   const pendingRpcById = new Map();
+
+  function clearRuntimeTimers() {
+    if (volumeFlushTimer) {
+      clearTimeout(volumeFlushTimer);
+      volumeFlushTimer = null;
+    }
+    if (channelsRefreshTimer) {
+      clearTimeout(channelsRefreshTimer);
+      channelsRefreshTimer = null;
+    }
+    if (mixesRefreshTimer) {
+      clearTimeout(mixesRefreshTimer);
+      mixesRefreshTimer = null;
+    }
+    if (postLocalWriteRefreshTimer) {
+      clearTimeout(postLocalWriteRefreshTimer);
+      postLocalWriteRefreshTimer = null;
+    }
+  }
+
+  function disposeWaveLinkRuntime() {
+    disposed = true;
+    connecting = false;
+    manualConnectRequested = false;
+    clearRuntimeTimers();
+    clearAllPendingAppInfo();
+    clearAllPendingRpc();
+    const currentWsId = wsId;
+    wsId = null;
+    connectedPort = null;
+    if (currentWsId) {
+      ctx.ws.close(currentWsId).catch(() => {});
+    }
+    pendingVolumeWrites.clear();
+    lastSentVolumeByEndpoint.clear();
+    primaryFeedbackIntentByBinding.clear();
+    localVolumeIntentByEndpoint.clear();
+    mixes = [];
+    channels = [];
+    outputDevicesState = { mainOutput: null, outputDevices: [] };
+    pendingAppInfoByWsId.clear();
+    pendingRpcById.clear();
+  }
+
+  ctx.lifecycle?.onDispose?.(disposeWaveLinkRuntime);
 
   function endpointKey(endpoint) {
     if (!endpoint) return "";
@@ -757,7 +806,7 @@ export async function activate(ctx) {
   }
 
   async function sendJsonRpc(method, params, id) {
-    if (!wsId) {
+    if (!wsId || disposed) {
       throw new Error("Wave Link not connected");
     }
     // Keep state query ids stable (1/2/3), but use unique ids for rapid write
@@ -784,8 +833,16 @@ export async function activate(ctx) {
     pendingRpcById.delete(id);
   }
 
+  function clearAllPendingRpc() {
+    for (const [id, pending] of pendingRpcById.entries()) {
+      try { clearTimeout(pending.timer); } catch { }
+      try { pending.resolve?.({ ok: false, disposed: true }); } catch {}
+      pendingRpcById.delete(id);
+    }
+  }
+
   async function requestJsonRpc(method, params = {}, timeoutMs = RPC_TIMEOUT_MS) {
-    if (!wsId) throw new Error("Wave Link not connected");
+    if (!wsId || disposed) throw new Error("Wave Link not connected");
     rpcSequence += 1;
     if (rpcSequence > 2_000_000_000) rpcSequence = 10;
     const requestId = rpcSequence;
@@ -800,11 +857,17 @@ export async function activate(ctx) {
     if (params && typeof params === "object" && Object.keys(params).length > 0) {
       req.params = params;
     }
-    await ctx.ws.send(wsId, JSON.stringify(req));
+    try {
+      await ctx.ws.send(wsId, JSON.stringify(req));
+    } catch (err) {
+      clearPendingRpc(requestId);
+      throw err;
+    }
     return wait;
   }
 
   async function requestFullState() {
+    if (disposed || !wsId) return;
     try {
       await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getMixes", id: 2 }));
       await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getChannels", id: 3 }));
@@ -819,6 +882,14 @@ export async function activate(ctx) {
     if (!pending) return;
     try { clearTimeout(pending.timer); } catch { }
     pendingAppInfoByWsId.delete(wsKey);
+  }
+
+  function clearAllPendingAppInfo() {
+    for (const [wsKey, pending] of pendingAppInfoByWsId.entries()) {
+      try { clearTimeout(pending.timer); } catch { }
+      try { pending.resolve?.(null); } catch {}
+      pendingAppInfoByWsId.delete(wsKey);
+    }
   }
 
   function waitForApplicationInfo(wsKey, timeoutMs = APP_INFO_TIMEOUT_MS) {
@@ -845,6 +916,7 @@ export async function activate(ctx) {
   }
 
   function handleWsText(text, sourceWsId = null) {
+    if (disposed) return;
     let json;
     try {
       json = JSON.parse(text);
@@ -933,9 +1005,14 @@ export async function activate(ctx) {
   }
 
   async function openWsCandidate(port) {
+    if (disposed) return null;
     const url = `ws://${HOST}:${port}`;
     try {
       const id = await ctx.ws.open(url, { Origin: ORIGIN }, CONNECT_TIMEOUT_MS);
+      if (disposed) {
+        try { await ctx.ws.close(id); } catch {}
+        return null;
+      }
       return { id, port };
     } catch {
       // ignore
@@ -958,11 +1035,16 @@ export async function activate(ctx) {
   }
 
   async function connectOnce() {
+    if (disposed) return false;
     connecting = true;
     setStatus(false, "Scanning...", { connecting: true, disconnectedByUser });
 
     let connected = null;
     const ports = await getPortCandidates();
+    if (disposed) {
+      connecting = false;
+      return false;
+    }
 
     if (ports.length === 0) {
       connecting = false;
@@ -972,6 +1054,13 @@ export async function activate(ctx) {
 
     for (const port of ports) {
       const candidate = await openWsCandidate(port);
+      if (disposed) {
+        if (candidate?.id) {
+          try { await ctx.ws.close(candidate.id); } catch {}
+        }
+        connecting = false;
+        return false;
+      }
       if (!candidate) continue;
 
       const candidateId = candidate.id;
@@ -1013,6 +1102,7 @@ export async function activate(ctx) {
 
   // Track close events
   ctx.tauri.listen("ws_closed", (event) => {
+    if (disposed) return;
     let payload = event?.payload;
     if (typeof payload === "string") {
       try { payload = JSON.parse(payload); } catch { payload = null; }
@@ -1114,6 +1204,7 @@ export async function activate(ctx) {
           disconnectedByUser = false;
           manualConnectRequested = true;
           connectOnce().catch(() => {
+            if (disposed) return;
             connecting = false;
             setStatus(false, "Not connected", { disconnectedByUser });
           });
@@ -1122,15 +1213,23 @@ export async function activate(ctx) {
 
       setStatus(lastStatus.connected, lastStatus.detail, { connecting: lastStatus.connecting || connecting, disconnectedByUser });
     },
+    unmount: () => {
+      ui.statusText = null;
+      ui.statusDot = null;
+      ui.connectBtn = null;
+      ui.appInfoText = null;
+      ui.autoConnectInput = null;
+    },
   });
 
   // Background reconnect loop
   (async () => {
-    while (true) {
+    while (!disposed) {
       if (!wsId && !connecting && !disconnectedByUser && (autoConnect || manualConnectRequested)) {
         try {
           await connectOnce();
         } catch {
+          if (disposed) return;
           connecting = false;
           // ignore
         }
@@ -1535,6 +1634,7 @@ export async function activate(ctx) {
 
   setBindings(readBindings());
   ctx.bindings?.onChanged?.((next) => {
+    if (disposed) return;
     setBindings(next);
     syncAllFeedback().catch(() => {});
   });

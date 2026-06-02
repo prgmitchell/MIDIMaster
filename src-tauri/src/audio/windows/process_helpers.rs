@@ -14,6 +14,7 @@ use windows::Win32::Graphics::Gdi::{
     BI_RGB, DIB_RGB_COLORS,
 };
 use windows::Win32::Media::Audio::IAudioSessionControl2;
+use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
@@ -247,12 +248,22 @@ pub(super) fn pwstr_to_string(ptr: PWSTR) -> Option<String> {
     }
 }
 
+pub(super) fn owned_pwstr_to_string(ptr: PWSTR) -> Option<String> {
+    let output = pwstr_to_string(ptr);
+    if !ptr.0.is_null() {
+        unsafe {
+            CoTaskMemFree(Some(ptr.0 as _));
+        }
+    }
+    output
+}
+
 pub(super) fn session_identifier(
     control2: &IAudioSessionControl2,
     process_id: u32,
 ) -> Option<String> {
     let identifier = unsafe { control2.GetSessionIdentifier() }.ok()?;
-    let identifier = pwstr_to_string(identifier)?;
+    let identifier = owned_pwstr_to_string(identifier)?;
     if identifier.trim().is_empty() {
         None
     } else {
@@ -336,6 +347,28 @@ pub(super) fn friendly_process_label(path: &str) -> Option<String> {
         None
     } else {
         Some(label)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr;
+    use windows::Win32::System::Com::CoTaskMemAlloc;
+
+    #[test]
+    fn owned_pwstr_to_string_copies_and_frees_com_allocated_memory() {
+        let text: Vec<u16> = "MIDIMaster".encode_utf16().chain(Some(0)).collect();
+        let byte_len = text.len() * std::mem::size_of::<u16>();
+        let raw = unsafe { CoTaskMemAlloc(byte_len) } as *mut u16;
+        assert!(!raw.is_null());
+
+        unsafe {
+            ptr::copy_nonoverlapping(text.as_ptr(), raw, text.len());
+        }
+
+        let output = owned_pwstr_to_string(PWSTR(raw));
+        assert_eq!(output.as_deref(), Some("MIDIMaster"));
     }
 }
 

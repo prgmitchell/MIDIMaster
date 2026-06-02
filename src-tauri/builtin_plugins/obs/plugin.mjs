@@ -114,6 +114,7 @@ export async function activate(ctx) {
   let ws = null;
   let connected = false;
   let connecting = false;
+  let disposed = false;
   let requestId = 1;
   const pending = new Map();
 
@@ -142,6 +143,60 @@ export async function activate(ctx) {
   const lastSentVolumeByInput = new Map(); // inputName -> volume
   let volumeFlushTimer = null;
   let volumeFlushInFlight = false;
+
+  function clearPendingRequests(errorMessage = null) {
+    for (const entry of pending.values()) {
+      if (entry?.timer) clearTimeout(entry.timer);
+      if (errorMessage && typeof entry?.reject === "function") {
+        try { entry.reject(new Error(errorMessage)); } catch {}
+      }
+    }
+    pending.clear();
+  }
+
+  function clearRuntimeTimers() {
+    if (listRefreshTimer) {
+      clearTimeout(listRefreshTimer);
+      listRefreshTimer = null;
+    }
+    if (volumeFlushTimer) {
+      clearTimeout(volumeFlushTimer);
+      volumeFlushTimer = null;
+    }
+  }
+
+  function closeSocketForDispose() {
+    const current = ws;
+    ws = null;
+    if (!current) return;
+    try {
+      current.onopen = null;
+      current.onmessage = null;
+      current.onclose = null;
+      current.onerror = null;
+      current.close();
+    } catch {}
+  }
+
+  function disposeObsRuntime() {
+    disposed = true;
+    connected = false;
+    connecting = false;
+    manualConnectRequested = false;
+    clearRuntimeTimers();
+    closeSocketForDispose();
+    clearPendingRequests("OBS plugin disposed");
+    pendingVolumeWrites.clear();
+    lastSentVolumeByInput.clear();
+    knownVolumes.clear();
+    knownMutes.clear();
+    statefulActionFeedback.clear();
+    lastLocalWriteAt.clear();
+    localVolumeIntentByBinding.clear();
+    resetAudioInputDiscovery();
+  }
+
+  ctx.lifecycle?.onDispose?.(disposeObsRuntime);
 
   function readBindings() {
     try {
@@ -601,13 +656,15 @@ export async function activate(ctx) {
       },
     };
     const p = new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (pending.has(id)) {
+          const entry = pending.get(id);
           pending.delete(id);
+          if (entry?.timer) clearTimeout(entry.timer);
           reject(new Error(`OBS request timed out: ${requestType}`));
         }
       }, 4000);
+      pending.set(id, { resolve, reject, timer });
     });
     await send(payload);
     return p;
@@ -692,6 +749,7 @@ export async function activate(ctx) {
   }
 
   async function connectOnce() {
+    if (disposed) return;
     const { host, port, password } = getSettings();
     const url = `ws://${host}:${port}`;
     connecting = true;
@@ -802,6 +860,7 @@ export async function activate(ctx) {
         const id = msg.d?.requestId;
         const entry = pending.get(id);
         if (!entry) return;
+        if (entry?.timer) clearTimeout(entry.timer);
         pending.delete(id);
 
         const ok = msg.d?.requestStatus?.result;
@@ -814,11 +873,12 @@ export async function activate(ctx) {
     };
 
     ws.onclose = () => {
+      if (disposed) return;
       connected = false;
       connecting = false;
       setStatus(false, "Disconnected");
       ws = null;
-      pending.clear();
+      clearPendingRequests();
       pendingVolumeWrites.clear();
       lastSentVolumeByInput.clear();
       resetAudioInputDiscovery();
@@ -860,18 +920,22 @@ export async function activate(ctx) {
 
   try {
     applyProfileSettings(ctx.profile?.get?.());
-    ctx.profile?.onChanged?.((ev) => applyProfileSettings(ev?.settings || ev));
+    ctx.profile?.onChanged?.((ev) => {
+      if (disposed) return;
+      applyProfileSettings(ev?.settings || ev);
+    });
   } catch {
     // ignore
   }
 
   // Reconnect loop (auto-connect or manual connect)
   (async () => {
-    while (true) {
+    while (!disposed) {
       if (!connected && !connecting && !disconnectedByUser && (autoConnect || manualConnectRequested)) {
         try {
           await connectOnce();
         } catch {
+          if (disposed) return;
           connecting = false;
           setStatus(false, "Not connected", { disconnectedByUser });
         }
@@ -1221,6 +1285,7 @@ export async function activate(ctx) {
   // Bindings feed for two-way sync
   setBindings(readBindings());
   ctx.bindings?.onChanged?.((next) => {
+    if (disposed) return;
     setBindings(next);
     syncAllFeedback({ silent: true }).catch(() => {});
   });
@@ -1315,6 +1380,7 @@ export async function activate(ctx) {
           disconnectedByUser = false;
           manualConnectRequested = true;
           connectOnce().catch(() => {
+            if (disposed) return;
             connecting = false;
             setStatus(false, "Not connected", { disconnectedByUser });
           });
@@ -1323,6 +1389,15 @@ export async function activate(ctx) {
 
       // Apply current status
       setStatus(connected, connected ? "Connected" : "Not connected", { connecting, disconnectedByUser });
+    },
+    unmount: () => {
+      ui.statusText = null;
+      ui.statusDot = null;
+      ui.connectBtn = null;
+      ui.autoConnectInput = null;
+      ui.hostInput = null;
+      ui.portInput = null;
+      ui.passwordInput = null;
     },
   });
 }

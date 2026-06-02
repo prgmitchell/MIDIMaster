@@ -359,7 +359,32 @@ Use this to:
 - Discover which targets are actually bound
 - Perform sync for only those targets
 
-### 6.5 `ctx.feedback.set(bindingId, value, action, opts)`
+### 6.5 `ctx.lifecycle.onDispose(handler)`
+
+Register cleanup for plugin-owned timers, async loops, native browser
+`WebSocket`s, `AbortController`s, and retained DOM references.
+
+```js
+let disposed = false;
+const timer = setInterval(syncState, 5000);
+
+ctx.lifecycle.onDispose(() => {
+  disposed = true;
+  clearInterval(timer);
+  socket?.close();
+});
+```
+
+`ctx.lifecycle.onDispose(handler)` returns a function that runs that cleanup early
+and unregisters it. MIDIMaster also calls a returned plugin API `dispose()` or
+`stop()` method if your `activate(ctx)` returns one.
+
+MIDIMaster automatically tracks cleanup for subscriptions and sockets created
+through `ctx.profile.onChanged`, `ctx.bindings.onChanged`, `ctx.tauri.listen`,
+`ctx.ws.open`, and `ctx.ws.onMessage`. Plugins should still use
+`ctx.lifecycle.onDispose` to stop their own background work.
+
+### 6.6 `ctx.feedback.set(bindingId, value, action, opts)`
 
 This is how plugins update:
 
@@ -384,7 +409,7 @@ Use `silent: true` for:
 - Reconnect sync
 - Motor fader alignment
 
-### 6.6 `ctx.ws` (WebSocket bridge)
+### 6.7 `ctx.ws` (WebSocket bridge)
 
 Use this when you need custom headers or consistent backend-managed sockets.
 
@@ -406,7 +431,7 @@ Message handler receives:
 - `{ id, type: "text", data: string }`
 - `{ id, type: "binary", data: base64String }`
 
-### 6.7 `ctx.http` (HTTPS JSON requests)
+### 6.8 `ctx.http` (HTTPS JSON requests)
 
 Use this when a plugin needs reliable JSON POST requests that are not blocked by
 browser CORS limits.
@@ -439,7 +464,7 @@ Constraints:
 - Request and response bodies are size-limited.
 - `timeoutMs` defaults to `4500` and cannot exceed `10000`.
 
-### 6.8 `ctx.assets` (Read plugin assets)
+### 6.9 `ctx.assets` (Read plugin assets)
 
 - `await ctx.assets.readBase64(relPath)` -> base64 string
 - `await ctx.assets.readDataUrl(relPath, mime)` -> `data:<mime>;base64,...`
@@ -450,7 +475,7 @@ Example:
 const icon = await ctx.assets.readDataUrl("icon.svg", "image/svg+xml");
 ```
 
-### 6.9 `ctx.tauri` (Low-level)
+### 6.10 `ctx.tauri` (Low-level)
 
 Advanced escape hatch:
 
@@ -459,7 +484,7 @@ Advanced escape hatch:
 
 Prefer stable APIs (`ws`, `feedback`, etc.) when possible.
 
-### 6.10 `ctx.app.invalidateBindingsUI()`
+### 6.11 `ctx.app.invalidateBindingsUI()`
 
 If your plugin's connection/availability state changes, call:
 

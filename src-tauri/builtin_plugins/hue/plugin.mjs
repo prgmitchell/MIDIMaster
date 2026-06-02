@@ -500,6 +500,7 @@ export async function activate(ctx) {
   let autoConnect = DEFAULT_AUTO_CONNECT;
   let manualConnectRequested = false;
   let disconnectedByUser = false;
+  let disposed = false;
 
   let discovering = false;
   let discoveredBridges = [];
@@ -730,16 +731,19 @@ export async function activate(ctx) {
   }
 
   function schedulePostWriteRefresh() {
+    if (disposed) return;
     if (postWriteRefreshTimer) return;
     postWriteRefreshTimer = setTimeout(async () => {
       postWriteRefreshTimer = null;
+      if (disposed) return;
       try {
         await writeScheduler.whenIdle(30000);
       } catch {
         // A long-running fader move should not block refresh forever.
       }
-      if (!connected || connecting) return;
+      if (disposed || !connected || connecting) return;
       refreshHueState({ silent: true }).catch(() => {
+        if (disposed) return;
         markDisconnected("Disconnected");
       });
     }, LOCAL_WRITE_QUIET_MS + POST_WRITE_REFRESH_DEBOUNCE_MS);
@@ -748,10 +752,12 @@ export async function activate(ctx) {
   const writeScheduler = createHueWriteScheduler({
     put: huePut,
     onWriteSuccess: () => {
+      if (disposed) return;
       transientWriteFailures = 0;
       schedulePostWriteRefresh();
     },
     onWriteFailure: (_err, failedWrite) => {
+      if (disposed) return;
       transientWriteFailures += 1;
       if (transientWriteFailures >= MAX_TRANSIENT_WRITE_FAILURES) {
         markDisconnected("Disconnected");
@@ -762,6 +768,33 @@ export async function activate(ctx) {
       }
     },
   });
+
+  function disposeHueRuntime() {
+    disposed = true;
+    connected = false;
+    connecting = false;
+    pairing = false;
+    discovering = false;
+    manualConnectRequested = false;
+    transientWriteFailures = 0;
+    if (pairingCancelToken) pairingCancelToken.cancelled = true;
+    if (postWriteRefreshTimer) {
+      clearTimeout(postWriteRefreshTimer);
+      postWriteRefreshTimer = null;
+    }
+    writeScheduler.clear();
+    stateByKey.clear();
+    lastLocalWriteAt.clear();
+    localIntentByKey.clear();
+    lastNonzeroBriByKey.clear();
+    lastQueuedVolumeByKey.clear();
+    groupLightIdsByKey.clear();
+    groupWriteGenerationByKey.clear();
+    discoveredBridges = [];
+    closePairPanel();
+  }
+
+  ctx.lifecycle?.onDispose?.(disposeHueRuntime);
 
   function incrementGroupGeneration(key) {
     const next = (groupWriteGenerationByKey.get(key) || 0) + 1;
@@ -1021,6 +1054,7 @@ export async function activate(ctx) {
   }
 
   async function refreshHueState(opts = null) {
+    if (disposed) return;
     const silent = (opts && typeof opts === "object") ? Boolean(opts.silent) : true;
     const lightsJson = await hueGet("/lights");
     const groupsJson = await hueGet("/groups");
@@ -1054,6 +1088,7 @@ export async function activate(ctx) {
   }
 
   function markDisconnected(detail = "Disconnected") {
+    if (disposed) return;
     connected = false;
     connecting = false;
     transientWriteFailures = 0;
@@ -1066,6 +1101,7 @@ export async function activate(ctx) {
   }
 
   async function connectOnce() {
+    if (disposed) return false;
     if (connecting) return false;
 
     const ip = effectiveBridgeIp();
@@ -1087,6 +1123,7 @@ export async function activate(ctx) {
         await persistProfilePatch({ bridge_ip: ip });
       }
       await refreshHueState({ silent: true });
+      if (disposed) return false;
       connected = true;
       connecting = false;
       transientWriteFailures = 0;
@@ -1095,6 +1132,7 @@ export async function activate(ctx) {
       setStatus(true, `Connected (${ip})`);
       return true;
     } catch {
+      if (disposed) return false;
       connected = false;
       connecting = false;
       setStatus(false, "Not connected", { disconnectedByUser });
@@ -1103,6 +1141,7 @@ export async function activate(ctx) {
   }
 
   async function discoverBridges(opts = null) {
+    if (disposed) return;
     const silent = (opts && typeof opts === "object") ? Boolean(opts.silent) : false;
     if (discovering) return;
     discovering = true;
@@ -1119,6 +1158,7 @@ export async function activate(ctx) {
         candidateIps,
         candidate_ips: candidateIps,
       }, 12000);
+      if (disposed) return;
       const unique = Array.from(new Set((Array.isArray(ips) ? ips : []).map((x) => String(x || "").trim()).filter(Boolean)));
       discoveredBridges = unique;
       console.debug("[hue] discovery", {
@@ -1141,6 +1181,7 @@ export async function activate(ctx) {
         setStatus(connected, detail, { disconnectedByUser });
       }
     } catch (err) {
+      if (disposed) return;
       discoveredBridges = [];
       console.debug("[hue] discovery failed", {
         error: err?.message || String(err || ""),
@@ -1155,6 +1196,7 @@ export async function activate(ctx) {
       }
     } finally {
       discovering = false;
+      if (disposed) return;
       renderDiscoveryState();
       renderBridgeList();
     }
@@ -1207,6 +1249,7 @@ export async function activate(ctx) {
   }
 
   async function startPairing() {
+    if (disposed) return;
     if (pairing) return;
 
     const ip = effectiveBridgeIp();
@@ -1269,22 +1312,29 @@ export async function activate(ctx) {
 
   try {
     applyProfileSettings(ctx.profile?.get?.());
-    ctx.profile?.onChanged?.((ev) => applyProfileSettings(ev?.settings || ev));
+    ctx.profile?.onChanged?.((ev) => {
+      if (disposed) return;
+      applyProfileSettings(ev?.settings || ev);
+    });
   } catch {
     // ignore
   }
 
   setBindings(ctx.bindings?.getAll?.() || []);
-  ctx.bindings?.onChanged?.((next) => setBindings(next));
+  ctx.bindings?.onChanged?.((next) => {
+    if (disposed) return;
+    setBindings(next);
+  });
 
   (async () => {
-    while (true) {
+    while (!disposed) {
       if (!connected && !connecting && !pairing && !disconnectedByUser && (autoConnect || manualConnectRequested)) {
         await connectOnce();
       } else if (connected && !connecting) {
         try {
           await refreshHueState({ silent: true });
         } catch {
+          if (disposed) return;
           markDisconnected("Disconnected");
         }
       }

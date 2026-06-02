@@ -95,6 +95,97 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
     });
   }
 
+  function createPluginCleanup(pluginId) {
+    let disposed = false;
+    const disposers = new Set();
+    const pendingDisposers = new Set();
+    const wsIds = new Set();
+
+    function addDisposer(disposer) {
+      if (typeof disposer !== "function") return () => { };
+      let active = true;
+      const wrapped = async () => {
+        if (!active) return;
+        active = false;
+        disposers.delete(wrapped);
+        try { await disposer(); } catch (err) {
+          console.warn(`[plugins] cleanup failed for ${pluginId}`, err);
+        }
+      };
+      if (disposed) {
+        wrapped();
+        return wrapped;
+      }
+      disposers.add(wrapped);
+      return wrapped;
+    }
+
+    function trackListener(unlistenPromise) {
+      let tracked = null;
+      tracked = Promise.resolve(unlistenPromise)
+        .then((unlisten) => addDisposer(unlisten))
+        .finally(() => {
+          pendingDisposers.delete(tracked);
+        });
+      pendingDisposers.add(tracked);
+      return tracked;
+    }
+
+    async function closeTrackedSockets() {
+      const ids = Array.from(wsIds);
+      wsIds.clear();
+      for (const id of ids) {
+        wsMessageHandlers.delete(id);
+        try { await invoke("ws_close", { id }); } catch { }
+      }
+    }
+
+    async function dispose(api = null) {
+      if (disposed) return;
+      disposed = true;
+
+      const apiDisposers = [];
+      if (api && typeof api.dispose === "function") apiDisposers.push(api.dispose);
+      if (api && typeof api.stop === "function" && api.stop !== api.dispose) apiDisposers.push(api.stop);
+      for (const fn of apiDisposers) {
+        try { await fn.call(api); } catch (err) {
+          console.warn(`[plugins] api cleanup failed for ${pluginId}`, err);
+        }
+      }
+
+      if (pendingDisposers.size > 0) {
+        await Promise.allSettled(Array.from(pendingDisposers));
+      }
+
+      const cleanupFns = Array.from(disposers);
+      disposers.clear();
+      for (const fn of cleanupFns) {
+        await fn();
+      }
+
+      await closeTrackedSockets();
+    }
+
+    return {
+      onDispose: (handler) => addDisposer(handler),
+      trackListener,
+      trackWs: (id) => {
+        if (id == null) return;
+        if (disposed) {
+          wsMessageHandlers.delete(id);
+          invoke("ws_close", { id }).catch(() => { });
+          return;
+        }
+        wsIds.add(id);
+      },
+      forgetWs: (id) => {
+        wsIds.delete(id);
+        wsMessageHandlers.delete(id);
+      },
+      dispose,
+    };
+  }
+
   async function loadInstalledPlugins() {
     const manifests = await invoke("list_plugins");
     if (!Array.isArray(manifests)) {
@@ -107,7 +198,15 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
       const pluginId = String(manifest.id || "");
       const entry = String(manifest.entry || "");
       if (!pluginId || !entry) continue;
+      let cleanup = null;
+      let api = null;
       try {
+        if (plugins.has(pluginId)) {
+          const previous = plugins.get(pluginId);
+          await previous?.cleanup?.dispose?.(previous.api);
+          plugins.delete(pluginId);
+        }
+        cleanup = createPluginCleanup(pluginId);
         // Tauri JS invoke expects camelCase keys for command arguments.
         const code = await invoke("read_plugin_text", {
           pluginId,
@@ -167,7 +266,7 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
               };
               profileChangedHandlers.add(wrapped);
               try { wrapped(profileState); } catch { }
-              return () => profileChangedHandlers.delete(wrapped);
+              return cleanup.onDispose(() => profileChangedHandlers.delete(wrapped));
             },
           },
           assets: {
@@ -190,12 +289,19 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
               return `data:${safeMime};base64,${b64}`;
             },
           },
-          tauri: { invoke, listen },
+          lifecycle: {
+            onDispose: (handler) => cleanup.onDispose(handler),
+          },
+          tauri: {
+            invoke,
+            listen: (eventName, handler) => cleanup.trackListener(listen(eventName, handler)),
+          },
           bindings: {
             getAll: () => bindingsSnapshot,
             onChanged: (handler) => {
+              if (typeof handler !== "function") return () => { };
               bindingsChangedHandlers.add(handler);
-              return () => bindingsChangedHandlers.delete(handler);
+              return cleanup.onDispose(() => bindingsChangedHandlers.delete(handler));
             },
           },
           feedback: {
@@ -228,21 +334,28 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
             },
           },
           ws: {
-            open: (url, headers = {}, connectTimeoutMs = 500) => invoke("ws_open", {
-              url,
-              headers,
-              connectTimeoutMs,
-              // Compatibility
-              connect_timeout_ms: connectTimeoutMs,
-            }),
+            open: async (url, headers = {}, connectTimeoutMs = 500) => {
+              const id = await invoke("ws_open", {
+                url,
+                headers,
+                connectTimeoutMs,
+                // Compatibility
+                connect_timeout_ms: connectTimeoutMs,
+              });
+              cleanup.trackWs(id);
+              return id;
+            },
             send: (id, text) => invoke("ws_send", { id, text }),
-            close: (id) => invoke("ws_close", { id }),
+            close: async (id) => {
+              cleanup.forgetWs(id);
+              return invoke("ws_close", { id });
+            },
             onMessage: (id, handler) => {
               if (!wsMessageHandlers.has(id)) {
                 wsMessageHandlers.set(id, new Set());
               }
               wsMessageHandlers.get(id).add(handler);
-              return () => wsMessageHandlers.get(id)?.delete(handler);
+              return cleanup.onDispose(() => wsMessageHandlers.get(id)?.delete(handler));
             },
           },
           http: {
@@ -256,12 +369,13 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
           },
         };
 
-        const api = await activate(ctx);
+        api = await activate(ctx);
 
         console.log(`[plugins] activated ${pluginId}`);
-        plugins.set(pluginId, { manifest, api });
+        plugins.set(pluginId, { manifest, api, cleanup });
         loaded.push({ pluginId, manifest });
       } catch (err) {
+        await cleanup?.dispose?.(api);
         console.error(`Failed to load plugin ${pluginId}`, err);
       }
     }
@@ -374,6 +488,23 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
   }
 
   async function stop() {
+    for (const tab of connectionTabs.values()) {
+      if (typeof tab.unmount === "function") {
+        try { await tab.unmount(); } catch { }
+      }
+    }
+
+    const pluginEntries = Array.from(plugins.values());
+    for (const plugin of pluginEntries) {
+      await plugin.cleanup?.dispose?.(plugin.api);
+    }
+    plugins.clear();
+    integrations.clear();
+    connectionTabs.clear();
+    profileChangedHandlers.clear();
+    bindingsChangedHandlers.clear();
+    wsMessageHandlers.clear();
+
     if (triggerListenerUnlisten) {
       try { await triggerListenerUnlisten(); } catch { }
       triggerListenerUnlisten = null;

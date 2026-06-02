@@ -19,8 +19,7 @@ use windows::Win32::System::Com::StructuredStorage::{
     PropVariantClear, PropVariantToStringAlloc, PROPVARIANT,
 };
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_ALL,
-    COINIT_MULTITHREADED, STGM_READ,
+    CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ,
 };
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
@@ -546,7 +545,7 @@ fn collect_device_sessions(
 
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
-            .and_then(pwstr_to_string)
+            .and_then(owned_pwstr_to_string)
             .map(|name| name.trim().to_string())
             .filter(|name: &String| !name.is_empty())
             .filter(|name: &String| !is_resource_display_name(name));
@@ -641,7 +640,7 @@ fn session_info_for_process(
 
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
-            .and_then(pwstr_to_string)
+            .and_then(owned_pwstr_to_string)
             .map(|name| name.trim().to_string())
             .filter(|name: &String| !name.is_empty())
             .filter(|name: &String| !is_resource_display_name(name));
@@ -839,7 +838,7 @@ fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Re
 
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
-            .and_then(pwstr_to_string)
+            .and_then(owned_pwstr_to_string)
             .map(|n| n.trim().to_string());
 
         let matches = session_matches_application_name(
@@ -900,7 +899,7 @@ fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Resu
 
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
-            .and_then(pwstr_to_string)
+            .and_then(owned_pwstr_to_string)
             .map(|n| n.trim().to_string());
 
         let matches = session_matches_application_name(
@@ -988,20 +987,13 @@ fn get_session_manager(
 
 fn device_id_string(device: &IMMDevice) -> Option<String> {
     let id = unsafe { device.GetId() }.ok()?;
-    pwstr_to_string(id)
+    owned_pwstr_to_string(id)
 }
 
 fn get_device_property_string(device: &IMMDevice, key: &PROPERTYKEY) -> Option<String> {
     let store: IPropertyStore = unsafe { device.OpenPropertyStore(STGM_READ).ok()? };
     let value: PROPVARIANT = unsafe { store.GetValue(key as *const _).ok()? };
-    let allocated = unsafe { PropVariantToStringAlloc(&value).ok()? };
+    let allocated = unsafe { PropVariantToStringAlloc(&value).ok() };
     let _ = unsafe { PropVariantClear(&value as *const _ as *mut _) };
-    if allocated.0.is_null() {
-        return None;
-    }
-    let output = pwstr_to_string(allocated);
-    unsafe {
-        CoTaskMemFree(Some(allocated.0 as _));
-    }
-    output
+    owned_pwstr_to_string(allocated?)
 }

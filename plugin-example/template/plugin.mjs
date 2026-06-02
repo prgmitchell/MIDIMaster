@@ -4,6 +4,7 @@
 // - Keep this file self-contained (Blob-import friendly).
 // - Use ctx.profile for per-profile settings.
 // - Use ctx.feedback.set(...) to keep UI + OSD + motor faders in sync.
+// - Register cleanup with ctx.lifecycle.onDispose(...) for timers, sockets, and loops.
 
 function clamp01(v) {
   const n = Number(v);
@@ -28,6 +29,22 @@ export async function activate(ctx) {
   // Connection state for demonstration
   let connected = false;
   let connecting = false;
+  let disposed = false;
+  let fakeConnectTimer = null;
+
+  function clearFakeConnectTimer() {
+    if (fakeConnectTimer) {
+      clearTimeout(fakeConnectTimer);
+      fakeConnectTimer = null;
+    }
+  }
+
+  ctx.lifecycle?.onDispose?.(() => {
+    disposed = true;
+    clearFakeConnectTimer();
+    connected = false;
+    connecting = false;
+  });
 
   function describeConnection() {
     if (connected) return "Connected";
@@ -36,6 +53,7 @@ export async function activate(ctx) {
   }
 
   function setConnected(next) {
+    if (disposed) return;
     const changed = Boolean(next) !== connected;
     connected = Boolean(next);
     connecting = false;
@@ -111,12 +129,18 @@ export async function activate(ctx) {
           }
           connecting = true;
           renderStatus();
-          setTimeout(() => {
+          clearFakeConnectTimer();
+          fakeConnectTimer = setTimeout(() => {
+            fakeConnectTimer = null;
+            if (disposed) return;
             setConnected(true);
             renderStatus();
           }, 300);
         });
       }
+    },
+    unmount: () => {
+      clearFakeConnectTimer();
     },
   });
 
@@ -191,6 +215,10 @@ export async function activate(ctx) {
   // Optional: simple auto-connect behavior
   if (autoConnect) {
     connecting = true;
-    setTimeout(() => setConnected(true), 200);
+    clearFakeConnectTimer();
+    fakeConnectTimer = setTimeout(() => {
+      fakeConnectTimer = null;
+      setConnected(true);
+    }, 200);
   }
 }
