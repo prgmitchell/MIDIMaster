@@ -111,6 +111,19 @@ export function createTargetsFeature({
     return null;
   }
 
+  function exeNameFromPath(path) {
+    const filename = String(path || "").split(/[\\/]/).pop().trim();
+    return filename || "";
+  }
+
+  function processTagForSession(session) {
+    const processName = exeNameFromPath(session?.process_name) || exeNameFromPath(session?.process_path);
+    if (!processName || /^pid\s+\d+$/i.test(processName) || /^msedgewebview2\.exe$/i.test(processName)) {
+      return "";
+    }
+    return processName;
+  }
+
   async function pickOpenApplication() {
     if (!callInvoke) return null;
     const picked = await callInvoke("pick_executable_path");
@@ -299,6 +312,7 @@ export function createTargetsFeature({
       option?.kind,
       option?.categoryLabel,
       option?.description,
+      ...(Array.isArray(option?.title_tags) ? option.title_tags : []),
       ...(Array.isArray(option?.tags) ? option.tags : []),
     ].filter(Boolean).join(" ").toLowerCase();
   }
@@ -431,7 +445,7 @@ export function createTargetsFeature({
       label.className = "target-label";
       renderLabelFromRawWithTags(label, {
         rawLabel: option.label,
-        extraTags: [],
+        extraTags: Array.isArray(option.title_tags) ? option.title_tags : [],
         truncateMain: true,
       });
       titleRow.appendChild(label);
@@ -740,6 +754,7 @@ export function createTargetsFeature({
           label: session.display_name,
           display_name: session.display_name,
           icon_data: session.icon_data,
+          title_tags: [processTagForSession(session)].filter(Boolean),
           kind: "session",
         });
       });
