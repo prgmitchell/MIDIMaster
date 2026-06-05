@@ -11,6 +11,8 @@ pub struct DeviceInfo {
 pub struct SessionInfo {
     pub id: String,
     pub display_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub application_key: Option<String>,
     pub process_name: Option<String>,
     pub process_path: Option<String>,
     pub icon_data: Option<String>,

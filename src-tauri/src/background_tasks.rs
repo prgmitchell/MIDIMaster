@@ -36,6 +36,7 @@ fn focused_sessions_match(left: &Option<SessionInfo>, right: &Option<SessionInfo
         (Some(left), Some(right)) => {
             left.id == right.id
                 && left.display_name == right.display_name
+                && left.application_key == right.application_key
                 && left.process_name == right.process_name
                 && left.process_path == right.process_path
                 && left.icon_data == right.icon_data

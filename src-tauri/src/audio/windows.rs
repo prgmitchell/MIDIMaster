@@ -60,6 +60,7 @@ impl AudioBackend for WindowsAudioBackend {
         let mut sessions = vec![SessionInfo {
             id: "master".to_string(),
             display_name: "Master".to_string(),
+            application_key: None,
             process_name: None,
             process_path: None,
             icon_data: None,
@@ -175,7 +176,7 @@ impl AudioBackend for WindowsAudioBackend {
         let _com = init_com()?;
         let process_id =
             foreground_process_id().ok_or_else(|| anyhow!("No focused application"))?;
-        let process_path = query_process_path(process_id);
+        let process_identity = query_effective_process_identity(process_id);
         let enumerator = get_device_enumerator()?;
         let target_volume = volume.clamp(0.0, 1.0);
         let mut updated = false;
@@ -184,7 +185,7 @@ impl AudioBackend for WindowsAudioBackend {
             if set_session_volume_for_process(
                 &device,
                 process_id,
-                process_path.as_deref(),
+                &process_identity,
                 target_volume,
             )? {
                 updated = true;
@@ -223,7 +224,7 @@ impl AudioBackend for WindowsAudioBackend {
             Some(process_id) => process_id,
             None => return Ok(None),
         };
-        let process_path = query_process_path(process_id);
+        let process_identity = query_effective_process_identity(process_id);
         let enumerator = get_device_enumerator()?;
         let default_device = get_default_device_from(&enumerator)?;
         let default_device_id = device_id_string(&default_device);
@@ -235,7 +236,7 @@ impl AudioBackend for WindowsAudioBackend {
                 &device_id,
                 default_device_id.as_deref(),
                 process_id,
-                process_path.as_deref(),
+                &process_identity,
                 &mut icon_cache,
             )? {
                 return Ok(Some(session));
@@ -257,12 +258,12 @@ impl AudioBackend for WindowsAudioBackend {
         let _com = init_com()?;
         let process_id =
             foreground_process_id().ok_or_else(|| anyhow!("No focused application"))?;
-        let process_path = query_process_path(process_id);
+        let process_identity = query_effective_process_identity(process_id);
         let enumerator = get_device_enumerator()?;
         let mut updated = false;
 
         for (device, _id) in enumerate_active_devices(&enumerator, eRender)? {
-            if set_session_mute_for_process(&device, process_id, process_path.as_deref(), muted)? {
+            if set_session_mute_for_process(&device, process_id, &process_identity, muted)? {
                 updated = true;
             }
         }
@@ -539,57 +540,14 @@ fn collect_device_sessions(
             format!("{}|{}", device_id, base_id)
         };
 
-        if !seen_ids.insert(session_id.clone()) {
-            continue;
+        if let Some(session) =
+            session_info_from_control(&control2, &simple, session_id, process_id, icon_cache)?
+        {
+            if !seen_ids.insert(session.id.clone()) {
+                continue;
+            }
+            sessions.push(session);
         }
-
-        let display_name = unsafe { control2.GetDisplayName() }
-            .ok()
-            .and_then(owned_pwstr_to_string)
-            .map(|name| name.trim().to_string())
-            .filter(|name: &String| !name.is_empty())
-            .filter(|name: &String| !is_resource_display_name(name));
-        let process_path = query_process_path(process_id);
-        let process_name = process_path
-            .as_ref()
-            .and_then(|path| Path::new(path).file_name())
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string())
-            .or_else(|| Some(format!("PID {}", process_id)));
-        let friendly_name = display_name
-            .clone()
-            .or_else(|| {
-                process_path
-                    .as_ref()
-                    .and_then(|path| friendly_process_label(path))
-            })
-            .or_else(|| process_name.as_ref().map(|name| humanize_label(name)))
-            .unwrap_or_else(|| "Unknown".to_string());
-        if should_skip_session(
-            process_id,
-            &display_name,
-            &process_name,
-            &process_path,
-            &friendly_name,
-        ) {
-            continue;
-        }
-        let icon_data = process_path
-            .as_ref()
-            .and_then(|path| icon_data_for_path(path, icon_cache));
-        let volume = unsafe { simple.GetMasterVolume() }?;
-        let is_muted = unsafe { simple.GetMute() }?.as_bool();
-
-        sessions.push(SessionInfo {
-            id: session_id,
-            display_name: friendly_name,
-            process_name,
-            process_path,
-            icon_data,
-            volume,
-            is_muted,
-            is_master: false,
-        });
     }
 
     Ok(())
@@ -600,7 +558,7 @@ fn session_info_for_process(
     device_id: &str,
     default_device_id: Option<&str>,
     process_id: u32,
-    process_path: Option<&str>,
+    process_identity: &ProcessIdentity,
     icon_cache: &mut HashMap<String, Option<String>>,
 ) -> Result<Option<SessionInfo>> {
     let session_manager = get_session_manager(device)?;
@@ -616,14 +574,9 @@ fn session_info_for_process(
         let mut matches = session_process_id == process_id;
 
         // Fallback: Check process path if PID mismatch
-        if !matches && process_path.is_some() && session_process_id != 0 {
-            if let Some(session_path) = query_process_path(session_process_id) {
-                if let Some(target_path) = process_path {
-                    if session_path == target_path {
-                        matches = true;
-                    }
-                }
-            }
+        if !matches && session_process_id != 0 {
+            let session_identity = query_effective_process_identity(session_process_id);
+            matches = process_identities_match(&session_identity, process_identity);
         }
 
         if !matches {
@@ -638,56 +591,127 @@ fn session_info_for_process(
             format!("{}|{}", device_id, base_id)
         };
 
-        let display_name = unsafe { control2.GetDisplayName() }
-            .ok()
-            .and_then(owned_pwstr_to_string)
-            .map(|name| name.trim().to_string())
-            .filter(|name: &String| !name.is_empty())
-            .filter(|name: &String| !is_resource_display_name(name));
-        let process_path = query_process_path(session_process_id);
-        let process_name = process_path
-            .as_ref()
-            .and_then(|path| Path::new(path).file_name())
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string())
-            .or_else(|| Some(format!("PID {}", session_process_id)));
-        let friendly_name = display_name
-            .clone()
-            .or_else(|| {
-                process_path
-                    .as_ref()
-                    .and_then(|path| friendly_process_label(path))
-            })
-            .or_else(|| process_name.as_ref().map(|name| humanize_label(name)))
-            .unwrap_or_else(|| "Unknown".to_string());
-        if should_skip_session(
+        if let Some(session) = session_info_from_control(
+            &control2,
+            &simple,
+            session_id,
             session_process_id,
-            &display_name,
-            &process_name,
-            &process_path,
-            &friendly_name,
-        ) {
-            continue;
+            icon_cache,
+        )? {
+            return Ok(Some(session));
         }
-        let icon_data = process_path
-            .as_ref()
-            .and_then(|path| icon_data_for_path(path, icon_cache));
-        let volume = unsafe { simple.GetMasterVolume() }?;
-        let is_muted = unsafe { simple.GetMute() }?.as_bool();
-
-        return Ok(Some(SessionInfo {
-            id: session_id,
-            display_name: friendly_name,
-            process_name,
-            process_path,
-            icon_data,
-            volume,
-            is_muted,
-            is_master: false,
-        }));
     }
 
     Ok(None)
+}
+
+fn session_info_from_control(
+    control2: &IAudioSessionControl2,
+    simple: &ISimpleAudioVolume,
+    session_id: String,
+    process_id: u32,
+    icon_cache: &mut HashMap<String, Option<String>>,
+) -> Result<Option<SessionInfo>> {
+    let raw_display_name = unsafe { control2.GetDisplayName() }
+        .ok()
+        .and_then(owned_pwstr_to_string);
+    let display_name = session_display_name(raw_display_name.as_deref());
+    let identity = query_effective_process_identity(process_id);
+    let process_path = identity.path.clone();
+    let process_name = process_path
+        .as_ref()
+        .and_then(|path| Path::new(path).file_name())
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string());
+    let application_key = stable_application_key(
+        &identity,
+        process_path.as_deref(),
+        process_name.as_deref(),
+        display_name.as_deref(),
+    );
+    let friendly_name = friendly_session_name(
+        display_name.as_deref(),
+        process_path.as_deref(),
+        process_name.as_deref(),
+        &identity,
+    );
+
+    if should_skip_session(
+        process_id,
+        &display_name,
+        &process_name,
+        &process_path,
+        &friendly_name,
+        &application_key,
+        &identity,
+    ) {
+        return Ok(None);
+    }
+
+    let icon_data = icon_data_for_package(&identity, icon_cache).or_else(|| {
+        process_path
+            .as_ref()
+            .and_then(|path| icon_data_for_path(path, icon_cache))
+    });
+    let volume = unsafe { simple.GetMasterVolume() }?;
+    let is_muted = unsafe { simple.GetMute() }?.as_bool();
+
+    Ok(Some(SessionInfo {
+        id: session_id,
+        display_name: friendly_name,
+        application_key,
+        process_name,
+        process_path,
+        icon_data,
+        volume,
+        is_muted,
+        is_master: false,
+    }))
+}
+
+fn friendly_session_name(
+    display_name: Option<&str>,
+    process_path: Option<&str>,
+    process_name: Option<&str>,
+    identity: &ProcessIdentity,
+) -> String {
+    package_display_name(identity)
+        .or_else(|| {
+            display_name
+                .filter(|name| !is_resource_display_name(name))
+                .map(|name| name.to_string())
+        })
+        .filter(|name| !is_resource_display_name(name))
+        .or_else(|| package_label(identity))
+        .or_else(|| process_path.and_then(friendly_process_label))
+        .or_else(|| process_name.map(humanize_label))
+        .or_else(|| display_name.map(|name| name.to_string()))
+        .unwrap_or_else(|| "Unknown".to_string())
+}
+
+fn process_identities_match(left: &ProcessIdentity, right: &ProcessIdentity) -> bool {
+    optional_identity_match(left.path.as_deref(), right.path.as_deref())
+        || optional_identity_match(
+            left.application_user_model_id.as_deref(),
+            right.application_user_model_id.as_deref(),
+        )
+        || optional_identity_match(
+            left.package_family_name.as_deref(),
+            right.package_family_name.as_deref(),
+        )
+        || optional_identity_match(
+            left.package_full_name.as_deref(),
+            right.package_full_name.as_deref(),
+        )
+}
+
+fn optional_identity_match(left: Option<&str>, right: Option<&str>) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => {
+            !left.trim().is_empty() && left.trim().eq_ignore_ascii_case(right.trim())
+        }
+        _ => false,
+    }
 }
 
 fn split_session_id(session_id: &str) -> (Option<&str>, &str) {
@@ -726,7 +750,7 @@ fn set_session_volume_on_device(
 fn set_session_volume_for_process(
     device: &IMMDevice,
     process_id: u32,
-    process_path: Option<&str>,
+    process_identity: &ProcessIdentity,
     volume: f32,
 ) -> Result<bool> {
     let session_manager = get_session_manager(device)?;
@@ -742,14 +766,9 @@ fn set_session_volume_for_process(
         let session_process_id = unsafe { control2.GetProcessId() }?;
         let mut matches = session_process_id == process_id;
 
-        if !matches && process_path.is_some() && session_process_id != 0 {
-            if let Some(session_path) = query_process_path(session_process_id) {
-                if let Some(target_path) = process_path {
-                    if session_path == target_path {
-                        matches = true;
-                    }
-                }
-            }
+        if !matches && session_process_id != 0 {
+            let session_identity = query_effective_process_identity(session_process_id);
+            matches = process_identities_match(&session_identity, process_identity);
         }
 
         if matches {
@@ -764,7 +783,7 @@ fn set_session_volume_for_process(
 fn set_session_mute_for_process(
     device: &IMMDevice,
     process_id: u32,
-    process_path: Option<&str>,
+    process_identity: &ProcessIdentity,
     muted: bool,
 ) -> Result<bool> {
     let session_manager = get_session_manager(device)?;
@@ -780,14 +799,9 @@ fn set_session_mute_for_process(
         let session_process_id = unsafe { control2.GetProcessId() }?;
         let mut matches = session_process_id == process_id;
 
-        if !matches && process_path.is_some() && session_process_id != 0 {
-            if let Some(session_path) = query_process_path(session_process_id) {
-                if let Some(target_path) = process_path {
-                    if session_path == target_path {
-                        matches = true;
-                    }
-                }
-            }
+        if !matches && session_process_id != 0 {
+            let session_identity = query_effective_process_identity(session_process_id);
+            matches = process_identities_match(&session_identity, process_identity);
         }
 
         if matches {
@@ -804,9 +818,12 @@ fn session_matches_application_name(
     process_path: Option<&str>,
     process_name: Option<&str>,
     display_name: Option<&str>,
+    identity: &ProcessIdentity,
 ) -> bool {
     let friendly = process_path.and_then(friendly_process_label);
     let humanized = process_name.map(humanize_label);
+    let application_key =
+        stable_application_key(identity, process_path, process_name, display_name);
     application_name_matches(
         target_name,
         process_path,
@@ -814,6 +831,10 @@ fn session_matches_application_name(
         display_name,
         friendly.as_deref(),
         humanized.as_deref(),
+        application_key.as_deref(),
+        identity.package_family_name.as_deref(),
+        identity.package_full_name.as_deref(),
+        identity.application_user_model_id.as_deref(),
     )
 }
 
@@ -829,7 +850,8 @@ fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Re
         let simple: ISimpleAudioVolume = control.cast()?;
 
         let process_id = unsafe { control2.GetProcessId() }?;
-        let process_path = query_process_path(process_id);
+        let identity = query_effective_process_identity(process_id);
+        let process_path = identity.path.clone();
         let process_name = process_path
             .as_ref()
             .and_then(|path| Path::new(path).file_name())
@@ -839,13 +861,14 @@ fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Re
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
             .and_then(owned_pwstr_to_string)
-            .map(|n| n.trim().to_string());
+            .and_then(|name| session_display_name(Some(&name)));
 
         let matches = session_matches_application_name(
             name,
             process_path.as_deref(),
             process_name.as_deref(),
             display_name.as_deref(),
+            &identity,
         );
 
         if matches {
@@ -890,7 +913,8 @@ fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Resu
         let simple: ISimpleAudioVolume = control.cast()?;
 
         let process_id = unsafe { control2.GetProcessId() }?;
-        let process_path = query_process_path(process_id);
+        let identity = query_effective_process_identity(process_id);
+        let process_path = identity.path.clone();
         let process_name = process_path
             .as_ref()
             .and_then(|path| Path::new(path).file_name())
@@ -900,13 +924,14 @@ fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Resu
         let display_name = unsafe { control2.GetDisplayName() }
             .ok()
             .and_then(owned_pwstr_to_string)
-            .map(|n| n.trim().to_string());
+            .and_then(|name| session_display_name(Some(&name)));
 
         let matches = session_matches_application_name(
             name,
             process_path.as_deref(),
             process_name.as_deref(),
             display_name.as_deref(),
+            &identity,
         );
 
         if matches {

@@ -553,6 +553,7 @@ mod tests {
         model::SessionInfo {
             id: format!("session-{}", name.to_lowercase()),
             display_name: name.to_string(),
+            application_key: None,
             process_name: Some(format!("{}.exe", name.to_lowercase())),
             process_path: Some(format!("C:\\Program Files\\{}\\{}.exe", name, name)),
             icon_data: None,
@@ -787,6 +788,7 @@ mod tests {
         let state = test_app_state(TestAudioBackend::new(vec![model::SessionInfo {
             id: "session-firefox".to_string(),
             display_name: "Firefox".to_string(),
+            application_key: None,
             process_name: Some("firefox.exe".to_string()),
             process_path: Some("C:\\Program Files\\Mozilla Firefox\\firefox.exe".to_string()),
             icon_data: None,
@@ -824,6 +826,7 @@ mod tests {
         let state = test_app_state(TestAudioBackend::new(vec![model::SessionInfo {
             id: "session-firefox".to_string(),
             display_name: "Firefox".to_string(),
+            application_key: None,
             process_name: Some("firefox.exe".to_string()),
             process_path: Some("C:\\Program Files\\Mozilla Firefox\\firefox.exe".to_string()),
             icon_data: None,
@@ -964,6 +967,7 @@ mod tests {
         let state = test_app_state(TestAudioBackend::new(vec![model::SessionInfo {
             id: "session-firefox".to_string(),
             display_name: "Firefox".to_string(),
+            application_key: None,
             process_name: Some("firefox.exe".to_string()),
             process_path: Some("C:\\Program Files\\Mozilla Firefox\\firefox.exe".to_string()),
             icon_data: None,

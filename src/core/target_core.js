@@ -33,17 +33,56 @@ function getIntegrationTarget(target) {
 }
 
 function normalizeSessionKey(session) {
+  const applicationKey = String(session?.application_key || session?.applicationKey || "").trim();
+  if (applicationKey) {
+    return applicationKey.toLowerCase();
+  }
+  const isGenericProcessName = (name) => /^(pid\s+\d+|msedgewebview2)$/i.test(name);
   if (session?.process_path) {
     const filename = session.process_path.split(/[\\/]/).pop() || "";
     const stem = filename.replace(/\.[^/.]+$/, "");
-    if (stem) {
+    if (stem && !isGenericProcessName(stem)) {
       return stem.toLowerCase();
     }
   }
   if (session?.process_name) {
-    return session.process_name.replace(/\.[^/.]+$/, "").toLowerCase();
+    const processName = session.process_name.replace(/\.[^/.]+$/, "").trim();
+    if (processName && !isGenericProcessName(processName)) {
+      return processName.toLowerCase();
+    }
   }
-  return session?.display_name?.toLowerCase() || "";
+  const displayName = String(session?.display_name || "").trim();
+  if (!displayName || isGenericProcessName(displayName)) {
+    return "";
+  }
+  return displayName.toLowerCase();
+}
+
+function packageProductKey(value) {
+  let raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+  raw = raw.replace(/^(package|aumid):/, "");
+  raw = raw.split("!")[0];
+  raw = raw.split("_")[0];
+  const product = raw.split(".").filter(Boolean).pop() || "";
+  return product;
+}
+
+function sessionMatchesAppName(session, appName) {
+  const target = String(appName || "").trim().toLowerCase();
+  if (!target) return false;
+
+  const candidates = new Set();
+  const key = normalizeSessionKey(session);
+  if (key) {
+    candidates.add(key);
+    const productKey = packageProductKey(key);
+    if (productKey) candidates.add(productKey);
+  }
+  const displayName = String(session?.display_name || "").trim().toLowerCase();
+  if (displayName) candidates.add(displayName);
+
+  return candidates.has(target);
 }
 
 function friendlyAppLabel(name) {
@@ -127,7 +166,7 @@ export function createTargetCore({
       : (appContainer?.name ?? appContainer?.appName ?? target.name ?? target.appName);
 
     if (appName) {
-      const session = sessions.find((item) => normalizeSessionKey(item) === appName.toLowerCase());
+      const session = sessions.find((item) => sessionMatchesAppName(item, appName));
       const storedLabel = (typeof appContainer === "object" && appContainer)
         ? (appContainer.display_name || appContainer.displayName || appContainer.label)
         : null;
@@ -319,7 +358,7 @@ export function createTargetCore({
     const appContainer = target.Application || target.application || (targetType === "Application" ? target : null);
     const appName = (typeof appContainer === "string") ? appContainer : (appContainer?.name ?? appContainer?.appName);
     if (appName) {
-      const matching = sessions.filter((item) => normalizeSessionKey(item) === appName.toLowerCase());
+      const matching = sessions.filter((item) => sessionMatchesAppName(item, appName));
       if (matching.length === 0) return null;
       return Math.max(...matching.map((s) => s.volume));
     }
@@ -388,7 +427,7 @@ export function createTargetCore({
     const appContainer = target.Application || target.application;
     const appName = appContainer?.name ?? target.name;
     if (appName) {
-      const matching = sessions.filter((item) => normalizeSessionKey(item) === appName.toLowerCase());
+      const matching = sessions.filter((item) => sessionMatchesAppName(item, appName));
       if (matching.length === 0) return null;
       return Math.max(...matching.map((s) => s.volume));
     }
@@ -453,7 +492,7 @@ export function createTargetCore({
     const appContainer = target.Application || target.application;
     const appName = appContainer?.name ?? target.name;
     if (appName) {
-      const session = sessions.find((item) => normalizeSessionKey(item) === appName.toLowerCase());
+      const session = sessions.find((item) => sessionMatchesAppName(item, appName));
       return session ? session.muted : false;
     }
 

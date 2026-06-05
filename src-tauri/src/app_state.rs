@@ -363,6 +363,10 @@ impl AppState {
                             Some(s.display_name.as_str()),
                             None,
                             None,
+                            s.application_key.as_deref(),
+                            None,
+                            None,
+                            None,
                         )
                     })
                 })
@@ -521,6 +525,10 @@ impl AppState {
                                 Some(session.display_name.as_str()),
                                 None,
                                 None,
+                                session.application_key.as_deref(),
+                                None,
+                                None,
+                                None,
                             )
                         })
                         .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
@@ -573,6 +581,10 @@ impl AppState {
                                 session.process_path.as_deref(),
                                 session.process_name.as_deref(),
                                 Some(session.display_name.as_str()),
+                                None,
+                                None,
+                                session.application_key.as_deref(),
+                                None,
                                 None,
                                 None,
                             )

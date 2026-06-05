@@ -58,6 +58,79 @@ function testFocusValueTracksFocusChangesWithoutSessionListChanges() {
   assert.equal(targetCore.getMuteForTarget("Focus"), false);
 }
 
+function testNormalizeSessionKeyPrefersApplicationKey() {
+  assert.equal(
+    targetCore.normalizeSessionKey({
+      application_key: "package:5319275A.WhatsAppDesktop_cv1g1gvanyjgm",
+      process_name: "ApplicationFrameHost.exe",
+      display_name: "WhatsApp",
+    }),
+    "package:5319275a.whatsappdesktop_cv1g1gvanyjgm",
+  );
+}
+
+function testNormalizeSessionKeyAvoidsPidOnlyFallback() {
+  assert.equal(
+    targetCore.normalizeSessionKey({
+      process_name: "PID 1234",
+      display_name: "PID 1234",
+    }),
+    "",
+  );
+}
+
+function testNormalizeSessionKeyAvoidsWebView2Fallback() {
+  assert.equal(
+    targetCore.normalizeSessionKey({
+      process_path: "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\148\\msedgewebview2.exe",
+      process_name: "msedgewebview2.exe",
+      display_name: "WhatsApp",
+    }),
+    "whatsapp",
+  );
+  assert.equal(
+    targetCore.normalizeSessionKey({
+      process_path: "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\148\\msedgewebview2.exe",
+      process_name: "msedgewebview2.exe",
+      application_key: "package:5319275A.WhatsAppDesktop_cv1g1gvanyjgm",
+      display_name: "WhatsApp",
+    }),
+    "package:5319275a.whatsappdesktop_cv1g1gvanyjgm",
+  );
+}
+
+function testPackageProductNameMatchesLegacyApplicationTarget() {
+  const sessions = [{
+    id: "session-whatsapp",
+    display_name: "WhatsApp",
+    application_key: "package:5319275A.WhatsAppDesktop_cv1g1gvanyjgm",
+    process_name: "WhatsApp.Root.exe",
+    volume: 0.42,
+    muted: true,
+    icon_data: "whatsapp-icon",
+  }];
+  const core = createTargetCore({
+    masterIconData: "master",
+    focusIconData: "focus",
+    mediaPlayPauseIconData: "media",
+    getSessions: () => sessions,
+    getPlaybackDevices: () => [],
+    getRecordingDevices: () => [],
+    getFocusedSession: () => null,
+    getPluginHost: () => null,
+    getIntegrationTargetState: () => null,
+  });
+  const legacyTarget = { Application: { name: "whatsappdesktop" } };
+
+  assert.equal(core.getVolumeForTarget(legacyTarget), 0.42);
+  assert.equal(core.resolveTargetVolume(legacyTarget), 0.42);
+  assert.equal(core.getMuteForTarget(legacyTarget), true);
+  assert.deepEqual(core.resolveOsdTarget(legacyTarget), {
+    label: "WhatsApp",
+    icon_data: "whatsapp-icon",
+  });
+}
+
 async function testFocusRefreshUpdatesTargetDisplaysWithoutSessionListChanges() {
   let state = {
     sessions: [],
@@ -110,6 +183,10 @@ async function testFocusRefreshUpdatesTargetDisplaysWithoutSessionListChanges() 
 
 testFocusVolumeAndMuteResolveFromFocusedSession();
 testFocusValueTracksFocusChangesWithoutSessionListChanges();
+testNormalizeSessionKeyPrefersApplicationKey();
+testNormalizeSessionKeyAvoidsPidOnlyFallback();
+testNormalizeSessionKeyAvoidsWebView2Fallback();
+testPackageProductNameMatchesLegacyApplicationTarget();
 await testFocusRefreshUpdatesTargetDisplaysWithoutSessionListChanges();
 
 console.log("Target core focus tests passed");
