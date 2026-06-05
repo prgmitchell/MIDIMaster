@@ -11,6 +11,19 @@ fn file_stem(path_or_name: &str) -> Option<String> {
         .map(normalize_name)
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ApplicationMatchInfo<'a> {
+    pub process_path: Option<&'a str>,
+    pub process_name: Option<&'a str>,
+    pub display_name: Option<&'a str>,
+    pub friendly_process_label: Option<&'a str>,
+    pub humanized_process_name: Option<&'a str>,
+    pub application_key: Option<&'a str>,
+    pub package_family_name: Option<&'a str>,
+    pub package_full_name: Option<&'a str>,
+    pub application_user_model_id: Option<&'a str>,
+}
+
 fn package_product_key(value: &str) -> Option<String> {
     let mut raw = normalize_name(value);
     raw = raw
@@ -21,8 +34,7 @@ fn package_product_key(value: &str) -> Option<String> {
     raw = raw.split('!').next().unwrap_or(&raw).to_string();
     raw = raw.split('_').next().unwrap_or(&raw).to_string();
     raw.split('.')
-        .filter(|part| !part.trim().is_empty())
-        .last()
+        .rfind(|part| !part.trim().is_empty())
         .map(|part| part.to_string())
 }
 
@@ -33,18 +45,7 @@ fn identity_candidate_matches(candidate: &str, target: &str) -> bool {
             .unwrap_or(false)
 }
 
-pub fn application_name_matches(
-    target_name: &str,
-    process_path: Option<&str>,
-    process_name: Option<&str>,
-    display_name: Option<&str>,
-    friendly_process_label: Option<&str>,
-    humanized_process_name: Option<&str>,
-    application_key: Option<&str>,
-    package_family_name: Option<&str>,
-    package_full_name: Option<&str>,
-    application_user_model_id: Option<&str>,
-) -> bool {
+pub fn application_name_matches(target_name: &str, info: ApplicationMatchInfo<'_>) -> bool {
     let target = normalize_name(target_name);
     if target.is_empty() {
         return false;
@@ -52,32 +53,36 @@ pub fn application_name_matches(
 
     let candidate_matches = |candidate: &str| identity_candidate_matches(candidate, &target);
 
-    if application_key.map(candidate_matches).unwrap_or(false) {
+    if info.application_key.map(candidate_matches).unwrap_or(false) {
         return true;
     }
 
-    if application_user_model_id
+    if info
+        .application_user_model_id
         .map(|id| candidate_matches(id) || candidate_matches(&format!("aumid:{}", id)))
         .unwrap_or(false)
     {
         return true;
     }
 
-    if package_family_name
+    if info
+        .package_family_name
         .map(|name| candidate_matches(name) || candidate_matches(&format!("package:{}", name)))
         .unwrap_or(false)
     {
         return true;
     }
 
-    if package_full_name
+    if info
+        .package_full_name
         .map(|name| candidate_matches(name) || candidate_matches(&format!("package:{}", name)))
         .unwrap_or(false)
     {
         return true;
     }
 
-    if process_path
+    if info
+        .process_path
         .and_then(file_stem)
         .map(|name| name == target)
         .unwrap_or(false)
@@ -85,16 +90,18 @@ pub fn application_name_matches(
         return true;
     }
 
-    if process_name
+    if info
+        .process_name
         .and_then(file_stem)
-        .or_else(|| process_name.map(normalize_name))
+        .or_else(|| info.process_name.map(normalize_name))
         .map(|name| name == target)
         .unwrap_or(false)
     {
         return true;
     }
 
-    if display_name
+    if info
+        .display_name
         .map(normalize_name)
         .map(|name| name == target)
         .unwrap_or(false)
@@ -102,7 +109,8 @@ pub fn application_name_matches(
         return true;
     }
 
-    if friendly_process_label
+    if info
+        .friendly_process_label
         .map(normalize_name)
         .map(|name| name == target)
         .unwrap_or(false)
@@ -110,7 +118,7 @@ pub fn application_name_matches(
         return true;
     }
 
-    humanized_process_name
+    info.humanized_process_name
         .map(normalize_name)
         .map(|name| name == target)
         .unwrap_or(false)
@@ -120,147 +128,123 @@ pub fn application_name_matches(
 mod tests {
     use super::*;
 
+    fn matches(target_name: &str, info: ApplicationMatchInfo<'_>) -> bool {
+        application_name_matches(target_name, info)
+    }
+
     #[test]
     fn matches_path_stem_process_name_display_and_friendly_names() {
-        assert!(application_name_matches(
+        assert!(matches(
             "spotify",
-            Some("C:\\Apps\\Spotify.exe"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None
+            ApplicationMatchInfo {
+                process_path: Some("C:\\Apps\\Spotify.exe"),
+                ..Default::default()
+            }
         ));
-        assert!(application_name_matches(
+        assert!(matches(
             "obs64",
-            None,
-            Some("obs64.exe"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None
+            ApplicationMatchInfo {
+                process_name: Some("obs64.exe"),
+                ..Default::default()
+            }
         ));
-        assert!(application_name_matches(
+        assert!(matches(
             "wave link",
-            None,
-            Some("WaveLink.exe"),
-            Some("Wave Link"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None
+            ApplicationMatchInfo {
+                process_name: Some("WaveLink.exe"),
+                display_name: Some("Wave Link"),
+                ..Default::default()
+            }
         ));
-        assert!(application_name_matches(
+        assert!(matches(
             "Elgato Wave Link",
-            None,
-            Some("WaveLink.exe"),
-            None,
-            Some("Elgato Wave Link"),
-            None,
-            None,
-            None,
-            None,
-            None
+            ApplicationMatchInfo {
+                process_name: Some("WaveLink.exe"),
+                friendly_process_label: Some("Elgato Wave Link"),
+                ..Default::default()
+            }
         ));
     }
 
     #[test]
     fn matches_packaged_application_identities() {
-        assert!(application_name_matches(
+        assert!(matches(
             "aumid:5319275a.whatsappdesktop_cv1g1gvanyjgm!app",
-            None,
-            None,
-            Some("WhatsApp"),
-            None,
-            None,
-            Some("aumid:5319275a.whatsappdesktop_cv1g1gvanyjgm!app"),
-            Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App")
+            ApplicationMatchInfo {
+                display_name: Some("WhatsApp"),
+                application_key: Some("aumid:5319275a.whatsappdesktop_cv1g1gvanyjgm!app"),
+                package_family_name: Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
+                package_full_name: Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
+                application_user_model_id: Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"),
+                ..Default::default()
+            }
         ));
-        assert!(application_name_matches(
+        assert!(matches(
             "package:5319275a.whatsappdesktop_cv1g1gvanyjgm",
-            None,
-            None,
-            Some("WhatsApp"),
-            None,
-            None,
-            None,
-            Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
-            None
+            ApplicationMatchInfo {
+                display_name: Some("WhatsApp"),
+                package_family_name: Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
+                package_full_name: Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
+                ..Default::default()
+            }
         ));
-        assert!(application_name_matches(
+        assert!(matches(
             "whatsappdesktop",
-            None,
-            None,
-            Some("WhatsApp"),
-            None,
-            None,
-            Some("package:5319275a.whatsappdesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
-            None
+            ApplicationMatchInfo {
+                display_name: Some("WhatsApp"),
+                application_key: Some("package:5319275a.whatsappdesktop_cv1g1gvanyjgm"),
+                package_family_name: Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
+                package_full_name: Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
+                ..Default::default()
+            }
         ));
-        assert!(application_name_matches(
+        assert!(matches(
             "WhatsApp",
-            Some("C:\\Program Files\\WindowsApps\\WhatsApp.Root.exe"),
-            Some("WhatsApp.Root.exe"),
-            Some("WhatsApp"),
-            Some("WhatsApp Root"),
-            Some("WhatsApp Root"),
-            Some("package:5319275a.whatsappdesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
-            None
+            ApplicationMatchInfo {
+                process_path: Some("C:\\Program Files\\WindowsApps\\WhatsApp.Root.exe"),
+                process_name: Some("WhatsApp.Root.exe"),
+                display_name: Some("WhatsApp"),
+                friendly_process_label: Some("WhatsApp Root"),
+                humanized_process_name: Some("WhatsApp Root"),
+                application_key: Some("package:5319275a.whatsappdesktop_cv1g1gvanyjgm"),
+                package_family_name: Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
+                package_full_name: Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
+                ..Default::default()
+            }
         ));
-        assert!(!application_name_matches(
+        assert!(!matches(
             "msedgewebview2",
-            Some("C:\\Program Files\\WindowsApps\\WhatsApp.Root.exe"),
-            Some("WhatsApp.Root.exe"),
-            Some("WhatsApp"),
-            Some("WhatsApp Root"),
-            Some("WhatsApp Root"),
-            Some("package:5319275a.whatsappdesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
-            Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
-            None
+            ApplicationMatchInfo {
+                process_path: Some("C:\\Program Files\\WindowsApps\\WhatsApp.Root.exe"),
+                process_name: Some("WhatsApp.Root.exe"),
+                display_name: Some("WhatsApp"),
+                friendly_process_label: Some("WhatsApp Root"),
+                humanized_process_name: Some("WhatsApp Root"),
+                application_key: Some("package:5319275a.whatsappdesktop_cv1g1gvanyjgm"),
+                package_family_name: Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm"),
+                package_full_name: Some("5319275A.WhatsAppDesktop_1.0.0.0_x64__cv1g1gvanyjgm"),
+                ..Default::default()
+            }
         ));
     }
 
     #[test]
     fn rejects_empty_or_unrelated_targets() {
-        assert!(!application_name_matches(
+        assert!(!matches(
             "",
-            Some("C:\\Apps\\Spotify.exe"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None
+            ApplicationMatchInfo {
+                process_path: Some("C:\\Apps\\Spotify.exe"),
+                ..Default::default()
+            }
         ));
-        assert!(!application_name_matches(
+        assert!(!matches(
             "discord",
-            Some("C:\\Apps\\Spotify.exe"),
-            Some("Spotify.exe"),
-            Some("Spotify"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None
+            ApplicationMatchInfo {
+                process_path: Some("C:\\Apps\\Spotify.exe"),
+                process_name: Some("Spotify.exe"),
+                display_name: Some("Spotify"),
+                ..Default::default()
+            }
         ));
     }
 }

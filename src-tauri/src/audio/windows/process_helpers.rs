@@ -674,8 +674,7 @@ pub(super) fn package_label(identity: &ProcessIdentity) -> Option<String> {
             let package_name = value.split('_').next().unwrap_or(value);
             let product = package_name
                 .split('.')
-                .filter(|part| !part.trim().is_empty())
-                .last()
+                .rfind(|part| !part.trim().is_empty())
                 .unwrap_or(package_name);
             let label = humanize_label(product);
             if label.is_empty() {
@@ -950,8 +949,10 @@ fn query_app_model_string(handle: HANDLE, kind: AppModelString) -> Option<String
 
 fn process_snapshot_entries() -> Option<Vec<ProcessSnapshotEntry>> {
     let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }.ok()?;
-    let mut entry = PROCESSENTRY32W::default();
-    entry.dwSize = size_of::<PROCESSENTRY32W>() as u32;
+    let mut entry = PROCESSENTRY32W {
+        dwSize: size_of::<PROCESSENTRY32W>() as u32,
+        ..Default::default()
+    };
 
     if unsafe { Process32FirstW(snapshot, &mut entry) }.is_err() {
         let _ = unsafe { CloseHandle(snapshot) };
@@ -1029,7 +1030,7 @@ fn process_identity_is_webview2(identity: &ProcessIdentity) -> bool {
         .as_deref()
         .and_then(|path| Path::new(path).file_stem())
         .and_then(|stem| stem.to_str())
-        .map(|name| is_webview2_label(&name))
+        .map(is_webview2_label)
         .unwrap_or(false)
 }
 

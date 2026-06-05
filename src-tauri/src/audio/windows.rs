@@ -1,4 +1,4 @@
-use crate::audio::target_match::application_name_matches;
+use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo};
 use crate::audio::AudioBackend;
 use crate::device_target::{parse_device_target, DeviceTargetKind};
 use crate::model::{PlaybackDeviceInfo, SessionInfo};
@@ -826,15 +826,17 @@ fn session_matches_application_name(
         stable_application_key(identity, process_path, process_name, display_name);
     application_name_matches(
         target_name,
-        process_path,
-        process_name,
-        display_name,
-        friendly.as_deref(),
-        humanized.as_deref(),
-        application_key.as_deref(),
-        identity.package_family_name.as_deref(),
-        identity.package_full_name.as_deref(),
-        identity.application_user_model_id.as_deref(),
+        ApplicationMatchInfo {
+            process_path,
+            process_name,
+            display_name,
+            friendly_process_label: friendly.as_deref(),
+            humanized_process_name: humanized.as_deref(),
+            application_key: application_key.as_deref(),
+            package_family_name: identity.package_family_name.as_deref(),
+            package_full_name: identity.package_full_name.as_deref(),
+            application_user_model_id: identity.application_user_model_id.as_deref(),
+        },
     )
 }
 

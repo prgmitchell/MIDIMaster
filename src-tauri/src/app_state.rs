@@ -1,5 +1,5 @@
 use crate::app_settings::{AppSettings, AppSettingsStore};
-use crate::audio::target_match::application_name_matches;
+use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo};
 use crate::audio::AudioBackend;
 use crate::bindings::{BindingKey, BindingState};
 use crate::device_target::{parse_device_target, DeviceTargetKind};
@@ -358,15 +358,13 @@ impl AppState {
                     sessions.into_iter().find(|s| {
                         application_name_matches(
                             name,
-                            s.process_path.as_deref(),
-                            s.process_name.as_deref(),
-                            Some(s.display_name.as_str()),
-                            None,
-                            None,
-                            s.application_key.as_deref(),
-                            None,
-                            None,
-                            None,
+                            ApplicationMatchInfo {
+                                process_path: s.process_path.as_deref(),
+                                process_name: s.process_name.as_deref(),
+                                display_name: Some(s.display_name.as_str()),
+                                application_key: s.application_key.as_deref(),
+                                ..Default::default()
+                            },
                         )
                     })
                 })
@@ -520,15 +518,13 @@ impl AppState {
                         .find(|session| {
                             application_name_matches(
                                 name,
-                                session.process_path.as_deref(),
-                                session.process_name.as_deref(),
-                                Some(session.display_name.as_str()),
-                                None,
-                                None,
-                                session.application_key.as_deref(),
-                                None,
-                                None,
-                                None,
+                                ApplicationMatchInfo {
+                                    process_path: session.process_path.as_deref(),
+                                    process_name: session.process_name.as_deref(),
+                                    display_name: Some(session.display_name.as_str()),
+                                    application_key: session.application_key.as_deref(),
+                                    ..Default::default()
+                                },
                             )
                         })
                         .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
@@ -578,15 +574,13 @@ impl AppState {
                         .find(|session| {
                             application_name_matches(
                                 name,
-                                session.process_path.as_deref(),
-                                session.process_name.as_deref(),
-                                Some(session.display_name.as_str()),
-                                None,
-                                None,
-                                session.application_key.as_deref(),
-                                None,
-                                None,
-                                None,
+                                ApplicationMatchInfo {
+                                    process_path: session.process_path.as_deref(),
+                                    process_name: session.process_name.as_deref(),
+                                    display_name: Some(session.display_name.as_str()),
+                                    application_key: session.application_key.as_deref(),
+                                    ..Default::default()
+                                },
                             )
                         })
                         .map(|session| {
