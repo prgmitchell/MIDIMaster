@@ -83,6 +83,21 @@ export function resolveMidiDeviceDropdownState({
   };
 }
 
+export function shouldRecoverSuspectMidiPair(health, preference) {
+  const current = (health && typeof health === "object") ? health : {};
+  const pref = normalizeMidiPreference(preference);
+  const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
+  const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
+
+  return Boolean(
+    current.suspect
+    && pref.inputDeviceId
+    && pref.outputDeviceId
+    && inputDeviceId === pref.inputDeviceId
+    && outputDeviceId === pref.outputDeviceId
+  );
+}
+
 export function unavailableDeviceLabel(name, id, kind) {
   const base = String(name || id || `${kind} device`).trim();
   return `${base} (Unavailable)`;

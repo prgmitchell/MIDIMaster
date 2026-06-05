@@ -13,6 +13,9 @@ const MIDI_PORT_PREFIX: &str = "midi:";
 const LOG_MIDI_MESSAGES: bool = false;
 const MIDI_DIAGNOSTIC_MIN_INTERVAL_MS: u128 = 250;
 const EMPTY_INPUT_ENUMERATION_LOG_INTERVAL: Duration = Duration::from_secs(60);
+const OUTPUT_RECONNECT_COOLDOWN: Duration = Duration::from_secs(5);
+const OUTPUT_RECONNECT_SKIPPED_LOG_INTERVAL: Duration = Duration::from_secs(30);
+const MAX_OUTPUT_RECONNECT_FAILURES: u32 = 3;
 static INPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
 static OUTPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
 static EMPTY_INPUT_ENUMERATION_LOG_STATE: OnceLock<Mutex<EmptyEnumerationLogState>> =
@@ -56,6 +59,16 @@ struct FeedbackMessage {
     protocol: &'static str,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MidiConnectionHealth {
+    pub input_device_id: String,
+    pub output_device_id: String,
+    pub connected: bool,
+    pub suspect: bool,
+    pub reason: String,
+}
+
 pub struct MidiManager {
     input_connection: Option<MidiInputConnection<()>>,
     output_connections: Vec<MidiOutputConnection>,
@@ -63,7 +76,10 @@ pub struct MidiManager {
     active_output_device: Option<String>,
     active_output_device_name: Option<String>,
     last_reconnect_attempt: Option<std::time::Instant>,
+    last_reconnect_skipped_log: Option<std::time::Instant>,
     reconnect_failures: u32,
+    connection_suspect: bool,
+    connection_suspect_reason: Option<String>,
 }
 
 impl MidiManager {
@@ -75,7 +91,10 @@ impl MidiManager {
             active_output_device: None,
             active_output_device_name: None,
             last_reconnect_attempt: None,
+            last_reconnect_skipped_log: None,
             reconnect_failures: 0,
+            connection_suspect: false,
+            connection_suspect_reason: None,
         }
     }
 
@@ -138,6 +157,46 @@ impl MidiManager {
         .filter(|_| self.input_connection.is_some() && !self.output_connections.is_empty())
     }
 
+    pub fn connection_health(&self) -> MidiConnectionHealth {
+        let input_device_id = self.active_device.clone().unwrap_or_default();
+        let output_device_id = self.active_output_device.clone().unwrap_or_default();
+        let has_active_pair = !input_device_id.is_empty() && !output_device_id.is_empty();
+        let suspect = has_active_pair && self.connection_suspect;
+        MidiConnectionHealth {
+            input_device_id,
+            output_device_id,
+            connected: has_active_pair
+                && self.input_connection.is_some()
+                && !self.output_connections.is_empty()
+                && !suspect,
+            suspect,
+            reason: self.connection_suspect_reason.clone().unwrap_or_default(),
+        }
+    }
+
+    fn mark_connection_suspect(&mut self, reason: &str) {
+        if self.active_device.is_none() && self.active_output_device.is_none() {
+            return;
+        }
+        self.connection_suspect = true;
+        self.connection_suspect_reason = Some(reason.to_string());
+    }
+
+    fn clear_connection_suspect(&mut self) {
+        self.connection_suspect = false;
+        self.connection_suspect_reason = None;
+        self.last_reconnect_skipped_log = None;
+    }
+
+    fn begin_full_connection_switch(&mut self) {
+        self.input_connection = None;
+        self.output_connections.clear();
+        self.active_device = None;
+        self.active_output_device = None;
+        self.active_output_device_name = None;
+        self.clear_connection_suspect();
+    }
+
     fn connect_output(&mut self, output_device_id: &str) -> Result<()> {
         // Clear existing output connections first
         self.output_connections.clear();
@@ -183,6 +242,7 @@ impl MidiManager {
             && self.active_output_device.as_deref() == Some(output_device_id)
             && self.input_connection.is_some()
             && !self.output_connections.is_empty()
+            && !self.connection_suspect
         {
             run_logger::info(
                 "midi",
@@ -207,12 +267,7 @@ impl MidiManager {
             ),
         );
 
-        // Clear existing input connection first
-        self.input_connection = None;
-        self.output_connections.clear();
-        self.active_device = None;
-        self.active_output_device = None;
-        self.active_output_device_name = None;
+        self.begin_full_connection_switch();
 
         // Input setup
         let input_port_index = input_device_id
@@ -280,6 +335,7 @@ impl MidiManager {
         self.active_device = None;
         self.active_output_device = None;
         self.active_output_device_name = None;
+        self.clear_connection_suspect();
     }
 
     pub fn send_binding_feedback(&mut self, binding: &Binding, value: f32) -> Result<()> {
@@ -399,46 +455,49 @@ impl MidiManager {
         }
 
         if !send_success {
-            // Rate limit reconnection attempts: wait at least 5 seconds between attempts
-            // and give up after 3 consecutive failures
-            const RECONNECT_COOLDOWN_SECS: u64 = 5;
-            const MAX_RECONNECT_FAILURES: u32 = 3;
+            self.mark_connection_suspect("output_send_failed");
 
             let should_attempt = self
                 .last_reconnect_attempt
-                .map(|t| t.elapsed().as_secs() >= RECONNECT_COOLDOWN_SECS)
+                .map(|t| t.elapsed() >= OUTPUT_RECONNECT_COOLDOWN)
                 .unwrap_or(true);
 
-            if !should_attempt || self.reconnect_failures >= MAX_RECONNECT_FAILURES {
-                // Silently skip reconnection - either too soon or too many failures
-                run_logger::warn(
-                    "midi",
-                    "output_reconnect_skipped",
-                    &format!(
-                        "feedback_protocol={} output_device_id={} output_device_name={} cooldown_ready={} reconnect_failures={} max_failures={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
-                        feedback.protocol,
-                        output_device_id,
-                        output_device_name,
-                        should_attempt,
-                        self.reconnect_failures,
-                        MAX_RECONNECT_FAILURES,
-                        channel,
-                        controller,
-                        msg_type,
-                        feedback.physical_channel,
-                        feedback.physical_controller,
-                        feedback.physical_msg_type,
-                        feedback.normalized_value,
-                        feedback.logical_raw_midi_value,
-                        feedback.physical_raw_midi_value,
-                        format_midi_bytes(&feedback.logical_bytes),
-                        format_midi_bytes(&feedback.physical_bytes)
-                    ),
-                );
+            if !should_attempt || self.reconnect_failures >= MAX_OUTPUT_RECONNECT_FAILURES {
+                if should_log_reconnect_skipped(
+                    &mut self.last_reconnect_skipped_log,
+                    Instant::now(),
+                    OUTPUT_RECONNECT_SKIPPED_LOG_INTERVAL,
+                ) {
+                    run_logger::warn(
+                        "midi",
+                        "output_reconnect_skipped",
+                        &format!(
+                            "feedback_protocol={} output_device_id={} output_device_name={} cooldown_ready={} reconnect_failures={} max_failures={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
+                            feedback.protocol,
+                            output_device_id,
+                            output_device_name,
+                            should_attempt,
+                            self.reconnect_failures,
+                            MAX_OUTPUT_RECONNECT_FAILURES,
+                            channel,
+                            controller,
+                            msg_type,
+                            feedback.physical_channel,
+                            feedback.physical_controller,
+                            feedback.physical_msg_type,
+                            feedback.normalized_value,
+                            feedback.logical_raw_midi_value,
+                            feedback.physical_raw_midi_value,
+                            format_midi_bytes(&feedback.logical_bytes),
+                            format_midi_bytes(&feedback.physical_bytes)
+                        ),
+                    );
+                }
                 return Ok(());
             }
 
             self.last_reconnect_attempt = Some(std::time::Instant::now());
+            self.last_reconnect_skipped_log = None;
             run_logger::warn(
                 "midi",
                 "output_send_failed",
@@ -474,6 +533,7 @@ impl MidiManager {
                         );
                         if let Some(conn) = self.output_connections.get_mut(0) {
                             if let Err(e) = conn.send(&feedback.physical_bytes) {
+                                self.mark_connection_suspect("output_retry_send_failed");
                                 run_logger::error(
                                     "midi",
                                     "retry_send_failed",
@@ -524,8 +584,9 @@ impl MidiManager {
                         }
                     }
                     Err(e) => {
+                        self.mark_connection_suspect("output_reconnect_failed");
                         self.reconnect_failures += 1;
-                        if self.reconnect_failures >= MAX_RECONNECT_FAILURES {
+                        if self.reconnect_failures >= MAX_OUTPUT_RECONNECT_FAILURES {
                             run_logger::error(
                                 "midi",
                                 "output_reconnect_give_up",
@@ -892,6 +953,22 @@ fn should_log_empty_enumeration(
     false
 }
 
+fn should_log_reconnect_skipped(
+    last_logged_at: &mut Option<Instant>,
+    now: Instant,
+    interval: Duration,
+) -> bool {
+    let elapsed = last_logged_at
+        .map(|last| now.duration_since(last))
+        .unwrap_or(interval);
+    if elapsed >= interval {
+        *last_logged_at = Some(now);
+        return true;
+    }
+
+    false
+}
+
 fn note_non_empty_enumeration(state: &mut EmptyEnumerationLogState) {
     state.empty_since_last_non_empty = false;
     state.last_logged_at = None;
@@ -1118,6 +1195,75 @@ mod tests {
             start + Duration::from_secs(3),
             interval
         ));
+    }
+
+    #[test]
+    fn reconnect_skipped_logging_is_rate_limited() {
+        let mut last_logged_at = None;
+        let start = Instant::now();
+        let interval = Duration::from_secs(30);
+
+        assert!(should_log_reconnect_skipped(
+            &mut last_logged_at,
+            start,
+            interval
+        ));
+        assert!(!should_log_reconnect_skipped(
+            &mut last_logged_at,
+            start + Duration::from_secs(3),
+            interval
+        ));
+        assert!(should_log_reconnect_skipped(
+            &mut last_logged_at,
+            start + Duration::from_secs(31),
+            interval
+        ));
+    }
+
+    #[test]
+    fn connection_health_marks_suspect_pair() {
+        let mut manager = MidiManager::new();
+        manager.active_device = Some("midi:0".to_string());
+        manager.active_output_device = Some("midi:1".to_string());
+
+        manager.mark_connection_suspect("output_send_failed");
+
+        let health = manager.connection_health();
+        assert_eq!(health.input_device_id, "midi:0");
+        assert_eq!(health.output_device_id, "midi:1");
+        assert!(health.suspect);
+        assert!(!health.connected);
+        assert_eq!(health.reason, "output_send_failed");
+    }
+
+    #[test]
+    fn full_connection_switch_clears_suspect_health() {
+        let mut manager = MidiManager::new();
+        manager.active_device = Some("midi:0".to_string());
+        manager.active_output_device = Some("midi:1".to_string());
+        manager.mark_connection_suspect("output_send_failed");
+
+        manager.begin_full_connection_switch();
+
+        let health = manager.connection_health();
+        assert_eq!(health.input_device_id, "");
+        assert_eq!(health.output_device_id, "");
+        assert!(!health.suspect);
+        assert_eq!(health.reason, "");
+    }
+
+    #[test]
+    fn stop_clears_suspect_health() {
+        let mut manager = MidiManager::new();
+        manager.active_device = Some("midi:0".to_string());
+        manager.active_output_device = Some("midi:1".to_string());
+        manager.mark_connection_suspect("output_reconnect_failed");
+
+        manager.stop();
+
+        let health = manager.connection_health();
+        assert!(!health.suspect);
+        assert_eq!(health.reason, "");
     }
 
     #[test]

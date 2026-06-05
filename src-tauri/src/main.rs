@@ -330,6 +330,7 @@ fn main() {
             frontend_log,
             list_midi_devices,
             list_midi_output_devices,
+            get_midi_connection_health,
             start_midi_device,
             stop_midi_device,
             list_sessions,

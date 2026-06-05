@@ -11,6 +11,7 @@ import {
   normalizeMidiPreference,
   resolveMidiDeviceDropdownState,
   resolvePreferredMidiDevicePair,
+  shouldRecoverSuspectMidiPair,
   stripUnavailableSuffix,
   unavailableDeviceLabel,
 } from "./device_preferences.js";
@@ -85,6 +86,30 @@ export function createMidiFeature({
       inputDeviceName: connectedInputName,
       outputDeviceName: connectedOutputName,
     };
+  }
+
+  function markSelectedPairUnavailable(inputId, outputId, inputName, outputName) {
+    const nextInputId = String(inputId || "").trim();
+    const nextOutputId = String(outputId || "").trim();
+    if (nextInputId && d.midiSelect) {
+      ensureOption(
+        d.midiSelect,
+        nextInputId,
+        unavailableDeviceLabel(inputName, nextInputId, "Input"),
+        true,
+      );
+      d.midiSelect.value = nextInputId;
+    }
+    if (nextOutputId && d.midiOutputSelect) {
+      ensureOption(
+        d.midiOutputSelect,
+        nextOutputId,
+        unavailableDeviceLabel(outputName, nextOutputId, "Output"),
+        true,
+      );
+      d.midiOutputSelect.value = nextOutputId;
+    }
+    renderDeviceDropdowns();
   }
 
   function ensureOption(selectEl, value, label, unavailable = false) {
@@ -257,6 +282,14 @@ export function createMidiFeature({
     })();
 
     return deviceRefreshInFlight;
+  }
+
+  async function getMidiConnectionHealth() {
+    try {
+      return await invoke("get_midi_connection_health");
+    } catch {
+      return null;
+    }
   }
 
   function refreshDevicesIfStale(reason) {
@@ -452,6 +485,52 @@ export function createMidiFeature({
       let preferredNowAvailable = preferredPair.available;
 
       if (currentlyConnected) {
+        const health = await getMidiConnectionHealth();
+        if (shouldRecoverSuspectMidiPair(health, getCurrentConnectedPreference())) {
+          const staleInputId = connectedInputId;
+          const staleOutputId = connectedOutputId;
+          const displayInputName = connectedInputName || pref.inputDeviceName || staleInputId;
+          const displayOutputName = connectedOutputName || pref.outputDeviceName || staleOutputId;
+          stopSessionRefresh();
+          await invoke("stop_midi_device").catch(() => { });
+          setConnectedState("", "", "", "");
+          if (typeof showMain === "function") {
+            showMain(displayInputName, displayOutputName, { connected: false });
+          }
+          if (d.midiStatus) {
+            d.midiStatus.textContent = t("midi.disconnected");
+          }
+          markSelectedPairUnavailable(staleInputId, staleOutputId, displayInputName, displayOutputName);
+
+          if (!prefAvailable || suspendProfileAutoReconnect) {
+            return;
+          }
+
+          const refreshed = await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "suspect_reconnect_available" });
+          const refreshedPair = resolvePreferredMidiDevicePair(refreshed, pref);
+          inputMatch = refreshedPair.inputMatch;
+          outputMatch = refreshedPair.outputMatch;
+          preferredNowAvailable = refreshedPair.available;
+          if (!preferredNowAvailable) {
+            return;
+          }
+
+          try {
+            await startWithResolvedDevice(inputMatch, outputMatch, {
+              inputName: pref.inputDeviceName,
+              outputName: pref.outputDeviceName,
+              auto: true,
+              fromProfile: true,
+            });
+            if (d.midiStatus) {
+              d.midiStatus.textContent = t("midi.reconnectedProfile");
+            }
+          } catch {
+            markSelectedPairUnavailable(staleInputId, staleOutputId, displayInputName, displayOutputName);
+          }
+          return;
+        }
+
         const activeInputAlive = findConnectedAliveDevice(devices, connectedInputId, connectedInputName);
         const activeOutputAlive = findConnectedAliveDevice(outputDevices, connectedOutputId, connectedOutputName);
         if (!activeInputAlive || !activeOutputAlive) {

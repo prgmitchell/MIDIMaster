@@ -109,8 +109,61 @@ function testHotplugStatusFlow() {
   assert.equal(connectedAfterStart.connected, true);
 }
 
+function testSuspectBackendHealthTriggersSamePairRecovery() {
+  const connectedPreference = {
+    inputDeviceId: "midi:0",
+    outputDeviceId: "midi:1",
+    inputDeviceName: "nanoKONTROL2 1 SLIDER/KNOB",
+    outputDeviceName: "nanoKONTROL2 1 CTRL",
+  };
+  const stillVisibleSnapshot = {
+    inputs: [{ id: "midi:0", name: "nanoKONTROL2 1 SLIDER/KNOB" }],
+    outputs: [{ id: "midi:1", name: "nanoKONTROL2 1 CTRL" }],
+  };
+
+  const visiblePair = midiPreferences.resolvePreferredMidiDevicePair(
+    stillVisibleSnapshot,
+    connectedPreference,
+  );
+  assert.equal(visiblePair.available, true);
+  assert.equal(midiPreferences.shouldRecoverSuspectMidiPair({
+    inputDeviceId: "midi:0",
+    outputDeviceId: "midi:1",
+    connected: false,
+    suspect: true,
+    reason: "output_send_failed",
+  }, connectedPreference), true);
+
+  const recovering = midiPreferences.resolveMidiDeviceDropdownState({
+    selectedValue: connectedPreference.inputDeviceId,
+    selectedUnavailable: true,
+    connectedDeviceId: "",
+  });
+  assert.equal(recovering.connected, false);
+  assert.equal(recovering.unavailable, true);
+
+  const afterRestart = midiPreferences.resolveMidiDeviceDropdownState({
+    selectedValue: visiblePair.inputMatch.id,
+    selectedUnavailable: false,
+    connectedDeviceId: visiblePair.inputMatch.id,
+  });
+  assert.equal(afterRestart.connected, true);
+
+  assert.equal(midiPreferences.shouldRecoverSuspectMidiPair({
+    inputDeviceId: "midi:2",
+    outputDeviceId: "midi:1",
+    suspect: true,
+  }, connectedPreference), false);
+  assert.equal(midiPreferences.shouldRecoverSuspectMidiPair({
+    inputDeviceId: "midi:0",
+    outputDeviceId: "midi:1",
+    suspect: false,
+  }, connectedPreference), false);
+}
+
 testDropdownStateRequiresActiveConnection();
 testPreferredPairDisappearsAndReturnsByName();
 testHotplugStatusFlow();
+testSuspectBackendHealthTriggersSamePairRecovery();
 
 console.log("MIDI hotplug tests passed");

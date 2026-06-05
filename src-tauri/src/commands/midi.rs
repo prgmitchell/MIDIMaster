@@ -1,5 +1,6 @@
 use crate::run_logger;
 use crate::{
+    midi::MidiConnectionHealth,
     model::{DeviceInfo, Profile},
     AppState,
 };
@@ -72,6 +73,15 @@ pub fn list_midi_output_devices(state: State<AppState>) -> Result<Vec<DeviceInfo
         .map_err(|_| "Lock poisoned".to_string())?
         .list_output_devices()
         .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn get_midi_connection_health(state: State<AppState>) -> Result<MidiConnectionHealth, String> {
+    Ok(state
+        .midi
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?
+        .connection_health())
 }
 
 #[tauri::command]
