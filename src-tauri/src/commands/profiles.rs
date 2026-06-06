@@ -44,6 +44,22 @@ fn normalize_profile_bindings(profile: &mut Profile) -> bool {
     changed
 }
 
+fn normalize_profile_midi_preference(profile: &mut Profile) -> bool {
+    if profile.midi_device_preference_set {
+        return false;
+    }
+    if profile
+        .midi_device_preference
+        .normalized_routes()
+        .is_empty()
+    {
+        return false;
+    }
+
+    profile.midi_device_preference_set = true;
+    true
+}
+
 fn safe_export_file_name(name: &str) -> String {
     let cleaned: String = name
         .chars()
@@ -110,13 +126,14 @@ pub fn load_profile(
         .ok_or_else(|| "Profile not found".to_string())?;
 
     let bindings_changed = normalize_profile_bindings(&mut profile);
+    let midi_preference_changed = normalize_profile_midi_preference(&mut profile);
 
     if heal_legacy_osd_monitor_id(&app, &mut profile) {
         state
             .profile_store
             .save_profile(profile.clone())
             .map_err(|err| err.to_string())?;
-    } else if bindings_changed {
+    } else if bindings_changed || midi_preference_changed {
         state
             .profile_store
             .save_profile(profile.clone())
@@ -134,6 +151,7 @@ pub fn save_profile(
     mut profile: Profile,
 ) -> Result<(), String> {
     normalize_profile_bindings(&mut profile);
+    normalize_profile_midi_preference(&mut profile);
     state
         .profile_store
         .save_profile(profile.clone())

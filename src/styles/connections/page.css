@@ -288,7 +288,8 @@ body.dark-mode:not([data-theme]) .binding-action.delete:hover {
   background: #dbe2ea;
 }
 
-.topbar .midi-device-dropdown .target-button .target-display::after {
+.topbar .midi-device-dropdown .target-button .target-display::after,
+.topbar .midi-device-status .target-display::after {
   content: "";
   width: 8px;
   height: 8px;
@@ -299,17 +300,20 @@ body.dark-mode:not([data-theme]) .binding-action.delete:hover {
   flex: 0 0 auto;
 }
 
-.topbar .midi-device-dropdown.device-connected .target-button .target-display::after {
+.topbar .midi-device-dropdown.device-connected .target-button .target-display::after,
+.topbar .midi-device-status.device-connected .target-display::after {
   background: var(--success);
   box-shadow: 0 0 0 2px rgba(82, 211, 128, 0.08);
 }
 
-.topbar .midi-device-dropdown.device-unavailable .target-button .target-display::after {
+.topbar .midi-device-dropdown.device-unavailable .target-button .target-display::after,
+.topbar .midi-device-status.device-unavailable .target-display::after {
   background: var(--danger);
   box-shadow: 0 0 0 2px rgba(244, 90, 112, 0.1);
 }
 
-.topbar .midi-device-dropdown .target-button .target-display {
+.topbar .midi-device-dropdown .target-button .target-display,
+.topbar .midi-device-status .target-display {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -320,11 +324,15 @@ body.dark-mode:not([data-theme]) .binding-action.delete:hover {
 .topbar .midi-device-dropdown .target-button .target-label,
 .topbar .midi-device-dropdown .target-button .target-label-content,
 .topbar .midi-device-dropdown .target-button .target-label-main,
+.topbar .midi-device-status .target-label,
+.topbar .midi-device-status .target-label-content,
+.topbar .midi-device-status .target-label-main,
 .profile-select .select-button #profile-current {
   min-width: 0;
 }
 
 .topbar .midi-device-dropdown .target-button .target-label-content,
+.topbar .midi-device-status .target-label-content,
 .profile-select .select-button #profile-current {
   overflow: hidden;
   overflow-x: auto;
@@ -332,17 +340,20 @@ body.dark-mode:not([data-theme]) .binding-action.delete:hover {
 }
 
 .topbar .midi-device-dropdown .target-button .target-label-content::-webkit-scrollbar,
+.topbar .midi-device-status .target-label-content::-webkit-scrollbar,
 .profile-select .select-button #profile-current::-webkit-scrollbar {
   display: none;
 }
 
 .topbar .midi-device-dropdown .target-button .target-label-main,
+.topbar .midi-device-status .target-label-main,
 .profile-select .select-button #profile-current {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.topbar .midi-device-dropdown .target-button {
+.topbar .midi-device-dropdown .target-button,
+.topbar .midi-device-status {
   background: #111820;
   border-color: #303945;
 }

@@ -1,4 +1,6 @@
-use crate::model::{Binding, BindingAction, DeviceInfo, MidiEvent, MidiMessageType, MidiMode};
+use crate::model::{
+    Binding, BindingAction, DeviceInfo, MidiDeviceRoute, MidiEvent, MidiMessageType, MidiMode,
+};
 use crate::run_logger;
 use anyhow::{anyhow, Result};
 use midir::{
@@ -70,11 +72,19 @@ pub struct MidiConnectionHealth {
 }
 
 pub struct MidiManager {
+    input_routes: HashMap<String, MidiInputRoute>,
+    output_routes: HashMap<String, MidiOutputRoute>,
+}
+
+struct MidiInputRoute {
     input_connection: Option<MidiInputConnection<()>>,
-    output_connections: Vec<MidiOutputConnection>,
-    active_device: Option<String>,
-    active_output_device: Option<String>,
-    active_output_device_name: Option<String>,
+    input_device_id: String,
+    output_device_id: String,
+}
+
+struct MidiOutputRoute {
+    output_connection: Option<MidiOutputConnection>,
+    output_device_name: String,
     last_reconnect_attempt: Option<std::time::Instant>,
     last_reconnect_skipped_log: Option<std::time::Instant>,
     reconnect_failures: u32,
@@ -85,16 +95,8 @@ pub struct MidiManager {
 impl MidiManager {
     pub fn new() -> Self {
         Self {
-            input_connection: None,
-            output_connections: Vec::new(),
-            active_device: None,
-            active_output_device: None,
-            active_output_device_name: None,
-            last_reconnect_attempt: None,
-            last_reconnect_skipped_log: None,
-            reconnect_failures: 0,
-            connection_suspect: false,
-            connection_suspect_reason: None,
+            input_routes: HashMap::new(),
+            output_routes: HashMap::new(),
         }
     }
 
@@ -149,58 +151,87 @@ impl MidiManager {
         Ok(devices)
     }
 
-    pub fn active_pair(&self) -> Option<(String, String)> {
-        Some((
-            self.active_device.clone()?,
-            self.active_output_device.clone()?,
-        ))
-        .filter(|_| self.input_connection.is_some() && !self.output_connections.is_empty())
+    pub fn active_routes(&self) -> Vec<(String, String)> {
+        let mut routes = self
+            .input_routes
+            .values()
+            .map(|route| {
+                (
+                    route.input_device_id.clone(),
+                    route.output_device_id.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        routes.sort_by(|a, b| a.0.cmp(&b.0));
+        routes
+    }
+
+    pub fn active_route_count(&self) -> usize {
+        self.input_routes.len()
     }
 
     pub fn connection_health(&self) -> MidiConnectionHealth {
-        let input_device_id = self.active_device.clone().unwrap_or_default();
-        let output_device_id = self.active_output_device.clone().unwrap_or_default();
-        let has_active_pair = !input_device_id.is_empty() && !output_device_id.is_empty();
-        let suspect = has_active_pair && self.connection_suspect;
-        MidiConnectionHealth {
-            input_device_id,
-            output_device_id,
-            connected: has_active_pair
-                && self.input_connection.is_some()
-                && !self.output_connections.is_empty()
-                && !suspect,
-            suspect,
-            reason: self.connection_suspect_reason.clone().unwrap_or_default(),
-        }
+        self.route_health()
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| MidiConnectionHealth {
+                input_device_id: String::new(),
+                output_device_id: String::new(),
+                connected: false,
+                suspect: false,
+                reason: String::new(),
+            })
     }
 
-    fn mark_connection_suspect(&mut self, reason: &str) {
-        if self.active_device.is_none() && self.active_output_device.is_none() {
+    pub fn route_health(&self) -> Vec<MidiConnectionHealth> {
+        let mut health = self
+            .input_routes
+            .values()
+            .map(|route| {
+                let output = self.output_routes.get(&route.output_device_id);
+                let suspect = output
+                    .map(|output| output.connection_suspect)
+                    .unwrap_or(true);
+                let reason = output
+                    .and_then(|output| output.connection_suspect_reason.clone())
+                    .unwrap_or_else(|| {
+                        if output.is_none() {
+                            "output_not_connected".to_string()
+                        } else {
+                            String::new()
+                        }
+                    });
+                MidiConnectionHealth {
+                    input_device_id: route.input_device_id.clone(),
+                    output_device_id: route.output_device_id.clone(),
+                    connected: route.input_connection.is_some()
+                        && output
+                            .map(|output| output.output_connection.is_some() && !suspect)
+                            .unwrap_or(false),
+                    suspect,
+                    reason,
+                }
+            })
+            .collect::<Vec<_>>();
+        health.sort_by(|a, b| a.input_device_id.cmp(&b.input_device_id));
+        health
+    }
+
+    fn mark_output_suspect(&mut self, output_device_id: &str, reason: &str) {
+        let Some(route) = self.output_routes.get_mut(output_device_id) else {
             return;
-        }
-        self.connection_suspect = true;
-        self.connection_suspect_reason = Some(reason.to_string());
+        };
+        route.connection_suspect = true;
+        route.connection_suspect_reason = Some(reason.to_string());
     }
 
-    fn clear_connection_suspect(&mut self) {
-        self.connection_suspect = false;
-        self.connection_suspect_reason = None;
-        self.last_reconnect_skipped_log = None;
+    fn clear_output_suspect(route: &mut MidiOutputRoute) {
+        route.connection_suspect = false;
+        route.connection_suspect_reason = None;
+        route.last_reconnect_skipped_log = None;
     }
 
-    fn begin_full_connection_switch(&mut self) {
-        self.input_connection = None;
-        self.output_connections.clear();
-        self.active_device = None;
-        self.active_output_device = None;
-        self.active_output_device_name = None;
-        self.clear_connection_suspect();
-    }
-
-    fn connect_output(&mut self, output_device_id: &str) -> Result<()> {
-        // Clear existing output connections first
-        self.output_connections.clear();
-
+    fn open_output_connection(output_device_id: &str) -> Result<(MidiOutputConnection, String)> {
         let output_port_index = output_device_id
             .strip_prefix(MIDI_PORT_PREFIX)
             .ok_or_else(|| anyhow!("Invalid output device id"))?
@@ -213,11 +244,41 @@ impl MidiManager {
         let output_connection = midi_out
             .connect(&output_port, "midimaster-output")
             .map_err(|e| anyhow!("Failed to connect to output: {}", e))?;
+        Ok((output_connection, output_port_name))
+    }
 
-        self.output_connections = vec![output_connection];
-        self.active_output_device = Some(output_device_id.to_string());
-        self.active_output_device_name = Some(output_port_name.clone());
-        self.reconnect_failures = 0; // Reset failure count on successful connect
+    fn ensure_output_connected(&mut self, output_device_id: &str) -> Result<()> {
+        if self
+            .output_routes
+            .get(output_device_id)
+            .map(|route| route.output_connection.is_some())
+            .unwrap_or(false)
+        {
+            return Ok(());
+        }
+        let (output_connection, output_port_name) = Self::open_output_connection(output_device_id)?;
+        match self.output_routes.get_mut(output_device_id) {
+            Some(route) => {
+                route.output_connection = Some(output_connection);
+                route.output_device_name = output_port_name.clone();
+                route.reconnect_failures = 0;
+                Self::clear_output_suspect(route);
+            }
+            None => {
+                self.output_routes.insert(
+                    output_device_id.to_string(),
+                    MidiOutputRoute {
+                        output_connection: Some(output_connection),
+                        output_device_name: output_port_name.clone(),
+                        last_reconnect_attempt: None,
+                        last_reconnect_skipped_log: None,
+                        reconnect_failures: 0,
+                        connection_suspect: false,
+                        connection_suspect_reason: None,
+                    },
+                );
+            }
+        }
         run_logger::info(
             "midi",
             "output_connected",
@@ -229,47 +290,95 @@ impl MidiManager {
         Ok(())
     }
 
-    pub fn start_device<F>(
+    pub fn set_device_routes(
         &mut self,
-        input_device_id: &str,
-        output_device_id: &str,
-        on_event: F,
-    ) -> Result<()>
-    where
-        F: Fn(MidiEvent) + Send + 'static,
-    {
-        if self.active_device.as_deref() == Some(input_device_id)
-            && self.active_output_device.as_deref() == Some(output_device_id)
-            && self.input_connection.is_some()
-            && !self.output_connections.is_empty()
-            && !self.connection_suspect
-        {
-            run_logger::info(
-                "midi",
-                "start_device_noop",
-                &format!(
-                    "input_device_id={} output_device_id={}",
-                    input_device_id, output_device_id
-                ),
-            );
-            return Ok(());
+        routes: &[MidiDeviceRoute],
+        on_event: std::sync::Arc<dyn Fn(MidiEvent) + Send + Sync + 'static>,
+    ) -> Result<()> {
+        let mut next_routes = Vec::new();
+        let mut seen_inputs = std::collections::HashSet::new();
+        for route in routes {
+            let Some(route) = route.normalized() else {
+                continue;
+            };
+            if !route.enabled {
+                continue;
+            }
+            let input_device_id = route.input_id().unwrap_or_default().to_string();
+            let output_device_id = route.output_id().unwrap_or_default().to_string();
+            if !seen_inputs.insert(input_device_id.clone()) {
+                return Err(anyhow!("Duplicate MIDI input route: {}", input_device_id));
+            }
+            next_routes.push((input_device_id, output_device_id));
         }
 
-        run_logger::info(
-            "midi",
-            "switch_device_begin",
-            &format!(
-                "previous_input={} previous_output={} next_input={} next_output={}",
-                self.active_device.as_deref().unwrap_or(""),
-                self.active_output_device.as_deref().unwrap_or(""),
-                input_device_id,
-                output_device_id
-            ),
-        );
+        let desired_inputs = next_routes
+            .iter()
+            .map(|(input, _)| input.clone())
+            .collect::<std::collections::HashSet<_>>();
+        let existing_inputs = self.input_routes.keys().cloned().collect::<Vec<_>>();
+        for input_device_id in existing_inputs {
+            if !desired_inputs.contains(&input_device_id) {
+                self.input_routes.remove(&input_device_id);
+                run_logger::info(
+                    "midi",
+                    "input_route_disconnected",
+                    &format!("input_device_id={}", input_device_id),
+                );
+            }
+        }
 
-        self.begin_full_connection_switch();
+        for (_, output_device_id) in &next_routes {
+            self.ensure_output_connected(output_device_id)?;
+        }
 
-        // Input setup
+        for (input_device_id, output_device_id) in next_routes {
+            if let Some(existing) = self.input_routes.get_mut(&input_device_id) {
+                if existing.output_device_id != output_device_id {
+                    run_logger::info(
+                        "midi",
+                        "input_route_output_changed",
+                        &format!(
+                            "input_device_id={} previous_output={} next_output={}",
+                            input_device_id, existing.output_device_id, output_device_id
+                        ),
+                    );
+                    existing.output_device_id = output_device_id;
+                }
+                continue;
+            }
+
+            let route =
+                self.connect_input_route(&input_device_id, &output_device_id, on_event.clone())?;
+            self.input_routes.insert(input_device_id, route);
+        }
+
+        let referenced_outputs = self
+            .input_routes
+            .values()
+            .map(|route| route.output_device_id.clone())
+            .collect::<std::collections::HashSet<_>>();
+        let existing_outputs = self.output_routes.keys().cloned().collect::<Vec<_>>();
+        for output_device_id in existing_outputs {
+            if !referenced_outputs.contains(&output_device_id) {
+                self.output_routes.remove(&output_device_id);
+                run_logger::info(
+                    "midi",
+                    "output_route_disconnected",
+                    &format!("output_device_id={}", output_device_id),
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn connect_input_route(
+        &self,
+        input_device_id: &str,
+        output_device_id: &str,
+        on_event: std::sync::Arc<dyn Fn(MidiEvent) + Send + Sync + 'static>,
+    ) -> Result<MidiInputRoute> {
         let input_port_index = input_device_id
             .strip_prefix(MIDI_PORT_PREFIX)
             .ok_or_else(|| anyhow!("Invalid input device id"))?
@@ -277,12 +386,12 @@ impl MidiManager {
         let mut midi_in = MidiInput::new("MIDIMaster")?;
         midi_in.ignore(Ignore::None);
         let input_port = find_input_port(&midi_in, input_port_index)?;
-
-        // Output setup
-        self.connect_output(output_device_id)?;
+        let input_port_name = midi_in
+            .port_name(&input_port)
+            .unwrap_or_else(|_| format!("Input {}", input_port_index));
         run_logger::info(
             "midi",
-            "start_device_requested",
+            "start_route_requested",
             &format!(
                 "input_device_id={} output_device_id={}",
                 input_device_id, output_device_id
@@ -290,7 +399,6 @@ impl MidiManager {
         );
 
         let event_device_id = input_device_id.to_string();
-        let active_device = input_device_id.to_string(); // we use input device ID as the primary ID for the session
 
         let connection = midi_in.connect(
             &input_port,
@@ -307,15 +415,20 @@ impl MidiManager {
             (),
         )?;
 
-        self.input_connection = Some(connection);
-        self.active_device = Some(active_device);
         run_logger::info(
             "midi",
             "input_connected",
-            &format!("input_device_id={}", input_device_id),
+            &format!(
+                "input_device_id={} input_device_name={} output_device_id={}",
+                input_device_id, input_port_name, output_device_id
+            ),
         );
 
-        Ok(())
+        Ok(MidiInputRoute {
+            input_connection: Some(connection),
+            input_device_id: input_device_id.to_string(),
+            output_device_id: output_device_id.to_string(),
+        })
     }
 
     pub fn stop(&mut self) {
@@ -323,19 +436,34 @@ impl MidiManager {
             "midi",
             "stop_device",
             &format!(
-                "had_input={} had_output={} active_input={} active_output={}",
-                self.input_connection.is_some(),
-                !self.output_connections.is_empty(),
-                self.active_device.as_deref().unwrap_or(""),
-                self.active_output_device.as_deref().unwrap_or("")
+                "input_route_count={} output_route_count={}",
+                self.input_routes.len(),
+                self.output_routes.len()
             ),
         );
-        self.input_connection.take();
-        self.output_connections.clear();
-        self.active_device = None;
-        self.active_output_device = None;
-        self.active_output_device_name = None;
-        self.clear_connection_suspect();
+        self.input_routes.clear();
+        self.output_routes.clear();
+    }
+
+    pub fn stop_route(&mut self, input_device_id: &str) -> Option<String> {
+        let route = self.input_routes.remove(input_device_id)?;
+        let output_device_id = route.output_device_id.clone();
+        let still_referenced = self
+            .input_routes
+            .values()
+            .any(|other| other.output_device_id == output_device_id);
+        if !still_referenced {
+            self.output_routes.remove(&output_device_id);
+        }
+        run_logger::info(
+            "midi",
+            "route_stopped",
+            &format!(
+                "input_device_id={} output_device_id={}",
+                input_device_id, output_device_id
+            ),
+        );
+        Some(output_device_id)
     }
 
     pub fn send_binding_feedback(&mut self, binding: &Binding, value: f32) -> Result<()> {
@@ -369,7 +497,87 @@ impl MidiManager {
         msg_type: MidiMessageType,
         binding: Option<&Binding>,
     ) -> Result<()> {
-        let output_device_name = self.active_output_device_name.clone().unwrap_or_default();
+        let resolved_route = self
+            .input_routes
+            .get(device_id)
+            .map(|route| {
+                (
+                    route.input_device_id.clone(),
+                    route.output_device_id.clone(),
+                    false,
+                )
+            })
+            .or_else(|| {
+                if self.input_routes.len() == 1 {
+                    self.input_routes.values().next().map(|route| {
+                        (
+                            route.input_device_id.clone(),
+                            route.output_device_id.clone(),
+                            true,
+                        )
+                    })
+                } else {
+                    None
+                }
+            });
+
+        let Some((route_input_device_id, output_device_id, used_single_route_fallback)) =
+            resolved_route
+        else {
+            run_logger::debug(
+                "midi",
+                "feedback_skipped_no_route",
+                &format!(
+                    "input_device_id={} active_route_count={} logical_channel={} logical_controller={} logical_msg_type={:?} normalized_value={:.4}",
+                    device_id,
+                    self.input_routes.len(),
+                    channel,
+                    controller,
+                    msg_type,
+                    value
+                ),
+            );
+            return Ok(());
+        };
+        if used_single_route_fallback {
+            run_logger::debug(
+                "midi",
+                "feedback_route_fallback_single_active",
+                &format!(
+                    "requested_input_device_id={} route_input_device_id={} output_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} normalized_value={:.4}",
+                    device_id,
+                    route_input_device_id,
+                    output_device_id,
+                    channel,
+                    controller,
+                    msg_type,
+                    value
+                ),
+            );
+        }
+
+        let Some(output_device_name) = self
+            .output_routes
+            .get(&output_device_id)
+            .map(|route| route.output_device_name.clone())
+        else {
+            run_logger::debug(
+                "midi",
+                "feedback_skipped_no_output",
+                &format!(
+                    "input_device_id={} requested_input_device_id={} output_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} normalized_value={:.4}",
+                    route_input_device_id,
+                    device_id,
+                    output_device_id,
+                    channel,
+                    controller,
+                    msg_type,
+                    value
+                ),
+            );
+            return Ok(());
+        };
+
         let feedback = build_feedback_message(
             channel,
             controller,
@@ -379,73 +587,21 @@ impl MidiManager {
             &output_device_name,
         );
 
-        // We only send feedback if the requested device matches our active ONE
-        if self.active_device.as_deref() != Some(device_id) {
-            run_logger::debug(
-                "midi",
-                "feedback_skipped_device_mismatch",
-                &format!(
-                    "feedback_protocol={} requested_input_device={} active_input_device={} active_output_device={} active_output_device_name={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
-                    feedback.protocol,
-                    device_id,
-                    self.active_device.as_deref().unwrap_or(""),
-                    self.active_output_device.as_deref().unwrap_or(""),
-                    output_device_name,
-                    channel,
-                    controller,
-                    msg_type,
-                    feedback.physical_channel,
-                    feedback.physical_controller,
-                    feedback.physical_msg_type,
-                    feedback.normalized_value,
-                    feedback.logical_raw_midi_value,
-                    feedback.physical_raw_midi_value,
-                    format_midi_bytes(&feedback.logical_bytes),
-                    format_midi_bytes(&feedback.physical_bytes)
-                ),
-            );
-            return Ok(());
-        }
-
-        // Early exit if no output is connected yet (prevents spam on startup)
-        if self.active_output_device.is_none() {
-            run_logger::debug(
-                "midi",
-                "feedback_skipped_no_output",
-                &format!(
-                    "feedback_protocol={} input_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
-                    feedback.protocol,
-                    device_id,
-                    channel,
-                    controller,
-                    msg_type,
-                    feedback.physical_channel,
-                    feedback.physical_controller,
-                    feedback.physical_msg_type,
-                    feedback.normalized_value,
-                    feedback.logical_raw_midi_value,
-                    feedback.physical_raw_midi_value,
-                    format_midi_bytes(&feedback.logical_bytes),
-                    format_midi_bytes(&feedback.physical_bytes)
-                ),
-            );
-            return Ok(());
-        }
-
-        let output_device_id = self
-            .active_output_device
-            .as_deref()
-            .unwrap_or("")
-            .to_string();
         let mut send_success = false;
-        if let Some(conn) = self.output_connections.get_mut(0) {
-            if conn.send(&feedback.physical_bytes).is_ok() {
+        if let Some(route) = self.output_routes.get_mut(&output_device_id) {
+            if route
+                .output_connection
+                .as_mut()
+                .map(|connection| connection.send(&feedback.physical_bytes).is_ok())
+                .unwrap_or(false)
+            {
                 send_success = true;
+                Self::clear_output_suspect(route);
             }
         }
         if send_success {
             log_feedback_sent_if_needed(
-                device_id,
+                &route_input_device_id,
                 &output_device_id,
                 channel,
                 controller,
@@ -455,49 +611,58 @@ impl MidiManager {
         }
 
         if !send_success {
-            self.mark_connection_suspect("output_send_failed");
+            self.mark_output_suspect(&output_device_id, "output_send_failed");
+            let (should_attempt, reconnect_failures) = if let Some(route) =
+                self.output_routes.get_mut(&output_device_id)
+            {
+                let should_attempt = route
+                    .last_reconnect_attempt
+                    .map(|t| t.elapsed() >= OUTPUT_RECONNECT_COOLDOWN)
+                    .unwrap_or(true);
+                let reconnect_failures = route.reconnect_failures;
 
-            let should_attempt = self
-                .last_reconnect_attempt
-                .map(|t| t.elapsed() >= OUTPUT_RECONNECT_COOLDOWN)
-                .unwrap_or(true);
-
-            if !should_attempt || self.reconnect_failures >= MAX_OUTPUT_RECONNECT_FAILURES {
-                if should_log_reconnect_skipped(
-                    &mut self.last_reconnect_skipped_log,
-                    Instant::now(),
-                    OUTPUT_RECONNECT_SKIPPED_LOG_INTERVAL,
-                ) {
-                    run_logger::warn(
-                        "midi",
-                        "output_reconnect_skipped",
-                        &format!(
-                            "feedback_protocol={} output_device_id={} output_device_name={} cooldown_ready={} reconnect_failures={} max_failures={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
-                            feedback.protocol,
-                            output_device_id,
-                            output_device_name,
-                            should_attempt,
-                            self.reconnect_failures,
-                            MAX_OUTPUT_RECONNECT_FAILURES,
-                            channel,
-                            controller,
-                            msg_type,
-                            feedback.physical_channel,
-                            feedback.physical_controller,
-                            feedback.physical_msg_type,
-                            feedback.normalized_value,
-                            feedback.logical_raw_midi_value,
-                            feedback.physical_raw_midi_value,
-                            format_midi_bytes(&feedback.logical_bytes),
-                            format_midi_bytes(&feedback.physical_bytes)
-                        ),
-                    );
+                if !should_attempt || reconnect_failures >= MAX_OUTPUT_RECONNECT_FAILURES {
+                    if should_log_reconnect_skipped(
+                        &mut route.last_reconnect_skipped_log,
+                        Instant::now(),
+                        OUTPUT_RECONNECT_SKIPPED_LOG_INTERVAL,
+                    ) {
+                        run_logger::warn(
+                                "midi",
+                                "output_reconnect_skipped",
+                                &format!(
+                                    "feedback_protocol={} output_device_id={} output_device_name={} cooldown_ready={} reconnect_failures={} max_failures={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
+                                    feedback.protocol,
+                                    output_device_id,
+                                    output_device_name,
+                                    should_attempt,
+                                    reconnect_failures,
+                                    MAX_OUTPUT_RECONNECT_FAILURES,
+                                    channel,
+                                    controller,
+                                    msg_type,
+                                    feedback.physical_channel,
+                                    feedback.physical_controller,
+                                    feedback.physical_msg_type,
+                                    feedback.normalized_value,
+                                    feedback.logical_raw_midi_value,
+                                    feedback.physical_raw_midi_value,
+                                    format_midi_bytes(&feedback.logical_bytes),
+                                    format_midi_bytes(&feedback.physical_bytes)
+                                ),
+                            );
+                    }
+                    return Ok(());
                 }
-                return Ok(());
-            }
 
-            self.last_reconnect_attempt = Some(std::time::Instant::now());
-            self.last_reconnect_skipped_log = None;
+                route.last_reconnect_attempt = Some(std::time::Instant::now());
+                route.last_reconnect_skipped_log = None;
+                (should_attempt, reconnect_failures)
+            } else {
+                return Ok(());
+            };
+            let _ = should_attempt;
+            let _ = reconnect_failures;
             run_logger::warn(
                 "midi",
                 "output_send_failed",
@@ -520,113 +685,156 @@ impl MidiManager {
                 ),
             );
 
-            if let Some(output_id) = self.active_output_device.clone() {
-                // Clear old connections first to release the port
-                self.output_connections.clear();
-
-                match self.connect_output(&output_id) {
-                    Ok(_) => {
-                        run_logger::info(
-                            "midi",
-                            "output_reconnected",
-                            &format!("output_device_id={}", output_id),
-                        );
-                        if let Some(conn) = self.output_connections.get_mut(0) {
-                            if let Err(e) = conn.send(&feedback.physical_bytes) {
-                                self.mark_connection_suspect("output_retry_send_failed");
-                                run_logger::error(
-                                    "midi",
-                                    "retry_send_failed",
-                                    &format!(
-                                        "feedback_protocol={} output_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={} error={}",
-                                        feedback.protocol,
-                                        output_id,
-                                        channel,
-                                        controller,
-                                        msg_type,
-                                        feedback.physical_channel,
-                                        feedback.physical_controller,
-                                        feedback.physical_msg_type,
-                                        feedback.normalized_value,
-                                        feedback.logical_raw_midi_value,
-                                        feedback.physical_raw_midi_value,
-                                        format_midi_bytes(&feedback.logical_bytes),
-                                        format_midi_bytes(&feedback.physical_bytes),
-                                        e
-                                    ),
-                                );
-                            } else {
-                                run_logger::info(
-                                    "midi",
-                                    "retry_send_successful",
-                                    &format!(
-                                        "feedback_protocol={} output_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
-                                        feedback.protocol,
-                                        output_id,
-                                        channel,
-                                        controller,
-                                        msg_type,
-                                        feedback.physical_channel,
-                                        feedback.physical_controller,
-                                        feedback.physical_msg_type,
-                                        feedback.normalized_value,
-                                        feedback.logical_raw_midi_value,
-                                        feedback.physical_raw_midi_value,
-                                        format_midi_bytes(&feedback.logical_bytes),
-                                        format_midi_bytes(&feedback.physical_bytes)
-                                    ),
-                                );
-                                log_feedback_sent_if_needed(
-                                    device_id, &output_id, channel, controller, &msg_type,
-                                    &feedback,
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        self.mark_connection_suspect("output_reconnect_failed");
-                        self.reconnect_failures += 1;
-                        if self.reconnect_failures >= MAX_OUTPUT_RECONNECT_FAILURES {
+            if let Some(route) = self.output_routes.get_mut(&output_device_id) {
+                route.output_connection = None;
+            }
+            match self.ensure_output_connected(&output_device_id) {
+                Ok(_) => {
+                    run_logger::info(
+                        "midi",
+                        "output_reconnected",
+                        &format!("output_device_id={}", output_device_id),
+                    );
+                    if let Some(route) = self.output_routes.get_mut(&output_device_id) {
+                        let retry_error = route
+                            .output_connection
+                            .as_mut()
+                            .and_then(|connection| {
+                                connection
+                                    .send(&feedback.physical_bytes)
+                                    .err()
+                                    .map(|error| error.to_string())
+                            })
+                            .or_else(|| {
+                                if route.output_connection.is_none() {
+                                    Some("output not connected".to_string())
+                                } else {
+                                    None
+                                }
+                            });
+                        if let Some(e) = retry_error {
+                            route.connection_suspect = true;
+                            route.connection_suspect_reason =
+                                Some("output_retry_send_failed".to_string());
                             run_logger::error(
                                 "midi",
-                                "output_reconnect_give_up",
+                                "retry_send_failed",
                                 &format!(
-                                    "feedback_protocol={} output_device_id={} attempts={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} physical_raw_midi_value={} physical_bytes_hex={} error={}",
+                                    "feedback_protocol={} output_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={} error={}",
                                     feedback.protocol,
-                                    output_id,
-                                    self.reconnect_failures,
+                                    output_device_id,
                                     channel,
                                     controller,
                                     msg_type,
                                     feedback.physical_channel,
                                     feedback.physical_controller,
                                     feedback.physical_msg_type,
+                                    feedback.normalized_value,
+                                    feedback.logical_raw_midi_value,
                                     feedback.physical_raw_midi_value,
+                                    format_midi_bytes(&feedback.logical_bytes),
                                     format_midi_bytes(&feedback.physical_bytes),
                                     e
                                 ),
                             );
                         } else {
-                            run_logger::warn(
+                            Self::clear_output_suspect(route);
+                            run_logger::info(
                                 "midi",
-                                "output_reconnect_failed",
+                                "retry_send_successful",
                                 &format!(
-                                    "feedback_protocol={} output_device_id={} attempt={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} physical_raw_midi_value={} physical_bytes_hex={} error={}",
+                                    "feedback_protocol={} output_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
                                     feedback.protocol,
-                                    output_id,
-                                    self.reconnect_failures,
+                                    output_device_id,
                                     channel,
                                     controller,
                                     msg_type,
                                     feedback.physical_channel,
                                     feedback.physical_controller,
                                     feedback.physical_msg_type,
+                                    feedback.normalized_value,
+                                    feedback.logical_raw_midi_value,
                                     feedback.physical_raw_midi_value,
-                                    format_midi_bytes(&feedback.physical_bytes),
-                                    e
+                                    format_midi_bytes(&feedback.logical_bytes),
+                                    format_midi_bytes(&feedback.physical_bytes)
                                 ),
                             );
+                            log_feedback_sent_if_needed(
+                                &route_input_device_id,
+                                &output_device_id,
+                                channel,
+                                controller,
+                                &msg_type,
+                                &feedback,
+                            );
                         }
+                    }
+                }
+                Err(e) => {
+                    let failures =
+                        if let Some(route) = self.output_routes.get_mut(&output_device_id) {
+                            route.connection_suspect = true;
+                            route.connection_suspect_reason =
+                                Some("output_reconnect_failed".to_string());
+                            route.reconnect_failures += 1;
+                            route.reconnect_failures
+                        } else {
+                            self.output_routes.insert(
+                                output_device_id.clone(),
+                                MidiOutputRoute {
+                                    output_connection: None,
+                                    output_device_name: output_device_name.clone(),
+                                    last_reconnect_attempt: Some(std::time::Instant::now()),
+                                    last_reconnect_skipped_log: None,
+                                    reconnect_failures: 1,
+                                    connection_suspect: true,
+                                    connection_suspect_reason: Some(
+                                        "output_reconnect_failed".to_string(),
+                                    ),
+                                },
+                            );
+                            1
+                        };
+                    if failures >= MAX_OUTPUT_RECONNECT_FAILURES {
+                        run_logger::error(
+                            "midi",
+                            "output_reconnect_give_up",
+                            &format!(
+                                "feedback_protocol={} output_device_id={} attempts={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} physical_raw_midi_value={} physical_bytes_hex={} error={}",
+                                feedback.protocol,
+                                output_device_id,
+                                failures,
+                                channel,
+                                controller,
+                                msg_type,
+                                feedback.physical_channel,
+                                feedback.physical_controller,
+                                feedback.physical_msg_type,
+                                feedback.physical_raw_midi_value,
+                                format_midi_bytes(&feedback.physical_bytes),
+                                e
+                            ),
+                        );
+                    } else {
+                        run_logger::warn(
+                            "midi",
+                            "output_reconnect_failed",
+                            &format!(
+                                "feedback_protocol={} output_device_id={} attempt={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} physical_raw_midi_value={} physical_bytes_hex={} error={}",
+                                feedback.protocol,
+                                output_device_id,
+                                failures,
+                                channel,
+                                controller,
+                                msg_type,
+                                feedback.physical_channel,
+                                feedback.physical_controller,
+                                feedback.physical_msg_type,
+                                feedback.physical_raw_midi_value,
+                                format_midi_bytes(&feedback.physical_bytes),
+                                e
+                            ),
+                        );
                     }
                 }
             }
@@ -1132,6 +1340,35 @@ mod tests {
         }
     }
 
+    fn manager_with_test_route(input_device_id: &str, output_device_id: &str) -> MidiManager {
+        let mut manager = MidiManager::new();
+        insert_test_route(&mut manager, input_device_id, output_device_id);
+        manager
+    }
+
+    fn insert_test_route(manager: &mut MidiManager, input_device_id: &str, output_device_id: &str) {
+        manager.input_routes.insert(
+            input_device_id.to_string(),
+            MidiInputRoute {
+                input_connection: None,
+                input_device_id: input_device_id.to_string(),
+                output_device_id: output_device_id.to_string(),
+            },
+        );
+        manager.output_routes.insert(
+            output_device_id.to_string(),
+            MidiOutputRoute {
+                output_connection: None,
+                output_device_name: "Test Output".to_string(),
+                last_reconnect_attempt: None,
+                last_reconnect_skipped_log: None,
+                reconnect_failures: 0,
+                connection_suspect: false,
+                connection_suspect_reason: None,
+            },
+        );
+    }
+
     fn xtouch_mini_mc_volume_binding(controller: u8) -> Binding {
         Binding {
             id: "binding-1".to_string(),
@@ -1222,11 +1459,9 @@ mod tests {
 
     #[test]
     fn connection_health_marks_suspect_pair() {
-        let mut manager = MidiManager::new();
-        manager.active_device = Some("midi:0".to_string());
-        manager.active_output_device = Some("midi:1".to_string());
+        let mut manager = manager_with_test_route("midi:0", "midi:1");
 
-        manager.mark_connection_suspect("output_send_failed");
+        manager.mark_output_suspect("midi:1", "output_send_failed");
 
         let health = manager.connection_health();
         assert_eq!(health.input_device_id, "midi:0");
@@ -1237,13 +1472,85 @@ mod tests {
     }
 
     #[test]
-    fn full_connection_switch_clears_suspect_health() {
-        let mut manager = MidiManager::new();
-        manager.active_device = Some("midi:0".to_string());
-        manager.active_output_device = Some("midi:1".to_string());
-        manager.mark_connection_suspect("output_send_failed");
+    fn route_health_isolated_by_output_route() {
+        let mut manager = manager_with_test_route("midi:0", "midi:10");
+        insert_test_route(&mut manager, "midi:1", "midi:11");
 
-        manager.begin_full_connection_switch();
+        manager.mark_output_suspect("midi:10", "output_send_failed");
+
+        let health = manager.route_health();
+
+        assert_eq!(health.len(), 2);
+        assert_eq!(health[0].input_device_id, "midi:0");
+        assert!(health[0].suspect);
+        assert_eq!(health[0].reason, "output_send_failed");
+        assert_eq!(health[1].input_device_id, "midi:1");
+        assert!(!health[1].suspect);
+        assert_eq!(health[1].reason, "");
+    }
+
+    #[test]
+    fn feedback_failure_marks_only_binding_route_output_suspect() {
+        let mut manager = manager_with_test_route("midi:0", "midi:998");
+        insert_test_route(&mut manager, "midi:1", "midi:999");
+
+        manager
+            .send_feedback("midi:0", 0, 7, 0.5, MidiMessageType::ControlChange)
+            .expect("feedback send should degrade health instead of failing");
+
+        let health = manager.route_health();
+        let first = health
+            .iter()
+            .find(|route| route.input_device_id == "midi:0")
+            .expect("first route health");
+        let second = health
+            .iter()
+            .find(|route| route.input_device_id == "midi:1")
+            .expect("second route health");
+
+        assert!(first.suspect);
+        assert_eq!(first.output_device_id, "midi:998");
+        assert!(!second.suspect);
+        assert_eq!(second.output_device_id, "midi:999");
+    }
+
+    #[test]
+    fn feedback_with_stale_device_id_uses_single_active_route() {
+        let mut manager = manager_with_test_route("midi:1", "midi:998");
+
+        manager
+            .send_feedback("midi:0", 0, 7, 0.5, MidiMessageType::ControlChange)
+            .expect("single active route feedback fallback should not fail");
+
+        let health = manager.route_health();
+        assert_eq!(health.len(), 1);
+        assert_eq!(health[0].input_device_id, "midi:1");
+        assert_eq!(health[0].output_device_id, "midi:998");
+        assert!(health[0].suspect);
+    }
+
+    #[test]
+    fn feedback_with_stale_device_id_does_not_fallback_when_routes_are_ambiguous() {
+        let mut manager = manager_with_test_route("midi:1", "midi:998");
+        insert_test_route(&mut manager, "midi:2", "midi:999");
+
+        manager
+            .send_feedback("midi:0", 0, 7, 0.5, MidiMessageType::ControlChange)
+            .expect("ambiguous stale feedback should be skipped without failing");
+
+        let health = manager.route_health();
+        assert_eq!(health.len(), 2);
+        assert!(health.iter().all(|route| !route.suspect));
+    }
+
+    #[test]
+    fn setting_empty_routes_clears_suspect_health() {
+        let mut manager = manager_with_test_route("midi:0", "midi:1");
+        manager.mark_output_suspect("midi:1", "output_send_failed");
+
+        manager
+            .set_device_routes(&[], std::sync::Arc::new(|_| {}))
+            .expect("empty route sync");
 
         let health = manager.connection_health();
         assert_eq!(health.input_device_id, "");
@@ -1254,10 +1561,8 @@ mod tests {
 
     #[test]
     fn stop_clears_suspect_health() {
-        let mut manager = MidiManager::new();
-        manager.active_device = Some("midi:0".to_string());
-        manager.active_output_device = Some("midi:1".to_string());
-        manager.mark_connection_suspect("output_reconnect_failed");
+        let mut manager = manager_with_test_route("midi:0", "midi:1");
+        manager.mark_output_suspect("midi:1", "output_reconnect_failed");
 
         manager.stop();
 

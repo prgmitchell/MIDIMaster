@@ -401,18 +401,300 @@ input::placeholder {
 
 .target-button,
 .select-button,
+.midi-device-status,
 .midi-device-dropdown .target-button,
 .settings-select-dropdown .target-button,
 .settings-monitor-dropdown .target-button {
   min-height: var(--control-h);
+  border: 1px solid var(--line-strong);
+  box-sizing: border-box;
   background: var(--control-bg);
   color: var(--text-primary);
   border-color: var(--line-strong);
   border-radius: 4px;
 }
 
-.midi-device-dropdown {
+.midi-device-dropdown,
+.midi-device-status {
   width: 214px;
+}
+
+.midi-device-status {
+  display: flex;
+  align-items: center;
+  height: var(--control-h);
+  padding: 0 12px;
+  cursor: default;
+  font-size: 14px;
+  line-height: 1;
+  user-select: text;
+}
+
+.midi-device-status.device-empty {
+  color: var(--text-muted);
+}
+
+.midi-device-status .target-display {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.midi-device-status .target-label,
+.midi-device-status .target-label-content,
+.midi-device-status .target-label-main {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.midi-output-route-shell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.midi-output-route-shell .midi-device-dropdown,
+.midi-output-route-shell .midi-device-status {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+.midi-routes-button {
+  position: relative;
+  width: var(--control-h);
+  min-width: var(--control-h);
+  height: var(--control-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--control-bg);
+  color: var(--text-primary);
+}
+
+.midi-routes-button.has-multiple-routes {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.midi-routes-button.has-multiple-routes::after {
+  content: attr(data-route-count);
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--topbar-bg);
+  background: var(--accent);
+  color: var(--app-bg);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.midi-routes-button svg,
+.midi-route-icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.midi-routes-popover {
+  position: fixed;
+  z-index: 90;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-raised);
+}
+
+.midi-routes-popover.hidden {
+  display: none;
+}
+
+.midi-routes-header,
+.midi-routes-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.midi-routes-title {
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.midi-routes-actions,
+.midi-route-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.midi-routes-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.midi-route-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 82%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--control-bg) 86%, var(--surface-muted) 14%);
+}
+
+.midi-route-column-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.midi-route-select-labels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.midi-route-column-label {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.midi-route-row.disabled {
+  opacity: 0.72;
+  background: color-mix(in srgb, var(--surface-raised) 78%, var(--surface-muted) 22%);
+}
+
+.midi-route-enable {
+  margin: 0 auto;
+}
+
+.midi-route-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.midi-route-select-wrap,
+.midi-route-dropdown {
+  width: 100%;
+  min-width: 0;
+}
+
+.midi-route-dropdown .target-button {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-color: var(--control-border);
+  background: var(--surface-raised);
+}
+
+.midi-route-dropdown .target-button:hover {
+  border-color: var(--control-border-strong);
+  background: var(--control-bg-hover);
+}
+
+.midi-route-dropdown .target-display,
+.midi-route-dropdown .target-label,
+.midi-route-dropdown .target-label-content,
+.midi-route-dropdown .target-label-main {
+  min-width: 0;
+}
+
+.midi-route-dropdown .target-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.midi-route-dropdown .target-menu {
+  width: 100%;
+}
+
+.midi-route-badge {
+  padding: 3px 6px;
+  border: 1px solid var(--chip-border);
+  border-radius: 4px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.midi-route-icon-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--control-border);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.midi-route-icon-button:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+.midi-route-icon-button.is-danger {
+  color: var(--danger);
+}
+
+.midi-route-icon-button.is-danger:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.midi-route-action-button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.midi-routes-empty {
+  padding: 14px;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .profile-select {
@@ -448,6 +730,18 @@ input::placeholder {
 .target-option:hover,
 .dropdown-item button:first-child:hover {
   background: var(--control-bg-hover);
+}
+
+.target-dropdown .target-option:disabled,
+.target-dropdown .target-option.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.target-dropdown .target-option:disabled:hover,
+.target-dropdown .target-option.is-disabled:hover {
+  background: var(--control-bg);
+  border-color: transparent;
 }
 
 .target-panel {

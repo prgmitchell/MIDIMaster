@@ -653,6 +653,33 @@
   font-weight: 600;
 }
 
+.binding-config-midi-stack {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  line-height: 1.12;
+}
+
+.binding-config-midi-device,
+.binding-config-midi-control {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binding-config-midi-device {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.binding-config-midi-control {
+  color: #96a8c6;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .binding-config-panel--button .binding-config-content {
   width: min(940px, 96vw);
 }
@@ -903,6 +930,14 @@ body[data-theme] .binding-config-panel--button .binding-config-preview-summary-v
 
 body[data-theme] .binding-config-panel--button .binding-config-toggle-help,
 body[data-theme] .binding-config-panel--button .binding-config-preview-summary-label {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-config-midi-device {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-midi-control {
   color: var(--text-secondary);
 }
 

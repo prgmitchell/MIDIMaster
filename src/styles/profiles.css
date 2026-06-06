@@ -114,7 +114,8 @@ body[data-theme] .binding-headers {
 }
 
 body[data-theme] .profile-select .select-button,
-body[data-theme] .topbar .midi-device-dropdown .target-button {
+body[data-theme] .topbar .midi-device-dropdown .target-button,
+body[data-theme] .topbar .midi-device-status {
   height: var(--control-h);
   min-height: var(--control-h);
   border-radius: 4px;

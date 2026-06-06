@@ -1,3 +1,4 @@
+use crate::model::{normalized_routes_with_legacy, MidiDeviceRoute};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
@@ -14,6 +15,7 @@ pub struct AppSettings {
     pub midi_output_device_id: Option<String>,
     pub midi_input_device_name: Option<String>,
     pub midi_output_device_name: Option<String>,
+    pub midi_device_routes: Vec<MidiDeviceRoute>,
     pub active_profile_name: Option<String>,
     pub auto_check_updates: bool,
     pub language: String,
@@ -31,10 +33,23 @@ impl Default for AppSettings {
             midi_output_device_id: None,
             midi_input_device_name: None,
             midi_output_device_name: None,
+            midi_device_routes: Vec::new(),
             active_profile_name: None,
             auto_check_updates: true,
             language: "en".to_string(),
         }
+    }
+}
+
+impl AppSettings {
+    pub fn normalized_midi_routes(&self) -> Vec<MidiDeviceRoute> {
+        normalized_routes_with_legacy(
+            &self.midi_device_routes,
+            self.midi_input_device_id.clone(),
+            self.midi_output_device_id.clone(),
+            self.midi_input_device_name.clone(),
+            self.midi_output_device_name.clone(),
+        )
     }
 }
 

@@ -1,10 +1,20 @@
 use crate::run_logger;
 use crate::{
     midi::MidiConnectionHealth,
-    model::{DeviceInfo, Profile},
+    model::{DeviceInfo, MidiDeviceRoute, MidiMessageType, Profile},
     AppState,
 };
+use serde::Serialize;
+use std::{collections::HashSet, sync::Arc};
 use tauri::{AppHandle, Emitter, Manager, State};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BindingDeviceMigration {
+    binding_id: String,
+    previous_device_id: String,
+    device_id: String,
+}
 
 fn emit_midi_connection_status(
     app: &AppHandle,
@@ -24,20 +34,394 @@ fn emit_midi_connection_status(
     );
 }
 
-fn migrate_profile_input_device(profile: &mut Profile, input_device_id: &str) -> usize {
+fn route_status_json(routes: &[MidiDeviceRoute]) -> Vec<serde_json::Value> {
+    routes
+        .iter()
+        .filter_map(|route| route.normalized())
+        .map(|route| {
+            serde_json::json!({
+                "inputDeviceId": route.input_id().unwrap_or_default(),
+                "outputDeviceId": route.output_id().unwrap_or_default(),
+                "inputDeviceName": route.input_device_name.as_deref().unwrap_or_default(),
+                "outputDeviceName": route.output_device_name.as_deref().unwrap_or_default(),
+                "enabled": route.enabled,
+            })
+        })
+        .collect()
+}
+
+fn routes_from_pairs(pairs: Vec<(String, String)>) -> Vec<MidiDeviceRoute> {
+    pairs
+        .into_iter()
+        .map(|(input_device_id, output_device_id)| MidiDeviceRoute {
+            input_device_id: Some(input_device_id),
+            output_device_id: Some(output_device_id),
+            input_device_name: None,
+            output_device_name: None,
+            enabled: true,
+        })
+        .collect()
+}
+
+fn emit_midi_routes_connection_status(
+    app: &AppHandle,
+    routes: &[MidiDeviceRoute],
+    state: &str,
+    reason: &str,
+) {
+    let normalized_routes = route_status_json(routes);
+    let route_count = normalized_routes.len();
+    let first = normalized_routes.first();
+    let _ = app.emit(
+        "midi_connection_status",
+        serde_json::json!({
+            "inputDeviceId": first
+                .and_then(|route| route.get("inputDeviceId"))
+                .and_then(|value| value.as_str())
+                .unwrap_or_default(),
+            "outputDeviceId": first
+                .and_then(|route| route.get("outputDeviceId"))
+                .and_then(|value| value.as_str())
+                .unwrap_or_default(),
+            "routes": normalized_routes,
+            "routeCount": route_count,
+            "state": state,
+            "reason": reason,
+        }),
+    );
+}
+
+fn midi_event_callback(
+    app_handle: AppHandle,
+) -> Arc<dyn Fn(crate::model::MidiEvent) + Send + Sync + 'static> {
+    Arc::new(move |event| {
+        let state = app_handle.state::<AppState>();
+        let enqueue_result = state.midi_event_queue.lock();
+        match enqueue_result {
+            Ok(mut queue) => {
+                queue.enqueue(event);
+                crate::background_tasks::notify_midi_event_queued();
+            }
+            Err(_) => run_logger::error("midi_queue", "enqueue_failed", "queue lock poisoned"),
+        };
+    })
+}
+
+fn migrate_profile_route_inputs(
+    profile: &mut Profile,
+    routes: &[MidiDeviceRoute],
+) -> (usize, Vec<BindingDeviceMigration>) {
+    let saved_routes = profile.midi_device_preference.normalized_routes();
+    let mut migrated_count = 0usize;
+    let mut migrations = Vec::new();
+
+    for route in routes {
+        let Some(next_route) = route.normalized() else {
+            continue;
+        };
+        let Some(next_input_id) = next_route.input_id() else {
+            continue;
+        };
+        let Some(next_input_name) = next_route
+            .input_device_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+
+        for saved in &saved_routes {
+            let Some(previous_input_id) = saved.input_id() else {
+                continue;
+            };
+            if previous_input_id == next_input_id {
+                continue;
+            }
+            let saved_name_matches = saved
+                .input_device_name
+                .as_deref()
+                .map(str::trim)
+                .map(|name| name == next_input_name)
+                .unwrap_or(false);
+            if saved_name_matches {
+                migrated_count += migrate_control_device_id(
+                    profile,
+                    previous_input_id,
+                    next_input_id,
+                    &mut migrations,
+                );
+            }
+        }
+    }
+
+    migrated_count += migrate_orphaned_binding_device_ids_to_primary_route(
+        profile,
+        &saved_routes,
+        routes,
+        &mut migrations,
+    );
+
+    migrated_count +=
+        migrate_pitch_bend_bindings_saved_to_route_outputs(profile, routes, &mut migrations);
+
+    (migrated_count, migrations)
+}
+
+fn migrate_control_device_id(
+    profile: &mut Profile,
+    previous_input_id: &str,
+    next_input_id: &str,
+    migrations: &mut Vec<BindingDeviceMigration>,
+) -> usize {
     let mut migrated_count = 0usize;
 
     for binding in &mut profile.bindings {
-        if update_device_id(&mut binding.device_id, input_device_id) {
+        let mut binding_migrated = false;
+        if binding.device_id == previous_input_id {
+            binding.device_id = next_input_id.to_string();
             migrated_count += 1;
+            binding_migrated = true;
         }
         if let Some(mute_control) = binding.mute_control.as_mut() {
-            if update_device_id(&mut mute_control.device_id, input_device_id) {
+            if mute_control.device_id == previous_input_id {
+                mute_control.device_id = next_input_id.to_string();
+                migrated_count += 1;
+                binding_migrated = true;
+            }
+        }
+        if let Some(assign_control) = binding.assign_control.as_mut() {
+            if assign_control.device_id == previous_input_id {
+                assign_control.device_id = next_input_id.to_string();
+                migrated_count += 1;
+                binding_migrated = true;
+            }
+        }
+        if binding_migrated {
+            record_binding_migration(migrations, &binding.id, previous_input_id, next_input_id);
+        }
+    }
+
+    migrated_count
+}
+
+fn migrate_orphaned_binding_device_ids_to_primary_route(
+    profile: &mut Profile,
+    saved_routes: &[MidiDeviceRoute],
+    routes: &[MidiDeviceRoute],
+    migrations: &mut Vec<BindingDeviceMigration>,
+) -> usize {
+    if saved_routes.is_empty() || saved_routes.iter().any(|route| !route.enabled) {
+        return 0;
+    }
+    let saved_enabled_routes = saved_routes
+        .iter()
+        .filter(|route| route.enabled)
+        .filter_map(|route| route.normalized())
+        .collect::<Vec<_>>();
+    if saved_enabled_routes.is_empty() {
+        return 0;
+    }
+
+    let normalized_routes = routes
+        .iter()
+        .filter_map(|route| route.normalized())
+        .collect::<Vec<_>>();
+    if normalized_routes.is_empty() {
+        return 0;
+    }
+    if normalized_routes.len() < saved_enabled_routes.len()
+        || !saved_enabled_routes.iter().all(|saved_route| {
+            normalized_routes
+                .iter()
+                .any(|route| routes_share_input_identity(saved_route, route))
+        })
+    {
+        return 0;
+    }
+
+    let primary_saved_route = saved_enabled_routes.first();
+    let Some(primary_saved_route) = primary_saved_route else {
+        return 0;
+    };
+    let Some(primary_route) = normalized_routes
+        .iter()
+        .find(|route| routes_share_input_identity(primary_saved_route, route))
+    else {
+        return 0;
+    };
+    let Some(primary_input_id) = primary_route.input_id() else {
+        return 0;
+    };
+
+    if saved_enabled_routes.len() == 1 {
+        let stale_device_ids = binding_midi_device_ids(profile)
+            .into_iter()
+            .filter(|device_id| device_id != primary_input_id)
+            .collect::<HashSet<_>>();
+        return migrate_single_stale_device_id_to_primary_route(
+            profile,
+            &stale_device_ids,
+            primary_input_id,
+            normalized_routes.len(),
+            migrations,
+        );
+    }
+
+    let active_input_ids = normalized_routes
+        .iter()
+        .filter_map(|route| route.input_id().map(str::to_string))
+        .collect::<HashSet<_>>();
+    let active_output_ids = normalized_routes
+        .iter()
+        .filter_map(|route| route.output_id().map(str::to_string))
+        .collect::<HashSet<_>>();
+    let orphan_device_ids = binding_midi_device_ids(profile)
+        .into_iter()
+        .filter(|device_id| {
+            !active_input_ids.contains(device_id) && !active_output_ids.contains(device_id)
+        })
+        .collect::<HashSet<_>>();
+
+    if orphan_device_ids.len() != 1 {
+        return 0;
+    }
+
+    migrate_single_stale_device_id_to_primary_route(
+        profile,
+        &orphan_device_ids,
+        primary_input_id,
+        normalized_routes.len(),
+        migrations,
+    )
+}
+
+fn migrate_single_stale_device_id_to_primary_route(
+    profile: &mut Profile,
+    stale_device_ids: &HashSet<String>,
+    primary_input_id: &str,
+    active_route_count: usize,
+    migrations: &mut Vec<BindingDeviceMigration>,
+) -> usize {
+    if stale_device_ids.len() != 1 {
+        return 0;
+    }
+    let Some(orphan_device_id) = stale_device_ids.iter().next() else {
+        return 0;
+    };
+    if orphan_device_id == primary_input_id {
+        return 0;
+    }
+
+    let migrated_count =
+        migrate_control_device_id(profile, orphan_device_id, primary_input_id, migrations);
+    if migrated_count > 0 {
+        run_logger::info(
+            "midi_cmd",
+            "orphan_binding_device_ids_migrated",
+            &format!(
+                "previous_device_id={} device_id={} binding_control_count={} active_route_count={}",
+                orphan_device_id, primary_input_id, migrated_count, active_route_count
+            ),
+        );
+    }
+    migrated_count
+}
+
+fn binding_midi_device_ids(profile: &Profile) -> HashSet<String> {
+    let mut device_ids = HashSet::new();
+    for binding in &profile.bindings {
+        insert_midi_device_id(&mut device_ids, &binding.device_id);
+        if let Some(mute_control) = binding.mute_control.as_ref() {
+            insert_midi_device_id(&mut device_ids, &mute_control.device_id);
+        }
+        if let Some(assign_control) = binding.assign_control.as_ref() {
+            insert_midi_device_id(&mut device_ids, &assign_control.device_id);
+        }
+    }
+    device_ids
+}
+
+fn insert_midi_device_id(device_ids: &mut HashSet<String>, device_id: &str) {
+    let device_id = device_id.trim();
+    if device_id.starts_with("midi:") {
+        device_ids.insert(device_id.to_string());
+    }
+}
+
+fn routes_share_input_identity(left: &MidiDeviceRoute, right: &MidiDeviceRoute) -> bool {
+    if left.input_id().is_some() && left.input_id() == right.input_id() {
+        return true;
+    }
+
+    let left_name = left
+        .input_device_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
+    let right_name = right
+        .input_device_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
+
+    left_name.is_some() && left_name == right_name
+}
+
+fn migrate_pitch_bend_bindings_saved_to_route_outputs(
+    profile: &mut Profile,
+    routes: &[MidiDeviceRoute],
+    migrations: &mut Vec<BindingDeviceMigration>,
+) -> usize {
+    let normalized_routes = routes
+        .iter()
+        .filter_map(|route| route.normalized())
+        .collect::<Vec<_>>();
+    let active_input_ids = normalized_routes
+        .iter()
+        .filter_map(|route| route.input_id().map(str::to_string))
+        .collect::<HashSet<_>>();
+    let mut migrated_count = 0usize;
+
+    for binding in &mut profile.bindings {
+        if binding.control.msg_type != MidiMessageType::PitchBend {
+            continue;
+        }
+
+        let Some(route) = normalized_routes.iter().find(|route| {
+            let Some(input_id) = route.input_id() else {
+                return false;
+            };
+            let Some(output_id) = route.output_id() else {
+                return false;
+            };
+            if active_input_ids.contains(output_id) {
+                return false;
+            }
+            input_id != output_id && binding.device_id == output_id
+        }) else {
+            continue;
+        };
+        let Some(input_id) = route.input_id() else {
+            continue;
+        };
+        let Some(output_id) = route.output_id() else {
+            continue;
+        };
+
+        binding.device_id = input_id.to_string();
+        migrated_count += 1;
+        record_binding_migration(migrations, &binding.id, output_id, input_id);
+
+        if let Some(mute_control) = binding.mute_control.as_mut() {
+            if mute_control.device_id == output_id {
+                mute_control.device_id = input_id.to_string();
                 migrated_count += 1;
             }
         }
         if let Some(assign_control) = binding.assign_control.as_mut() {
-            if update_device_id(&mut assign_control.device_id, input_device_id) {
+            if assign_control.device_id == output_id {
+                assign_control.device_id = input_id.to_string();
                 migrated_count += 1;
             }
         }
@@ -46,13 +430,25 @@ fn migrate_profile_input_device(profile: &mut Profile, input_device_id: &str) ->
     migrated_count
 }
 
-fn update_device_id(device_id: &mut String, input_device_id: &str) -> bool {
-    if device_id == input_device_id {
-        return false;
+fn record_binding_migration(
+    migrations: &mut Vec<BindingDeviceMigration>,
+    binding_id: &str,
+    previous_device_id: &str,
+    device_id: &str,
+) {
+    if migrations.iter().any(|migration| {
+        migration.binding_id == binding_id
+            && migration.previous_device_id == previous_device_id
+            && migration.device_id == device_id
+    }) {
+        return;
     }
 
-    *device_id = input_device_id.to_string();
-    true
+    migrations.push(BindingDeviceMigration {
+        binding_id: binding_id.to_string(),
+        previous_device_id: previous_device_id.to_string(),
+        device_id: device_id.to_string(),
+    });
 }
 
 #[tauri::command]
@@ -85,6 +481,15 @@ pub fn get_midi_connection_health(state: State<AppState>) -> Result<MidiConnecti
 }
 
 #[tauri::command]
+pub fn get_midi_route_health(state: State<AppState>) -> Result<Vec<MidiConnectionHealth>, String> {
+    Ok(state
+        .midi
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?
+        .route_health())
+}
+
+#[tauri::command]
 pub fn start_midi_device(
     app: AppHandle,
     state: State<AppState>,
@@ -99,56 +504,31 @@ pub fn start_midi_device(
             input_device_id, output_device_id
         ),
     );
-    emit_midi_connection_status(
-        &app,
-        &input_device_id,
-        &output_device_id,
-        "reconnecting",
-        "start_requested",
-    );
-    let app_handle = app.clone();
-    {
-        if let Err(err) = state
-            .midi
-            .lock()
-            .map_err(|_| "Lock poisoned".to_string())?
-            .start_device(&input_device_id, &output_device_id, move |event| {
-                let state = app_handle.state::<AppState>();
-                let enqueue_result = state.midi_event_queue.lock();
-                match enqueue_result {
-                    Ok(mut queue) => {
-                        queue.enqueue(event);
-                        crate::background_tasks::notify_midi_event_queued();
-                    }
-                    Err(_) => {
-                        run_logger::error("midi_queue", "enqueue_failed", "queue lock poisoned")
-                    }
-                };
-            })
-            .map_err(|err| err.to_string())
-        {
-            run_logger::error(
-                "midi_cmd",
-                "start_failed",
-                &format!(
-                    "input_device_id={} output_device_id={} error={}",
-                    input_device_id, output_device_id, err
-                ),
-            );
-            emit_midi_connection_status(
-                &app,
-                &input_device_id,
-                &output_device_id,
-                "failed",
-                "start_failed",
-            );
-            return Err(err);
-        }
-    }
+    let route = MidiDeviceRoute {
+        input_device_id: Some(input_device_id.clone()),
+        output_device_id: Some(output_device_id.clone()),
+        input_device_name: None,
+        output_device_name: None,
+        enabled: true,
+    };
+    start_midi_device_routes(app, state, vec![route])
+}
 
-    // Keep persisted bindings aligned with the currently connected input device.
-    // This prevents stale device ids (e.g. midi index changed) from breaking
-    // event lookup, motor feedback, and UI event mapping.
+#[tauri::command]
+pub fn start_midi_device_routes(
+    app: AppHandle,
+    state: State<AppState>,
+    routes: Vec<MidiDeviceRoute>,
+) -> Result<(), String> {
+    let enabled_routes = routes
+        .iter()
+        .filter_map(|route| route.normalized())
+        .filter(|route| route.enabled)
+        .collect::<Vec<_>>();
+    emit_midi_routes_connection_status(&app, &enabled_routes, "reconnecting", "start_requested");
+
+    // Keep persisted bindings aligned before connecting new inputs so
+    // multi-route matching never sees stale single-route device ids.
     let mut migrated_count = 0usize;
     let mut profile_for_sync = None;
     {
@@ -158,19 +538,39 @@ pub fn start_midi_device(
             .map_err(|_| "Lock poisoned".to_string())?;
 
         if let Some(profile) = profile_guard.as_mut() {
-            migrated_count = migrate_profile_input_device(profile, &input_device_id);
+            let migrations;
+            (migrated_count, migrations) = migrate_profile_route_inputs(profile, &enabled_routes);
 
             if migrated_count > 0 {
                 state
                     .profile_store
                     .save_profile(profile.clone())
                     .map_err(|err| err.to_string())?;
-                profile_for_sync = Some(profile.clone());
+                profile_for_sync = Some((profile.clone(), migrations));
             }
         }
     }
 
-    if let Some(profile) = profile_for_sync {
+    let app_handle = app.clone();
+    {
+        if let Err(err) = state
+            .midi
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?
+            .set_device_routes(&enabled_routes, midi_event_callback(app_handle))
+            .map_err(|err| err.to_string())
+        {
+            run_logger::error(
+                "midi_cmd",
+                "start_routes_failed",
+                &format!("route_count={} error={}", enabled_routes.len(), err),
+            );
+            emit_midi_routes_connection_status(&app, &enabled_routes, "failed", "start_failed");
+            return Err(err);
+        }
+    }
+
+    if let Some((profile, migrations)) = profile_for_sync {
         if let Ok(mut states) = state.binding_state.lock() {
             states.clear();
         }
@@ -183,7 +583,11 @@ pub fn start_midi_device(
         state.sync_feedback_values(&profile);
         let _ = app.emit(
             "bindings_migrated",
-            serde_json::json!({ "device_id": input_device_id, "count": migrated_count }),
+            serde_json::json!({
+                "route_count": enabled_routes.len(),
+                "count": migrated_count,
+                "migrations": migrations,
+            }),
         );
     }
 
@@ -199,40 +603,61 @@ pub fn start_midi_device(
 
     run_logger::info(
         "midi_cmd",
-        "start_succeeded",
+        "start_routes_succeeded",
         &format!(
-            "input_device_id={} output_device_id={} bindings_migrated={}",
-            input_device_id, output_device_id, migrated_count
+            "route_count={} bindings_migrated={}",
+            enabled_routes.len(),
+            migrated_count
         ),
     );
-    emit_midi_connection_status(
-        &app,
-        &input_device_id,
-        &output_device_id,
-        "connected",
-        "start_succeeded",
-    );
+    emit_midi_routes_connection_status(&app, &enabled_routes, "connected", "start_succeeded");
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_midi_route(
+    app: AppHandle,
+    state: State<AppState>,
+    input_device_id: String,
+) -> Result<(), String> {
+    let (output_device_id, remaining_routes) = {
+        let mut midi = state.midi.lock().map_err(|_| "Lock poisoned".to_string())?;
+        let output_device_id = midi.stop_route(&input_device_id);
+        let remaining_routes = routes_from_pairs(midi.active_routes());
+        (output_device_id, remaining_routes)
+    };
+    if let Some(output_device_id) = output_device_id {
+        let state = if remaining_routes.is_empty() {
+            "disconnected"
+        } else {
+            "connected"
+        };
+        let reason = if remaining_routes.is_empty() {
+            "stop_route_requested"
+        } else {
+            "route_stopped_remaining_connected"
+        };
+        if remaining_routes.is_empty() {
+            emit_midi_connection_status(&app, &input_device_id, &output_device_id, state, reason);
+        } else {
+            emit_midi_routes_connection_status(&app, &remaining_routes, state, reason);
+        }
+    }
     Ok(())
 }
 
 #[tauri::command]
 pub fn stop_midi_device(app: AppHandle, state: State<AppState>) -> Result<(), String> {
     run_logger::info("midi_cmd", "stop_requested", "");
-    let active = {
+    let had_active = {
         let mut midi = state.midi.lock().map_err(|_| "Lock poisoned".to_string())?;
-        let active = midi.active_pair();
+        let had_active = !midi.active_routes().is_empty();
         midi.stop();
-        active
+        had_active
     };
-    if let Some((input_device_id, output_device_id)) = active {
-        emit_midi_connection_status(
-            &app,
-            &input_device_id,
-            &output_device_id,
-            "disconnected",
-            "stop_requested",
-        );
+    if had_active {
+        emit_midi_routes_connection_status(&app, &[], "disconnected", "stop_requested");
     }
     Ok(())
 }
@@ -297,6 +722,7 @@ mod tests {
             osd_settings: model::OsdSettings::default(),
             plugin_settings: HashMap::new(),
             midi_device_preference: model::MidiDevicePreference::default(),
+            midi_device_preference_set: false,
         }
     }
 
@@ -349,75 +775,246 @@ mod tests {
         }
     }
 
-    #[test]
-    fn migrate_input_device_updates_primary_stale_id() {
-        let mut profile = profile_with(binding("midi:1", None, None));
-
-        let migrated_count = migrate_profile_input_device(&mut profile, "midi:0");
-
-        assert_eq!(migrated_count, 1);
-        assert_eq!(profile.bindings[0].device_id, "midi:0");
+    fn route(input_id: &str, output_id: &str, input_name: &str) -> MidiDeviceRoute {
+        MidiDeviceRoute {
+            input_device_id: Some(input_id.to_string()),
+            output_device_id: Some(output_id.to_string()),
+            input_device_name: Some(input_name.to_string()),
+            output_device_name: Some(format!("{input_name} Out")),
+            enabled: true,
+        }
     }
 
     #[test]
-    fn migrate_input_device_updates_mute_aux_when_primary_is_current() {
-        let mut profile = profile_with(binding("midi:0", Some("midi:1"), None));
+    fn migrate_route_inputs_updates_only_matching_saved_route_by_name() {
+        let mut profile = profile_with(binding("midi:0", Some("midi:0"), Some("midi:5")));
+        profile
+            .bindings
+            .push(binding("midi:5", Some("midi:5"), None));
+        profile.midi_device_preference.routes = vec![
+            route("midi:0", "midi:10", "Deck A"),
+            route("midi:5", "midi:15", "Deck B"),
+        ];
 
-        let migrated_count = migrate_profile_input_device(&mut profile, "midi:0");
+        let (migrated_count, migrations) =
+            migrate_profile_route_inputs(&mut profile, &[route("midi:2", "midi:12", "Deck A")]);
 
-        let mute_control = profile.bindings[0]
-            .mute_control
-            .as_ref()
-            .expect("mute control should remain mapped");
-        assert_eq!(migrated_count, 1);
-        assert_eq!(profile.bindings[0].device_id, "midi:0");
-        assert_eq!(mute_control.device_id, "midi:0");
-        assert_eq!(mute_control.channel, 0);
-        assert_eq!(mute_control.controller, 18);
-        assert_eq!(mute_control.msg_type, MidiMessageType::Note);
-    }
-
-    #[test]
-    fn migrate_input_device_updates_assign_aux_when_primary_is_current() {
-        let mut profile = profile_with(binding("midi:0", None, Some("midi:1")));
-
-        let migrated_count = migrate_profile_input_device(&mut profile, "midi:0");
-
-        let assign_control = profile.bindings[0]
-            .assign_control
-            .as_ref()
-            .expect("assign control should remain mapped");
-        assert_eq!(migrated_count, 1);
-        assert_eq!(profile.bindings[0].device_id, "midi:0");
-        assert_eq!(assign_control.device_id, "midi:0");
-        assert_eq!(assign_control.channel, 0);
-        assert_eq!(assign_control.controller, 19);
-        assert_eq!(assign_control.msg_type, MidiMessageType::Note);
-    }
-
-    #[test]
-    fn migrate_input_device_returns_zero_when_all_controls_match() {
-        let mut profile = profile_with(binding("midi:0", Some("midi:0"), Some("midi:0")));
-
-        let migrated_count = migrate_profile_input_device(&mut profile, "midi:0");
-
-        assert_eq!(migrated_count, 0);
-        assert_eq!(profile.bindings[0].device_id, "midi:0");
+        assert_eq!(migrated_count, 2);
+        assert_eq!(migrations.len(), 1);
+        assert_eq!(migrations[0].binding_id, "binding-1");
+        assert_eq!(migrations[0].previous_device_id, "midi:0");
+        assert_eq!(migrations[0].device_id, "midi:2");
+        assert_eq!(profile.bindings[0].device_id, "midi:2");
         assert_eq!(
             profile.bindings[0]
                 .mute_control
                 .as_ref()
-                .expect("mute control should remain mapped")
+                .expect("mute control")
                 .device_id,
-            "midi:0"
+            "midi:2"
         );
         assert_eq!(
             profile.bindings[0]
                 .assign_control
                 .as_ref()
-                .expect("assign control should remain mapped")
+                .expect("assign control")
+                .device_id,
+            "midi:5"
+        );
+        assert_eq!(profile.bindings[1].device_id, "midi:5");
+    }
+
+    #[test]
+    fn migrate_route_inputs_ignores_routes_without_name_match() {
+        let mut profile = profile_with(binding("midi:0", Some("midi:0"), None));
+        profile.midi_device_preference.routes = vec![route("midi:0", "midi:10", "Deck A")];
+
+        let (migrated_count, migrations) =
+            migrate_profile_route_inputs(&mut profile, &[route("midi:2", "midi:12", "Deck B")]);
+
+        assert_eq!(migrated_count, 0);
+        assert!(migrations.is_empty());
+        assert_eq!(profile.bindings[0].device_id, "midi:0");
+        assert_eq!(
+            profile.bindings[0]
+                .mute_control
+                .as_ref()
+                .expect("mute control")
                 .device_id,
             "midi:0"
+        );
+    }
+
+    #[test]
+    fn migrate_route_inputs_repairs_single_orphan_when_profile_expands_to_multiple_routes() {
+        let mut profile = profile_with(binding("midi:0", Some("midi:0"), None));
+        profile.midi_device_preference.routes = vec![route("midi:1", "midi:2", "Platform X+")];
+
+        let (migrated_count, migrations) = migrate_profile_route_inputs(
+            &mut profile,
+            &[
+                route("midi:1", "midi:2", "Platform X+"),
+                route("midi:3", "midi:4", "Focusrite USB MIDI"),
+            ],
+        );
+
+        assert_eq!(migrated_count, 2);
+        assert_eq!(migrations.len(), 1);
+        assert_eq!(migrations[0].binding_id, "binding-1");
+        assert_eq!(migrations[0].previous_device_id, "midi:0");
+        assert_eq!(migrations[0].device_id, "midi:1");
+        assert_eq!(profile.bindings[0].device_id, "midi:1");
+        assert_eq!(
+            profile.bindings[0]
+                .mute_control
+                .as_ref()
+                .expect("mute control")
+                .device_id,
+            "midi:1"
+        );
+    }
+
+    #[test]
+    fn migrate_route_inputs_repairs_single_route_stale_id_reused_by_new_route() {
+        let mut profile = profile_with(binding("midi:0", Some("midi:0"), None));
+        profile.midi_device_preference.routes = vec![route("midi:1", "midi:2", "Platform X+")];
+
+        let (migrated_count, migrations) = migrate_profile_route_inputs(
+            &mut profile,
+            &[
+                route("midi:1", "midi:2", "Platform X+"),
+                route("midi:0", "midi:3", "Focusrite USB MIDI"),
+            ],
+        );
+
+        assert_eq!(migrated_count, 2);
+        assert_eq!(migrations.len(), 1);
+        assert_eq!(profile.bindings[0].device_id, "midi:1");
+        assert_eq!(
+            profile.bindings[0]
+                .mute_control
+                .as_ref()
+                .expect("mute control")
+                .device_id,
+            "midi:1"
+        );
+        assert_eq!(
+            migrations[0],
+            BindingDeviceMigration {
+                binding_id: "binding-1".to_string(),
+                previous_device_id: "midi:0".to_string(),
+                device_id: "midi:1".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn migrate_route_inputs_repairs_single_orphan_in_existing_multi_route_profile() {
+        let mut platform_binding = binding("midi:0", None, None);
+        platform_binding.id = "platform-fader".to_string();
+        let mut midi_mix_binding = binding("midi:3", None, None);
+        midi_mix_binding.id = "midi-mix-fader".to_string();
+        midi_mix_binding.control.msg_type = MidiMessageType::ControlChange;
+        midi_mix_binding.control.controller = 7;
+
+        let mut profile = profile_with(platform_binding);
+        profile.bindings.push(midi_mix_binding);
+        profile.midi_device_preference.routes = vec![
+            route("midi:1", "midi:2", "Platform X+"),
+            route("midi:3", "midi:4", "MIDI Mix"),
+        ];
+        let active_routes = profile.midi_device_preference.routes.clone();
+
+        let (migrated_count, migrations) =
+            migrate_profile_route_inputs(&mut profile, &active_routes);
+
+        assert_eq!(migrated_count, 1);
+        assert_eq!(migrations.len(), 1);
+        assert_eq!(profile.bindings[0].device_id, "midi:1");
+        assert_eq!(profile.bindings[1].device_id, "midi:3");
+        assert_eq!(
+            migrations[0],
+            BindingDeviceMigration {
+                binding_id: "platform-fader".to_string(),
+                previous_device_id: "midi:0".to_string(),
+                device_id: "midi:1".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn migrate_route_inputs_does_not_reassign_disabled_route_bindings() {
+        let mut profile = profile_with(binding("midi:3", None, None));
+        let mut disabled_route = route("midi:3", "midi:4", "MIDI Mix");
+        disabled_route.enabled = false;
+        profile.midi_device_preference.routes =
+            vec![route("midi:1", "midi:2", "Platform X+"), disabled_route];
+
+        let (migrated_count, migrations) =
+            migrate_profile_route_inputs(&mut profile, &[route("midi:1", "midi:2", "Platform X+")]);
+
+        assert_eq!(migrated_count, 0);
+        assert!(migrations.is_empty());
+        assert_eq!(profile.bindings[0].device_id, "midi:3");
+    }
+
+    #[test]
+    fn migrate_route_inputs_does_not_repair_pitch_bend_output_when_id_is_active_input() {
+        let mut platform_binding = binding("midi:1", None, None);
+        platform_binding.id = "platform-fader".to_string();
+        let mut focusrite_binding = binding("midi:0", None, None);
+        focusrite_binding.id = "focusrite-fader".to_string();
+        focusrite_binding.control.msg_type = MidiMessageType::ControlChange;
+        focusrite_binding.control.controller = 7;
+
+        let mut profile = profile_with(platform_binding);
+        profile.bindings.push(focusrite_binding);
+        profile.midi_device_preference.routes = vec![
+            route("midi:1", "midi:2", "Platform X+"),
+            route("midi:0", "midi:1", "Focusrite USB MIDI"),
+        ];
+        let active_routes = profile.midi_device_preference.routes.clone();
+
+        let (migrated_count, migrations) =
+            migrate_profile_route_inputs(&mut profile, &active_routes);
+
+        assert_eq!(migrated_count, 0);
+        assert!(migrations.is_empty());
+        assert_eq!(profile.bindings[0].device_id, "midi:1");
+        assert_eq!(profile.bindings[1].device_id, "midi:0");
+    }
+
+    #[test]
+    fn migrate_route_inputs_repairs_pitch_bend_bindings_saved_to_route_output() {
+        let mut platform_binding = binding("midi:2", None, None);
+        platform_binding.id = "platform-fader".to_string();
+        let mut midi_mix_binding = binding("midi:2", None, None);
+        midi_mix_binding.id = "midi-mix-cc".to_string();
+        midi_mix_binding.control.msg_type = MidiMessageType::ControlChange;
+        midi_mix_binding.control.controller = 7;
+
+        let mut profile = profile_with(platform_binding);
+        profile.bindings.push(midi_mix_binding);
+        profile.midi_device_preference.routes = vec![
+            route("midi:1", "midi:2", "Platform X+"),
+            route("midi:4", "midi:3", "MIDI Mix"),
+        ];
+        let active_routes = profile.midi_device_preference.routes.clone();
+
+        let (migrated_count, migrations) =
+            migrate_profile_route_inputs(&mut profile, &active_routes);
+
+        assert_eq!(migrated_count, 1);
+        assert_eq!(profile.bindings[0].device_id, "midi:1");
+        assert_eq!(profile.bindings[1].device_id, "midi:2");
+        assert_eq!(migrations.len(), 1);
+        assert_eq!(
+            migrations[0],
+            BindingDeviceMigration {
+                binding_id: "platform-fader".to_string(),
+                previous_device_id: "midi:2".to_string(),
+                device_id: "midi:1".to_string(),
+            }
         );
     }
 }

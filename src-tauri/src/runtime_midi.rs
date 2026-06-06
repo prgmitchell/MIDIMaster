@@ -1,6 +1,7 @@
 use crate::binding_actions::{self, IntegrationBatchTrigger, IntegrationTrigger};
 use crate::bindings::{
-    apply_midi_event as apply_binding_midi_event, find_binding, BindingKey, BindingState,
+    apply_midi_event as apply_binding_midi_event, find_binding_with_options, BindingKey,
+    BindingState,
 };
 use crate::model::{self, MidiEvent};
 use crate::run_logger;
@@ -248,7 +249,12 @@ pub(crate) fn apply_midi_event(
         None => return Ok(()),
     };
     let key = BindingKey::from_event(&event);
-    let binding = match find_binding(&profile, &key) {
+    let allow_stale_device_fallback = state
+        .midi
+        .lock()
+        .map(|midi| midi.active_route_count() <= 1)
+        .unwrap_or(true);
+    let binding = match find_binding_with_options(&profile, &key, allow_stale_device_fallback) {
         Some(binding) => binding.clone(),
         None => {
             aux_controls::handle_aux_or_unmatched(state, app, &profile, &key, &event)?;

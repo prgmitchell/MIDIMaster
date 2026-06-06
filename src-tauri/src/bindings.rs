@@ -43,13 +43,21 @@ impl BindingKey {
     }
 }
 
-pub fn find_binding<'a>(profile: &'a Profile, key: &BindingKey) -> Option<&'a Binding> {
+pub fn find_binding_with_options<'a>(
+    profile: &'a Profile,
+    key: &BindingKey,
+    allow_stale_device_fallback: bool,
+) -> Option<&'a Binding> {
     if let Some(exact) = profile
         .bindings
         .iter()
         .find(|binding| BindingKey::from_binding(binding) == *key)
     {
         return Some(exact);
+    }
+
+    if !allow_stale_device_fallback {
+        return None;
     }
 
     // Back-compat fallback for profiles saved with a stale MIDI device id.
@@ -312,6 +320,51 @@ mod tests {
             value_14: None,
             msg_type: MidiMessageType::ControlChange,
         }
+    }
+
+    fn sample_profile(bindings: Vec<Binding>) -> Profile {
+        Profile {
+            name: "Default".to_string(),
+            bindings,
+            osd_settings: crate::model::OsdSettings::default(),
+            plugin_settings: std::collections::HashMap::new(),
+            midi_device_preference: crate::model::MidiDevicePreference::default(),
+            midi_device_preference_set: false,
+        }
+    }
+
+    #[test]
+    fn stale_device_fallback_matches_unique_channel_controller_when_allowed() {
+        let profile = sample_profile(vec![sample_binding(
+            MidiMode::Absolute,
+            RelativeFormat::Auto,
+        )]);
+        let key = BindingKey {
+            device_id: "midi:shifted".to_string(),
+            channel: 0,
+            controller: 1,
+            msg_type: MidiMessageType::ControlChange,
+        };
+
+        let binding = find_binding_with_options(&profile, &key, true).expect("fallback binding");
+
+        assert_eq!(binding.device_id, "midi:0");
+    }
+
+    #[test]
+    fn stale_device_fallback_can_be_disabled_for_multiple_routes() {
+        let profile = sample_profile(vec![sample_binding(
+            MidiMode::Absolute,
+            RelativeFormat::Auto,
+        )]);
+        let key = BindingKey {
+            device_id: "midi:shifted".to_string(),
+            channel: 0,
+            controller: 1,
+            msg_type: MidiMessageType::ControlChange,
+        };
+
+        assert!(find_binding_with_options(&profile, &key, false).is_none());
     }
 
     #[test]

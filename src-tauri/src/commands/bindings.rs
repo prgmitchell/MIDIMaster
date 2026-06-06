@@ -309,6 +309,7 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
             osd_settings: model::OsdSettings::default(),
             plugin_settings: std::collections::HashMap::new(),
             midi_device_preference: model::MidiDevicePreference::default(),
+            midi_device_preference_set: false,
         });
         profile.bindings.retain(|existing| {
             existing.id != binding.id

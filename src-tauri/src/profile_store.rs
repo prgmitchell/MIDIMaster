@@ -195,6 +195,7 @@ mod tests {
             osd_settings: Default::default(),
             plugin_settings: Default::default(),
             midi_device_preference: Default::default(),
+            midi_device_preference_set: false,
         }
     }
 

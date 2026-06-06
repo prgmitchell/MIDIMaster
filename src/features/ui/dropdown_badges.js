@@ -29,6 +29,8 @@ export function renderLabelWithBadges(
         return {
           text: String(badge.text || ""),
           kind: String(badge.kind || "neutral"),
+          title: String(badge.title || ""),
+          ariaLabel: String(badge.ariaLabel || badge.aria_label || ""),
         };
       }
       return null;
@@ -42,7 +44,10 @@ export function renderLabelWithBadges(
       const el = document.createElement("span");
       el.className = `target-tag target-tag--${badge.kind}`;
       el.textContent = badge.text;
-      el.title = badge.text;
+      el.title = badge.title || badge.text;
+      if (badge.ariaLabel) {
+        el.setAttribute("aria-label", badge.ariaLabel);
+      }
       tags.appendChild(el);
     });
     content.appendChild(tags);

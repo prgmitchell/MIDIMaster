@@ -595,8 +595,14 @@
     gap: 16px;
   }
 
-  .midi-device-dropdown {
+  .midi-device-dropdown,
+  .midi-device-status {
     width: 190px;
+  }
+
+  .midi-output-route-shell .midi-device-dropdown,
+  .midi-output-route-shell .midi-device-status {
+    flex-basis: 190px;
   }
 
   .settings-bottom-grid {
@@ -744,7 +750,8 @@ body.osd-only .app-shell {
 }
 
 body.dark-mode:not([data-theme]) .profile-select .select-button,
-body.dark-mode:not([data-theme]) .topbar .midi-device-dropdown .target-button {
+body.dark-mode:not([data-theme]) .topbar .midi-device-dropdown .target-button,
+body.dark-mode:not([data-theme]) .topbar .midi-device-status {
   min-height: 40px;
   height: 40px;
   border: 1px solid #303945;
@@ -1071,6 +1078,7 @@ body[data-theme] .target-button,
 body[data-theme] .select-button,
 body[data-theme] .profile-select .select-button,
 body[data-theme] .topbar .midi-device-dropdown .target-button,
+body[data-theme] .topbar .midi-device-status,
 body[data-theme] .settings-input,
 body[data-theme] .secondary-action,
 body[data-theme] .danger-action {
@@ -1135,6 +1143,18 @@ body[data-theme] .profile-select .dropdown-item:hover,
 body[data-theme] .target-dropdown .target-option:hover {
   background: var(--control-bg-hover);
   border-color: var(--control-border-strong);
+}
+
+body[data-theme] .target-dropdown .target-option:disabled,
+body[data-theme] .target-dropdown .target-option.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+body[data-theme] .target-dropdown .target-option:disabled:hover,
+body[data-theme] .target-dropdown .target-option.is-disabled:hover {
+  background: var(--control-bg);
+  border-color: transparent;
 }
 
 body[data-theme] .target-dropdown .target-option.selected {

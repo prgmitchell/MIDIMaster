@@ -15,7 +15,9 @@ pub use midi_types::{
     SessionInfo,
 };
 pub use osd_types::OsdSettings;
-pub use profile_types::{MidiDevicePreference, Profile, ProfileSummary};
+pub use profile_types::{
+    normalized_routes_with_legacy, MidiDevicePreference, MidiDeviceRoute, Profile, ProfileSummary,
+};
 
 #[cfg(test)]
 mod tests;

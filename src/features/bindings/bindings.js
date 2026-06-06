@@ -48,6 +48,7 @@ export function createBindingsFeature({
   setBindings,
   bindingFallbackName,
   controlLabel,
+  getMidiDeviceLabel,
   buildTargetSelect,
   getVolumeForTarget,
   getMuteForTarget,
@@ -98,6 +99,9 @@ export function createBindingsFeature({
   const labelForControl = (typeof controlLabel === "function")
     ? controlLabel
     : ((c) => `Ch ${c?.channel ?? "?"} CC ${c?.controller ?? "?"}`);
+  const labelForMidiDevice = (typeof getMidiDeviceLabel === "function")
+    ? getMidiDeviceLabel
+    : ((deviceId) => String(deviceId || "").trim());
 
   const buildTarget = (typeof buildTargetSelect === "function")
     ? buildTargetSelect
@@ -985,6 +989,32 @@ export function createBindingsFeature({
     return `Ch ${control.channel} ${msg} ${control.controller}`;
   }
 
+  function renderMidiMappingSummary(element, deviceId, control, controlText) {
+    if (!element) return;
+    element.innerHTML = "";
+    if (!control) {
+      element.textContent = t("bindings.notMapped");
+      return;
+    }
+
+    const deviceLabel = labelForMidiDevice(deviceId) || String(deviceId || "").trim();
+    const wrapper = document.createElement("span");
+    wrapper.className = "binding-config-midi-stack";
+    wrapper.title = deviceLabel ? `${deviceLabel} - ${controlText}` : controlText;
+
+    const device = document.createElement("span");
+    device.className = "binding-config-midi-device";
+    device.textContent = deviceLabel || t("bindings.notMapped");
+
+    const controlLabelEl = document.createElement("span");
+    controlLabelEl.className = "binding-config-midi-control";
+    controlLabelEl.textContent = controlText;
+
+    wrapper.appendChild(device);
+    wrapper.appendChild(controlLabelEl);
+    element.appendChild(wrapper);
+  }
+
   function formatPreviewMidiValue(binding, normalizedValue, rawNormalizedValue = null) {
     const sourceValue = rawNormalizedValue != null ? rawNormalizedValue : normalizedValue;
     const clamped = Math.min(1, Math.max(0, Number(sourceValue) || 0));
@@ -1184,13 +1214,28 @@ export function createBindingsFeature({
     }
     if (d.bindingConfigPreviewFill) d.bindingConfigPreviewFill.style.height = `${fillPercent}%`;
     if (d.bindingConfigPreviewThumb) d.bindingConfigPreviewThumb.style.bottom = `calc(${fillPercent}% - 18px)`;
-    if (d.bindingConfigPreviewMainMidi) d.bindingConfigPreviewMainMidi.textContent = labelForControl(binding.control || {});
+    renderMidiMappingSummary(
+      d.bindingConfigPreviewMainMidi,
+      binding.device_id,
+      binding.control,
+      labelForControl(binding.control || {}),
+    );
     if (d.bindingConfigPreviewMuteRow) d.bindingConfigPreviewMuteRow.classList.toggle("hidden", isButton);
     if (d.bindingConfigPreviewAssignRow) d.bindingConfigPreviewAssignRow.classList.toggle("hidden", isButton);
     if (d.bindingConfigPreviewCurveRow) d.bindingConfigPreviewCurveRow.classList.toggle("hidden", isButton);
     if (d.bindingConfigPreviewLightRow) d.bindingConfigPreviewLightRow.classList.toggle("hidden", !isButton);
-    if (d.bindingConfigPreviewMute) d.bindingConfigPreviewMute.textContent = formatMidiControlLabel(binding.mute_control);
-    if (d.bindingConfigPreviewAssign) d.bindingConfigPreviewAssign.textContent = formatMidiControlLabel(binding.assign_control);
+    renderMidiMappingSummary(
+      d.bindingConfigPreviewMute,
+      binding.mute_control?.device_id,
+      binding.mute_control,
+      formatMidiControlLabel(binding.mute_control),
+    );
+    renderMidiMappingSummary(
+      d.bindingConfigPreviewAssign,
+      binding.assign_control?.device_id,
+      binding.assign_control,
+      formatMidiControlLabel(binding.assign_control),
+    );
     if (d.bindingConfigPreviewCurve) d.bindingConfigPreviewCurve.textContent = curveDisplayName(binding.fader_curve);
     if (d.bindingConfigPreviewLight) d.bindingConfigPreviewLight.textContent = buttonLightLabel(binding);
     if (d.bindingConfigPreviewMidiValue) {

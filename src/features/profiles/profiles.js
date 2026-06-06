@@ -84,27 +84,99 @@ export function createProfilesFeature({
 
   function buildPersistedMidiDevicePreference(source) {
     const current = (source && typeof source === "object") ? source : {};
-    const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
-    const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
-    const inputDeviceName = String(current.inputDeviceName || current.input_device_name || "").trim();
-    const outputDeviceName = String(current.outputDeviceName || current.output_device_name || "").trim();
+    const routes = normalizeProfileRoutes(current);
+    const first = routes[0] || {};
+    const inputDeviceId = String(first.inputDeviceId || current.inputDeviceId || current.input_device_id || "").trim();
+    const outputDeviceId = String(first.outputDeviceId || current.outputDeviceId || current.output_device_id || "").trim();
+    const inputDeviceName = String(first.inputDeviceName || current.inputDeviceName || current.input_device_name || "").trim();
+    const outputDeviceName = String(first.outputDeviceName || current.outputDeviceName || current.output_device_name || "").trim();
 
     return {
       input_device_id: inputDeviceId || null,
       output_device_id: outputDeviceId || null,
       input_device_name: inputDeviceName || null,
       output_device_name: outputDeviceName || null,
+      routes: routes.map((route) => ({
+        input_device_id: route.inputDeviceId,
+        output_device_id: route.outputDeviceId,
+        input_device_name: route.inputDeviceName || null,
+        output_device_name: route.outputDeviceName || null,
+        enabled: route.enabled !== false,
+      })),
     };
   }
 
   function toClientMidiDevicePreference(source) {
     const persisted = buildPersistedMidiDevicePreference(source);
+    const current = (source && typeof source === "object") ? source : {};
+    const routes = normalizeProfileRoutes(persisted);
     return {
       inputDeviceId: persisted.input_device_id || "",
       outputDeviceId: persisted.output_device_id || "",
       inputDeviceName: persisted.input_device_name || "",
       outputDeviceName: persisted.output_device_name || "",
+      routes,
+      configured: Boolean(
+        current.configured
+        ?? current.midiDevicePreferenceSet
+        ?? current.midi_device_preference_set
+        ?? current.midi_device_preference_configured
+        ?? (routes.length > 0)
+      ),
     };
+  }
+
+  function normalizeProfileRoute(source) {
+    const current = (source && typeof source === "object") ? source : {};
+    const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
+    const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
+    if (!inputDeviceId || !outputDeviceId) return null;
+    return {
+      inputDeviceId,
+      outputDeviceId,
+      inputDeviceName: String(current.inputDeviceName || current.input_device_name || "").trim(),
+      outputDeviceName: String(current.outputDeviceName || current.output_device_name || "").trim(),
+      enabled: current.enabled !== false,
+    };
+  }
+
+  function normalizeProfileRoutes(source) {
+    const current = (source && typeof source === "object") ? source : {};
+    const rawRoutes = Array.isArray(current.routes)
+      ? current.routes
+      : (Array.isArray(current.midi_device_routes) ? current.midi_device_routes : []);
+    const routes = [];
+    rawRoutes.forEach((raw) => {
+      const route = normalizeProfileRoute(raw);
+      if (!route || routes.some((existing) => sameProfileInputRouteIdentity(existing, route))) return;
+      routes.push(route);
+    });
+    if (routes.length === 0) {
+      const legacy = normalizeProfileRoute({
+        inputDeviceId: current.inputDeviceId || current.input_device_id,
+        outputDeviceId: current.outputDeviceId || current.output_device_id,
+        inputDeviceName: current.inputDeviceName || current.input_device_name,
+        outputDeviceName: current.outputDeviceName || current.output_device_name,
+        enabled: true,
+      });
+      if (legacy) routes.push(legacy);
+    }
+    return routes;
+  }
+
+  function sameProfileInputRouteIdentity(left, right) {
+    const leftInputId = String(left?.inputDeviceId || left?.input_device_id || "").trim();
+    const rightInputId = String(right?.inputDeviceId || right?.input_device_id || "").trim();
+    if (!leftInputId || leftInputId !== rightInputId) return false;
+
+    const leftName = stripUnavailableSuffix(left?.inputDeviceName || left?.input_device_name || "");
+    const rightName = stripUnavailableSuffix(right?.inputDeviceName || right?.input_device_name || "");
+    return !(leftName && rightName && leftName !== rightName);
+  }
+
+  function stripUnavailableSuffix(label) {
+    const raw = String(label || "").trim();
+    return raw.endsWith(" (Unavailable)") ? raw.slice(0, -" (Unavailable)".length) : raw;
   }
 
   function setProfileSelection(name) {
@@ -172,7 +244,10 @@ export function createProfilesFeature({
     if (typeof setProfilePluginSettings === "function") {
       setProfilePluginSettings(pps);
     }
-    const midiPref = toClientMidiDevicePreference(profile.midi_device_preference);
+    const midiPref = toClientMidiDevicePreference({
+      ...(profile.midi_device_preference || {}),
+      midi_device_preference_set: profile.midi_device_preference_set,
+    });
     if (typeof setActiveProfileMidiPreference === "function") {
       setActiveProfileMidiPreference(midiPref);
     }
@@ -225,6 +300,7 @@ export function createProfilesFeature({
       await onProfileLoaded({
         name: profile.name,
         midiDevicePreference: midiPref,
+        midiDevicePreferenceSet: Boolean(profile.midi_device_preference_set || midiPref.configured),
       });
     }
     return profile;
@@ -257,6 +333,7 @@ export function createProfilesFeature({
             midi_device_preference: buildPersistedMidiDevicePreference(
               (typeof getCurrentMidiPreference === "function") ? getCurrentMidiPreference() : null
             ),
+            midi_device_preference_set: true,
           },
         });
         try {
@@ -282,9 +359,6 @@ export function createProfilesFeature({
   async function createProfileByName(rawName) {
     const name = normalizeProfileName(rawName);
     if (!name) return;
-    const inheritedMidi = (typeof getCurrentMidiPreference === "function")
-      ? getCurrentMidiPreference()
-      : null;
     await invoke("save_profile", {
       profile: {
         name,
@@ -293,7 +367,8 @@ export function createProfilesFeature({
           (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
         ),
         plugin_settings: {},
-        midi_device_preference: buildPersistedMidiDevicePreference(inheritedMidi),
+        midi_device_preference: buildPersistedMidiDevicePreference({ routes: [] }),
+        midi_device_preference_set: true,
       },
     });
     await loadProfileByName(name);
@@ -414,6 +489,7 @@ export function createProfilesFeature({
           midi_device_preference: buildPersistedMidiDevicePreference(
             (typeof getCurrentMidiPreference === "function") ? getCurrentMidiPreference() : null
           ),
+          midi_device_preference_set: true,
         },
       });
       profiles = await invoke("list_profiles");
@@ -625,6 +701,7 @@ export function createProfilesFeature({
         midi_device_preference: buildPersistedMidiDevicePreference(
           (typeof getActiveProfileMidiPreference === "function") ? getActiveProfileMidiPreference() : null
         ),
+        midi_device_preference_set: true,
       },
     });
   }

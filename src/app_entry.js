@@ -26,6 +26,7 @@ import { createTauriBridge, scheduleRetry } from "./app/bootstrap.js";
 import {
   hasProfileMidiPreference,
   normalizeProfileMidiPreference,
+  normalizeProfileMidiRoutes,
 } from "./app/preferences.js";
 import { createSessionRefresher } from "./app/session_refresh.js";
 import { createPluginRuntime } from "./app/plugin_runtime.js";
@@ -245,6 +246,7 @@ let activeProfileMidiPreference = {
   outputDeviceId: "",
   inputDeviceName: "",
   outputDeviceName: "",
+  routes: [],
 };
 let targetMenuListenerBound = false;
 const masterIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><path d='M5 4h2v10H5zM11 4h2v10h-2z' fill='white'/></svg>";
@@ -269,7 +271,9 @@ let persistedMidiInputId = "";
 let persistedMidiOutputId = "";
 let persistedMidiInputName = "";
 let persistedMidiOutputName = "";
+let persistedMidiRoutes = [];
 let persistedActiveProfileName = "";
+let activeMidiRouteCount = 0;
 
 function updateThemeToggleMeta(isDark) {
   if (!themeToggleButton) return;
@@ -363,54 +367,59 @@ function getSavedMidiDeviceIds() {
     outputId: outputId || persistedMidiOutputId || "",
     inputName: inputName || persistedMidiInputName || "",
     outputName: outputName || persistedMidiOutputName || "",
+    routes: persistedMidiRoutes || [],
   };
 }
 
-async function saveMidiDeviceIds(inputId, outputId, inputName = "", outputName = "") {
-  persistedMidiInputId = inputId || "";
-  persistedMidiOutputId = outputId || "";
-  persistedMidiInputName = inputName || "";
-  persistedMidiOutputName = outputName || "";
-  try {
-    if (persistedMidiInputId) {
-      localStorage.setItem(midiInputStorageKey, persistedMidiInputId);
-    }
-    if (persistedMidiOutputId) {
-      localStorage.setItem(midiOutputStorageKey, persistedMidiOutputId);
-    }
-    if (persistedMidiInputName) {
-      localStorage.setItem(midiInputNameStorageKey, persistedMidiInputName);
-    }
-    if (persistedMidiOutputName) {
-      localStorage.setItem(midiOutputNameStorageKey, persistedMidiOutputName);
-    }
-  } catch {
-    // ignore storage failures
-  }
-  if (persistedMidiInputId && persistedMidiOutputId) {
-    await invoke("set_midi_device_preferences", {
+function midiDeviceLabelForBindingDevice(deviceId) {
+  const normalizedId = String(deviceId || "").trim();
+  if (!normalizedId) return "";
+
+  const routes = [
+    ...(Array.isArray(activeProfileMidiPreference?.routes) ? activeProfileMidiPreference.routes : []),
+    ...(Array.isArray(persistedMidiRoutes) ? persistedMidiRoutes : []),
+  ];
+  const legacyRoutes = [
+    {
+      inputDeviceId: activeProfileMidiPreference?.inputDeviceId,
+      inputDeviceName: activeProfileMidiPreference?.inputDeviceName,
+      outputDeviceId: activeProfileMidiPreference?.outputDeviceId,
+      outputDeviceName: activeProfileMidiPreference?.outputDeviceName,
+    },
+    {
       inputDeviceId: persistedMidiInputId,
+      inputDeviceName: persistedMidiInputName,
       outputDeviceId: persistedMidiOutputId,
-      inputDeviceName: persistedMidiInputName || null,
-      outputDeviceName: persistedMidiOutputName || null,
-    }).catch(() => { });
+      outputDeviceName: persistedMidiOutputName,
+    },
+  ];
+
+  const allRoutes = [...routes, ...legacyRoutes];
+  const inputMatch = allRoutes.find((route) => String(route?.inputDeviceId || route?.input_device_id || "").trim() === normalizedId);
+  if (inputMatch) {
+    return stripDeviceStateSuffix(inputMatch.inputDeviceName || inputMatch.input_device_name || normalizedId) || normalizedId;
   }
+
+  const outputMatch = allRoutes.find((route) => String(route?.outputDeviceId || route?.output_device_id || "").trim() === normalizedId);
+  if (outputMatch) {
+    return stripDeviceStateSuffix(outputMatch.outputDeviceName || outputMatch.output_device_name || normalizedId) || normalizedId;
+  }
+
+  return normalizedId;
+}
+
+async function saveMidiDeviceIds(inputId, outputId, inputName = "", outputName = "") {
+  void inputId;
+  void outputId;
+  void inputName;
+  void outputName;
+}
+
+async function saveMidiDeviceRoutes(routes = []) {
+  void routes;
 }
 
 async function clearSavedMidiDeviceIds() {
-  persistedMidiInputId = "";
-  persistedMidiOutputId = "";
-  persistedMidiInputName = "";
-  persistedMidiOutputName = "";
-  try {
-    localStorage.removeItem(midiInputStorageKey);
-    localStorage.removeItem(midiOutputStorageKey);
-    localStorage.removeItem(midiInputNameStorageKey);
-    localStorage.removeItem(midiOutputNameStorageKey);
-  } catch {
-    // ignore storage failures
-  }
-  await invoke("clear_midi_device_preferences").catch(() => { });
 }
 
 async function hydrateClientPreferences() {
@@ -438,6 +447,7 @@ async function hydrateClientPreferences() {
     persistedMidiOutputId = savedOutputId || "";
     persistedMidiInputName = savedInputName || "";
     persistedMidiOutputName = savedOutputName || "";
+    persistedMidiRoutes = normalizeProfileMidiRoutes(settings);
     const savedActiveProfileName = settings.active_profile_name ?? settings.activeProfileName ?? "";
     persistedActiveProfileName = String(savedActiveProfileName || "").trim();
 
@@ -622,7 +632,26 @@ function showMain(inputName, outputName, options = {}) {
   }
   const input = stripDeviceStateSuffix(inputName) || t("midi.notSelected");
   const output = stripDeviceStateSuffix(outputName) || t("midi.notSelected");
-  midiStatus.textContent = t("midi.statusConnected", { input, output });
+  const routeCount = Number(options.routeCount || options.routes?.length || 0);
+  midiStatus.textContent = routeCount > 1
+    ? t("midi.statusConnectedMultiple", { input, output, count: routeCount })
+    : t("midi.statusConnected", { input, output });
+}
+
+function enabledMidiRouteCount(routes = []) {
+  return normalizeProfileMidiRoutes({ routes })
+    .filter((route) => route.enabled !== false)
+    .length;
+}
+
+function knownMidiRouteCount() {
+  return activeMidiRouteCount
+    || enabledMidiRouteCount(persistedMidiRoutes)
+    || enabledMidiRouteCount(activeProfileMidiPreference.routes);
+}
+
+function normalizeMidiMessageType(value) {
+  return String(value || "ControlChange");
 }
 
 async function preparePage(page) {
@@ -844,6 +873,7 @@ function midiControlSignature(deviceId, control) {
     String(deviceId || ""),
     Number(control.channel),
     Number(control.controller),
+    normalizeMidiMessageType(control.msg_type || control.msgType),
   ].join(":");
 }
 
@@ -977,8 +1007,11 @@ profilesFeature = createProfilesFeature({
   setActiveProfileMidiPreference: (next) => {
     activeProfileMidiPreference = normalizeProfileMidiPreference(next);
   },
-  onProfileLoaded: async ({ midiDevicePreference }) => {
-    activeProfileMidiPreference = normalizeProfileMidiPreference(midiDevicePreference);
+  onProfileLoaded: async ({ midiDevicePreference, midiDevicePreferenceSet }) => {
+    activeProfileMidiPreference = normalizeProfileMidiPreference({
+      ...(midiDevicePreference || {}),
+      configured: Boolean(midiDevicePreferenceSet),
+    });
     await midiFeature?.syncToProfileDevice?.(activeProfileMidiPreference);
   },
   showAlert: (title, message = "") => showAlert(title, message),
@@ -1115,6 +1148,7 @@ bindingsFeature = createBindingsFeature({
   setBindings: (next) => { bindings = next; },
   bindingFallbackName,
   controlLabel,
+  getMidiDeviceLabel: midiDeviceLabelForBindingDevice,
   buildTargetSelect,
   getVolumeForTarget,
   getMuteForTarget,
@@ -1212,7 +1246,14 @@ midiFeature = createMidiFeature({
   },
   getSavedMidiDeviceIds,
   saveMidiDeviceIds,
+  saveMidiDeviceRoutes,
   clearSavedMidiDeviceIds,
+  onConnected: (connection = {}) => {
+    activeMidiRouteCount = enabledMidiRouteCount(connection.routes || []);
+  },
+  onDisconnected: () => {
+    activeMidiRouteCount = 0;
+  },
   onProfileDeviceSelected: async (nextPreference) => {
     const normalized = normalizeProfileMidiPreference(nextPreference);
     activeProfileMidiPreference = normalized;
@@ -1282,20 +1323,29 @@ function findBindingForEvent(payload) {
   if (!payload || !bindings.length) {
     return null;
   }
+  const msgType = normalizeMidiMessageType(payload.msg_type || payload.msgType);
+  const channel = Number(payload.channel);
+  const controller = Number(payload.controller);
   const exact = bindings.find((binding) =>
     binding.device_id === payload.device_id
-    && binding.control?.channel === payload.channel
-    && binding.control?.controller === payload.controller,
+    && Number(binding.control?.channel) === channel
+    && Number(binding.control?.controller) === controller
+    && normalizeMidiMessageType(binding.control?.msg_type || binding.control?.msgType) === msgType,
   );
   if (exact) {
     return exact;
   }
 
+  if (knownMidiRouteCount() > 1) {
+    return null;
+  }
+
   // Back-compat fallback for stale saved device IDs.
   // Match by channel/controller only when this is unambiguous.
   const fallback = bindings.filter((binding) =>
-    binding.control?.channel === payload.channel
-    && binding.control?.controller === payload.controller,
+    Number(binding.control?.channel) === channel
+    && Number(binding.control?.controller) === controller
+    && normalizeMidiMessageType(binding.control?.msg_type || binding.control?.msgType) === msgType,
   );
   return fallback.length === 1 ? fallback[0] : null;
 }
@@ -1886,9 +1936,51 @@ async function setupListeners() {
         return;
       }
     }
-    const deviceId = payload?.device_id;
     const count = Number(payload?.count || 0);
-    if (!deviceId || !Number.isFinite(count) || count <= 0) {
+    if (!Number.isFinite(count) || count <= 0) {
+      return;
+    }
+
+    const migrations = Array.isArray(payload?.migrations) ? payload.migrations : [];
+    if (migrations.length > 0) {
+      const parsedMigrations = migrations.map((migration) => {
+        const bindingId = String(migration?.bindingId || migration?.binding_id || "");
+        const deviceId = String(migration?.deviceId || migration?.device_id || "");
+        const previousDeviceId = String(migration?.previousDeviceId || migration?.previous_device_id || "");
+        if (!bindingId || !deviceId) return null;
+        return { bindingId, deviceId, previousDeviceId };
+      }).filter(Boolean);
+      if (parsedMigrations.length === 0) return;
+
+      const migrateAuxControl = (control, migration) => {
+        if (!control || typeof control !== "object") return control;
+        if (migration.previousDeviceId && control.device_id !== migration.previousDeviceId) {
+          return control;
+        }
+        return { ...control, device_id: migration.deviceId };
+      };
+
+      bindings = (bindings || []).map((binding) => {
+        let nextBinding = binding;
+        parsedMigrations.forEach((migration) => {
+          if (migration.bindingId !== String(nextBinding?.id || "")) return;
+          nextBinding = {
+            ...nextBinding,
+            device_id: migration.previousDeviceId && nextBinding.device_id !== migration.previousDeviceId
+              ? nextBinding.device_id
+              : migration.deviceId,
+            mute_control: migrateAuxControl(nextBinding?.mute_control, migration),
+            assign_control: migrateAuxControl(nextBinding?.assign_control, migration),
+          };
+        });
+        return nextBinding;
+      });
+      requestBindingsRerender("bindings_migrated");
+      return;
+    }
+
+    const deviceId = payload?.device_id;
+    if (!deviceId) {
       return;
     }
 
@@ -2029,14 +2121,37 @@ async function setupListeners() {
       })()
       : event.payload;
     if (!payload || typeof payload !== "object" || !midiStatus) return;
+    const routes = normalizeProfileMidiRoutes({ routes: payload.routes || [] });
+    const routeCount = Number(payload.routeCount ?? payload.route_count ?? routes.length);
+    if (Number.isFinite(routeCount)) {
+      activeMidiRouteCount = Math.max(0, routeCount);
+    }
     if (payload.state === "disconnected") {
-      midiStatus.textContent = t("midi.disconnected");
+      if (routes.length > 0) {
+        const first = routes[0] || {};
+        showMain(
+          first.inputDeviceName || first.inputDeviceId,
+          first.outputDeviceName || first.outputDeviceId,
+          { routeCount: routes.length, routes },
+        );
+      } else {
+        midiStatus.textContent = t("midi.disconnected");
+      }
     } else if (payload.state === "reconnecting") {
       midiStatus.textContent = t("midi.searchingDevices");
     } else if (payload.state === "failed") {
       midiStatus.textContent = t("midi.connectFailed", { message: payload.reason || "MIDI connection failed" });
     } else if (payload.state === "connected") {
-      midiStatus.textContent = "Connected.";
+      if (routes.length > 0) {
+        const first = routes[0] || {};
+        showMain(
+          first.inputDeviceName || first.inputDeviceId,
+          first.outputDeviceName || first.outputDeviceId,
+          { routeCount: routes.length, routes },
+        );
+      } else {
+        midiStatus.textContent = "Connected.";
+      }
     }
   });
 
@@ -2271,7 +2386,8 @@ async function startMainApp() {
     return;
   }
   appStarted = true;
-  const savedDevice = getSavedMidiDeviceIds().inputId;
+  const savedMidi = getSavedMidiDeviceIds();
+  const savedDevice = savedMidi.inputId || savedMidi.routes?.[0]?.inputDeviceId || "";
   if (!savedDevice && midiStatus) {
     midiStatus.textContent = t("bindings.selectDevicesSentence");
   }

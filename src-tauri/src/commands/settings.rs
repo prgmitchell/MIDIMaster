@@ -1,6 +1,9 @@
 use crate::{
-    app_paths::app_data_root_dir, app_settings::AppSettings, collect_monitor_descriptors,
-    model::OsdSettings, run_logger, AppState,
+    app_paths::app_data_root_dir,
+    app_settings::AppSettings,
+    collect_monitor_descriptors,
+    model::{MidiDevicePreference, MidiDeviceRoute, OsdSettings},
+    run_logger, AppState,
 };
 use serde::Serialize;
 use std::process::Command;
@@ -290,6 +293,7 @@ pub fn set_midi_device_preferences(
     settings.midi_output_device_id = Some(output_device_id);
     settings.midi_input_device_name = input_device_name;
     settings.midi_output_device_name = output_device_name;
+    settings.midi_device_routes = settings.normalized_midi_routes();
     let updated = settings.clone();
     drop(settings);
 
@@ -297,6 +301,75 @@ pub fn set_midi_device_preferences(
         .app_settings_store
         .save(&updated)
         .map_err(|err| err.to_string())?;
+    if let Ok(mut profile_guard) = state.active_profile.lock() {
+        if let Some(profile) = profile_guard.as_mut() {
+            profile.midi_device_preference = MidiDevicePreference {
+                input_device_id: updated.midi_input_device_id.clone(),
+                output_device_id: updated.midi_output_device_id.clone(),
+                input_device_name: updated.midi_input_device_name.clone(),
+                output_device_name: updated.midi_output_device_name.clone(),
+                routes: updated.midi_device_routes.clone(),
+            };
+            profile.midi_device_preference_set = true;
+            state
+                .profile_store
+                .save_profile(profile.clone())
+                .map_err(|err| err.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_midi_device_routes(
+    state: State<AppState>,
+    routes: Vec<MidiDeviceRoute>,
+) -> Result<(), String> {
+    let normalized = crate::model::normalized_routes_with_legacy(&routes, None, None, None, None);
+    run_logger::info(
+        "settings",
+        "set_midi_device_routes",
+        &format!("route_count={}", normalized.len()),
+    );
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    settings.midi_device_routes = normalized.clone();
+    if let Some(first) = normalized.first() {
+        settings.midi_input_device_id = first.input_device_id.clone();
+        settings.midi_output_device_id = first.output_device_id.clone();
+        settings.midi_input_device_name = first.input_device_name.clone();
+        settings.midi_output_device_name = first.output_device_name.clone();
+    } else {
+        settings.midi_input_device_id = None;
+        settings.midi_output_device_id = None;
+        settings.midi_input_device_name = None;
+        settings.midi_output_device_name = None;
+    }
+    let updated = settings.clone();
+    drop(settings);
+
+    state
+        .app_settings_store
+        .save(&updated)
+        .map_err(|err| err.to_string())?;
+    if let Ok(mut profile_guard) = state.active_profile.lock() {
+        if let Some(profile) = profile_guard.as_mut() {
+            profile.midi_device_preference = MidiDevicePreference {
+                input_device_id: updated.midi_input_device_id.clone(),
+                output_device_id: updated.midi_output_device_id.clone(),
+                input_device_name: updated.midi_input_device_name.clone(),
+                output_device_name: updated.midi_output_device_name.clone(),
+                routes: normalized,
+            };
+            profile.midi_device_preference_set = true;
+            state
+                .profile_store
+                .save_profile(profile.clone())
+                .map_err(|err| err.to_string())?;
+        }
+    }
     Ok(())
 }
 
@@ -311,6 +384,7 @@ pub fn clear_midi_device_preferences(state: State<AppState>) -> Result<(), Strin
     settings.midi_output_device_id = None;
     settings.midi_input_device_name = None;
     settings.midi_output_device_name = None;
+    settings.midi_device_routes = Vec::new();
     let updated = settings.clone();
     drop(settings);
 
@@ -318,6 +392,16 @@ pub fn clear_midi_device_preferences(state: State<AppState>) -> Result<(), Strin
         .app_settings_store
         .save(&updated)
         .map_err(|err| err.to_string())?;
+    if let Ok(mut profile_guard) = state.active_profile.lock() {
+        if let Some(profile) = profile_guard.as_mut() {
+            profile.midi_device_preference = MidiDevicePreference::default();
+            profile.midi_device_preference_set = true;
+            state
+                .profile_store
+                .save_profile(profile.clone())
+                .map_err(|err| err.to_string())?;
+        }
+    }
     Ok(())
 }
 

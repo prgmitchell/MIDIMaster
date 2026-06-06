@@ -1095,6 +1095,7 @@ body[data-theme] .binding-add-button,
 body[data-theme] .binding-type-filter,
 body[data-theme] .binding-search-field,
 body[data-theme] .topbar .midi-device-dropdown .target-button,
+body[data-theme] .topbar .midi-device-status,
 body[data-theme] .profile-select .select-button {
   background: var(--control-bg);
   border-color: var(--control-border);
@@ -1141,7 +1142,8 @@ body[data-theme] .topbar-field {
 }
 
 body[data-theme] .profile-select,
-body[data-theme] .topbar .midi-device-dropdown {
+body[data-theme] .topbar .midi-device-dropdown,
+body[data-theme] .topbar .midi-device-status {
   width: 100%;
   min-width: 0;
 }

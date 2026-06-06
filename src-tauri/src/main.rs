@@ -331,7 +331,10 @@ fn main() {
             list_midi_devices,
             list_midi_output_devices,
             get_midi_connection_health,
+            get_midi_route_health,
             start_midi_device,
+            start_midi_device_routes,
+            stop_midi_route,
             stop_midi_device,
             list_sessions,
             list_monitors,
@@ -343,6 +346,7 @@ fn main() {
             update_app_settings,
             set_theme_preference,
             set_midi_device_preferences,
+            set_midi_device_routes,
             clear_midi_device_preferences,
             set_active_profile_preference,
             reset_app_data,
@@ -641,6 +645,7 @@ mod tests {
             osd_settings: model::OsdSettings::default(),
             plugin_settings: HashMap::new(),
             midi_device_preference: model::MidiDevicePreference::default(),
+            midi_device_preference_set: false,
         }
     }
 

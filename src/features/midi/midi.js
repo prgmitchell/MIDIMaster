@@ -1,17 +1,20 @@
 import {
   closeOpenDropdowns,
+  positionFloatingDropdownMenu,
+  renderLabelWithBadges,
+  wireDropdownToggle,
 } from "../ui/dropdown_badges.js";
 import {
-  createSelectDropdownShell,
-  renderNativeSelectDropdown,
-} from "../ui/dropdown_select.js";
-import {
+  buildPersistedMidiRoutes,
   findConnectedAliveDevice,
   findPreferredDevice,
+  hasDuplicateInputRoute,
   normalizeMidiPreference,
-  resolveMidiDeviceDropdownState,
+  normalizeMidiRoute,
+  normalizeMidiRoutes,
   resolvePreferredMidiDevicePair,
-  shouldRecoverSuspectMidiPair,
+  resolvePreferredMidiDeviceRoutes,
+  sharedOutputCounts,
   stripUnavailableSuffix,
   unavailableDeviceLabel,
 } from "./device_preferences.js";
@@ -26,6 +29,7 @@ export function createMidiFeature({
   addBindingFromLearn,
   getSavedMidiDeviceIds,
   saveMidiDeviceIds,
+  saveMidiDeviceRoutes,
   clearSavedMidiDeviceIds,
   onProfileDeviceSelected,
   i18n,
@@ -63,20 +67,36 @@ export function createMidiFeature({
   let connectedOutputId = "";
   let connectedInputName = "";
   let connectedOutputName = "";
+  let connectedRoutes = [];
+  let routeDrafts = [];
   let currentProfilePreference = null;
-  let inputDropdownEl = null;
-  let inputMenuEl = null;
-  let inputDisplayEl = null;
-  let outputDropdownEl = null;
-  let outputMenuEl = null;
-  let outputDisplayEl = null;
+  let inputStatusEl = null;
+  let inputStatusDisplayEl = null;
+  let outputStatusEl = null;
+  let outputStatusDisplayEl = null;
+  let outputRouteShellEl = null;
+  let routesButtonEl = null;
+  let routesPopoverEl = null;
   let deviceDocClickBound = false;
 
   function setConnectedState(inputId, outputId, inputName = "", outputName = "") {
-    connectedInputId = String(inputId || "");
-    connectedOutputId = String(outputId || "");
-    connectedInputName = String(inputName || "");
-    connectedOutputName = String(outputName || "");
+    setConnectedRoutes(inputId && outputId ? [{
+      inputDeviceId: inputId,
+      outputDeviceId: outputId,
+      inputDeviceName: inputName,
+      outputDeviceName: outputName,
+      enabled: true,
+    }] : []);
+  }
+
+  function setConnectedRoutes(routes) {
+    connectedRoutes = normalizeMidiRoutes({ routes }).filter((route) => route.enabled !== false);
+    const first = connectedRoutes[0] || {};
+    connectedInputId = String(first.inputDeviceId || "");
+    connectedOutputId = String(first.outputDeviceId || "");
+    connectedInputName = String(first.inputDeviceName || "");
+    connectedOutputName = String(first.outputDeviceName || "");
+    routeDrafts = mergeDraftRouteState(routeDrafts, connectedRoutes);
   }
 
   function getCurrentConnectedPreference() {
@@ -85,7 +105,79 @@ export function createMidiFeature({
       outputDeviceId: connectedOutputId,
       inputDeviceName: connectedInputName,
       outputDeviceName: connectedOutputName,
+      routes: connectedRoutes.slice(),
     };
+  }
+
+  function mergeDraftRouteState(previous, nextConnected) {
+    const previousRoutes = normalizeMidiRoutes({ routes: previous });
+    const connected = normalizeMidiRoutes({ routes: nextConnected });
+    if (previousRoutes.length === 0) {
+      return connected.slice();
+    }
+    const merged = previousRoutes.map((route) => (
+      connected.find((candidate) => routeMatchesIdentity(route, candidate)) || route
+    ));
+    connected.forEach((route) => {
+      if (!merged.some((existing) => routeMatchesIdentity(existing, route))) {
+        merged.push(route);
+      }
+    });
+    return merged;
+  }
+
+  function currentRoutesForSave() {
+    const profileRoutes = normalizeMidiPreference(currentProfilePreference).routes;
+    return normalizeMidiRoutes({
+      routes: routeDrafts.length ? routeDrafts : (profileRoutes.length ? profileRoutes : connectedRoutes),
+    });
+  }
+
+  function routeMatchesIdentity(route, candidate) {
+    if (!route || !candidate) return false;
+    const inputId = String(route.inputDeviceId || "").trim();
+    const inputName = stripUnavailableSuffix(route.inputDeviceName || "");
+    const candidateId = String(candidate.inputDeviceId || "").trim();
+    const candidateName = stripUnavailableSuffix(candidate.inputDeviceName || "");
+    if (inputId && candidateId && inputId === candidateId) {
+      return !(inputName && candidateName && inputName !== candidateName);
+    }
+    return Boolean(inputName && candidateName && inputName === candidateName);
+  }
+
+  function preserveUnavailableRouteDrafts(aliveRoutes, missingRoutes) {
+    const pref = normalizeMidiPreference(currentProfilePreference);
+    const baseRoutes = pref.routes.length
+      ? pref.routes
+      : (routeDrafts.length ? routeDrafts : connectedRoutes);
+    const replacements = [...aliveRoutes, ...missingRoutes];
+    const merged = normalizeMidiRoutes({ routes: baseRoutes }).map((route) => (
+      replacements.find((candidate) => routeMatchesIdentity(route, candidate)) || route
+    ));
+
+    replacements.forEach((route) => {
+      if (!merged.some((candidate) => routeMatchesIdentity(candidate, route))) {
+        merged.push(route);
+      }
+    });
+
+    return normalizeMidiRoutes({ routes: merged });
+  }
+
+  function routesFromResolvedPreferences(resolvedRoutes) {
+    const resolved = Array.isArray(resolvedRoutes?.routes) ? resolvedRoutes.routes : [];
+    return normalizeMidiRoutes({
+      routes: resolved.map((route) => {
+        if (route.preference?.enabled === false) return route.preference;
+        return {
+          inputDeviceId: route.inputMatch?.id || route.preference?.inputDeviceId,
+          outputDeviceId: route.outputMatch?.id || route.preference?.outputDeviceId,
+          inputDeviceName: route.inputMatch?.name || route.preference?.inputDeviceName,
+          outputDeviceName: route.outputMatch?.name || route.preference?.outputDeviceName,
+          enabled: true,
+        };
+      }),
+    });
   }
 
   function markSelectedPairUnavailable(inputId, outputId, inputName, outputName) {
@@ -144,106 +236,607 @@ export function createMidiFeature({
     clearUnavailableOptions(d.midiOutputSelect, keepOutput);
   }
 
+  function routesForUnavailableOptions() {
+    const routes = [];
+    const seen = new Set();
+    [
+      normalizeMidiPreference(currentProfilePreference).routes,
+      normalizeMidiRoutes({ routes: routeDrafts }),
+      normalizeMidiRoutes({ routes: connectedRoutes }),
+    ].forEach((list) => {
+      list.forEach((route) => {
+        const key = `${route.inputDeviceId}\u0000${route.outputDeviceId}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        routes.push(route);
+      });
+    });
+    return routes;
+  }
+
+  function ensureUnavailableRouteOptions(inputDevices, outputDevices) {
+    routesForUnavailableOptions().forEach((route) => {
+      if (route.inputDeviceId && !findDeviceBySavedIdentity(inputDevices, route.inputDeviceId, route.inputDeviceName)) {
+        ensureOption(
+          d.midiSelect,
+          route.inputDeviceId,
+          unavailableDeviceLabel(route.inputDeviceName, route.inputDeviceId, "Input"),
+          true,
+        );
+      }
+      if (route.outputDeviceId && !findDeviceBySavedIdentity(outputDevices, route.outputDeviceId, route.outputDeviceName)) {
+        ensureOption(
+          d.midiOutputSelect,
+          route.outputDeviceId,
+          unavailableDeviceLabel(route.outputDeviceName, route.outputDeviceId, "Output"),
+          true,
+        );
+      }
+    });
+  }
+
   function closeDeviceDropdowns() {
     closeOpenDropdowns({ except: null });
+    closeRoutesPopover();
+  }
+
+  function closeRoutesPopover() {
+    if (routesPopoverEl) routesPopoverEl.classList.add("hidden");
+    if (routesButtonEl) routesButtonEl.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleRoutesPopover() {
+    ensureRoutesPopover();
+    const opening = routesPopoverEl?.classList?.contains("hidden");
+    if (routesPopoverEl) routesPopoverEl.classList.toggle("hidden", !opening);
+    if (routesButtonEl) routesButtonEl.setAttribute("aria-expanded", String(Boolean(opening)));
+    if (opening) renderRoutesPopover();
+  }
+
+  function ensureRoutesPopover() {
+    if (!routesButtonEl && d.midiOutputSelect) {
+      routesButtonEl = document.createElement("button");
+      routesButtonEl.type = "button";
+      routesButtonEl.className = "midi-routes-button";
+      routesButtonEl.title = t("midi.routes");
+      routesButtonEl.setAttribute("aria-label", t("midi.routes"));
+      routesButtonEl.setAttribute("aria-haspopup", "dialog");
+      routesButtonEl.setAttribute("aria-expanded", "false");
+      routesButtonEl.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleRoutesPopover();
+      });
+    }
+    ensureOutputRouteShell();
+
+    if (!routesPopoverEl) {
+      routesPopoverEl = document.createElement("div");
+      routesPopoverEl.className = "midi-routes-popover hidden";
+      routesPopoverEl.setAttribute("role", "dialog");
+      routesPopoverEl.setAttribute("aria-label", t("midi.routes"));
+      routesPopoverEl.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      document.body.appendChild(routesPopoverEl);
+    }
+    syncRoutesPopoverPosition();
+  }
+
+  function ensureOutputRouteShell() {
+    const outputRoot = outputStatusEl || d.midiOutputSelect;
+    if (!outputRoot || !routesButtonEl) return;
+
+    const existingShell = outputRoot.closest?.(".midi-output-route-shell");
+    outputRouteShellEl = existingShell || outputRouteShellEl;
+    if (!outputRouteShellEl || !outputRouteShellEl.isConnected) {
+      outputRouteShellEl = document.createElement("div");
+      outputRouteShellEl.className = "midi-output-route-shell";
+      outputRoot.parentNode?.insertBefore(outputRouteShellEl, outputRoot);
+      outputRouteShellEl.appendChild(outputRoot);
+    }
+
+    if (routesButtonEl.parentElement !== outputRouteShellEl) {
+      outputRouteShellEl.appendChild(routesButtonEl);
+    }
+  }
+
+  function syncRoutesButtonLabel() {
+    if (!routesButtonEl) return;
+    const count = currentRoutesForSave().filter((route) => route.enabled !== false).length;
+    routesButtonEl.replaceChildren(createRouteIcon("sliders"));
+    routesButtonEl.dataset.routeCount = count > 1 ? String(count) : "";
+    routesButtonEl.classList.toggle("has-multiple-routes", count > 1);
+    routesButtonEl.title = t("midi.routesCount", { count });
+    routesButtonEl.setAttribute("aria-label", t("midi.routesCount", { count }));
+  }
+
+  function createRouteIcon(name) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+
+    const icons = {
+      sliders: ["M4 21v-7", "M4 10V3", "M12 21v-9", "M12 8V3", "M20 21v-5", "M20 12V3", "M2 14h4", "M10 8h4", "M18 16h4"],
+      close: ["M18 6 6 18", "M6 6l12 12"],
+      trash: ["M3 6h18", "M8 6V4h8v2", "M6 6l1 15h10l1-15", "M10 11v6", "M14 11v6"],
+    };
+
+    (icons[name] || icons.sliders).forEach((dValue) => {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", dValue);
+      svg.appendChild(path);
+    });
+
+    return svg;
+  }
+
+  function setIconButton(button, name) {
+    button.replaceChildren(createRouteIcon(name));
+  }
+
+  function syncRoutesPopoverPosition() {
+    if (!routesPopoverEl || !routesButtonEl) return;
+    const rect = routesButtonEl.getBoundingClientRect();
+    const viewportPadding = 16;
+    const popoverWidth = Math.min(520, Math.max(0, window.innerWidth - (viewportPadding * 2)));
+    const maxLeft = Math.max(viewportPadding, window.innerWidth - popoverWidth - viewportPadding);
+    const left = Math.max(viewportPadding, Math.min(rect.left, maxLeft));
+    routesPopoverEl.style.top = `${Math.round(rect.bottom + 8)}px`;
+    routesPopoverEl.style.left = `${Math.round(left)}px`;
   }
 
   function ensureDeviceDropdowns() {
-    const attachDropdown = (selectEl, kind) => {
+    const attachStatus = (selectEl, kind) => {
       if (!selectEl) return;
 
-      let existingRoot = kind === "input" ? inputDropdownEl : outputDropdownEl;
+      let existingRoot = kind === "input" ? inputStatusEl : outputStatusEl;
       if (existingRoot && existingRoot.isConnected) return;
 
       selectEl.classList.add("hidden");
-      const entry = createSelectDropdownShell({
-        selectEl,
-        rootClass: "midi-device-dropdown",
-        title: kind === "input" ? t("topbar.inputDevice") : t("topbar.outputDevice"),
-      });
-      if (!entry) return;
+      const root = document.createElement("div");
+      root.className = `midi-device-status midi-device-status-${kind}`;
+      root.setAttribute("role", "status");
+      root.setAttribute("aria-live", "polite");
 
-      const refreshReason = kind === "input" ? "input_dropdown" : "output_dropdown";
-      entry.root.addEventListener("pointerdown", () => {
-        refreshDevicesIfStale(refreshReason);
-      });
-      entry.root.addEventListener("focusin", () => {
-        refreshDevicesIfStale(refreshReason);
-      });
+      const display = document.createElement("span");
+      display.className = "target-display";
+      root.appendChild(display);
+
+      selectEl.insertAdjacentElement("afterend", root);
 
       if (kind === "input") {
-        inputDropdownEl = entry.root;
-        inputMenuEl = entry.menu;
-        inputDisplayEl = entry.display;
+        inputStatusEl = root;
+        inputStatusDisplayEl = display;
       } else {
-        outputDropdownEl = entry.root;
-        outputMenuEl = entry.menu;
-        outputDisplayEl = entry.display;
+        outputStatusEl = root;
+        outputStatusDisplayEl = display;
+        ensureOutputRouteShell();
       }
     };
 
-    attachDropdown(d.midiSelect, "input");
-    attachDropdown(d.midiOutputSelect, "output");
+    attachStatus(d.midiSelect, "input");
+    attachStatus(d.midiOutputSelect, "output");
 
     if (!deviceDocClickBound) {
       deviceDocClickBound = true;
       document.addEventListener("click", (event) => {
-        if (inputDropdownEl && inputDropdownEl.contains(event.target)) return;
-        if (outputDropdownEl && outputDropdownEl.contains(event.target)) return;
+        if (inputStatusEl && inputStatusEl.contains(event.target)) return;
+        if (outputStatusEl && outputStatusEl.contains(event.target)) return;
+        if (routesButtonEl && routesButtonEl.contains(event.target)) return;
+        if (routesPopoverEl && routesPopoverEl.contains(event.target)) return;
         closeDeviceDropdowns();
       });
+      window.addEventListener("resize", syncRoutesPopoverPosition);
     }
+
+    ensureRoutesPopover();
+    syncRoutesButtonLabel();
   }
 
-  function renderDeviceDropdownForSelect(selectEl, menuEl, displayEl, fallbackText, connectedDeviceId = "") {
-    if (!selectEl || !menuEl || !displayEl) return;
-    renderNativeSelectDropdown({
-      entry: { menu: menuEl, display: displayEl },
-      selectEl,
-      fallbackText,
-      closeDropdowns: closeDeviceDropdowns,
-      formatOptionText: (opt) => stripUnavailableSuffix(opt.textContent || ""),
-      getOptionBadges: (opt) => (opt.dataset.unavailable === "true"
-        ? [{ text: t("targets.unavailable"), kind: "state" }]
-        : []),
-      getDisplayBadges: () => [],
-      truncateMenuLabels: false,
-      truncateDisplayLabel: true,
-    });
+  function routeDeviceLabel(route, kind) {
+    if (!route) return "";
+    if (kind === "input") {
+      return route.inputDeviceName || route.inputDeviceId || "";
+    }
+    return route.outputDeviceName || route.outputDeviceId || "";
+  }
 
-    const root = menuEl.closest(".midi-device-dropdown");
-    const selected = selectEl.selectedOptions?.[0] || null;
-    const state = resolveMidiDeviceDropdownState({
-      selectedValue: selectEl.value,
-      selectedUnavailable: selected?.dataset?.unavailable === "true",
-      connectedDeviceId,
+  function renderDeviceStatus(root, displayEl, kind) {
+    if (!root || !displayEl) return;
+    const activeRoutes = connectedRoutes.filter((route) => route.enabled !== false);
+    const first = activeRoutes[0] || null;
+    const extraCount = Math.max(0, activeRoutes.length - 1);
+    const label = first ? routeDeviceLabel(first, kind) : t("midi.noActiveDevice");
+    const additionalDevices = activeRoutes
+      .slice(1)
+      .map((route) => routeDeviceLabel(route, kind))
+      .filter(Boolean);
+    const additionalDeviceList = additionalDevices.join(", ");
+    const badges = extraCount > 0 ? [{
+      text: `+${extraCount}`,
+      kind: "count",
+      title: additionalDeviceList,
+      ariaLabel: additionalDeviceList,
+    }] : [];
+    renderLabelWithBadges(displayEl, {
+      text: label,
+      badges,
+      truncate: true,
     });
-    root?.classList.toggle("device-connected", state.connected);
-    root?.classList.toggle("device-unavailable", state.unavailable);
-    root?.classList.toggle("device-empty", state.empty);
+    const title = activeRoutes.length > 0
+      ? activeRoutes.map((route) => routeDeviceLabel(route, kind)).filter(Boolean).join(", ")
+      : t("midi.noActiveDevice");
+    root.title = title;
+    root.classList.toggle("device-connected", activeRoutes.length > 0);
+    root.classList.toggle("device-unavailable", activeRoutes.length === 0);
+    root.classList.toggle("device-empty", activeRoutes.length === 0);
   }
 
   function renderDeviceDropdowns() {
     ensureDeviceDropdowns();
-    renderDeviceDropdownForSelect(
-      d.midiSelect,
-      inputMenuEl,
-      inputDisplayEl,
-      t("midi.selectInputDevice"),
-      connectedInputId,
-    );
-    renderDeviceDropdownForSelect(
-      d.midiOutputSelect,
-      outputMenuEl,
-      outputDisplayEl,
-      t("midi.selectOutputDevice"),
-      connectedOutputId,
-    );
+    renderDeviceStatus(inputStatusEl, inputStatusDisplayEl, "input");
+    renderDeviceStatus(outputStatusEl, outputStatusDisplayEl, "output");
+    syncRoutesButtonLabel();
+    if (routesPopoverEl && !routesPopoverEl.classList.contains("hidden") && !isRouteDropdownOpen()) {
+      renderRoutesPopover();
+    }
+  }
+
+  function isRouteDropdownOpen() {
+    return Boolean(routesPopoverEl?.querySelector?.(".midi-route-dropdown.open"));
+  }
+
+  function findDeviceBySavedIdentity(devices, id, savedName) {
+    const list = Array.isArray(devices) ? devices : [];
+    const deviceId = String(id || "").trim();
+    const deviceName = stripUnavailableSuffix(savedName || "");
+    if (deviceId && deviceName) {
+      return list.find((device) => device.id === deviceId && device.name === deviceName) || null;
+    }
+    if (deviceId) {
+      return list.find((device) => device.id === deviceId) || null;
+    }
+    if (deviceName) {
+      return list.find((device) => device.name === deviceName) || null;
+    }
+    return null;
+  }
+
+  function deviceOptionLabel(devices, id, fallbackName, kind) {
+    const match = findDeviceBySavedIdentity(devices, id, fallbackName);
+    if (match) return match.name || id;
+    return unavailableDeviceLabel(fallbackName, id, kind);
+  }
+
+  function routeWithResolvedNames(route) {
+    const inputs = lastDeviceSnapshot.inputs || [];
+    const outputs = lastDeviceSnapshot.outputs || [];
+    return {
+      ...route,
+      inputDeviceName: deviceOptionLabel(inputs, route.inputDeviceId, route.inputDeviceName, "Input"),
+      outputDeviceName: deviceOptionLabel(outputs, route.outputDeviceId, route.outputDeviceName, "Output"),
+    };
+  }
+
+  function buildRouteSelect(kind, route, index) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "midi-route-select-wrap";
+    const devices = kind === "input" ? lastDeviceSnapshot.inputs : lastDeviceSnapshot.outputs;
+    const selectedId = kind === "input" ? route.inputDeviceId : route.outputDeviceId;
+    const selectedName = kind === "input" ? route.inputDeviceName : route.outputDeviceName;
+    const placeholderText = kind === "input" ? t("midi.selectInputDevice") : t("midi.selectOutputDevice");
+    const currentRoutes = currentRoutesForSave();
+
+    const options = [{ id: "", name: placeholderText, unavailable: false }];
+    (Array.isArray(devices) ? devices : []).forEach((device) => {
+      const optionName = device.name || device.id;
+      let disabled = false;
+      if (kind === "input") {
+        const candidateRoutes = currentRoutes.slice();
+        candidateRoutes[index] = {
+          ...route,
+          inputDeviceId: device.id,
+          inputDeviceName: optionName,
+        };
+        disabled = hasDuplicateInputRoute(candidateRoutes, device.id, index);
+      }
+      options.push({
+        id: device.id,
+        name: optionName,
+        unavailable: false,
+        disabled,
+        disabledReason: disabled ? t("midi.duplicateInputRoute") : "",
+      });
+    });
+    const cleanSelectedName = stripUnavailableSuffix(selectedName || "");
+    const selectedAvailableOption = options.find((option) => (
+      option.id === selectedId
+      && (!cleanSelectedName || option.name === cleanSelectedName)
+    ));
+    const selectedUnavailable = Boolean(selectedId && !selectedAvailableOption);
+    if (selectedUnavailable) {
+      options.push({
+        id: selectedId,
+        name: unavailableDeviceLabel(selectedName, selectedId, kind === "input" ? "Input" : "Output"),
+        unavailable: true,
+      });
+    }
+
+    const selectedOption = selectedAvailableOption
+      || (selectedId ? options.find((option) => option.id === selectedId && option.unavailable) : null)
+      || options[0];
+    const root = document.createElement("div");
+    root.className = "target-dropdown midi-route-dropdown settings-select-dropdown";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "target-button";
+    button.title = placeholderText;
+    button.setAttribute("aria-haspopup", "listbox");
+    button.setAttribute("aria-expanded", "false");
+
+    const display = document.createElement("span");
+    display.className = "target-display";
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    caret.textContent = "\u25be";
+    button.appendChild(display);
+    button.appendChild(caret);
+
+    const menu = document.createElement("div");
+    menu.className = "target-menu hidden";
+    menu.setAttribute("role", "listbox");
+    root.__positionDropdownMenu = () => {
+      if (menu.classList.contains("hidden")) return;
+      positionFloatingDropdownMenu({ menu, trigger: button, minHeight: 120, maxHeight: 260 });
+    };
+    wireDropdownToggle({ root, menu, trigger: button });
+
+    renderLabelWithBadges(display, {
+      text: stripUnavailableSuffix(selectedOption.name || placeholderText),
+      badges: selectedOption.unavailable ? [{ text: t("targets.unavailable"), kind: "state" }] : [],
+      truncate: true,
+    });
+    root.classList.toggle("target-unavailable", Boolean(selectedOption.unavailable));
+
+    options.forEach((option) => {
+      if (!option.id) return;
+      const optionButton = document.createElement("button");
+      optionButton.type = "button";
+      optionButton.className = "target-option";
+      optionButton.setAttribute("role", "option");
+      const optionMatchesSelection = option.id === selectedId
+        && (option.unavailable || !cleanSelectedName || option.name === cleanSelectedName);
+      optionButton.setAttribute("aria-selected", String(optionMatchesSelection));
+      if (optionMatchesSelection) optionButton.classList.add("selected");
+      if (option.unavailable) optionButton.classList.add("unavailable");
+      if (option.disabled && !optionMatchesSelection) {
+        optionButton.disabled = true;
+        optionButton.classList.add("is-disabled");
+        optionButton.setAttribute("aria-disabled", "true");
+        optionButton.title = option.disabledReason;
+      }
+
+      const optionLabel = document.createElement("span");
+      optionLabel.className = "target-label";
+      renderLabelWithBadges(optionLabel, {
+        text: stripUnavailableSuffix(option.name || option.id),
+        badges: option.unavailable ? [{ text: t("targets.unavailable"), kind: "state" }] : [],
+        truncate: false,
+      });
+      optionButton.appendChild(optionLabel);
+      optionButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (option.disabled && !optionMatchesSelection) return;
+        closeOpenDropdowns({ except: null });
+        await updateRouteFromSelect(index, kind, option.id);
+      });
+      menu.appendChild(optionButton);
+    });
+
+    root.appendChild(button);
+    root.appendChild(menu);
+    wrapper.appendChild(root);
+    return wrapper;
+  }
+
+  async function updateRouteFromSelect(index, kind, value) {
+    const routes = currentRoutesForSave();
+    const route = routes[index] || { enabled: true };
+    const devices = kind === "input" ? lastDeviceSnapshot.inputs : lastDeviceSnapshot.outputs;
+    const match = (Array.isArray(devices) ? devices : []).find((device) => device.id === value);
+    const next = {
+      ...route,
+      enabled: route.enabled !== false,
+      inputDeviceId: kind === "input" ? value : route.inputDeviceId,
+      outputDeviceId: kind === "output" ? value : route.outputDeviceId,
+      inputDeviceName: kind === "input" ? (match?.name || "") : route.inputDeviceName,
+      outputDeviceName: kind === "output" ? (match?.name || "") : route.outputDeviceName,
+    };
+    routes[index] = next;
+    if (kind === "input" && hasDuplicateInputRoute(routes, next.inputDeviceId, index)) {
+      if (d.midiStatus) d.midiStatus.textContent = t("midi.duplicateInputRoute");
+      renderRoutesPopover();
+      return;
+    }
+    routeDrafts = routes;
+    await applyRouteDrafts({ source: "manual" });
+  }
+
+  async function setRouteEnabled(index, enabled) {
+    const routes = currentRoutesForSave();
+    if (!routes[index]) return;
+    routes[index] = { ...routes[index], enabled: Boolean(enabled) };
+    routeDrafts = routes;
+    await applyRouteDrafts({ source: "manual" });
+  }
+
+  async function removeRoute(index) {
+    const routes = currentRoutesForSave();
+    routes.splice(index, 1);
+    routeDrafts = routes;
+    await applyRoutes(routes, { source: "manual" });
+  }
+
+  async function addRoute() {
+    const inputs = lastDeviceSnapshot.inputs || [];
+    const outputs = lastDeviceSnapshot.outputs || [];
+    const routes = currentRoutesForSave();
+    const usedInputs = new Set(routes.map((route) => route.inputDeviceId));
+    const input = inputs.find((device) => !usedInputs.has(device.id));
+    const output = input
+      ? (outputs.find((device) => device.name === input.name) || outputs[0])
+      : null;
+    if (!input || !output) {
+      if (d.midiStatus) d.midiStatus.textContent = t("midi.noAvailableRoute");
+      return;
+    }
+    routes.push({
+      inputDeviceId: input.id,
+      outputDeviceId: output.id,
+      inputDeviceName: input.name,
+      outputDeviceName: output.name,
+      enabled: true,
+    });
+    routeDrafts = routes;
+    await applyRouteDrafts({ source: "manual" });
+  }
+
+  async function disableAllRoutes() {
+    routeDrafts = currentRoutesForSave().map((route) => ({ ...route, enabled: false }));
+    await applyRouteDrafts({ source: "manual" });
+  }
+
+  function renderRoutesPopover() {
+    if (!routesPopoverEl) return;
+    syncRoutesPopoverPosition();
+    const routes = currentRoutesForSave();
+    const outputCounts = sharedOutputCounts(routes);
+    routesPopoverEl.innerHTML = "";
+
+    const header = document.createElement("div");
+    header.className = "midi-routes-header";
+    const title = document.createElement("div");
+    title.className = "midi-routes-title";
+    title.textContent = t("midi.routes");
+    const actions = document.createElement("div");
+    actions.className = "midi-routes-actions";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "midi-route-icon-button";
+    close.title = t("common.close");
+    close.setAttribute("aria-label", t("common.close"));
+    setIconButton(close, "close");
+    close.addEventListener("click", closeRoutesPopover);
+    actions.appendChild(close);
+    header.appendChild(title);
+    header.appendChild(actions);
+    routesPopoverEl.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "midi-routes-body";
+    if (routes.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "midi-routes-empty";
+      empty.textContent = t("midi.noRoutes");
+      body.appendChild(empty);
+    } else {
+      const columnHeader = document.createElement("div");
+      columnHeader.className = "midi-route-column-header";
+      columnHeader.setAttribute("aria-hidden", "true");
+      columnHeader.appendChild(document.createElement("span"));
+
+      const selectLabels = document.createElement("div");
+      selectLabels.className = "midi-route-select-labels";
+      const inputLabel = document.createElement("span");
+      inputLabel.className = "midi-route-column-label";
+      inputLabel.textContent = t("topbar.inputDevice");
+      const outputLabel = document.createElement("span");
+      outputLabel.className = "midi-route-column-label";
+      outputLabel.textContent = t("topbar.outputDevice");
+      selectLabels.appendChild(inputLabel);
+      selectLabels.appendChild(outputLabel);
+      columnHeader.appendChild(selectLabels);
+      columnHeader.appendChild(document.createElement("span"));
+      columnHeader.appendChild(document.createElement("span"));
+      body.appendChild(columnHeader);
+    }
+
+    routes.forEach((rawRoute, index) => {
+      const route = routeWithResolvedNames(rawRoute);
+      const row = document.createElement("div");
+      row.className = "midi-route-row";
+      row.classList.toggle("disabled", route.enabled === false);
+
+      const enableLabel = document.createElement("label");
+      enableLabel.className = "plugins-toggle midi-route-enable";
+      const enable = document.createElement("input");
+      enable.type = "checkbox";
+      enable.checked = route.enabled !== false;
+      enable.addEventListener("change", () => setRouteEnabled(index, enable.checked));
+      const enableUi = document.createElement("span");
+      enableUi.className = "plugins-toggle-ui";
+      enableLabel.appendChild(enable);
+      enableLabel.appendChild(enableUi);
+      row.appendChild(enableLabel);
+
+      const selects = document.createElement("div");
+      selects.className = "midi-route-selects";
+      selects.appendChild(buildRouteSelect("input", route, index));
+      selects.appendChild(buildRouteSelect("output", route, index));
+      row.appendChild(selects);
+
+      const badges = document.createElement("div");
+      badges.className = "midi-route-badges";
+      if ((outputCounts.get(route.outputDeviceId) || 0) > 1) {
+        const shared = document.createElement("span");
+        shared.className = "midi-route-badge";
+        shared.textContent = t("midi.sharedOutput");
+        badges.appendChild(shared);
+      }
+      row.appendChild(badges);
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "midi-route-icon-button is-danger";
+      remove.title = t("midi.removeRoute");
+      remove.setAttribute("aria-label", t("midi.removeRoute"));
+      setIconButton(remove, "trash");
+      remove.addEventListener("click", () => removeRoute(index));
+      row.appendChild(remove);
+      body.appendChild(row);
+    });
+    routesPopoverEl.appendChild(body);
+
+    const footer = document.createElement("div");
+    footer.className = "midi-routes-footer";
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "midi-route-action-button secondary-action";
+    add.textContent = t("midi.addRoute");
+    add.addEventListener("click", addRoute);
+    const disableAll = document.createElement("button");
+    disableAll.type = "button";
+    disableAll.className = "midi-route-action-button secondary-action";
+    disableAll.textContent = t("midi.disconnectAll");
+    disableAll.disabled = !routes.some((route) => route.enabled !== false);
+    disableAll.addEventListener("click", disableAllRoutes);
+    footer.appendChild(add);
+    footer.appendChild(disableAll);
+    routesPopoverEl.appendChild(footer);
   }
 
   function hasPreference(pref) {
     const normalized = normalizeMidiPreference(pref);
-    return Boolean(normalized.inputDeviceId && normalized.outputDeviceId);
+    return normalized.routes.length > 0;
   }
 
   function sleep(ms) {
@@ -292,6 +885,16 @@ export function createMidiFeature({
     }
   }
 
+  async function getMidiRouteHealth() {
+    try {
+      const health = await invoke("get_midi_route_health");
+      return Array.isArray(health) ? health : [];
+    } catch {
+      const fallback = await getMidiConnectionHealth();
+      return fallback ? [fallback] : [];
+    }
+  }
+
   function refreshDevicesIfStale(reason) {
     if (Date.now() - lastDeviceRefreshAt < MIDI_ENUM_STALE_MS) return;
     refreshMidiDevices({ force: true, reason }).catch(() => { });
@@ -317,15 +920,195 @@ export function createMidiFeature({
   }
 
   async function startWithResolvedDevice(input, output, options = {}) {
-    return applySelectedDevices({
-      inputId: input.id,
-      outputId: output.id,
-      inputName: input.name || options.inputName || "",
-      outputName: output.name || options.outputName || "",
+    return applyRoutes([{
+      inputDeviceId: input.id,
+      outputDeviceId: output.id,
+      inputDeviceName: input.name || options.inputName || "",
+      outputDeviceName: output.name || options.outputName || "",
+      enabled: true,
+    }], {
       source: options.fromProfile ? "profile" : (options.auto ? "auto" : "manual"),
       auto: Boolean(options.auto),
       fromProfile: Boolean(options.fromProfile),
     });
+  }
+
+  async function applyRouteDrafts(options = {}) {
+    return applyRoutes(currentRoutesForSave(), options);
+  }
+
+  function routesEquivalent(left, right) {
+    const a = normalizeMidiRoutes({ routes: left });
+    const b = normalizeMidiRoutes({ routes: right });
+    if (a.length !== b.length) return false;
+    return a.every((route, index) => {
+      const other = b[index];
+      return other
+        && route.inputDeviceId === other.inputDeviceId
+        && route.outputDeviceId === other.outputDeviceId
+        && (route.enabled !== false) === (other.enabled !== false);
+    });
+  }
+
+  async function persistRoutes(routes) {
+    const normalized = normalizeMidiRoutes({ routes });
+    const first = normalized[0] || {};
+    if (typeof saveMidiDeviceRoutes === "function") {
+      await saveMidiDeviceRoutes(normalized);
+    } else if (typeof saveMidiDeviceIds === "function" && first.inputDeviceId && first.outputDeviceId) {
+      await saveMidiDeviceIds(
+        first.inputDeviceId,
+        first.outputDeviceId,
+        first.inputDeviceName,
+        first.outputDeviceName,
+      );
+      await invoke("set_midi_device_routes", { routes: buildPersistedMidiRoutes(normalized) }).catch(() => { });
+    } else {
+      await invoke("set_midi_device_routes", { routes: buildPersistedMidiRoutes(normalized) }).catch(() => { });
+    }
+  }
+
+  async function applyRoutes(routes, options = {}) {
+    const rawRoutes = Array.isArray(routes) ? routes : [];
+    for (let index = 0; index < rawRoutes.length; index += 1) {
+      const route = rawRoutes[index];
+      const inputDeviceId = route?.inputDeviceId || route?.input_device_id || "";
+      if (hasDuplicateInputRoute(rawRoutes, inputDeviceId, index)) {
+        if (d.midiStatus) d.midiStatus.textContent = t("midi.duplicateInputRoute");
+        renderDeviceDropdowns();
+        return { connected: false, reason: "duplicate_input_route" };
+      }
+    }
+
+    const normalized = normalizeMidiRoutes({ routes });
+    const enabledRoutes = normalized.filter((route) => route.enabled !== false);
+    const previousDrafts = routeDrafts.slice();
+    const previousConnectedRoutes = connectedRoutes.slice();
+
+    routeDrafts = normalized;
+    if (enabledRoutes.length === 0) {
+      stopSessionRefresh();
+      cancelLearnPanel();
+      currentProfilePreference = normalizeMidiPreference({ routes: normalized, configured: true });
+      setConnectedRoutes([]);
+      if (d.midiStatus) d.midiStatus.textContent = t("midi.notConnected");
+      if (typeof onDisconnected === "function") onDisconnected();
+      renderDeviceDropdowns();
+      await invoke("stop_midi_device").catch(() => { });
+      await persistRoutes(normalized);
+      if (typeof onProfileDeviceSelected === "function") {
+        await onProfileDeviceSelected(currentProfilePreference);
+      }
+      return { connected: false, reason: "no_enabled_routes" };
+    }
+
+    const availableRoutes = enabledRoutes.filter((route) => {
+      const inputAvailable = findPreferredDevice(lastDeviceSnapshot.inputs, route.inputDeviceId, route.inputDeviceName);
+      const outputAvailable = findPreferredDevice(lastDeviceSnapshot.outputs, route.outputDeviceId, route.outputDeviceName);
+      return Boolean(inputAvailable && outputAvailable);
+    });
+    const hasUnavailableRoutes = availableRoutes.length < enabledRoutes.length;
+    const routesToStart = hasUnavailableRoutes && options.allowPartialUnavailable
+      ? availableRoutes
+      : enabledRoutes;
+    if (hasUnavailableRoutes && (!options.allowPartialUnavailable || routesToStart.length === 0)) {
+      if (d.midiStatus) {
+        d.midiStatus.textContent = options.partialUnavailableStatus || t("midi.unavailablePair");
+      }
+      if (options.allowPartialUnavailable) {
+        ensureUnavailableRouteOptions(lastDeviceSnapshot.inputs || [], lastDeviceSnapshot.outputs || []);
+        await persistRoutes(normalized);
+        currentProfilePreference = normalizeMidiPreference({ routes: normalized, configured: true });
+        if (typeof onProfileDeviceSelected === "function") {
+          await onProfileDeviceSelected(currentProfilePreference);
+        }
+      }
+      renderDeviceDropdowns();
+      return {
+        connected: connectedRoutes.length > 0,
+        partial: Boolean(options.allowPartialUnavailable),
+        reason: "unavailable_selection",
+        routes: connectedRoutes.slice(),
+      };
+    }
+
+    if (!options.force && routesEquivalent(routesToStart, connectedRoutes)) {
+      if (hasUnavailableRoutes && d.midiStatus) {
+        d.midiStatus.textContent = options.partialUnavailableStatus || t("midi.savedUnavailable");
+      }
+      renderDeviceDropdowns();
+      await persistRoutes(normalized);
+      currentProfilePreference = normalizeMidiPreference({ routes: normalized });
+      if (typeof onProfileDeviceSelected === "function") {
+        await onProfileDeviceSelected(currentProfilePreference);
+      }
+      return {
+        connected: routesToStart.length > 0 || connectedRoutes.length > 0,
+        unchanged: true,
+        partial: hasUnavailableRoutes,
+        routes: connectedRoutes.slice(),
+      };
+    }
+
+    if (d.midiStatus) d.midiStatus.textContent = t("midi.applyingChange");
+    const first = routesToStart[0] || enabledRoutes[0] || {};
+    if (d.midiSelect) d.midiSelect.value = first.inputDeviceId || "";
+    if (d.midiOutputSelect) d.midiOutputSelect.value = first.outputDeviceId || "";
+
+    setConnectedRoutes(routesToStart.map(routeWithResolvedNames));
+    renderDeviceDropdowns();
+
+    stopSessionRefresh();
+    try {
+      await invoke("start_midi_device_routes", { routes: buildPersistedMidiRoutes(routesToStart) });
+    } catch (error) {
+      routeDrafts = previousDrafts;
+      setConnectedRoutes(previousConnectedRoutes);
+      renderDeviceDropdowns();
+      if (d.midiStatus) d.midiStatus.textContent = t("midi.connectFailed", { message: error });
+      throw error;
+    }
+
+    await persistRoutes(normalized);
+    currentProfilePreference = normalizeMidiPreference({ routes: normalized });
+    suspendProfileAutoReconnect = false;
+    clearUnavailableDeviceSelections();
+    if (hasUnavailableRoutes && d.midiStatus) {
+      d.midiStatus.textContent = options.partialUnavailableStatus || t("midi.savedUnavailable");
+    }
+
+    if (typeof showMain === "function") {
+      const count = connectedRoutes.length;
+      showMain(connectedInputName, connectedOutputName, { routeCount: count, routes: connectedRoutes.slice() });
+    }
+    if (typeof refreshSessions === "function") {
+      await refreshSessions();
+    }
+    startSessionRefresh(refreshSessions || (async () => { }), d.mainScreen);
+    if (typeof onConnected === "function") {
+      onConnected({
+        inputId: connectedInputId,
+        outputId: connectedOutputId,
+        routes: connectedRoutes.slice(),
+        source: options.source || "manual",
+        auto: Boolean(options.auto),
+        fromProfile: Boolean(options.fromProfile),
+      });
+    }
+    if (typeof onProfileDeviceSelected === "function") {
+      await onProfileDeviceSelected(currentProfilePreference);
+    }
+    renderDeviceDropdowns();
+
+    return {
+      connected: true,
+      inputId: connectedInputId,
+      outputId: connectedOutputId,
+      inputName: connectedInputName,
+      outputName: connectedOutputName,
+      partial: hasUnavailableRoutes,
+      routes: connectedRoutes.slice(),
+    };
   }
 
   async function applySelectedDevices({
@@ -378,16 +1161,6 @@ export function createMidiFeature({
       };
     }
 
-    if (d.midiStatus) d.midiStatus.textContent = t("midi.applyingChange");
-    if (d.midiSelect) d.midiSelect.value = nextInputId;
-    if (d.midiOutputSelect) d.midiOutputSelect.value = nextOutputId;
-
-    stopSessionRefresh();
-    await invoke("stop_midi_device").catch(() => { });
-    setConnectedState("", "", "", "");
-    renderDeviceDropdowns();
-    await invoke("start_midi_device", { inputDeviceId: nextInputId, outputDeviceId: nextOutputId });
-
     const resolvedInputName = inputName
       || d.midiSelect?.options?.[d.midiSelect.selectedIndex]?.textContent
       || nextInputId;
@@ -395,43 +1168,13 @@ export function createMidiFeature({
       || d.midiOutputSelect?.options?.[d.midiOutputSelect.selectedIndex]?.textContent
       || nextOutputId;
 
-    if (typeof saveMidiDeviceIds === "function") {
-      await saveMidiDeviceIds(nextInputId, nextOutputId, resolvedInputName, resolvedOutputName);
-    }
-
-    setConnectedState(nextInputId, nextOutputId, resolvedInputName, resolvedOutputName);
-    currentProfilePreference = getCurrentConnectedPreference();
-    suspendProfileAutoReconnect = false;
-    clearUnavailableDeviceSelections();
-
-    if (typeof showMain === "function") {
-      showMain(resolvedInputName, resolvedOutputName);
-    }
-    if (typeof refreshSessions === "function") {
-      await refreshSessions();
-    }
-    startSessionRefresh(refreshSessions || (async () => { }), d.mainScreen);
-    if (typeof onConnected === "function") {
-      onConnected({
-        inputId: nextInputId,
-        outputId: nextOutputId,
-        source,
-        auto: Boolean(auto),
-        fromProfile: Boolean(fromProfile),
-      });
-    }
-    if (typeof onProfileDeviceSelected === "function") {
-      await onProfileDeviceSelected(getCurrentConnectedPreference());
-    }
-    renderDeviceDropdowns();
-
-    return {
-      connected: true,
-      inputId: nextInputId,
-      outputId: nextOutputId,
-      inputName: resolvedInputName,
-      outputName: resolvedOutputName,
-    };
+    return applyRoutes([{
+      inputDeviceId: nextInputId,
+      outputDeviceId: nextOutputId,
+      inputDeviceName: resolvedInputName,
+      outputDeviceName: resolvedOutputName,
+      enabled: true,
+    }], { source, auto, fromProfile });
   }
 
   function queueApplySelectedDevices(payload) {
@@ -473,101 +1216,121 @@ export function createMidiFeature({
     try {
       const pref = normalizeMidiPreference(currentProfilePreference);
       const prefAvailable = hasPreference(pref);
-      const currentlyConnected = Boolean(connectedInputId && connectedOutputId);
+      const currentlyConnected = connectedRoutes.length > 0;
       if (!prefAvailable && !currentlyConnected) return;
 
       const deviceSnapshot = await enumerateMidiDevices({ force: true, reason: "availability" });
       const devices = deviceSnapshot.inputs;
       const outputDevices = deviceSnapshot.outputs;
-      const preferredPair = resolvePreferredMidiDevicePair(deviceSnapshot, pref);
-      let inputMatch = preferredPair.inputMatch;
-      let outputMatch = preferredPair.outputMatch;
-      let preferredNowAvailable = preferredPair.available;
 
       if (currentlyConnected) {
-        const health = await getMidiConnectionHealth();
-        if (shouldRecoverSuspectMidiPair(health, getCurrentConnectedPreference())) {
-          const staleInputId = connectedInputId;
-          const staleOutputId = connectedOutputId;
-          const displayInputName = connectedInputName || pref.inputDeviceName || staleInputId;
-          const displayOutputName = connectedOutputName || pref.outputDeviceName || staleOutputId;
-          stopSessionRefresh();
-          await invoke("stop_midi_device").catch(() => { });
-          setConnectedState("", "", "", "");
-          if (typeof showMain === "function") {
-            showMain(displayInputName, displayOutputName, { connected: false });
-          }
-          if (d.midiStatus) {
-            d.midiStatus.textContent = t("midi.disconnected");
-          }
-          markSelectedPairUnavailable(staleInputId, staleOutputId, displayInputName, displayOutputName);
-
-          if (!prefAvailable || suspendProfileAutoReconnect) {
-            return;
-          }
-
-          const refreshed = await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "suspect_reconnect_available" });
-          const refreshedPair = resolvePreferredMidiDevicePair(refreshed, pref);
-          inputMatch = refreshedPair.inputMatch;
-          outputMatch = refreshedPair.outputMatch;
-          preferredNowAvailable = refreshedPair.available;
-          if (!preferredNowAvailable) {
-            return;
-          }
-
+        const routeHealth = await getMidiRouteHealth();
+        const suspectRoute = routeHealth.find((health) =>
+          health?.suspect
+          && connectedRoutes.some((route) =>
+            route.inputDeviceId === health.inputDeviceId
+            && route.outputDeviceId === health.outputDeviceId
+          )
+        );
+        if (suspectRoute && prefAvailable && !suspendProfileAutoReconnect) {
           try {
-            await startWithResolvedDevice(inputMatch, outputMatch, {
-              inputName: pref.inputDeviceName,
-              outputName: pref.outputDeviceName,
-              auto: true,
-              fromProfile: true,
-            });
+            await applyRoutes(currentRoutesForSave(), { auto: true, fromProfile: true, force: true });
             if (d.midiStatus) {
               d.midiStatus.textContent = t("midi.reconnectedProfile");
             }
           } catch {
-            markSelectedPairUnavailable(staleInputId, staleOutputId, displayInputName, displayOutputName);
+            const route = connectedRoutes.find((candidate) =>
+              candidate.inputDeviceId === suspectRoute.inputDeviceId
+              && candidate.outputDeviceId === suspectRoute.outputDeviceId
+            ) || {};
+            markSelectedPairUnavailable(
+              suspectRoute.inputDeviceId,
+              suspectRoute.outputDeviceId,
+              route.inputDeviceName || suspectRoute.inputDeviceId,
+              route.outputDeviceName || suspectRoute.outputDeviceId,
+            );
           }
           return;
         }
 
-        const activeInputAlive = findConnectedAliveDevice(devices, connectedInputId, connectedInputName);
-        const activeOutputAlive = findConnectedAliveDevice(outputDevices, connectedOutputId, connectedOutputName);
-        if (!activeInputAlive || !activeOutputAlive) {
-          stopSessionRefresh();
-          await invoke("stop_midi_device").catch(() => { });
-          const displayInputName = connectedInputName || pref.inputDeviceName || connectedInputId;
-          const displayOutputName = connectedOutputName || pref.outputDeviceName || connectedOutputId;
-          setConnectedState("", "", "", "");
+        const aliveRoutes = [];
+        const missingRoutes = [];
+        connectedRoutes.forEach((route) => {
+          const inputAlive = findConnectedAliveDevice(devices, route.inputDeviceId, route.inputDeviceName);
+          const outputAlive = findConnectedAliveDevice(outputDevices, route.outputDeviceId, route.outputDeviceName);
+          if (inputAlive && outputAlive) {
+            aliveRoutes.push(route);
+          } else {
+            missingRoutes.push(route);
+          }
+        });
+
+        if (missingRoutes.length > 0) {
+          const preservedDrafts = preserveUnavailableRouteDrafts(aliveRoutes, missingRoutes);
+          for (const route of missingRoutes) {
+            await invoke("stop_midi_route", { inputDeviceId: route.inputDeviceId }).catch(() => { });
+          }
+          setConnectedRoutes(aliveRoutes.map(routeWithResolvedNames));
+          routeDrafts = preservedDrafts;
+          currentProfilePreference = normalizeMidiPreference({ routes: preservedDrafts });
           if (typeof showMain === "function") {
-            showMain(displayInputName, displayOutputName, { connected: false });
+            const displayRoute = aliveRoutes[0] || missingRoutes[0] || {};
+            showMain(
+              displayRoute.inputDeviceName || displayRoute.inputDeviceId || pref.inputDeviceName,
+              displayRoute.outputDeviceName || displayRoute.outputDeviceId || pref.outputDeviceName,
+              {
+                connected: aliveRoutes.length > 0,
+                routeCount: aliveRoutes.length,
+                routes: connectedRoutes.slice(),
+              },
+            );
           }
           if (d.midiStatus) {
             d.midiStatus.textContent = t("midi.disconnected");
           }
+          if (aliveRoutes.length === 0) {
+            stopSessionRefresh();
+            if (typeof onDisconnected === "function") onDisconnected();
+          }
           await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "disconnect" });
-          return;
         }
       }
 
-      if (prefAvailable && !currentlyConnected && preferredNowAvailable && !suspendProfileAutoReconnect) {
-        const refreshed = await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "reconnect_available" });
-        const refreshedPair = resolvePreferredMidiDevicePair(refreshed, pref);
-        inputMatch = refreshedPair.inputMatch;
-        outputMatch = refreshedPair.outputMatch;
-        preferredNowAvailable = refreshedPair.available;
-        if (!preferredNowAvailable) {
+      if (prefAvailable && !suspendProfileAutoReconnect) {
+        let resolvedRoutes = resolvePreferredMidiDeviceRoutes(deviceSnapshot, pref);
+        if (!resolvedRoutes.available) {
+          const refreshed = await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "reconnect_available" });
+          resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, pref);
+        }
+        const anyRouteAvailable = resolvedRoutes.routes.some((route) =>
+          route.preference.enabled !== false && route.inputMatch && route.outputMatch
+        );
+        if (!resolvedRoutes.available && !anyRouteAvailable) {
+          return;
+        }
+        const routes = routesFromResolvedPreferences(resolvedRoutes);
+        const availableEnabledRoutes = routes.filter((route) => (
+          route.enabled !== false
+          && findPreferredDevice(lastDeviceSnapshot.inputs, route.inputDeviceId, route.inputDeviceName)
+          && findPreferredDevice(lastDeviceSnapshot.outputs, route.outputDeviceId, route.outputDeviceName)
+        ));
+        if (routesEquivalent(availableEnabledRoutes, connectedRoutes)) {
+          routeDrafts = routes;
+          currentProfilePreference = normalizeMidiPreference({ routes });
+          renderDeviceDropdowns();
           return;
         }
         try {
-          await startWithResolvedDevice(inputMatch, outputMatch, {
-            inputName: pref.inputDeviceName,
-            outputName: pref.outputDeviceName,
+          await applyRoutes(routes, {
             auto: true,
             fromProfile: true,
+            allowPartialUnavailable: !resolvedRoutes.available,
+            partialUnavailableStatus: t("midi.savedUnavailable"),
           });
           if (d.midiStatus) {
-            d.midiStatus.textContent = t("midi.reconnectedProfile");
+            d.midiStatus.textContent = resolvedRoutes.available
+              ? t("midi.reconnectedProfile")
+              : t("midi.savedUnavailable");
           }
         } catch {
           // Ignore transient reconnect failures; watcher will retry.
@@ -748,22 +1511,7 @@ export function createMidiFeature({
       }
 
       if ((!devices || devices.length === 0) && (!outputDevices || outputDevices.length === 0)) {
-        if (pref.inputDeviceId) {
-          ensureOption(
-            d.midiSelect,
-            pref.inputDeviceId,
-            unavailableDeviceLabel(pref.inputDeviceName, pref.inputDeviceId, "Input"),
-            true,
-          );
-        }
-        if (pref.outputDeviceId) {
-          ensureOption(
-            d.midiOutputSelect,
-            pref.outputDeviceId,
-            unavailableDeviceLabel(pref.outputDeviceName, pref.outputDeviceId, "Output"),
-            true,
-          );
-        }
+        ensureUnavailableRouteOptions([], []);
         if (d.midiSelect && pref.inputDeviceId) d.midiSelect.value = pref.inputDeviceId;
         if (d.midiOutputSelect && pref.outputDeviceId) d.midiOutputSelect.value = pref.outputDeviceId;
         if (d.midiStatus) {
@@ -790,38 +1538,7 @@ export function createMidiFeature({
         d.midiOutputSelect.appendChild(option);
       });
 
-      if (pref.inputDeviceId && !(Array.isArray(devices) && devices.some((dvc) => dvc.id === pref.inputDeviceId))) {
-        ensureOption(
-          d.midiSelect,
-          pref.inputDeviceId,
-          unavailableDeviceLabel(pref.inputDeviceName, pref.inputDeviceId, "Input"),
-          true,
-        );
-      }
-      if (pref.outputDeviceId && !(Array.isArray(outputDevices) && outputDevices.some((dvc) => dvc.id === pref.outputDeviceId))) {
-        ensureOption(
-          d.midiOutputSelect,
-          pref.outputDeviceId,
-          unavailableDeviceLabel(pref.outputDeviceName, pref.outputDeviceId, "Output"),
-          true,
-        );
-      }
-      if (connectedInputId && !(Array.isArray(devices) && devices.some((dvc) => dvc.id === connectedInputId))) {
-        ensureOption(
-          d.midiSelect,
-          connectedInputId,
-          unavailableDeviceLabel(connectedInputName, connectedInputId, "Input"),
-          true,
-        );
-      }
-      if (connectedOutputId && !(Array.isArray(outputDevices) && outputDevices.some((dvc) => dvc.id === connectedOutputId))) {
-        ensureOption(
-          d.midiOutputSelect,
-          connectedOutputId,
-          unavailableDeviceLabel(connectedOutputName, connectedOutputId, "Output"),
-          true,
-        );
-      }
+      ensureUnavailableRouteOptions(devices, outputDevices);
 
       if (d.midiSelect && previousSelection) {
         d.midiSelect.value = previousSelection;
@@ -863,7 +1580,20 @@ export function createMidiFeature({
       renderDeviceDropdowns();
       return;
     }
-    queueApplySelectedDevices({ inputId, outputId, source: "manual" });
+    const inputs = lastDeviceSnapshot.inputs || [];
+    const outputs = lastDeviceSnapshot.outputs || [];
+    const input = inputs.find((device) => device.id === inputId);
+    const output = outputs.find((device) => device.id === outputId);
+    const routes = currentRoutesForSave();
+    routes[0] = {
+      inputDeviceId: inputId,
+      outputDeviceId: outputId,
+      inputDeviceName: input?.name || connectedInputName || inputId,
+      outputDeviceName: output?.name || connectedOutputName || outputId,
+      enabled: true,
+    };
+    routeDrafts = routes;
+    await applyRouteDrafts({ source: "manual" });
   }
 
   async function disconnect() {
@@ -882,6 +1612,11 @@ export function createMidiFeature({
     suspendProfileAutoReconnect = true;
     if (typeof clearSavedMidiDeviceIds === "function") {
       await clearSavedMidiDeviceIds();
+    }
+    currentProfilePreference = normalizeMidiPreference({ routes: [], configured: true });
+    routeDrafts = [];
+    if (typeof onProfileDeviceSelected === "function") {
+      await onProfileDeviceSelected(currentProfilePreference);
     }
     if (d.midiStatus) d.midiStatus.textContent = t("midi.notConnected");
     await refreshMidiDevices();
@@ -943,12 +1678,14 @@ export function createMidiFeature({
       outputDeviceId: savedOutputId,
       inputDeviceName: savedInputName,
       outputDeviceName: savedOutputName,
+      routes: saved?.routes || [],
     });
 
     const inputs = Array.isArray(deviceData?.inputs) ? deviceData.inputs : [];
     const outputs = Array.isArray(deviceData?.outputs) ? deviceData.outputs : [];
+    const savedRoutes = currentProfilePreference.routes;
 
-    if (!savedInputId || !savedOutputId) {
+    if (savedRoutes.length === 0) {
       // First-run heuristic:
       // - if exactly one input exists, assume it
       // - prefer output with identical name; otherwise prefer a non-GS output
@@ -982,48 +1719,47 @@ export function createMidiFeature({
       return { connected: false, reason: "missing_saved" };
     }
 
-    let inputMatch = findPreferredDevice(inputs, savedInputId, savedInputName);
-    let outputMatch = savedOutputId ? findPreferredDevice(outputs, savedOutputId, savedOutputName) : null;
+    let resolvedRoutes = resolvePreferredMidiDeviceRoutes({ inputs, outputs }, currentProfilePreference);
 
-    if (!inputMatch) {
+    if (!resolvedRoutes.available) {
       const refreshed = await refreshMidiDevices();
-      inputMatch = findPreferredDevice(refreshed.inputs, savedInputId, savedInputName);
-      outputMatch = savedOutputId ? findPreferredDevice(refreshed.outputs, savedOutputId, savedOutputName) : null;
+      resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, currentProfilePreference);
     }
 
-    if (!inputMatch || !outputMatch) {
+    const missingRoute = resolvedRoutes.routes.find((route) =>
+      route.preference.enabled !== false && (!route.inputMatch || !route.outputMatch)
+    );
+    if (missingRoute) {
       if (d.midiStatus) {
         d.midiStatus.textContent = t("midi.savedUnavailable");
       }
-      ensureOption(
-        d.midiSelect,
-        savedInputId,
-        unavailableDeviceLabel(savedInputName, savedInputId, "Input"),
-        true,
-      );
-      ensureOption(
-        d.midiOutputSelect,
-        savedOutputId,
-        unavailableDeviceLabel(savedOutputName, savedOutputId, "Output"),
-        true,
-      );
-      if (d.midiSelect) d.midiSelect.value = savedInputId;
-      if (d.midiOutputSelect) d.midiOutputSelect.value = savedOutputId;
-      renderDeviceDropdowns();
-      if (connectedInputId && connectedOutputId) {
-        return { connected: true, preserved: true, reason: "saved_missing_preserved" };
+      try {
+        const result = await applyRoutes(routesFromResolvedPreferences(resolvedRoutes), {
+          source: "auto",
+          auto: true,
+          allowPartialUnavailable: true,
+          partialUnavailableStatus: t("midi.savedUnavailable"),
+        });
+        return {
+          connected: Boolean(result?.connected),
+          partial: true,
+          reason: result?.connected ? "saved_missing_partial" : "saved_missing",
+        };
+      } catch (error) {
+        if (d.midiStatus) {
+          d.midiStatus.textContent = t("midi.connectFailed", { message: error });
+        }
+        renderDeviceDropdowns();
+        return { connected: false, reason: "saved_missing_connect_failed" };
       }
-      return { connected: false, reason: "saved_missing" };
     }
 
     try {
-      if (d.midiSelect) d.midiSelect.value = inputMatch?.id || savedInputId;
-      if (d.midiOutputSelect) d.midiOutputSelect.value = outputMatch?.id || savedOutputId;
-      await startWithResolvedDevice(inputMatch, outputMatch, {
-        inputName: inputMatch?.name || savedInputName,
-        outputName: outputMatch?.name || savedOutputName,
-        auto: true,
-      });
+      const routes = routesFromResolvedPreferences(resolvedRoutes);
+      const first = routes.find((route) => route.enabled !== false) || routes[0] || {};
+      if (d.midiSelect) d.midiSelect.value = first.inputDeviceId || "";
+      if (d.midiOutputSelect) d.midiOutputSelect.value = first.outputDeviceId || "";
+      await applyRoutes(routes, { source: "auto", auto: true });
       return { connected: true };
     } catch (error) {
       setConnectedState("", "", "", "");
@@ -1039,67 +1775,68 @@ export function createMidiFeature({
     const pref = normalizeMidiPreference(profilePreference);
     currentProfilePreference = pref;
     suspendProfileAutoReconnect = false;
-    if (!pref.inputDeviceId || !pref.outputDeviceId) {
+    if (pref.routes.length === 0) {
+      if (pref.configured) {
+        await applyRoutes([], { source: "profile", fromProfile: true });
+        return { handled: true, connected: false, reason: "no_profile_routes" };
+      }
       return { handled: false, connected: false };
     }
 
-    if (matchesConnectedPreference(pref)) {
+    if (routesEquivalent(pref.routes.filter((route) => route.enabled !== false), connectedRoutes)) {
       // Profile switch can leave the visible dropdown on a previously selected
       // unavailable device even when the active connection already matches this profile.
       // Force UI selection back to the profile's connected pair.
       if (d.midiSelect) d.midiSelect.value = pref.inputDeviceId;
       if (d.midiOutputSelect) d.midiOutputSelect.value = pref.outputDeviceId;
+      routeDrafts = pref.routes.slice();
       clearUnavailableDeviceSelections();
       renderDeviceDropdowns();
       return { handled: true, connected: true, unchanged: true };
     }
 
     const devices = await refreshMidiDevices();
-    let inputMatch = findPreferredDevice(devices.inputs, pref.inputDeviceId, pref.inputDeviceName);
-    let outputMatch = findPreferredDevice(devices.outputs, pref.outputDeviceId, pref.outputDeviceName);
+    let resolvedRoutes = resolvePreferredMidiDeviceRoutes(devices, pref);
 
-    if (!inputMatch || !outputMatch) {
+    if (!resolvedRoutes.available) {
       const refreshed = await refreshMidiDevices();
-      inputMatch = findPreferredDevice(refreshed.inputs, pref.inputDeviceId, pref.inputDeviceName);
-      outputMatch = findPreferredDevice(refreshed.outputs, pref.outputDeviceId, pref.outputDeviceName);
+      resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, pref);
     }
 
-    if (!inputMatch || !outputMatch) {
-      ensureOption(
-        d.midiSelect,
-        pref.inputDeviceId,
-        unavailableDeviceLabel(pref.inputDeviceName, pref.inputDeviceId, "Input"),
-        true,
-      );
-      ensureOption(
-        d.midiOutputSelect,
-        pref.outputDeviceId,
-        unavailableDeviceLabel(pref.outputDeviceName, pref.outputDeviceId, "Output"),
-        true,
-      );
-      if (d.midiSelect) d.midiSelect.value = pref.inputDeviceId;
-      if (d.midiOutputSelect) d.midiOutputSelect.value = pref.outputDeviceId;
-
+    const missingRoute = resolvedRoutes.routes.find((route) =>
+      route.preference.enabled !== false && (!route.inputMatch || !route.outputMatch)
+    );
+    if (missingRoute) {
+      const partialStatus = connectedInputId && connectedOutputId
+        ? t("midi.profileUnavailableKeepingCurrent")
+        : t("midi.savedProfileDevicesNotFound");
       if (d.midiStatus) {
-        d.midiStatus.textContent = connectedInputId && connectedOutputId
-          ? t("midi.profileUnavailableKeepingCurrent")
-          : t("midi.savedProfileDevicesNotFound");
+        d.midiStatus.textContent = partialStatus;
       }
-      renderDeviceDropdowns();
-      return {
-        handled: true,
-        connected: Boolean(connectedInputId && connectedOutputId),
-        reason: "missing",
-      };
+      try {
+        const result = await applyRoutes(routesFromResolvedPreferences(resolvedRoutes), {
+          source: "profile",
+          auto: true,
+          fromProfile: true,
+          allowPartialUnavailable: true,
+          partialUnavailableStatus: partialStatus,
+        });
+        return {
+          handled: true,
+          connected: Boolean(result?.connected),
+          partial: true,
+          reason: "missing",
+        };
+      } catch (error) {
+        if (d.midiStatus) d.midiStatus.textContent = t("midi.connectFailed", { message: error });
+        renderDeviceDropdowns();
+        return { handled: true, connected: false, reason: "connect_failed" };
+      }
     }
 
     try {
-      await startWithResolvedDevice(inputMatch, outputMatch, {
-        inputName: pref.inputDeviceName,
-        outputName: pref.outputDeviceName,
-        auto: true,
-        fromProfile: true,
-      });
+      const routes = routesFromResolvedPreferences(resolvedRoutes);
+      await applyRoutes(routes, { source: "profile", auto: true, fromProfile: true });
       return { handled: true, connected: true };
     } catch (error) {
       if (d.midiStatus) d.midiStatus.textContent = t("midi.connectFailed", { message: error });
@@ -1126,22 +1863,6 @@ export function createMidiFeature({
     if (d.refreshMidiButton) {
       d.refreshMidiButton.addEventListener("click", async () => {
         await refreshMidiDevices({ force: true, reason: "manual_refresh" });
-      });
-    }
-    if (d.midiSelect) {
-      d.midiSelect.addEventListener("pointerdown", () => {
-        refreshDevicesIfStale("input_dropdown");
-      });
-      d.midiSelect.addEventListener("change", async () => {
-        await connectSelected();
-      });
-    }
-    if (d.midiOutputSelect) {
-      d.midiOutputSelect.addEventListener("pointerdown", () => {
-        refreshDevicesIfStale("output_dropdown");
-      });
-      d.midiOutputSelect.addEventListener("change", async () => {
-        await connectSelected();
       });
     }
     if (d.learnBindingButton) {

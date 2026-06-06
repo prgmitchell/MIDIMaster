@@ -58,18 +58,20 @@ fn profile_has_focus_target(profile: &crate::model::Profile) -> bool {
     })
 }
 
-fn feedback_context_signature(profile: &Profile, active_pair: Option<(String, String)>) -> String {
+fn feedback_context_signature(profile: &Profile, active_routes: Vec<(String, String)>) -> String {
     let binding_ids = profile
         .bindings
         .iter()
         .map(|binding| binding.id.as_str())
         .collect::<Vec<_>>()
         .join("|");
-    let active_pair = active_pair
+    let active_routes = active_routes
+        .into_iter()
         .map(|(input, output)| format!("{}->{}", input, output))
-        .unwrap_or_default();
+        .collect::<Vec<_>>()
+        .join("|");
 
-    format!("{}:{}:{}", profile.name, active_pair, binding_ids)
+    format!("{}:{}:{}", profile.name, active_routes, binding_ids)
 }
 
 fn should_send_feedback(
@@ -204,8 +206,12 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                 if last_feedback_sync.elapsed() >= sync_interval {
                     last_feedback_sync = loop_started;
 
-                    let active_pair = state.midi.lock().ok().and_then(|midi| midi.active_pair());
-                    let context = feedback_context_signature(profile, active_pair);
+                    let active_routes = state
+                        .midi
+                        .lock()
+                        .map(|midi| midi.active_routes())
+                        .unwrap_or_default();
+                    let context = feedback_context_signature(profile, active_routes);
                     let context_changed = context != last_feedback_context;
                     if context_changed {
                         last_feedback_context = context;

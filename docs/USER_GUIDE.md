@@ -19,18 +19,22 @@ When a target changes, MIDIMaster can send feedback back to your MIDI controller
 
 ## First-Time Setup
 
-### 1) Choose MIDI Input and Output
+### 1) Configure MIDI Routes
 
 1. Open MIDIMaster.
-2. On the setup screen, pick:
+2. The topbar shows the currently active MIDI input and output. If multiple routes are active, the first route is shown with a `+N` badge.
+3. Open `MIDI Routes` from the route button beside the Output readout.
+4. Add one or more routes. Each route pairs:
    - MIDI Input (the device you move)
    - MIDI Output (the device MIDIMaster sends feedback to)
-3. Click `Connect`.
+5. Routes apply automatically once both devices are selected.
 
 Notes:
 
-- Motorized faders require an output device.
-- If you pick the wrong output, MIDIMaster may not be able to move faders/LEDs.
+- Every active MIDI input route requires an output device.
+- Motorized faders and LEDs receive feedback through the output paired with the binding's input route.
+- Duplicate input routes are prevented. Sharing one output is allowed and marked with a `Shared` badge.
+- Disable a route to disconnect that MIDI session while keeping it saved. `Disconnect All` disables all routes and stops MIDI until you re-enable a route.
 
 ### 2) Pick a Profile
 
@@ -231,7 +235,8 @@ Most integrations only return target lists when connected.
 
 ### Motor faders do not move
 
-- Confirm a MIDI Output device is selected.
+- Open `MIDI Routes` and confirm the binding's input device route is enabled.
+- Confirm that route has the correct MIDI Output device selected.
 - Confirm the integration/plugin is connected.
 - Ensure the binding is to a target that supports feedback updates.
 

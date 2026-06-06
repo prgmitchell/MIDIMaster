@@ -154,6 +154,13 @@ Plugins can register a tab inside the Plugins modal. The plugin fully owns the U
 
 To keep UI, OSD, and motor faders in sync, plugins call `ctx.feedback.set(...)`.
 
+MIDIMaster can run multiple MIDI routes at once. A route pairs one MIDI input
+with one required MIDI output. Plugins do not choose an output device directly:
+feedback for `ctx.feedback.set(bindingId, ...)` is resolved through the stored
+binding id, then through that binding's `device_id`, and is sent to the output
+paired with that input route. This keeps motor faders and LEDs on separate
+controllers from receiving each other's feedback.
+
 ## 6. The Plugin Context (`ctx`) API
 
 Your `activate(ctx)` receives a context object.
@@ -390,7 +397,7 @@ This is how plugins update:
 
 - MIDIMaster UI (sliders, mute icons)
 - OSD
-- MIDI feedback (motor faders)
+- MIDI feedback (motor faders and LEDs)
 
 ```js
 await ctx.feedback.set(bindingId, 0.75, "Volume");
@@ -408,6 +415,10 @@ Use `silent: true` for:
 - Startup sync
 - Reconnect sync
 - Motor fader alignment
+
+With multiple MIDI routes, no plugin API change is required. Always pass the
+binding id you were given. MIDIMaster will infer the correct MIDI output from
+the binding's stored input device route.
 
 ### 6.7 `ctx.ws` (WebSocket bridge)
 
