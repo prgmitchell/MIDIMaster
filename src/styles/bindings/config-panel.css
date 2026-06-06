@@ -291,8 +291,10 @@
 }
 
 .binding-config-curve-card.is-selected {
-  border-color: rgba(78, 170, 255, 0.86);
-  box-shadow: 0 0 0 1px rgba(78, 170, 255, 0.32), inset 0 0 0 1px rgba(78, 170, 255, 0.18);
+  border-color: color-mix(in srgb, var(--accent, #53b2ff) 86%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #53b2ff) 32%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent, #53b2ff) 18%, transparent);
 }
 
 .binding-config-curve-card-title {
@@ -332,7 +334,7 @@
 
 .binding-config-curve-card-visual path {
   fill: none;
-  stroke: #53b2ff;
+  stroke: var(--accent, #53b2ff);
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -340,7 +342,7 @@
 
 .binding-config-curve-card-visual polyline {
   fill: none;
-  stroke: #53b2ff;
+  stroke: var(--accent, #53b2ff);
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;

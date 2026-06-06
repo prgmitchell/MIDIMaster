@@ -846,6 +846,15 @@ body[data-theme] .binding-config-curve-card.is-selected {
   border-color: var(--accent);
 }
 
+body[data-theme] .binding-config-curve-card-visual path,
+body[data-theme] .binding-config-curve-card-visual polyline {
+  stroke: var(--accent);
+}
+
+body[data-theme] .binding-config-curve-card-point {
+  stroke: var(--text-primary);
+}
+
 body[data-theme] .binding-config-content {
   background: var(--surface-raised);
   border-color: var(--control-border);
@@ -1125,12 +1134,28 @@ body[data-theme] .topbar {
     minmax(320px, 0.95fr)
     1px
     minmax(330px, 1fr)
-    minmax(330px, 1fr)
+    minmax(330px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding-left: 36px;
+  padding-right: 26px;
+}
+
+body[data-theme] .topbar.has-update {
+  grid-template-columns:
+    minmax(320px, 0.95fr)
     1px
+    minmax(330px, 1fr)
+    minmax(330px, 1fr)
     auto;
   align-items: center;
   gap: 12px;
   padding-left: 36px;
+  padding-right: 26px;
+}
+
+body[data-theme] .topbar:not(.has-update) .topbar-actions {
+  display: none;
 }
 
 body[data-theme] .topbar-field {

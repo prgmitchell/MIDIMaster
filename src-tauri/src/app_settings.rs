@@ -1,7 +1,156 @@
 use crate::model::{normalized_routes_with_legacy, MidiDeviceRoute};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf};
+
+fn default_active_theme_id() -> String {
+    "system".to_string()
+}
+
+fn default_accent_color() -> String {
+    "#5aa7ff".to_string()
+}
+
+fn default_color_temperature() -> f64 {
+    50.0
+}
+
+fn default_corner_radius() -> f64 {
+    4.0
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_effect_intensity() -> f64 {
+    30.0
+}
+
+fn default_surface_contrast() -> f64 {
+    50.0
+}
+
+fn default_icon_glow() -> f64 {
+    50.0
+}
+
+fn default_transparency() -> f64 {
+    30.0
+}
+
+fn default_font_family() -> String {
+    "bahnschrift".to_string()
+}
+
+fn default_font_size() -> f64 {
+    12.0
+}
+
+fn default_text_rendering() -> String {
+    "auto".to_string()
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AppearanceTheme {
+    pub id: String,
+    pub name: String,
+    pub scheme: String,
+    pub base_preset_id: String,
+    pub accent_color: String,
+    pub color_temperature: f64,
+    pub corner_radius: f64,
+    pub animations: bool,
+    pub background_effects: bool,
+    pub effect_intensity: f64,
+    pub surface_contrast: f64,
+    pub icon_glow: f64,
+    pub transparency: f64,
+    pub font_family: String,
+    pub font_size: f64,
+    pub text_rendering: String,
+    pub tokens: BTreeMap<String, String>,
+}
+
+impl Default for AppearanceTheme {
+    fn default() -> Self {
+        Self {
+            id: "custom-theme".to_string(),
+            name: "Custom Theme".to_string(),
+            scheme: "dark".to_string(),
+            base_preset_id: "dark".to_string(),
+            accent_color: default_accent_color(),
+            color_temperature: default_color_temperature(),
+            corner_radius: default_corner_radius(),
+            animations: true,
+            background_effects: true,
+            effect_intensity: default_effect_intensity(),
+            surface_contrast: default_surface_contrast(),
+            icon_glow: default_icon_glow(),
+            transparency: default_transparency(),
+            font_family: default_font_family(),
+            font_size: default_font_size(),
+            text_rendering: default_text_rendering(),
+            tokens: BTreeMap::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AppAppearanceSettings {
+    #[serde(default = "default_active_theme_id")]
+    pub active_theme_id: String,
+    #[serde(default = "default_accent_color")]
+    pub accent_color: String,
+    #[serde(default = "default_color_temperature")]
+    pub color_temperature: f64,
+    #[serde(default = "default_corner_radius")]
+    pub corner_radius: f64,
+    #[serde(default = "default_true")]
+    pub animations: bool,
+    #[serde(default = "default_true")]
+    pub background_effects: bool,
+    #[serde(default = "default_effect_intensity")]
+    pub effect_intensity: f64,
+    #[serde(default = "default_surface_contrast")]
+    pub surface_contrast: f64,
+    #[serde(default = "default_icon_glow")]
+    pub icon_glow: f64,
+    #[serde(default = "default_transparency")]
+    pub transparency: f64,
+    #[serde(default = "default_font_family")]
+    pub font_family: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: f64,
+    #[serde(default = "default_text_rendering")]
+    pub text_rendering: String,
+    pub tokens: BTreeMap<String, String>,
+    pub custom_themes: Vec<AppearanceTheme>,
+}
+
+impl Default for AppAppearanceSettings {
+    fn default() -> Self {
+        Self {
+            active_theme_id: default_active_theme_id(),
+            accent_color: default_accent_color(),
+            color_temperature: default_color_temperature(),
+            corner_radius: default_corner_radius(),
+            animations: true,
+            background_effects: true,
+            effect_intensity: default_effect_intensity(),
+            surface_contrast: default_surface_contrast(),
+            icon_glow: default_icon_glow(),
+            transparency: default_transparency(),
+            font_family: default_font_family(),
+            font_size: default_font_size(),
+            text_rendering: default_text_rendering(),
+            tokens: BTreeMap::new(),
+            custom_themes: Vec::new(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -19,6 +168,7 @@ pub struct AppSettings {
     pub active_profile_name: Option<String>,
     pub auto_check_updates: bool,
     pub language: String,
+    pub appearance: AppAppearanceSettings,
 }
 
 impl Default for AppSettings {
@@ -28,7 +178,7 @@ impl Default for AppSettings {
             start_in_tray: false,
             minimize_to_tray: false,
             exit_to_tray: false,
-            ui_theme: "light".to_string(),
+            ui_theme: "system".to_string(),
             midi_input_device_id: None,
             midi_output_device_id: None,
             midi_input_device_name: None,
@@ -37,6 +187,7 @@ impl Default for AppSettings {
             active_profile_name: None,
             auto_check_updates: true,
             language: "en".to_string(),
+            appearance: AppAppearanceSettings::default(),
         }
     }
 }
@@ -102,7 +253,8 @@ impl AppSettingsStore {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppSettings, AppSettingsStore};
+    use super::{AppAppearanceSettings, AppSettings, AppSettingsStore, AppearanceTheme};
+    use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -124,6 +276,10 @@ mod tests {
         assert_eq!(settings.language, "en");
         assert!(settings.start_with_windows);
         assert!(settings.minimize_to_tray);
+        assert_eq!(settings.appearance.active_theme_id, "system");
+        assert_eq!(settings.appearance.font_size, 12.0);
+        assert_eq!(settings.appearance.surface_contrast, 50.0);
+        assert_eq!(settings.appearance.icon_glow, 50.0);
     }
 
     #[test]
@@ -144,5 +300,54 @@ mod tests {
         assert_eq!(loaded.language, "fr");
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn appearance_defaults_to_system_theme() {
+        let appearance = AppAppearanceSettings::default();
+        assert_eq!(appearance.active_theme_id, "system");
+        assert_eq!(appearance.font_family, "bahnschrift");
+        assert_eq!(appearance.font_size, 12.0);
+        assert_eq!(appearance.surface_contrast, 50.0);
+        assert_eq!(appearance.icon_glow, 50.0);
+        assert!(appearance.animations);
+    }
+
+    #[test]
+    fn saved_appearance_round_trips() {
+        let mut tokens = BTreeMap::new();
+        tokens.insert("--accent".to_string(), "#24c8d6".to_string());
+        let settings = AppSettings {
+            appearance: AppAppearanceSettings {
+                active_theme_id: "custom-ocean".to_string(),
+                surface_contrast: 72.0,
+                icon_glow: 64.0,
+                custom_themes: vec![AppearanceTheme {
+                    id: "custom-ocean".to_string(),
+                    name: "Ocean Copy".to_string(),
+                    accent_color: "#24c8d6".to_string(),
+                    surface_contrast: 38.0,
+                    icon_glow: 24.0,
+                    tokens,
+                    ..AppearanceTheme::default()
+                }],
+                ..AppAppearanceSettings::default()
+            },
+            ..AppSettings::default()
+        };
+
+        let json = serde_json::to_string(&settings).expect("serialize settings");
+        let loaded: AppSettings = serde_json::from_str(&json).expect("deserialize settings");
+
+        assert_eq!(loaded.appearance.active_theme_id, "custom-ocean");
+        assert_eq!(loaded.appearance.surface_contrast, 72.0);
+        assert_eq!(loaded.appearance.icon_glow, 64.0);
+        assert_eq!(loaded.appearance.custom_themes.len(), 1);
+        assert_eq!(loaded.appearance.custom_themes[0].surface_contrast, 38.0);
+        assert_eq!(loaded.appearance.custom_themes[0].icon_glow, 24.0);
+        assert_eq!(
+            loaded.appearance.custom_themes[0].tokens.get("--accent"),
+            Some(&"#24c8d6".to_string())
+        );
     }
 }

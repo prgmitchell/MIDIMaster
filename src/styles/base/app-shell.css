@@ -1,6 +1,22 @@
 /* 2026 app shell */
 :root {
   --control-h: 40px;
+  --radius-control: 4px;
+  --radius-card: 5px;
+  --radius-panel: 6px;
+  --app-font-family: "Bahnschrift", "Aptos", "Segoe UI", sans-serif;
+  --app-font-size: 12px;
+  --text-rendering-mode: auto;
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-page: 100ms;
+  --appearance-effect-opacity: 0.3;
+  --appearance-effect-accent: 10%;
+  --appearance-effect-success: 7%;
+  --appearance-surface-opacity: 0.7;
+  --appearance-surface-opacity-percent: 70%;
+  --app-logo-filter: hue-rotate(0deg) saturate(100%) brightness(100%);
+  --app-logo-glow: rgba(90, 167, 255, 0.28);
 }
 
 /*
@@ -81,7 +97,7 @@ body[data-theme="light"] {
   --chip-border: #c7d8eb;
   --chip-text: #17385c;
   --slider-track: #d1dbe7;
-  --slider-fill: #55b7ec;
+  --slider-fill: var(--accent);
   --slider-thumb: #f8fbfe;
   --overlay-bg: rgba(23, 34, 48, 0.36);
 
@@ -101,7 +117,9 @@ body[data-theme="light"] {
 }
 
 body {
-  font-family: "Bahnschrift", "Aptos", "Segoe UI", sans-serif;
+  font-family: var(--app-font-family);
+  font-size: var(--app-font-size);
+  text-rendering: var(--text-rendering-mode);
   background: var(--app-bg);
   color: var(--text-primary);
 }
@@ -161,6 +179,12 @@ body.dark-mode {
   object-fit: contain;
 }
 
+.app-logo--dark,
+.app-logo--light {
+  filter: var(--app-logo-filter, hue-rotate(0deg) saturate(100%) brightness(100%)) drop-shadow(0 0 8px var(--app-logo-glow));
+  transition: filter var(--motion-normal) ease;
+}
+
 .app-logo--light {
   display: none;
 }
@@ -196,16 +220,16 @@ body[data-theme="light"] .app-logo--light {
   left: 0;
   right: 0;
   height: 62px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
   box-shadow: inset 4px 0 0 var(--accent);
   pointer-events: none;
   opacity: 0;
   z-index: 0;
   transition:
-    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 120ms ease;
+    transform var(--motion-normal) cubic-bezier(0.22, 1, 0.36, 1),
+    height var(--motion-normal) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity var(--motion-fast) ease;
   will-change: transform, height;
 }
 
@@ -217,7 +241,7 @@ body[data-theme="light"] .app-logo--light {
   display: flex;
   align-items: center;
   gap: 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-soft);
@@ -279,7 +303,7 @@ body[data-theme="light"] .app-logo--light {
   display: flex;
   align-items: center;
   gap: 26px;
-  padding: 0 24px 0 88px;
+  padding: 0 26px 0 88px;
   background: var(--topbar-bg);
   border-bottom: 1px solid var(--line);
 }
@@ -308,7 +332,7 @@ body[data-theme="light"] .app-logo--light {
 .danger-action {
   min-height: var(--control-h);
   border: 1px solid var(--line-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   background: var(--control-bg);
   color: var(--text-primary);
 }
@@ -327,7 +351,10 @@ body[data-theme="light"] .app-logo--light {
 main {
   min-height: 0;
   padding: 36px 26px 28px;
-  background: var(--app-bg);
+  background:
+    radial-gradient(circle at 12% 4%, color-mix(in srgb, var(--accent) var(--appearance-effect-accent), transparent), transparent 38%),
+    radial-gradient(circle at 94% 98%, color-mix(in srgb, var(--success) var(--appearance-effect-success), transparent), transparent 44%),
+    var(--app-bg);
 }
 
 .app-page {
@@ -339,7 +366,7 @@ main {
 }
 
 .app-page.active {
-  animation: appPageEnter 0.1s ease-out;
+  animation: appPageEnter var(--motion-page) ease-out;
 }
 
 .app-page.hidden {
@@ -379,7 +406,7 @@ h2 {
 select,
 input,
 button {
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--line-strong);
   background: var(--control-bg);
   color: var(--text-primary);
@@ -411,7 +438,7 @@ input::placeholder {
   background: var(--control-bg);
   color: var(--text-primary);
   border-color: var(--line-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .midi-device-dropdown,
@@ -474,7 +501,7 @@ input::placeholder {
   justify-content: center;
   flex: 0 0 auto;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--line-strong);
   background: var(--control-bg);
   color: var(--text-primary);
@@ -521,7 +548,7 @@ input::placeholder {
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   background: var(--surface-raised);
   color: var(--text-primary);
   box-shadow: var(--shadow-raised);
@@ -567,7 +594,7 @@ input::placeholder {
   gap: 8px;
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--control-border) 82%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--control-bg) 86%, var(--surface-muted) 14%);
 }
 
@@ -664,7 +691,7 @@ input::placeholder {
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--control-border);
   background: var(--surface-raised);
   color: var(--text-primary);
@@ -716,7 +743,7 @@ input::placeholder {
 .dropdown {
   background: var(--surface-raised);
   border-color: var(--line-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   box-shadow: var(--shadow-raised);
 }
 
@@ -752,7 +779,7 @@ input::placeholder {
   background: var(--panel-bg);
   color: var(--text-primary);
   border: 1px solid var(--line-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
 }
 
 .target-panel-header {

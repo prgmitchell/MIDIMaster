@@ -6,6 +6,19 @@ import {
   createSelectDropdownShell,
   renderNativeSelectDropdown,
 } from "../ui/dropdown_select.js";
+import {
+  appearanceBackgroundGlowPatch,
+  appearanceBackgroundGlowValue,
+  applyAppearancePatch,
+  applyBuiltInPreset,
+  applyAppearanceToDocument,
+  appearanceFromLegacyTheme,
+  defaultAppearanceSettings,
+  getBuiltInAppearancePresets,
+  normalizeAppearanceSettings,
+  resolveAppearance,
+  toBackendAppearanceSettings,
+} from "../../app/appearance.js";
 
 export function createSettingsFeature({
   invoke,
@@ -18,6 +31,7 @@ export function createSettingsFeature({
   setMonitorOptions,
   getAppSettings,
   setAppSettings,
+  applyAppearance,
   onUpdateAvailableClick,
 }) {
   if (typeof invoke !== "function") {
@@ -40,6 +54,18 @@ export function createSettingsFeature({
   let settingsNavIndicatorRaf = 0;
   let osdAppearanceRaf = 0;
   let osdPreviewResizeObserver = null;
+  const appearanceColorPickerState = {
+    open: false,
+    target: "accent",
+    token: "",
+    name: "",
+    color: "#5aa7ff",
+    hue: 210,
+    saturation: 0.65,
+    value: 1,
+    anchor: null,
+    dragging: false,
+  };
   const defaultSettingsSection = "startup";
   const defaultOsdAppearance = {
     style: "midnight",
@@ -62,6 +88,68 @@ export function createSettingsFeature({
   const languageOptions = Array.isArray(i18n?.supportedLocales) ? i18n.supportedLocales : [
     { code: "en", label: "English" },
   ];
+  const accentSwatches = [
+    "#5aa7ff",
+    "#2f78d4",
+    "#8b6dff",
+    "#7c3aed",
+    "#24c8d6",
+    "#14b8a6",
+    "#69c95a",
+    "#22c55e",
+    "#f0a12d",
+    "#f97316",
+    "#f25c61",
+    "#dc2626",
+    "#d44aa4",
+    "#ec4899",
+  ];
+  const colorPickerSwatches = [
+    ...accentSwatches,
+    "#ffffff",
+    "#d8dee9",
+    "#7b8794",
+    "#111820",
+  ];
+  const appearanceColorControls = [
+    {
+      target: "accent",
+      token: "",
+      intensityToken: "accentIntensity",
+      labelKey: "settings.appearance.accentColor",
+      swatches: ["#5aa7ff", "#2f78d4", "#8b6dff", "#24c8d6", "#69c95a", "#ec4899"],
+    },
+    {
+      target: "token",
+      token: "themeTint",
+      intensityToken: "themeTintIntensity",
+      labelKey: "settings.appearance.themeTint",
+      swatches: ["#172334", "#1d4ed8", "#7c3aed", "#0e7490", "#15803d", "#be185d"],
+    },
+    {
+      target: "token",
+      token: "controlBorder",
+      intensityToken: "controlBorderIntensity",
+      labelKey: "settings.appearance.colorBorders",
+      swatches: ["#5aa7ff", "#8b6dff", "#24c8d6", "#69c95a", "#f0a12d", "#ec4899"],
+    },
+    {
+      target: "token",
+      token: "textPrimary",
+      intensityToken: "textPrimaryIntensity",
+      labelKey: "settings.appearance.colorText",
+      swatches: ["#f3f6fb", "#7fbfff", "#c4b5fd", "#67e8f9", "#bbf7d0", "#f9a8d4"],
+    },
+    {
+      target: "token",
+      token: "iconColor",
+      intensityToken: "iconColorIntensity",
+      labelKey: "settings.appearance.iconColor",
+      swatches: ["#5aa7ff", "#2f78d4", "#8b6dff", "#24c8d6", "#69c95a", "#f0a12d"],
+    },
+  ];
+  const appearanceBuiltInPresets = getBuiltInAppearancePresets();
+  const appearanceBuiltInPresetIds = new Set(appearanceBuiltInPresets.map((preset) => preset.id));
   const updateState = {
     currentVersion: "-",
     latestVersion: "-",
@@ -115,6 +203,609 @@ export function createSettingsFeature({
     const range = max - min;
     if (!Number.isFinite(min) || !Number.isFinite(max) || range <= 0) return 0;
     return Math.min(100, Math.max(0, ((Number(value) - min) / range) * 100));
+  }
+
+  function appearanceEl(id) {
+    return d.settingsPanel?.querySelector?.(`#${id}`) || null;
+  }
+
+  function currentAppearance() {
+    const settings = (typeof getAppSettings === "function") ? (getAppSettings() || {}) : {};
+    const source = settings.appearance && typeof settings.appearance === "object"
+      ? settings.appearance
+      : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme);
+    return normalizeAppearanceSettings(source);
+  }
+
+  function setAppearanceState(appearance, { apply = true } = {}) {
+    const normalized = normalizeAppearanceSettings(appearance);
+    const current = (typeof getAppSettings === "function") ? (getAppSettings() || {}) : {};
+    if (typeof setAppSettings === "function") {
+      setAppSettings({ ...current, appearance: normalized });
+    }
+    if (apply) {
+      if (typeof applyAppearance === "function") {
+        applyAppearance(normalized);
+      } else {
+        applyAppearanceToDocument(normalized);
+      }
+    }
+    return normalized;
+  }
+
+  function syncRange(inputEl, valueEl, value, suffix = "") {
+    if (!inputEl) return;
+    const rounded = Math.round(Number(value) || 0);
+    inputEl.value = String(rounded);
+    inputEl.style.setProperty("--range-fill", `${sliderFillPercent(inputEl, rounded)}%`);
+    if (valueEl) {
+      valueEl.textContent = `${rounded}${suffix}`;
+    }
+  }
+
+  function appendSvgIcon(button, paths) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    paths.forEach((pathValue) => {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", pathValue);
+      svg.appendChild(path);
+    });
+    button.appendChild(svg);
+  }
+
+  function renderPresetMini(card, preset, selected) {
+    const mini = document.createElement("span");
+    mini.className = "appearance-preset-mini";
+    mini.setAttribute("aria-hidden", "true");
+    const tones = preset.preview || [preset.accentColor || "#5aa7ff", preset.accentColor || "#5aa7ff"];
+    mini.style.setProperty("--preset-accent", tones[0]);
+    mini.style.setProperty("--preset-accent-2", tones[1] || tones[0]);
+    for (let index = 0; index < 5; index += 1) {
+      const line = document.createElement("span");
+      line.className = `appearance-preset-line appearance-preset-line--${index + 1}`;
+      mini.appendChild(line);
+    }
+    if (selected) {
+      const check = document.createElement("span");
+      check.className = "appearance-preset-check";
+      mini.appendChild(check);
+    }
+    card.appendChild(mini);
+  }
+
+  function renderAppearancePresetCard(container, preset, appearance, isCustom = false) {
+    const selected = activeAppearancePresetId(appearance) === preset.id;
+    const card = document.createElement("div");
+    card.className = "appearance-preset-card";
+    card.classList.toggle("selected", selected);
+    card.classList.toggle("appearance-preset-card--custom", isCustom);
+    card.dataset.appearancePreset = preset.id;
+    card.dataset.appearancePresetKind = isCustom ? "custom" : "built-in";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-pressed", String(selected));
+
+    const label = document.createElement("span");
+    label.className = "appearance-preset-name";
+    label.textContent = isCustom ? preset.name : t(preset.labelKey);
+    card.appendChild(label);
+
+    if (isCustom) {
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "appearance-preset-delete";
+      deleteButton.dataset.appearanceDeleteCustom = preset.id;
+      const deleteLabel = `${t("common.delete")} ${preset.name}`;
+      deleteButton.setAttribute("aria-label", deleteLabel);
+      deleteButton.setAttribute("title", deleteLabel);
+      appendSvgIcon(deleteButton, [
+        "M3 6h18",
+        "M8 6V4h8v2",
+        "M6 6l1 15h10l1-15",
+        "M10 11v6",
+        "M14 11v6",
+      ]);
+      card.appendChild(deleteButton);
+    }
+
+    renderPresetMini(card, preset, selected);
+    container.appendChild(card);
+  }
+
+  function renderAppearancePresets(appearance) {
+    const container = appearanceEl("appearance-presets");
+    if (!container) return;
+    container.replaceChildren();
+    appearanceBuiltInPresets.forEach((preset) => {
+      renderAppearancePresetCard(container, preset, appearance, false);
+    });
+  }
+
+  function activeAppearancePresetId(appearance) {
+    if (appearanceBuiltInPresetIds.has(appearance.activeThemeId)) {
+      return appearance.activeThemeId;
+    }
+    const activeCustom = appearance.customThemes.find((theme) => theme.id === appearance.activeThemeId);
+    if (appearanceBuiltInPresetIds.has(activeCustom?.basePresetId)) {
+      return activeCustom.basePresetId;
+    }
+    return activeCustom?.scheme === "light" ? "light" : "dark";
+  }
+
+  function colorInputValue(value, fallback = "#000000") {
+    const raw = String(value || "").trim();
+    return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : fallback;
+  }
+
+  function findAppearanceColorControl(target = "accent", token = "") {
+    const normalizedTarget = target === "token" ? "token" : "accent";
+    const normalizedToken = normalizedTarget === "token" ? String(token || "") : "";
+    return appearanceColorControls.find((control) => (
+      control.target === normalizedTarget && String(control.token || "") === normalizedToken
+    )) || appearanceColorControls[0];
+  }
+
+  function appearanceColorControlValue(control, appearance, resolved = null) {
+    if (control?.target === "token") {
+      const resolvedAppearance = resolved || resolveAppearance(appearance, { matchMediaSource: window });
+      return colorInputValue(appearance?.tokens?.[control.token], colorInputValue(resolvedAppearance.tokens[control.token]));
+    }
+    return colorInputValue(appearance?.accentColor, "#5aa7ff");
+  }
+
+  function findAppearanceIntensityControl(intensityToken = "") {
+    const normalizedToken = String(intensityToken || "");
+    return appearanceColorControls.find((control) => control.intensityToken === normalizedToken) || null;
+  }
+
+  function appearanceColorControlIntensity(control, appearance) {
+    return Math.round(clampNumber(appearance?.tokens?.[control?.intensityToken], 0, 100, 100));
+  }
+
+  function applyAppearanceColorControlValue(control, color, { persist = false } = {}) {
+    const parsed = parseHexColorInput(color);
+    if (!parsed) return;
+    if (control?.target === "token" && control.token) {
+      applyAppearanceUpdate({ tokens: { [control.token]: parsed } }, { persist });
+      return;
+    }
+    applyAppearanceUpdate({ accentColor: parsed }, { persist });
+  }
+
+  function applyAppearanceColorControlIntensity(control, value, { persist = false, render = false } = {}) {
+    if (!control?.intensityToken) return;
+    const intensity = Math.round(clampNumber(value, 0, 100, 100));
+    applyAppearanceUpdate({ tokens: { [control.intensityToken]: String(intensity) } }, { persist, render });
+  }
+
+  function parseHexColorInput(value) {
+    const raw = String(value || "").trim().replace(/^#?/, "#");
+    if (/^#[0-9a-f]{6}$/i.test(raw)) return raw.toLowerCase();
+    const short = raw.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+    if (!short) return "";
+    return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
+  }
+
+  function hexToRgbColor(hex) {
+    const normalized = colorInputValue(hex).slice(1);
+    return {
+      r: parseInt(normalized.slice(0, 2), 16),
+      g: parseInt(normalized.slice(2, 4), 16),
+      b: parseInt(normalized.slice(4, 6), 16),
+    };
+  }
+
+  function rgbToHexColor({ r, g, b }) {
+    return `#${[r, g, b].map((part) => (
+      Math.round(Math.min(255, Math.max(0, part))).toString(16).padStart(2, "0")
+    )).join("")}`;
+  }
+
+  function rgbToHsvColor({ r, g, b }) {
+    const red = r / 255;
+    const green = g / 255;
+    const blue = b / 255;
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+    const delta = max - min;
+    let hue = 0;
+    if (delta > 0) {
+      if (max === red) {
+        hue = 60 * (((green - blue) / delta) % 6);
+      } else if (max === green) {
+        hue = 60 * (((blue - red) / delta) + 2);
+      } else {
+        hue = 60 * (((red - green) / delta) + 4);
+      }
+    }
+    if (hue < 0) hue += 360;
+    return {
+      h: hue,
+      s: max === 0 ? 0 : delta / max,
+      v: max,
+    };
+  }
+
+  function hsvToRgbColor({ h, s, v }) {
+    const hue = ((Number(h) % 360) + 360) % 360;
+    const saturation = Math.min(1, Math.max(0, Number(s) || 0));
+    const value = Math.min(1, Math.max(0, Number(v) || 0));
+    const chroma = value * saturation;
+    const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = value - chroma;
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    if (hue < 60) {
+      red = chroma;
+      green = x;
+    } else if (hue < 120) {
+      red = x;
+      green = chroma;
+    } else if (hue < 180) {
+      green = chroma;
+      blue = x;
+    } else if (hue < 240) {
+      green = x;
+      blue = chroma;
+    } else if (hue < 300) {
+      red = x;
+      blue = chroma;
+    } else {
+      red = chroma;
+      blue = x;
+    }
+    return {
+      r: (red + m) * 255,
+      g: (green + m) * 255,
+      b: (blue + m) * 255,
+    };
+  }
+
+  function setAppearanceColorPickerFromHex(color) {
+    const value = colorInputValue(color, appearanceColorPickerState.color);
+    const hsv = rgbToHsvColor(hexToRgbColor(value));
+    appearanceColorPickerState.color = value;
+    appearanceColorPickerState.hue = hsv.h;
+    appearanceColorPickerState.saturation = hsv.s;
+    appearanceColorPickerState.value = hsv.v;
+  }
+
+  function appearanceColorPickerPatch() {
+    if (appearanceColorPickerState.target === "token" && appearanceColorPickerState.token) {
+      return { tokens: { [appearanceColorPickerState.token]: appearanceColorPickerState.color } };
+    }
+    return { accentColor: appearanceColorPickerState.color };
+  }
+
+  function syncAppearanceColorPickerAnchor() {
+    const { anchor, color, target, name } = appearanceColorPickerState;
+    if (!anchor) return;
+    if (target === "token") {
+      anchor.style.setProperty("--theme-color", color);
+      anchor.setAttribute("aria-label", t("settings.appearance.themeColorValue", { name, color }));
+    } else {
+      anchor.style.setProperty("--picker-color", color);
+      anchor.style.setProperty("--theme-color", color);
+      anchor.setAttribute("aria-label", t("settings.appearance.accentColorValue", { color }));
+    }
+  }
+
+  function applyAppearanceColorPickerValue({ persist = false, render = false } = {}) {
+    syncAppearanceColorPickerAnchor();
+    applyAppearanceUpdate(appearanceColorPickerPatch(), { persist, render });
+  }
+
+  function syncAppearanceColorPickerUi({ syncHex = true } = {}) {
+    const popover = appearanceEl("appearance-color-popover");
+    if (!popover) return;
+    const color = appearanceColorPickerState.color;
+    popover.style.setProperty("--picker-color", color);
+    popover.style.setProperty("--picker-hue", Math.round(appearanceColorPickerState.hue));
+    const handle = popover.querySelector(".appearance-color-field-handle");
+    if (handle) {
+      handle.style.left = `${appearanceColorPickerState.saturation * 100}%`;
+      handle.style.top = `${(1 - appearanceColorPickerState.value) * 100}%`;
+    }
+    const hueInput = appearanceEl("appearance-color-hue");
+    if (hueInput) hueInput.value = String(Math.round(appearanceColorPickerState.hue));
+    const hexInput = appearanceEl("appearance-color-hex");
+    if (hexInput && (syncHex || document.activeElement !== hexInput)) {
+      hexInput.value = color;
+    }
+    const title = appearanceEl("appearance-color-popover-title");
+    if (title) {
+      title.textContent = appearanceColorPickerState.target === "token"
+        ? appearanceColorPickerState.name
+        : t("settings.appearance.customAccentColor");
+    }
+  }
+
+  function renderColorPickerSwatches() {
+    const container = appearanceEl("appearance-color-suggestions");
+    if (!container || container.childElementCount > 0) return;
+    colorPickerSwatches.forEach((color) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "appearance-picker-swatch";
+      button.dataset.appearancePickerSwatch = color;
+      button.style.setProperty("--swatch-color", color);
+      button.setAttribute("aria-label", t("settings.appearance.colorValue", { color }));
+      container.appendChild(button);
+    });
+  }
+
+  function positionAppearanceColorPicker(anchor) {
+    const popover = appearanceEl("appearance-color-popover");
+    if (!popover || !anchor) return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const margin = 10;
+    const width = popover.offsetWidth || 264;
+    const height = popover.offsetHeight || 278;
+    let left = anchorRect.left;
+    let top = anchorRect.bottom + 8;
+    if (top + height > window.innerHeight - margin) {
+      top = anchorRect.top - height - 8;
+    }
+    left = Math.min(window.innerWidth - width - margin, Math.max(margin, left));
+    top = Math.min(window.innerHeight - height - margin, Math.max(margin, top));
+    popover.style.left = `${Math.round(left)}px`;
+    popover.style.top = `${Math.round(top)}px`;
+  }
+
+  function openAppearanceColorPicker({ target = "accent", token = "", name = "", color = "#5aa7ff", anchor = null } = {}) {
+    const popover = appearanceEl("appearance-color-popover");
+    if (!popover) return;
+    appearanceColorPickerState.open = true;
+    appearanceColorPickerState.target = target;
+    appearanceColorPickerState.token = token;
+    appearanceColorPickerState.name = name;
+    appearanceColorPickerState.anchor = anchor;
+    setAppearanceColorPickerFromHex(color);
+    popover.classList.remove("hidden");
+    renderColorPickerSwatches();
+    syncAppearanceColorPickerUi();
+    positionAppearanceColorPicker(anchor);
+  }
+
+  function closeAppearanceColorPicker() {
+    const popover = appearanceEl("appearance-color-popover");
+    if (!popover) return;
+    appearanceColorPickerState.open = false;
+    appearanceColorPickerState.dragging = false;
+    appearanceColorPickerState.anchor = null;
+    popover.classList.add("hidden");
+  }
+
+  function setAppearanceColorPickerHsv(patch, { persist = false } = {}) {
+    const next = {
+      h: patch.h ?? appearanceColorPickerState.hue,
+      s: patch.s ?? appearanceColorPickerState.saturation,
+      v: patch.v ?? appearanceColorPickerState.value,
+    };
+    appearanceColorPickerState.hue = ((Number(next.h) % 360) + 360) % 360;
+    appearanceColorPickerState.saturation = Math.min(1, Math.max(0, Number(next.s) || 0));
+    appearanceColorPickerState.value = Math.min(1, Math.max(0, Number(next.v) || 0));
+    appearanceColorPickerState.color = rgbToHexColor(hsvToRgbColor({
+      h: appearanceColorPickerState.hue,
+      s: appearanceColorPickerState.saturation,
+      v: appearanceColorPickerState.value,
+    }));
+    syncAppearanceColorPickerUi();
+    applyAppearanceColorPickerValue({ persist, render: false });
+  }
+
+  function updateAppearanceColorPickerFromField(event, { persist = false } = {}) {
+    const field = appearanceEl("appearance-color-field");
+    const rect = field?.getBoundingClientRect?.();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const saturation = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const value = 1 - Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+    setAppearanceColorPickerHsv({ s: saturation, v: value }, { persist });
+  }
+
+  function setAppearanceColorPickerHex(color, { persist = false, syncHex = true } = {}) {
+    const parsed = parseHexColorInput(color);
+    if (!parsed) return false;
+    setAppearanceColorPickerFromHex(parsed);
+    syncAppearanceColorPickerUi({ syncHex });
+    applyAppearanceColorPickerValue({ persist, render: false });
+    return true;
+  }
+
+  function renderThemeColorControls(appearance) {
+    const container = appearanceEl("appearance-theme-colors");
+    if (!container) return;
+    const resolved = resolveAppearance(appearance, { matchMediaSource: window });
+    container.replaceChildren();
+    appearanceColorControls.forEach((control) => {
+      const value = appearanceColorControlValue(control, appearance, resolved);
+      const name = t(control.labelKey);
+      const card = document.createElement("div");
+      card.className = "appearance-token-color";
+      card.style.setProperty("--theme-color", value);
+
+      const header = document.createElement("div");
+      header.className = "appearance-token-color-header";
+
+      const label = document.createElement("span");
+      label.className = "appearance-token-color-label";
+      label.textContent = name;
+      header.appendChild(label);
+
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "appearance-token-color-edit";
+      edit.dataset.appearanceColorTrigger = control.target;
+      edit.dataset.appearanceColorName = name;
+      if (control.token) edit.dataset.appearanceToken = control.token;
+      edit.setAttribute("aria-label", t("settings.appearance.themeColorValue", { name, color: value }));
+      appendSvgIcon(edit, [
+        "M12 20h9",
+        "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z",
+      ]);
+      header.appendChild(edit);
+      card.appendChild(header);
+
+      const swatches = document.createElement("div");
+      swatches.className = "appearance-token-swatches";
+      const presetSwatches = control.swatches || accentSwatches.slice(0, 6);
+      const hasCurrentSwatch = presetSwatches.some((color) => color.toLowerCase() === value.toLowerCase());
+      const displaySwatches = hasCurrentSwatch
+        ? presetSwatches
+        : [value, ...presetSwatches.filter((color) => color.toLowerCase() !== value.toLowerCase())].slice(0, 6);
+      displaySwatches.forEach((color) => {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "appearance-token-swatch";
+        swatch.dataset.appearanceOptionSwatch = color;
+        swatch.dataset.appearanceColorRole = control.target;
+        if (control.token) swatch.dataset.appearanceToken = control.token;
+        swatch.style.setProperty("--swatch-color", color);
+        const selected = color.toLowerCase() === value.toLowerCase();
+        swatch.classList.toggle("selected", selected);
+        swatch.setAttribute("aria-label", t("settings.appearance.themeColorValue", { name, color }));
+        swatch.setAttribute("aria-pressed", String(selected));
+        swatches.appendChild(swatch);
+      });
+      card.appendChild(swatches);
+
+      const intensity = appearanceColorControlIntensity(control, appearance);
+      const intensityRow = document.createElement("div");
+      intensityRow.className = "appearance-token-intensity";
+
+      const intensityInput = document.createElement("input");
+      intensityInput.type = "range";
+      intensityInput.min = "0";
+      intensityInput.max = "100";
+      intensityInput.step = "1";
+      intensityInput.value = String(intensity);
+      intensityInput.className = "binding-volume-slider appearance-token-intensity-slider";
+      intensityInput.dataset.appearanceIntensityToken = control.intensityToken;
+      intensityInput.setAttribute("aria-label", `${name} ${t("settings.appearance.intensity")}`);
+      intensityInput.style.setProperty("--range-fill", `${sliderFillPercent(intensityInput, intensity)}%`);
+      intensityRow.appendChild(intensityInput);
+
+      const intensityValue = document.createElement("span");
+      intensityValue.className = "appearance-token-intensity-value";
+      intensityValue.textContent = `${intensity}%`;
+      intensityRow.appendChild(intensityValue);
+      card.appendChild(intensityRow);
+
+      container.appendChild(card);
+    });
+  }
+
+  function syncAppearanceControls(appearanceOverride = null) {
+    const appearance = setAppearanceState(appearanceOverride || currentAppearance(), { apply: Boolean(appearanceOverride) });
+    renderAppearancePresets(appearance);
+    renderThemeColorControls(appearance);
+    syncRange(
+      appearanceEl("appearance-temperature"),
+      appearanceEl("appearance-temperature-value"),
+      appearance.colorTemperature,
+      "%",
+    );
+    syncRange(
+      appearanceEl("appearance-font-size"),
+      appearanceEl("appearance-font-size-value"),
+      appearance.fontSize,
+      "px",
+    );
+    syncRange(
+      appearanceEl("appearance-background-glow"),
+      appearanceEl("appearance-background-glow-value"),
+      appearanceBackgroundGlowValue(appearance),
+      "%",
+    );
+    syncRange(
+      appearanceEl("appearance-surface-contrast"),
+      appearanceEl("appearance-surface-contrast-value"),
+      appearance.surfaceContrast,
+      "%",
+    );
+    syncRange(
+      appearanceEl("appearance-icon-glow"),
+      appearanceEl("appearance-icon-glow-value"),
+      appearance.iconGlow,
+      "%",
+    );
+
+    return appearance;
+  }
+
+  async function persistAppearanceSettings(appearance = currentAppearance()) {
+    const normalized = normalizeAppearanceSettings(appearance);
+    try {
+      const saved = await invoke("update_appearance_settings", {
+        appearance: toBackendAppearanceSettings(normalized),
+      });
+      if (saved) {
+        syncAppearanceControls(saved);
+      }
+    } catch (error) {
+      console.error("Failed to update appearance settings", error);
+    }
+  }
+
+  function applyAppearanceUpdate(patch, { persist = false, render = true } = {}) {
+    const current = currentAppearance();
+    const mergedPatch = patch?.tokens
+      ? { ...patch, tokens: { ...(current.tokens || {}), ...(patch.tokens || {}) } }
+      : patch;
+    const next = applyAppearancePatch(current, mergedPatch, { t });
+    if (render) {
+      syncAppearanceControls(next);
+    } else {
+      setAppearanceState(next);
+    }
+    if (persist) {
+      persistAppearanceSettings(next);
+    }
+  }
+
+  function selectCustomAppearanceTheme(id) {
+    const current = currentAppearance();
+    const theme = current.customThemes.find((item) => item.id === id);
+    if (!theme) return current;
+    return normalizeAppearanceSettings({
+      ...current,
+      activeThemeId: theme.id,
+      accentColor: theme.accentColor,
+      colorTemperature: theme.colorTemperature,
+      cornerRadius: theme.cornerRadius,
+      animations: theme.animations,
+      backgroundEffects: theme.backgroundEffects,
+      effectIntensity: theme.effectIntensity,
+      surfaceContrast: theme.surfaceContrast,
+      iconGlow: theme.iconGlow,
+      transparency: theme.transparency,
+      fontFamily: theme.fontFamily,
+      fontSize: theme.fontSize,
+      textRendering: theme.textRendering,
+    });
+  }
+
+  async function deleteCustomAppearanceTheme(id) {
+    const current = currentAppearance();
+    const themeId = String(id || current.activeThemeId || "").trim();
+    if (!themeId) return;
+    const remainingThemes = current.customThemes.filter((theme) => theme.id !== themeId);
+    if (remainingThemes.length === current.customThemes.length) return;
+    const next = current.activeThemeId === themeId
+      ? normalizeAppearanceSettings({
+          ...defaultAppearanceSettings(),
+          customThemes: remainingThemes,
+        })
+      : normalizeAppearanceSettings({
+          ...current,
+          customThemes: remainingThemes,
+        });
+    syncAppearanceControls(next);
+    await persistAppearanceSettings(next);
   }
 
   function applyOsdAppearanceAttributes(appearance) {
@@ -461,6 +1152,8 @@ export function createSettingsFeature({
     });
     if (activeSection === "osd") {
       syncOsdAppearanceControls();
+    } else if (activeSection === "appearance") {
+      syncAppearanceControls();
     }
     scheduleSettingsNavIndicatorSync({ animate: true });
   }
@@ -698,6 +1391,7 @@ export function createSettingsFeature({
     requestAnimationFrame(() => {
       renderAllSettingsSelectDropdowns();
       syncOsdAppearanceControls();
+      syncAppearanceControls();
     });
   }
 
@@ -888,10 +1582,14 @@ export function createSettingsFeature({
           exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
           autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
           language: normalizeLanguage(settings.language ?? settings.languageCode ?? "en"),
+          appearance: settings.appearance && typeof settings.appearance === "object"
+            ? normalizeAppearanceSettings(settings.appearance)
+            : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme),
         };
         if (typeof setAppSettings === "function") {
           setAppSettings(next);
         }
+        setAppearanceState(next.appearance);
         await i18n?.setLocale?.(next.language).catch((error) => {
           console.error("Failed to apply language setting", error);
         });
@@ -925,6 +1623,67 @@ export function createSettingsFeature({
           activateSettingsSection(sectionButton.dataset.settingsSection);
           return;
         }
+        const colorClose = event.target.closest("[data-appearance-color-close]");
+        if (colorClose && d.settingsPanel.contains(colorClose)) {
+          closeAppearanceColorPicker();
+          return;
+        }
+        const pickerSwatch = event.target.closest("[data-appearance-picker-swatch]");
+        if (pickerSwatch && d.settingsPanel.contains(pickerSwatch)) {
+          setAppearanceColorPickerHex(pickerSwatch.dataset.appearancePickerSwatch, { persist: true });
+          return;
+        }
+        const optionSwatch = event.target.closest("[data-appearance-option-swatch]");
+        if (optionSwatch && d.settingsPanel.contains(optionSwatch)) {
+          const control = findAppearanceColorControl(
+            optionSwatch.dataset.appearanceColorRole,
+            optionSwatch.dataset.appearanceToken,
+          );
+          closeAppearanceColorPicker();
+          applyAppearanceColorControlValue(control, optionSwatch.dataset.appearanceOptionSwatch, { persist: true });
+          return;
+        }
+        const colorTrigger = event.target.closest("[data-appearance-color-trigger]");
+        if (colorTrigger && d.settingsPanel.contains(colorTrigger)) {
+          const trigger = colorTrigger.dataset.appearanceColorTrigger;
+          if (trigger === "token") {
+            const token = colorTrigger.dataset.appearanceToken;
+            const name = colorTrigger.dataset.appearanceColorName || "";
+            const resolved = resolveAppearance(currentAppearance(), { matchMediaSource: window });
+            openAppearanceColorPicker({
+              target: "token",
+              token,
+              name,
+              color: colorInputValue(resolved.tokens[token]),
+              anchor: colorTrigger,
+            });
+          } else {
+            openAppearanceColorPicker({
+              target: "accent",
+              name: t("settings.appearance.accentColor"),
+              color: currentAppearance().accentColor,
+              anchor: colorTrigger,
+            });
+          }
+          return;
+        }
+        const deleteCustom = event.target.closest("[data-appearance-delete-custom]");
+        if (deleteCustom && d.settingsPanel.contains(deleteCustom)) {
+          deleteCustomAppearanceTheme(deleteCustom.dataset.appearanceDeleteCustom);
+          return;
+        }
+        const appearancePreset = event.target.closest("[data-appearance-preset]");
+        if (appearancePreset && d.settingsPanel.contains(appearancePreset)) {
+          const presetId = appearancePreset.dataset.appearancePreset;
+          const kind = appearancePreset.dataset.appearancePresetKind;
+          const next = kind === "custom"
+            ? selectCustomAppearanceTheme(presetId)
+            : applyBuiltInPreset(currentAppearance(), presetId);
+          closeAppearanceColorPicker();
+          syncAppearanceControls(next);
+          persistAppearanceSettings(next);
+          return;
+        }
         const styleButton = event.target.closest("[data-osd-style-option]");
         if (styleButton && d.settingsPanel.contains(styleButton) && d.osdStyleSelect) {
           d.osdStyleSelect.value = normalizeOsdStyle(styleButton.dataset.osdStyleOption);
@@ -934,6 +1693,22 @@ export function createSettingsFeature({
         if (d.settingsPanel.classList.contains("target-panel") && event.target === d.settingsPanel) {
           closeSettingsPanel();
         }
+        const colorPopover = appearanceEl("appearance-color-popover");
+        if (appearanceColorPickerState.open && colorPopover && !colorPopover.contains(event.target)) {
+          closeAppearanceColorPicker();
+        }
+      });
+      d.settingsPanel.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && appearanceColorPickerState.open) {
+          closeAppearanceColorPicker();
+          event.preventDefault();
+          return;
+        }
+        if (event.key !== "Enter" && event.key !== " ") return;
+        const appearancePreset = event.target.closest("[data-appearance-preset]");
+        if (!appearancePreset || !d.settingsPanel.contains(appearancePreset)) return;
+        event.preventDefault();
+        appearancePreset.click();
       });
       d.settingsPanel.addEventListener("input", (event) => {
         if (event.target === d.osdTransparencyInput) {
@@ -946,6 +1721,44 @@ export function createSettingsFeature({
           const scale = clampNumber(Number(d.osdScaleInput.value) / 100, 0.75, 1.5, defaultOsdAppearance.scale);
           const current = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
           syncOsdAppearanceUi({ ...current, scale });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-color-hue")) {
+          setAppearanceColorPickerHsv({ h: Number(event.target.value) });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-color-hex")) {
+          setAppearanceColorPickerHex(event.target.value, { syncHex: false });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-temperature")) {
+          applyAppearanceUpdate({ colorTemperature: Number(event.target.value) });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-font-size")) {
+          applyAppearanceUpdate({ fontSize: Number(event.target.value) });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-background-glow")) {
+          applyAppearanceUpdate(appearanceBackgroundGlowPatch(event.target.value));
+          return;
+        }
+        if (event.target === appearanceEl("appearance-surface-contrast")) {
+          applyAppearanceUpdate({ surfaceContrast: Number(event.target.value) });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-icon-glow")) {
+          applyAppearanceUpdate({ iconGlow: Number(event.target.value) });
+          return;
+        }
+        const intensityInput = event.target.closest("[data-appearance-intensity-token]");
+        if (intensityInput && d.settingsPanel.contains(intensityInput)) {
+          const value = Math.round(clampNumber(intensityInput.value, 0, 100, 100));
+          const control = findAppearanceIntensityControl(intensityInput.dataset.appearanceIntensityToken);
+          const valueEl = intensityInput.parentElement?.querySelector(".appearance-token-intensity-value");
+          intensityInput.style.setProperty("--range-fill", `${sliderFillPercent(intensityInput, value)}%`);
+          if (valueEl) valueEl.textContent = `${value}%`;
+          applyAppearanceColorControlIntensity(control, value);
         }
       });
       d.settingsPanel.addEventListener("change", (event) => {
@@ -966,6 +1779,69 @@ export function createSettingsFeature({
           applyOsdSettings({
             scale: clampNumber(Number(d.osdScaleInput.value) / 100, 0.75, 1.5, defaultOsdAppearance.scale),
           });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-color-hue")) {
+          setAppearanceColorPickerHsv({ h: Number(event.target.value) }, { persist: true });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-color-hex")) {
+          const updated = setAppearanceColorPickerHex(event.target.value, { persist: true });
+          if (!updated) syncAppearanceColorPickerUi();
+          return;
+        }
+        if (event.target === appearanceEl("appearance-temperature")) {
+          applyAppearanceUpdate({ colorTemperature: Number(event.target.value) }, { persist: true });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-font-size")) {
+          applyAppearanceUpdate({ fontSize: Number(event.target.value) }, { persist: true });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-background-glow")) {
+          applyAppearanceUpdate(appearanceBackgroundGlowPatch(event.target.value), { persist: true });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-surface-contrast")) {
+          applyAppearanceUpdate({ surfaceContrast: Number(event.target.value) }, { persist: true });
+          return;
+        }
+        if (event.target === appearanceEl("appearance-icon-glow")) {
+          applyAppearanceUpdate({ iconGlow: Number(event.target.value) }, { persist: true });
+          return;
+        }
+        const intensityInput = event.target.closest("[data-appearance-intensity-token]");
+        if (intensityInput && d.settingsPanel.contains(intensityInput)) {
+          const value = Math.round(clampNumber(intensityInput.value, 0, 100, 100));
+          const control = findAppearanceIntensityControl(intensityInput.dataset.appearanceIntensityToken);
+          applyAppearanceColorControlIntensity(control, value, { persist: true, render: false });
+          return;
+        }
+      });
+      const colorField = appearanceEl("appearance-color-field");
+      if (colorField) {
+        colorField.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          appearanceColorPickerState.dragging = true;
+          colorField.setPointerCapture?.(event.pointerId);
+          updateAppearanceColorPickerFromField(event);
+        });
+        colorField.addEventListener("pointermove", (event) => {
+          if (!appearanceColorPickerState.dragging) return;
+          updateAppearanceColorPickerFromField(event);
+        });
+        const finishColorDrag = (event) => {
+          if (!appearanceColorPickerState.dragging) return;
+          appearanceColorPickerState.dragging = false;
+          updateAppearanceColorPickerFromField(event, { persist: true });
+          colorField.releasePointerCapture?.(event.pointerId);
+        };
+        colorField.addEventListener("pointerup", finishColorDrag);
+        colorField.addEventListener("pointercancel", finishColorDrag);
+      }
+      window.addEventListener("resize", () => {
+        if (appearanceColorPickerState.open) {
+          positionAppearanceColorPicker(appearanceColorPickerState.anchor);
         }
       });
       scheduleSettingsControlSync();
@@ -1142,5 +2018,6 @@ export function createSettingsFeature({
     activateSettingsSection,
     renderAllSettingsSelectDropdowns,
     syncOsdAppearanceControls,
+    syncAppearanceControls,
   };
 }

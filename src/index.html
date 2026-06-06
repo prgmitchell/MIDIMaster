@@ -75,14 +75,13 @@
         </div>
         <div class="topbar-divider" aria-hidden="true"></div>
         <div class="topbar-field">
-          <label class="topbar-label" for="midi-device" data-i18n="topbar.inputDevice">Input Device</label>
-          <select id="midi-device" title="Input Device" data-i18n-title="topbar.inputDevice"></select>
+          <label class="topbar-label" for="midi-device" data-i18n="topbar.inputDevice">Input Device(s)</label>
+          <select id="midi-device" title="Input Device(s)" data-i18n-title="topbar.inputDevice"></select>
         </div>
         <div class="topbar-field">
-          <label class="topbar-label" for="midi-output-device" data-i18n="topbar.outputDevice">Output Device</label>
-          <select id="midi-output-device" title="Output Device" data-i18n-title="topbar.outputDevice"></select>
+          <label class="topbar-label" for="midi-output-device" data-i18n="topbar.outputDevice">Output Device(s)</label>
+          <select id="midi-output-device" title="Output Device(s)" data-i18n-title="topbar.outputDevice"></select>
         </div>
-        <div class="topbar-divider" aria-hidden="true"></div>
         <div class="topbar-actions">
           <button id="topbar-update-button" class="topbar-icon-button topbar-update-button hidden" type="button" aria-label="Update available" title="Update available" data-i18n-aria-label="topbar.updateAvailable" data-i18n-title="topbar.updateAvailable">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -91,25 +90,6 @@
               <path d="M5 19h14" />
             </svg>
             <span class="update-dot" aria-hidden="true"></span>
-          </button>
-          <button id="theme-toggle-button" class="topbar-icon-button" type="button" aria-label="Switch to light mode" title="Switch to light mode" data-i18n-aria-label="theme.switchToLight" data-i18n-title="theme.switchToLight" aria-pressed="true">
-            <svg class="theme-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <g class="theme-icon-sun">
-                <circle cx="12" cy="12" r="3.3"></circle>
-                <path d="M12 3.5v1.8"></path>
-                <path d="M12 18.7v1.8"></path>
-                <path d="m5.98 5.98 1.27 1.27"></path>
-                <path d="m16.75 16.75 1.27 1.27"></path>
-                <path d="M3.5 12h1.8"></path>
-                <path d="M18.7 12h1.8"></path>
-                <path d="m5.98 18.02 1.27-1.27"></path>
-                <path d="m16.75 7.25 1.27-1.27"></path>
-              </g>
-              <g class="theme-icon-moon">
-                <path class="theme-icon-moon-crescent" d="M19.6 13.15A7.1 7.1 0 0 1 10.85 4.4 7.8 7.8 0 1 0 19.6 13.15Z"></path>
-                <circle class="theme-icon-moon-dot" cx="16.7" cy="5.2" r="0.8"></circle>
-              </g>
-            </svg>
           </button>
         </div>
       </header>
@@ -211,6 +191,22 @@
                       </svg>
                     </span>
                     <span class="settings-nav-label" data-i18n="settings.osd">On-Screen Display</span>
+                  </button>
+                  <button class="settings-nav-item" type="button" data-settings-section="appearance">
+                    <span class="settings-nav-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M12 3v2"></path>
+                        <path d="M12 19v2"></path>
+                        <path d="M3 12h2"></path>
+                        <path d="M19 12h2"></path>
+                        <path d="m5.65 5.65 1.4 1.4"></path>
+                        <path d="m16.95 16.95 1.4 1.4"></path>
+                        <path d="m18.35 5.65-1.4 1.4"></path>
+                        <path d="m7.05 16.95-1.4 1.4"></path>
+                        <path d="M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z"></path>
+                      </svg>
+                    </span>
+                    <span class="settings-nav-label" data-i18n="settings.appearance">Appearance</span>
                   </button>
                   <button class="settings-nav-item" type="button" data-settings-section="maintenance">
                     <span class="settings-nav-icon" aria-hidden="true">
@@ -451,6 +447,90 @@
                         <div class="settings-field-help" data-i18n="settings.osdPositionHelp">The on-screen display will appear in the selected area of your screen.</div>
                       </div>
                     </div>
+                  </div>
+                </section>
+
+                <section class="settings-section settings-section-panel settings-appearance-section" data-settings-panel="appearance">
+                  <div class="settings-appearance-card">
+                    <div class="appearance-preset-preview-row">
+                      <div class="appearance-preset-column">
+                        <div class="settings-card-section-heading settings-card-section-heading--inline">
+                          <span data-i18n="settings.appearance.themePresets">Theme Presets</span>
+                        </div>
+                        <div id="appearance-presets" class="appearance-presets" aria-label="Theme presets" data-i18n-aria-label="settings.appearance.themePresets"></div>
+                      </div>
+                    </div>
+
+                    <div class="appearance-settings-grid">
+                      <div class="settings-card-section-heading settings-card-section-heading--inline">
+                        <span data-i18n="settings.appearance.themeCustomization">Theme Customization</span>
+                      </div>
+                      <div class="appearance-subcard">
+                        <div class="appearance-control-group appearance-control-group--theme-colors">
+                          <label class="appearance-control-label" data-i18n="settings.appearance.themeColors">Theme Colors</label>
+                          <div id="appearance-theme-colors" class="appearance-theme-colors"></div>
+                        </div>
+                        <div class="appearance-range-stack">
+                          <div class="appearance-control-group appearance-control-group--temperature">
+                            <label class="appearance-control-label" for="appearance-temperature" data-i18n="settings.appearance.colorTemperature">Color Temperature</label>
+                            <div class="settings-range-control">
+                              <input id="appearance-temperature" class="binding-volume-slider" type="range" min="0" max="100" step="1" value="50" />
+                              <span id="appearance-temperature-value" class="settings-range-value">50%</span>
+                            </div>
+                          </div>
+                          <div class="appearance-inline-control appearance-inline-control--background-glow">
+                            <label class="appearance-control-label" for="appearance-background-glow" data-i18n="settings.appearance.backgroundGlow">Background Glow</label>
+                            <div class="settings-range-control">
+                              <input id="appearance-background-glow" class="binding-volume-slider" type="range" min="0" max="100" step="1" value="30" />
+                              <span id="appearance-background-glow-value" class="settings-range-value">30%</span>
+                            </div>
+                          </div>
+                          <div class="appearance-inline-control appearance-inline-control--font-size">
+                            <label class="appearance-control-label" for="appearance-font-size" data-i18n="settings.appearance.fontSize">Font Size</label>
+                            <div class="settings-range-control">
+                              <input id="appearance-font-size" class="binding-volume-slider" type="range" min="11" max="18" step="1" value="12" />
+                              <span id="appearance-font-size-value" class="settings-range-value">12px</span>
+                            </div>
+                          </div>
+                          <div class="appearance-inline-control appearance-inline-control--surface-contrast">
+                            <label class="appearance-control-label" for="appearance-surface-contrast" data-i18n="settings.appearance.surfaceContrast">Surface Contrast</label>
+                            <div class="settings-range-control">
+                              <input id="appearance-surface-contrast" class="binding-volume-slider" type="range" min="0" max="100" step="1" value="50" />
+                              <span id="appearance-surface-contrast-value" class="settings-range-value">50%</span>
+                            </div>
+                          </div>
+                          <div class="appearance-inline-control appearance-inline-control--icon-glow">
+                            <label class="appearance-control-label" for="appearance-icon-glow" data-i18n="settings.appearance.iconGlow">Icon Glow</label>
+                            <div class="settings-range-control">
+                              <input id="appearance-icon-glow" class="binding-volume-slider" type="range" min="0" max="100" step="1" value="50" />
+                              <span id="appearance-icon-glow-value" class="settings-range-value">50%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="appearance-color-popover" class="appearance-color-popover hidden" role="dialog" aria-label="Custom color" data-i18n-aria-label="settings.appearance.customColor">
+                      <div class="appearance-color-popover-header">
+                        <span id="appearance-color-popover-title" data-i18n="settings.appearance.customColor">Custom Color</span>
+                        <button type="button" class="appearance-color-close" data-appearance-color-close aria-label="Close" data-i18n-aria-label="common.close">
+                          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M6 6l12 12"></path>
+                            <path d="M18 6L6 18"></path>
+                          </svg>
+                        </button>
+                      </div>
+                      <div id="appearance-color-field" class="appearance-color-field" tabindex="0" aria-label="Custom color" data-i18n-aria-label="settings.appearance.customColor">
+                        <span class="appearance-color-field-handle" aria-hidden="true"></span>
+                      </div>
+                      <input id="appearance-color-hue" class="appearance-color-hue" type="range" min="0" max="359" step="1" value="210" aria-label="Hue" data-i18n-aria-label="settings.appearance.hue" />
+                      <div id="appearance-color-suggestions" class="appearance-color-suggestions" aria-label="Suggested colors" data-i18n-aria-label="settings.appearance.suggestedColors"></div>
+                      <div class="appearance-color-footer">
+                        <span class="appearance-color-preview" aria-hidden="true"></span>
+                        <input id="appearance-color-hex" class="appearance-color-hex" type="text" value="#5aa7ff" maxlength="7" spellcheck="false" aria-label="Hex color" data-i18n-aria-label="settings.appearance.hexColor" />
+                      </div>
+                    </div>
+
                   </div>
                 </section>
 

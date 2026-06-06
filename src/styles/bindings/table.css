@@ -287,7 +287,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, #39d8ff, #66b3ff);
+  background: var(--slider-fill);
   transform: scaleX(0);
   transform-origin: left center;
   transition:
@@ -318,10 +318,10 @@
 
 .binding-button-value--stateful.is-active {
   background: var(--slider-track);
-  border-color: #66b3ff;
+  border-color: var(--slider-fill);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, #66b3ff 24%, transparent),
-    0 0 10px color-mix(in srgb, #66b3ff 18%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--slider-fill) 24%, transparent),
+    0 0 10px color-mix(in srgb, var(--slider-fill) 18%, transparent);
 }
 
 .binding-button-value--momentary::after {
@@ -1324,7 +1324,7 @@ body[data-theme] .binding-momentary-value::before {
   content: "";
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, #39d8ff, #66b3ff);
+  background: var(--slider-fill);
   transform: scaleX(0);
   transform-origin: left center;
   transition:
@@ -1355,10 +1355,10 @@ body[data-theme] .binding-button-value--stateful {
 
 body[data-theme] .binding-button-value--stateful.is-active {
   background: var(--slider-track);
-  border-color: #66b3ff;
+  border-color: var(--slider-fill);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, #66b3ff 24%, transparent),
-    0 0 10px color-mix(in srgb, #66b3ff 18%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--slider-fill) 24%, transparent),
+    0 0 10px color-mix(in srgb, var(--slider-fill) 18%, transparent);
 }
 
 body[data-theme] .binding-button-value--momentary::after {

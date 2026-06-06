@@ -53,6 +53,9 @@ jobs:
       - name: Test frontend focus target core
         run: node scripts/test-target-core-focus.mjs
 
+      - name: Test frontend appearance settings
+        run: node scripts/test-appearance.mjs
+
       - name: Test bundled Hue plugin
         run: node scripts/test-hue-plugin.mjs
 

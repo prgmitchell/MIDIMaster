@@ -28,6 +28,12 @@ import {
   normalizeProfileMidiPreference,
   normalizeProfileMidiRoutes,
 } from "./app/preferences.js";
+import {
+  appearanceFromLegacyTheme,
+  applyAppearanceToDocument,
+  defaultAppearanceSettings,
+  normalizeAppearanceSettings,
+} from "./app/appearance.js";
 import { createSessionRefresher } from "./app/session_refresh.js";
 import { createPluginRuntime } from "./app/plugin_runtime.js";
 import { createDomRefs } from "./app/dom_refs.js";
@@ -190,7 +196,6 @@ const {
   learnPanelConfirm,
   learnPanelClose,
   settingsButton,
-  themeToggleButton,
   topbarUpdateButton,
   settingsPanel,
   settingsPanelClose,
@@ -260,6 +265,7 @@ const startupSearchParams = new URLSearchParams(window.location.search);
 const isOsdWindow = startupSearchParams.has("osd");
 const isUpdateWindow = startupSearchParams.has("update");
 const themeStorageKey = "uiTheme";
+const appearanceStorageKey = "midimasterAppearance";
 const sidebarCollapsedStorageKey = "sidebarCollapsed";
 const midiInputStorageKey = "midiDeviceId";
 const BACKEND_ECHO_SUPPRESSION_MS = 220;
@@ -274,22 +280,6 @@ let persistedMidiOutputName = "";
 let persistedMidiRoutes = [];
 let persistedActiveProfileName = "";
 let activeMidiRouteCount = 0;
-
-function updateThemeToggleMeta(isDark) {
-  if (!themeToggleButton) return;
-  const label = isDark ? t("theme.switchToLight") : t("theme.switchToDark");
-  themeToggleButton.setAttribute("aria-label", label);
-  themeToggleButton.setAttribute("aria-pressed", String(isDark));
-  themeToggleButton.setAttribute("title", label);
-  themeToggleButton.title = label;
-}
-
-function applyTheme(nextTheme) {
-  const isDark = nextTheme === "dark";
-  document.body.dataset.theme = isDark ? "dark" : "light";
-  document.body.classList.toggle("dark-mode", isDark);
-  updateThemeToggleMeta(isDark);
-}
 
 function muteIconSvg(muted) {
   if (muted) {
@@ -337,15 +327,20 @@ function loadStoredTheme() {
   return "dark";
 }
 
-function toggleTheme() {
-  const nextTheme = document.body.classList.contains("dark-mode") ? "light" : "dark";
-  applyTheme(nextTheme);
+function loadStoredAppearance() {
   try {
-    localStorage.setItem(themeStorageKey, nextTheme);
+    const stored = localStorage.getItem(appearanceStorageKey);
+    if (stored) {
+      return normalizeAppearanceSettings(JSON.parse(stored));
+    }
+    const storedTheme = localStorage.getItem(themeStorageKey);
+    if (storedTheme === "dark" || storedTheme === "light" || storedTheme === "system") {
+      return appearanceFromLegacyTheme(storedTheme);
+    }
   } catch {
     // ignore storage failures
   }
-  invoke("set_theme_preference", { theme: nextTheme }).catch(() => { });
+  return defaultAppearanceSettings();
 }
 
 function getSavedMidiDeviceIds() {
@@ -429,15 +424,14 @@ async function hydrateClientPreferences() {
       return;
     }
 
-    const savedTheme = settings.ui_theme ?? settings.uiTheme;
-    if (savedTheme === "dark" || savedTheme === "light") {
-      applyTheme(savedTheme);
-      try {
-        localStorage.setItem(themeStorageKey, savedTheme);
-      } catch {
-        // ignore storage failures
-      }
-    }
+    const savedAppearance = settings.appearance && typeof settings.appearance === "object"
+      ? normalizeAppearanceSettings(settings.appearance)
+      : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme);
+    appSettings = {
+      ...appSettings,
+      appearance: savedAppearance,
+    };
+    applyAppearanceToDocument(savedAppearance, { matchMediaSource: window });
 
     const savedInputId = settings.midi_input_device_id ?? settings.midiInputDeviceId ?? "";
     const savedOutputId = settings.midi_output_device_id ?? settings.midiOutputDeviceId ?? "";
@@ -693,7 +687,7 @@ const {
 } = appShellRuntime;
 
 if (!isOsdWindow && !isUpdateWindow) {
-  applyTheme(loadStoredTheme());
+  applyAppearanceToDocument(loadStoredAppearance(), { matchMediaSource: window });
   applySidebarCollapsed(true);
 }
 
@@ -896,8 +890,37 @@ let appSettings = {
   exitToTray: false,
   autoCheckUpdates: true,
   language: "en",
+  appearance: defaultAppearanceSettings(),
 };
 let appStarted = false;
+
+function applyGlobalAppearance(nextAppearance) {
+  const appearance = normalizeAppearanceSettings(nextAppearance || appSettings.appearance);
+  appSettings = {
+    ...appSettings,
+    appearance,
+  };
+  return applyAppearanceToDocument(appearance, { matchMediaSource: window });
+}
+
+function bindSystemAppearanceListener() {
+  const query = typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
+  if (!query) return;
+  const handler = () => {
+    const appearance = normalizeAppearanceSettings(appSettings.appearance || loadStoredAppearance());
+    if (appearance.activeThemeId === "system") {
+      applyGlobalAppearance(appearance);
+      settingsFeature?.syncAppearanceControls?.();
+    }
+  };
+  if (typeof query.addEventListener === "function") {
+    query.addEventListener("change", handler);
+  } else if (typeof query.addListener === "function") {
+    query.addListener(handler);
+  }
+}
 
 pluginRuntime = createPluginRuntime({
   invoke,
@@ -962,6 +985,7 @@ settingsFeature = createSettingsFeature({
   setMonitorOptions: (next) => { monitorOptions = next; },
   getAppSettings: () => appSettings,
   setAppSettings: (next) => { appSettings = next; },
+  applyAppearance: applyGlobalAppearance,
   onUpdateAvailableClick: showUpdateAvailableDialog,
 });
 diagnosticInfo("settings_factory_ok");
@@ -1658,10 +1682,6 @@ appShell?.addEventListener?.("transitionend", (event) => {
   }
 });
 scheduleSidebarNavIndicatorSync();
-
-if (themeToggleButton) {
-  themeToggleButton.addEventListener("click", toggleTheme);
-}
 
 alertsController.bindUi();
 
@@ -2479,7 +2499,8 @@ async function init() {
     diagnosticError("i18n_init_failed", error);
   });
   applyTranslations();
-  applyTheme(document.body.classList.contains("dark-mode") ? "dark" : "light");
+  applyGlobalAppearance(appSettings.appearance || loadStoredAppearance());
+  bindSystemAppearanceListener();
   diagnosticInfo("hydrate_client_preferences_start");
   await hydrateClientPreferences();
   diagnosticInfo("hydrate_client_preferences_done");

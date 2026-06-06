@@ -1,17 +1,68 @@
 use crate::{
     app_paths::app_data_root_dir,
-    app_settings::AppSettings,
+    app_settings::{AppAppearanceSettings, AppSettings, AppearanceTheme},
     collect_monitor_descriptors,
     model::{MidiDevicePreference, MidiDeviceRoute, OsdSettings},
     run_logger, AppState,
 };
-use serde::Serialize;
-use std::process::Command;
+use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, fs, process::Command};
 use tauri::{AppHandle, Emitter, State};
 
 const SUPPORTED_LANGUAGE_CODES: &[&str] = &[
     "en", "fr", "es", "de", "it", "pt-BR", "nl", "pl", "ja", "ko", "zh-Hans",
 ];
+const APPEARANCE_THEME_FILE_KIND: &str = "midimaster.appearance.theme.v1";
+const BUILT_IN_APPEARANCE_IDS: &[&str] = &[
+    "system", "dark", "light", "midnight", "ocean", "forest", "sunset",
+];
+const SUPPORTED_FONT_FAMILIES: &[&str] = &["bahnschrift", "aptos", "segoe", "inter", "mono"];
+const SUPPORTED_TEXT_RENDERING: &[&str] = &["auto", "legibility", "geometric", "speed"];
+const ALLOWED_APPEARANCE_TOKEN_KEYS: &[&str] = &[
+    "--app-bg",
+    "--sidebar-bg",
+    "--topbar-bg",
+    "--surface",
+    "--surface-raised",
+    "--surface-muted",
+    "--surface-subtle",
+    "--control-bg",
+    "--control-bg-hover",
+    "--control-border",
+    "--control-border-intensity",
+    "--control-border-strong",
+    "--text-primary",
+    "--text-primary-intensity",
+    "--text-secondary",
+    "--text-muted",
+    "--theme-tint",
+    "--theme-tint-intensity",
+    "--icon-color",
+    "--icon-color-intensity",
+    "--accent",
+    "--accent-intensity",
+    "--accent-soft",
+    "--danger",
+    "--danger-soft",
+    "--success",
+    "--success-soft",
+    "--shadow-raised",
+    "--chip-bg",
+    "--chip-border",
+    "--chip-text",
+    "--slider-track",
+    "--slider-fill",
+    "--slider-thumb",
+    "--overlay-bg",
+    "--accent-strong",
+];
+
+#[derive(Clone, Serialize, Deserialize)]
+struct AppearanceThemeFile {
+    kind: String,
+    version: u32,
+    theme: AppearanceTheme,
+}
 
 #[derive(Clone, Serialize)]
 pub struct MonitorInfo {
@@ -235,6 +286,115 @@ pub fn update_app_settings(
     Ok(())
 }
 
+#[tauri::command]
+pub fn update_appearance_settings(
+    state: State<AppState>,
+    appearance: AppAppearanceSettings,
+) -> Result<AppAppearanceSettings, String> {
+    let normalized = normalize_appearance_settings(appearance)?;
+    run_logger::info(
+        "settings",
+        "update_appearance_settings",
+        &format!(
+            "active_theme_id={} custom_theme_count={}",
+            normalized.active_theme_id,
+            normalized.custom_themes.len()
+        ),
+    );
+
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    settings.ui_theme = legacy_theme_for_appearance(&normalized);
+    settings.appearance = normalized.clone();
+    let updated = settings.clone();
+    drop(settings);
+
+    state
+        .app_settings_store
+        .save(&updated)
+        .map_err(|err| err.to_string())?;
+    Ok(updated.appearance)
+}
+
+#[tauri::command]
+pub fn export_appearance_theme(theme: AppearanceTheme) -> Result<Option<String>, String> {
+    let theme = normalize_appearance_theme(theme)?;
+    let file_name = format!("{}.json", safe_file_stem(&theme.name));
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .set_file_name(&file_name)
+        .save_file()
+    else {
+        return Ok(None);
+    };
+
+    let payload = AppearanceThemeFile {
+        kind: APPEARANCE_THEME_FILE_KIND.to_string(),
+        version: 1,
+        theme,
+    };
+    let data = serde_json::to_string_pretty(&payload).map_err(|err| err.to_string())?;
+    fs::write(&path, data).map_err(|err| err.to_string())?;
+    Ok(Some(path.display().to_string()))
+}
+
+#[tauri::command]
+pub fn import_appearance_theme(
+    state: State<AppState>,
+) -> Result<Option<AppAppearanceSettings>, String> {
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .pick_file()
+    else {
+        return Ok(None);
+    };
+
+    let data = fs::read_to_string(&path).map_err(|err| err.to_string())?;
+    let payload: AppearanceThemeFile =
+        serde_json::from_str(&data).map_err(|err| err.to_string())?;
+    if payload.kind != APPEARANCE_THEME_FILE_KIND || payload.version != 1 {
+        return Err("Selected file is not a MIDIMaster appearance theme.".to_string());
+    }
+
+    let mut imported = normalize_appearance_theme(payload.theme)?;
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    let mut appearance = normalize_appearance_settings(settings.appearance.clone())?;
+    imported.name = unique_theme_name(&appearance.custom_themes, &imported.name);
+    imported.id = unique_theme_id(&appearance.custom_themes, &imported.name);
+
+    appearance.active_theme_id = imported.id.clone();
+    appearance.accent_color = imported.accent_color.clone();
+    appearance.color_temperature = imported.color_temperature;
+    appearance.corner_radius = imported.corner_radius;
+    appearance.animations = imported.animations;
+    appearance.background_effects = imported.background_effects;
+    appearance.effect_intensity = imported.effect_intensity;
+    appearance.surface_contrast = imported.surface_contrast;
+    appearance.icon_glow = imported.icon_glow;
+    appearance.transparency = imported.transparency;
+    appearance.font_family = imported.font_family.clone();
+    appearance.font_size = imported.font_size;
+    appearance.text_rendering = imported.text_rendering.clone();
+    appearance.custom_themes.push(imported);
+    let appearance = normalize_appearance_settings(appearance)?;
+
+    settings.ui_theme = legacy_theme_for_appearance(&appearance);
+    settings.appearance = appearance.clone();
+    let updated = settings.clone();
+    drop(settings);
+
+    state
+        .app_settings_store
+        .save(&updated)
+        .map_err(|err| err.to_string())?;
+    Ok(Some(updated.appearance))
+}
+
 fn normalize_language(language: Option<&str>) -> String {
     let value = language.unwrap_or("en").trim();
     if SUPPORTED_LANGUAGE_CODES.contains(&value) {
@@ -244,10 +404,240 @@ fn normalize_language(language: Option<&str>) -> String {
     }
 }
 
+fn normalize_appearance_settings(
+    mut appearance: AppAppearanceSettings,
+) -> Result<AppAppearanceSettings, String> {
+    appearance.active_theme_id = normalize_id(&appearance.active_theme_id, "system");
+    appearance.accent_color = normalize_hex_color(&appearance.accent_color, "#5aa7ff");
+    appearance.color_temperature = appearance.color_temperature.clamp(0.0, 100.0);
+    appearance.corner_radius = appearance.corner_radius.clamp(0.0, 16.0);
+    appearance.effect_intensity = appearance.effect_intensity.clamp(0.0, 100.0);
+    appearance.surface_contrast = appearance.surface_contrast.clamp(0.0, 100.0);
+    appearance.icon_glow = appearance.icon_glow.clamp(0.0, 100.0);
+    appearance.transparency = appearance.transparency.clamp(0.0, 80.0);
+    appearance.font_family = normalize_choice(
+        &appearance.font_family,
+        SUPPORTED_FONT_FAMILIES,
+        "bahnschrift",
+    );
+    appearance.font_size = appearance.font_size.clamp(11.0, 18.0);
+    appearance.text_rendering =
+        normalize_choice(&appearance.text_rendering, SUPPORTED_TEXT_RENDERING, "auto");
+    appearance.tokens = normalize_appearance_tokens(appearance.tokens)?;
+
+    let mut custom_themes = Vec::new();
+    for theme in appearance.custom_themes {
+        let normalized = normalize_appearance_theme(theme)?;
+        if !custom_themes
+            .iter()
+            .any(|existing: &AppearanceTheme| existing.id == normalized.id)
+        {
+            custom_themes.push(normalized);
+        }
+    }
+    let has_active_custom = custom_themes
+        .iter()
+        .any(|theme| theme.id == appearance.active_theme_id);
+    if !BUILT_IN_APPEARANCE_IDS.contains(&appearance.active_theme_id.as_str()) && !has_active_custom
+    {
+        appearance.active_theme_id = "system".to_string();
+    }
+    appearance.custom_themes = custom_themes;
+    Ok(appearance)
+}
+
+fn normalize_appearance_theme(mut theme: AppearanceTheme) -> Result<AppearanceTheme, String> {
+    theme.id = normalize_id(&theme.id, "custom-theme");
+    if BUILT_IN_APPEARANCE_IDS.contains(&theme.id.as_str()) {
+        theme.id = format!("custom-{}", theme.id);
+    }
+    theme.name = normalize_theme_name(&theme.name);
+    theme.scheme = normalize_choice(&theme.scheme, &["dark", "light"], "dark");
+    theme.base_preset_id = normalize_id(&theme.base_preset_id, &theme.scheme);
+    theme.accent_color = normalize_hex_color(
+        &theme.accent_color,
+        if theme.scheme == "light" {
+            "#2f78d4"
+        } else {
+            "#5aa7ff"
+        },
+    );
+    theme.color_temperature = theme.color_temperature.clamp(0.0, 100.0);
+    theme.corner_radius = theme.corner_radius.clamp(0.0, 16.0);
+    theme.effect_intensity = theme.effect_intensity.clamp(0.0, 100.0);
+    theme.surface_contrast = theme.surface_contrast.clamp(0.0, 100.0);
+    theme.icon_glow = theme.icon_glow.clamp(0.0, 100.0);
+    theme.transparency = theme.transparency.clamp(0.0, 80.0);
+    theme.font_family =
+        normalize_choice(&theme.font_family, SUPPORTED_FONT_FAMILIES, "bahnschrift");
+    theme.font_size = theme.font_size.clamp(11.0, 18.0);
+    theme.text_rendering =
+        normalize_choice(&theme.text_rendering, SUPPORTED_TEXT_RENDERING, "auto");
+    theme.tokens = normalize_appearance_tokens(theme.tokens)?;
+    Ok(theme)
+}
+
+fn normalize_appearance_tokens(
+    tokens: BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut safe_tokens = BTreeMap::new();
+    for (key, value) in tokens {
+        let key = key.trim().to_string();
+        let value = value.trim().to_string();
+        if !ALLOWED_APPEARANCE_TOKEN_KEYS.contains(&key.as_str()) {
+            return Err(format!("Theme token is not supported: {}", key));
+        }
+        if !is_safe_token_value(&key, &value) {
+            return Err(format!("Theme token value is not supported for {}", key));
+        }
+        safe_tokens.insert(key, value);
+    }
+    Ok(safe_tokens)
+}
+
+fn normalize_id(value: &str, fallback: &str) -> String {
+    let mut output = String::new();
+    let mut last_dash = false;
+    for ch in value.trim().to_ascii_lowercase().chars() {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            output.push(ch);
+            last_dash = false;
+        } else if (ch == '-' || ch.is_ascii_whitespace()) && !last_dash && !output.is_empty() {
+            output.push('-');
+            last_dash = true;
+        }
+    }
+    while output.ends_with('-') {
+        output.pop();
+    }
+    if output.is_empty() {
+        fallback.to_string()
+    } else {
+        output.chars().take(64).collect()
+    }
+}
+
+fn normalize_theme_name(value: &str) -> String {
+    let mut output = value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string();
+    if output.is_empty() {
+        output = "Custom Theme".to_string();
+    }
+    output.chars().take(64).collect()
+}
+
+fn normalize_choice(value: &str, allowed: &[&str], fallback: &str) -> String {
+    let normalized = value.trim();
+    if allowed.contains(&normalized) {
+        normalized.to_string()
+    } else {
+        fallback.to_string()
+    }
+}
+
+fn normalize_hex_color(value: &str, fallback: &str) -> String {
+    let trimmed = value.trim();
+    if is_hex_color(trimmed) {
+        return trimmed.to_ascii_lowercase();
+    }
+    fallback.to_string()
+}
+
+fn is_hex_color(value: &str) -> bool {
+    let Some(hex) = value.strip_prefix('#') else {
+        return false;
+    };
+    hex.len() == 6 && hex.chars().all(|ch| ch.is_ascii_hexdigit())
+}
+
+fn is_safe_token_value(key: &str, value: &str) -> bool {
+    if value.is_empty() || value.len() > 128 {
+        return false;
+    }
+    if value.contains(';')
+        || value.contains('{')
+        || value.contains('}')
+        || value.contains('<')
+        || value.contains('>')
+        || value.contains('\n')
+        || value.contains('\r')
+        || value.to_ascii_lowercase().contains("url(")
+    {
+        return false;
+    }
+    if key.ends_with("-intensity") {
+        return value
+            .parse::<f64>()
+            .map(|number| (0.0..=100.0).contains(&number))
+            .unwrap_or(false);
+    }
+    is_hex_color(value)
+        || value.starts_with("rgb(")
+        || value.starts_with("rgba(")
+        || value.starts_with("hsl(")
+        || value.starts_with("hsla(")
+        || value.starts_with("color-mix(")
+}
+
+fn legacy_theme_for_appearance(appearance: &AppAppearanceSettings) -> String {
+    match appearance.active_theme_id.as_str() {
+        "light" => "light".to_string(),
+        "system" => "system".to_string(),
+        _ => "dark".to_string(),
+    }
+}
+
+fn safe_file_stem(name: &str) -> String {
+    let normalized = normalize_id(name, "midimaster-theme");
+    if normalized.is_empty() {
+        "midimaster-theme".to_string()
+    } else {
+        normalized
+    }
+}
+
+fn unique_theme_name(existing: &[AppearanceTheme], desired: &str) -> String {
+    let base = normalize_theme_name(desired);
+    let names = existing
+        .iter()
+        .map(|theme| theme.name.to_ascii_lowercase())
+        .collect::<std::collections::HashSet<_>>();
+    if !names.contains(&base.to_ascii_lowercase()) {
+        return base;
+    }
+    for index in 2..1000 {
+        let candidate = format!("{} {}", base, index);
+        if !names.contains(&candidate.to_ascii_lowercase()) {
+            return candidate;
+        }
+    }
+    format!("{} {}", base, existing.len() + 1)
+}
+
+fn unique_theme_id(existing: &[AppearanceTheme], name: &str) -> String {
+    let base = normalize_id(name, "custom-theme");
+    let ids = existing
+        .iter()
+        .map(|theme| theme.id.clone())
+        .collect::<std::collections::HashSet<_>>();
+    let mut candidate = base.clone();
+    let mut index = 2;
+    while BUILT_IN_APPEARANCE_IDS.contains(&candidate.as_str()) || ids.contains(&candidate) {
+        candidate = format!("{}-{}", base, index);
+        index += 1;
+    }
+    candidate
+}
+
 #[tauri::command]
 pub fn set_theme_preference(state: State<AppState>, theme: String) -> Result<(), String> {
     let normalized = match theme.as_str() {
         "dark" => "dark".to_string(),
+        "system" => "system".to_string(),
         _ => "light".to_string(),
     };
 
@@ -255,7 +645,8 @@ pub fn set_theme_preference(state: State<AppState>, theme: String) -> Result<(),
         .app_settings
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
-    settings.ui_theme = normalized;
+    settings.ui_theme = normalized.clone();
+    settings.appearance.active_theme_id = normalized;
     let updated = settings.clone();
     drop(settings);
 
@@ -584,5 +975,32 @@ pub fn pick_autohotkey_script_path() -> Result<Option<PickAutoHotkeyScriptResult
     #[cfg(not(target_os = "windows"))]
     {
         Err("AutoHotkey Script is currently supported only on Windows".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_appearance_settings;
+    use crate::app_settings::{AppAppearanceSettings, AppearanceTheme};
+
+    #[test]
+    fn appearance_surface_contrast_and_icon_glow_are_clamped() {
+        let mut appearance = AppAppearanceSettings {
+            surface_contrast: 125.0,
+            icon_glow: -20.0,
+            ..AppAppearanceSettings::default()
+        };
+        appearance.custom_themes.push(AppearanceTheme {
+            surface_contrast: -10.0,
+            icon_glow: 140.0,
+            ..AppearanceTheme::default()
+        });
+
+        let normalized = normalize_appearance_settings(appearance).expect("normalize appearance");
+
+        assert_eq!(normalized.surface_contrast, 100.0);
+        assert_eq!(normalized.icon_glow, 0.0);
+        assert_eq!(normalized.custom_themes[0].surface_contrast, 0.0);
+        assert_eq!(normalized.custom_themes[0].icon_glow, 100.0);
     }
 }

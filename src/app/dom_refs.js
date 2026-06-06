@@ -128,7 +128,6 @@ export function createDomRefs() {
   const learnPanelConfirm = document.getElementById("learn-panel-confirm");
   const learnPanelClose = document.getElementById("learn-panel-close");
   const settingsButton = document.getElementById("settings-button");
-  const themeToggleButton = document.getElementById("theme-toggle-button");
   const topbarUpdateButton = document.getElementById("topbar-update-button");
   const settingsPanel = document.getElementById("settings-panel");
   const settingsPanelClose = document.getElementById("settings-panel-close");
@@ -267,7 +266,6 @@ export function createDomRefs() {
     learnPanelConfirm,
     learnPanelClose,
     settingsButton,
-    themeToggleButton,
     topbarUpdateButton,
     settingsPanel,
     settingsPanelClose,
