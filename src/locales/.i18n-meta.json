@@ -27,8 +27,8 @@
     "common.value": "8e37953d23daca5ff01b8282c33f4e0a2152f1d1885f94c06418617e3ee1d24e",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -449,7 +449,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -480,8 +484,8 @@
     "common.value": "8e37953d23daca5ff01b8282c33f4e0a2152f1d1885f94c06418617e3ee1d24e",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "theme.switchToLight": "bfa0cab91d75f7a4861cd6dd19aa4363a6ca8005463857d46362f1fb08b09a31",
@@ -901,7 +905,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -941,8 +949,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -1353,7 +1361,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1393,8 +1405,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -1805,7 +1817,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1845,8 +1861,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -2257,7 +2273,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2297,8 +2317,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -2709,7 +2729,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2749,8 +2773,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -3161,7 +3185,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -3197,8 +3225,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -3613,7 +3641,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -3649,8 +3681,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -4065,7 +4097,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4101,8 +4137,8 @@
     "common.additionalTags": "0f0fe91cc8c25b29c04e41efbdaf4151869559c3fba3012178aaa513ac1d7d24",
     "topbar.profile": "d696a35bdd1883da07a8d6c41bb7a3153381b23aa197629ee273479a6eaa5a9c",
     "topbar.defaultProfile": "21b111cbfe6e8fca2d181c43f53ad548b22e38aca955b9824706a504b0a07a2d",
-    "topbar.inputDevice": "967438abb32e13c209ff51b9c6d6dccee63703d84ab6896db1ff2e20becbd63e",
-    "topbar.outputDevice": "6c1703d6ca1470098531ebb636584251f35ba65fb72219f5b4bab25e3030e4dc",
+    "topbar.inputDevice": "7ec928cc3a9ece81cacd866ea990a874c91db4c604779a2a6af361911a7e3e75",
+    "topbar.outputDevice": "decf77747096051dbdcea04356817d9d781d24c83e0589879bd84efe7644eed7",
     "topbar.updateAvailable": "ff8b555d818f0b25bbdd1bec8b479660bac7fc276acbe993e759bf67fed32c34",
     "topbar.updateAvailableVersion": "ce4db99f767ff663045794c02f774d0e538a661e288ffc3bbadc8ca4fe6bca8d",
     "profiles.selectProfile": "d42c2434603d234a1cc580163cc5c38e4e3c974002795ab41f8f1397454c8e37",
@@ -4517,7 +4553,11 @@
     "settings.appearance.themeColorValue": "303a6947690d513ab13affa926008744c826e5f19f3d976eae9c56c38092d51d",
     "settings.appearance.suggestedColors": "86b8e1ea5a7d1c733d2dcd4df02e8f0d88d4ead36291cbab6aa7cf58b6e0cb88",
     "settings.appearance.colorValue": "83dccbfeeffb7805d4ce2125bcbe3c2ad957ededa5e0857b466c0caa035310e6",
-    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b"
+    "settings.appearance.iconColor": "a35abcd6dac9a2e5c1d7d6a58b9bcd2e7b00cad33a8aa63b75766f1ba6ce207b",
+    "settings.appearance.themeCustomization": "677346f8015f5ac6e51e13741e3e829464e8e36a1966c27f41c5c40d661116af",
+    "settings.appearance.iconGlow": "f4e665a78adbe98bd422c7162bc2c088ce00809dc5a0cf40ce3c77e38e1e799f",
+    "settings.appearance.backgroundGlow": "acfa10de3af3b07b5e5c1804c418df704bd599b541685e161d8681a4ef70af5b",
+    "settings.appearance.surfaceContrast": "33981ad061153ecd45b8b9e1929cdc9ddf28c413301bb1fbd2127691676ba7d1"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",
