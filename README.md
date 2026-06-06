@@ -6,7 +6,7 @@ MIDIMaster is a Windows desktop app for mapping MIDI controls like faders, knobs
 and buttons to system audio, app audio sessions, audio devices, utility actions
 like hotkeys and AutoHotkey scripts, and supported integrations.
 
-<img width="1308" height="890" alt="midimaster-night-light" src="https://github.com/user-attachments/assets/80d65d1d-9210-4777-9528-f5b37cf27911" />
+<img width="1282" height="922" alt="image" src="https://github.com/user-attachments/assets/8cf09889-f592-4123-9a12-bfc4cb26cd89" />
 
 ## Platform
 
