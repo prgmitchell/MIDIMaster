@@ -9,10 +9,10 @@ function testAppearanceDefaultsIncludePolishControls() {
   const defaults = appearance.defaultAppearanceSettings();
 
   assert.equal(defaults.backgroundEffects, true);
-  assert.equal(defaults.effectIntensity, 30);
+  assert.equal(defaults.effectIntensity, 40);
   assert.equal(defaults.surfaceContrast, 50);
   assert.equal(defaults.iconGlow, 50);
-  assert.equal(defaults.fontSize, 12);
+  assert.equal(defaults.fontSize, 14);
 }
 
 function testSystemPresetResolvesDarkFromOs() {
@@ -60,7 +60,7 @@ function testBuiltInPresetSelectionResetsPresetAccent() {
   assert.equal(next.accentColor, "#69c95a");
   assert.equal(next.surfaceContrast, 50);
   assert.equal(next.iconGlow, 50);
-  assert.equal(next.fontSize, 12);
+  assert.equal(next.fontSize, 14);
   assert.equal(next.customThemes.length, 0);
 }
 

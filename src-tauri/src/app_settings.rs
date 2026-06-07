@@ -24,7 +24,7 @@ fn default_true() -> bool {
 }
 
 fn default_effect_intensity() -> f64 {
-    30.0
+    40.0
 }
 
 fn default_surface_contrast() -> f64 {
@@ -44,7 +44,7 @@ fn default_font_family() -> String {
 }
 
 fn default_font_size() -> f64 {
-    12.0
+    14.0
 }
 
 fn default_text_rendering() -> String {
@@ -277,7 +277,7 @@ mod tests {
         assert!(settings.start_with_windows);
         assert!(settings.minimize_to_tray);
         assert_eq!(settings.appearance.active_theme_id, "system");
-        assert_eq!(settings.appearance.font_size, 12.0);
+        assert_eq!(settings.appearance.font_size, 14.0);
         assert_eq!(settings.appearance.surface_contrast, 50.0);
         assert_eq!(settings.appearance.icon_glow, 50.0);
     }
@@ -307,7 +307,7 @@ mod tests {
         let appearance = AppAppearanceSettings::default();
         assert_eq!(appearance.active_theme_id, "system");
         assert_eq!(appearance.font_family, "bahnschrift");
-        assert_eq!(appearance.font_size, 12.0);
+        assert_eq!(appearance.font_size, 14.0);
         assert_eq!(appearance.surface_contrast, 50.0);
         assert_eq!(appearance.icon_glow, 50.0);
         assert!(appearance.animations);

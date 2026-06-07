@@ -160,12 +160,14 @@
   min-height: 0;
 }
 
-.settings-general-section .settings-startup-card {
-  flex: 0 0 auto;
+.settings-general-section.active {
+  display: grid;
+  grid-template-rows: minmax(0, 5fr) minmax(0, 3fr);
+  gap: 12px;
 }
 
+.settings-general-section .settings-startup-card,
 .settings-general-section .settings-update-card {
-  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -245,7 +247,7 @@
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 0;
   align-items: stretch;
 }
 
@@ -258,6 +260,10 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.settings-appearance-control + .settings-appearance-control {
+  padding-left: 16px;
 }
 
 .settings-appearance-control > span:first-child {
@@ -303,7 +309,7 @@
 .osd-style-segment {
   min-width: 0;
   height: 32px;
-  padding: 0 6px;
+  padding: 0 2px;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -389,6 +395,8 @@
 
 .settings-startup-card {
   padding: 0;
+  display: grid;
+  grid-template-rows: auto repeat(5, minmax(54px, 1fr));
   gap: 0;
 }
 
@@ -1273,6 +1281,9 @@ body[data-theme="light"] .settings-osd-preview-stand {
 
 .settings-maintenance-button--danger {
   min-width: 240px;
+  border-color: color-mix(in srgb, var(--danger) 76%, var(--control-border));
+  background: color-mix(in srgb, var(--danger-soft) 72%, var(--surface-raised));
+  color: var(--danger);
 }
 
 body[data-theme] .settings-maintenance-button--danger:hover,
@@ -1327,6 +1338,8 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 
 .settings-update-card {
   padding: 0;
+  display: grid;
+  grid-template-rows: auto minmax(54px, 1fr) minmax(56px, 1fr) minmax(46px, 1fr);
   gap: 0;
 }
 
@@ -2396,6 +2409,184 @@ body[data-theme] .midi-routes-button.has-multiple-routes:hover {
 
 body[data-theme="light"] .midi-routes-button:hover {
   background: color-mix(in srgb, var(--accent) 9%, var(--control-bg));
+}
+
+body[data-theme] {
+  --ambient-glow-accent: color-mix(in srgb, var(--accent) var(--appearance-effect-accent, 0%), transparent);
+  --ambient-glow-success: color-mix(in srgb, var(--success) var(--appearance-effect-success, 0%), transparent);
+  --ambient-glow-accent-card: color-mix(in srgb, var(--ambient-glow-accent) 48%, transparent);
+  --ambient-glow-success-card: color-mix(in srgb, var(--ambient-glow-success) 42%, transparent);
+  --ambient-panel-background:
+    radial-gradient(circle at 7% -8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 98% 108%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) var(--appearance-surface-opacity-percent, 70%), transparent),
+      color-mix(in srgb, var(--surface) var(--appearance-surface-opacity-percent, 70%), transparent)
+    );
+  --ambient-card-background:
+    radial-gradient(circle at 2% -22%, var(--ambient-glow-accent-card), transparent 34%),
+    radial-gradient(circle at 104% 118%, var(--ambient-glow-success-card), transparent 44%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 94%, transparent),
+      color-mix(in srgb, var(--surface) 94%, transparent)
+    );
+  --ambient-panel-background-subtle:
+    radial-gradient(circle at 2% -24%, color-mix(in srgb, var(--ambient-glow-accent-card) 58%, transparent), transparent 38%),
+    radial-gradient(circle at 104% 124%, color-mix(in srgb, var(--ambient-glow-success-card) 58%, transparent), transparent 48%),
+    color-mix(in srgb, var(--surface) 94%, transparent);
+  --ambient-danger-card-background:
+    radial-gradient(circle at 0% -22%, color-mix(in srgb, var(--danger) 7%, transparent), transparent 36%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 95%, transparent),
+      color-mix(in srgb, var(--surface) 95%, transparent)
+    );
+  --ambient-row-background: color-mix(in srgb, var(--surface) 76%, transparent);
+  --ambient-row-hover-background: color-mix(in srgb, var(--surface-muted) 82%, transparent);
+  --ambient-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 76%, transparent),
+      color-mix(in srgb, var(--surface) 58%, transparent)
+    );
+}
+
+body[data-theme="light"] {
+  --ambient-glow-accent-card: color-mix(in srgb, var(--ambient-glow-accent) 28%, transparent);
+  --ambient-glow-success-card: color-mix(in srgb, var(--ambient-glow-success) 24%, transparent);
+  --ambient-panel-background:
+    radial-gradient(circle at 7% -8%, color-mix(in srgb, var(--ambient-glow-accent) 58%, transparent), transparent 38%),
+    radial-gradient(circle at 98% 108%, color-mix(in srgb, var(--ambient-glow-success) 52%, transparent), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 98%, var(--app-bg) 2%),
+      color-mix(in srgb, var(--surface) 96%, var(--app-bg) 4%)
+    );
+  --ambient-card-background:
+    radial-gradient(circle at 0% -24%, var(--ambient-glow-accent-card), transparent 32%),
+    radial-gradient(circle at 104% 118%, var(--ambient-glow-success-card), transparent 42%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 98%, var(--app-bg) 2%),
+      color-mix(in srgb, var(--surface) 97%, var(--app-bg) 3%)
+    );
+  --ambient-panel-background-subtle:
+    radial-gradient(circle at 0% -24%, color-mix(in srgb, var(--ambient-glow-accent-card) 50%, transparent), transparent 36%),
+    radial-gradient(circle at 104% 124%, color-mix(in srgb, var(--ambient-glow-success-card) 50%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface) 96%, var(--app-bg) 4%);
+  --ambient-danger-card-background:
+    radial-gradient(circle at 0% -22%, color-mix(in srgb, var(--danger) 5%, transparent), transparent 36%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 98%, var(--app-bg) 2%),
+      color-mix(in srgb, var(--surface) 97%, var(--app-bg) 3%)
+    );
+  --ambient-row-background: color-mix(in srgb, var(--surface-raised) 90%, var(--app-bg) 10%);
+  --ambient-row-hover-background: color-mix(in srgb, var(--surface-muted) 78%, var(--surface-raised) 22%);
+  --ambient-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 90%, var(--app-bg) 10%),
+      color-mix(in srgb, var(--surface) 88%, var(--app-bg) 12%)
+    );
+}
+
+body[data-theme] .bindings-card,
+body[data-theme] .target-panel-content,
+body[data-theme] .alert-panel-content,
+body[data-theme] .learn-panel-content {
+  background: var(--ambient-panel-background);
+  background-clip: padding-box;
+}
+
+body[data-theme] .settings-card,
+body[data-theme] .settings-list-card,
+body[data-theme] .inline-panel,
+body[data-theme] .modal-content,
+body[data-theme] .plugins-manager-row,
+body[data-theme] .plugins-store-row,
+body[data-theme] #plugins-page .plugins-browser-card,
+body[data-theme] .profile-page-row {
+  background: var(--ambient-card-background);
+  background-clip: padding-box;
+}
+
+body[data-theme] .settings-maintenance-section,
+body[data-theme] .settings-updates-section {
+  background: transparent;
+  border-color: transparent;
+}
+
+body[data-theme] .settings-maintenance-card--danger {
+  background: var(--ambient-danger-card-background);
+}
+
+body[data-theme] .bindings-empty,
+body[data-theme] .profile-page-empty,
+body[data-theme] .plugins-store-empty,
+body[data-theme] .plugins-manager-loading,
+body[data-theme] .settings-maintenance-inset,
+body[data-theme] .settings-update-summary {
+  background: var(--ambient-panel-background-subtle);
+  background-clip: padding-box;
+}
+
+body[data-theme] .binding-headers,
+body[data-theme] .settings-card-section-heading {
+  background: var(--ambient-header-background);
+}
+
+body[data-theme] .list-item.binding-item {
+  background: transparent;
+}
+
+body[data-theme] .binding-row {
+  background: var(--ambient-row-background);
+}
+
+body[data-theme] .list-item.binding-item:hover {
+  background: transparent;
+}
+
+body[data-theme] .binding-row:hover,
+body[data-theme] .list-item.binding-item:hover .binding-row {
+  background: var(--ambient-row-hover-background);
+}
+
+body[data-theme] .settings-action,
+body[data-theme] #plugins-page .plugins-browser-action {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--control-bg) 90%, var(--surface-raised) 10%),
+      color-mix(in srgb, var(--control-bg) 82%, var(--surface) 18%)
+    );
+  border-color: color-mix(in srgb, var(--control-border) 82%, var(--accent) 18%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+body[data-theme] .settings-action:hover,
+body[data-theme] #plugins-page .plugins-browser-action:hover {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--control-bg-hover) 88%, var(--surface-raised) 12%),
+      color-mix(in srgb, var(--control-bg-hover) 80%, var(--surface) 20%)
+    );
+  border-color: color-mix(in srgb, var(--control-border-strong) 72%, var(--accent) 28%);
+}
+
+body[data-theme] .settings-update-card > .settings-action {
+  background: color-mix(in srgb, var(--accent-soft) 28%, var(--control-bg));
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--control-border));
+  color: var(--text-primary);
+}
+
+body[data-theme] .settings-update-card > .settings-action:hover {
+  background: color-mix(in srgb, var(--accent-soft) 42%, var(--control-bg-hover));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--control-border-strong));
 }
 
 body[data-theme] :where(

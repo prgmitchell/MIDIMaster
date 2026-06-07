@@ -3,6 +3,7 @@ export const APPEARANCE_THEME_FILE_KIND = "midimaster.appearance.theme.v1";
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 const BUILT_IN_IDS = new Set(["system", "dark", "light", "midnight", "ocean", "forest", "sunset"]);
 const DEFAULT_FONT_FAMILY = "bahnschrift";
+const DEFAULT_FONT_SIZE = 14;
 const DEFAULT_TEXT_RENDERING = "auto";
 
 const FONT_STACKS = {
@@ -670,12 +671,12 @@ export function defaultAppearanceSettings() {
     cornerRadius: 4,
     animations: true,
     backgroundEffects: true,
-    effectIntensity: 30,
+    effectIntensity: 40,
     surfaceContrast: 50,
     iconGlow: 50,
     transparency: 30,
     fontFamily: DEFAULT_FONT_FAMILY,
-    fontSize: 12,
+    fontSize: DEFAULT_FONT_SIZE,
     textRendering: DEFAULT_TEXT_RENDERING,
     tokens: {},
     customThemes: [],
@@ -685,12 +686,12 @@ export function defaultAppearanceSettings() {
 export function appearanceBackgroundGlowValue(appearance) {
   const settings = normalizeAppearanceSettings(appearance);
   return settings.backgroundEffects
-    ? Math.round(clampNumber(settings.effectIntensity, 0, 100, 30))
+    ? Math.round(clampNumber(settings.effectIntensity, 0, 100, 40))
     : 0;
 }
 
 export function appearanceBackgroundGlowPatch(value) {
-  const glow = Math.round(clampNumber(value, 0, 100, 30));
+  const glow = Math.round(clampNumber(value, 0, 100, 40));
   return {
     backgroundEffects: glow > 0,
     effectIntensity: glow,
@@ -713,12 +714,12 @@ export function normalizeCustomTheme(theme, index = 0) {
     cornerRadius: clampNumber(source.cornerRadius ?? source.corner_radius, 0, 16, 4),
     animations: normalizeBoolean(source.animations, true),
     backgroundEffects: normalizeBoolean(source.backgroundEffects ?? source.background_effects, true),
-    effectIntensity: clampNumber(source.effectIntensity ?? source.effect_intensity, 0, 100, 30),
+    effectIntensity: clampNumber(source.effectIntensity ?? source.effect_intensity, 0, 100, 40),
     surfaceContrast: clampNumber(source.surfaceContrast ?? source.surface_contrast, 0, 100, 50),
     iconGlow: clampNumber(source.iconGlow ?? source.icon_glow, 0, 100, 50),
     transparency: clampNumber(source.transparency, 0, 80, 30),
     fontFamily: FONT_STACKS[source.fontFamily || source.font_family] ? (source.fontFamily || source.font_family) : DEFAULT_FONT_FAMILY,
-    fontSize: clampNumber(source.fontSize ?? source.font_size, 11, 18, 12),
+    fontSize: clampNumber(source.fontSize ?? source.font_size, 11, 18, DEFAULT_FONT_SIZE),
     textRendering: TEXT_RENDERING_MODES[source.textRendering || source.text_rendering] ? (source.textRendering || source.text_rendering) : DEFAULT_TEXT_RENDERING,
     tokens: normalizeCustomTokens(source.tokens),
   };

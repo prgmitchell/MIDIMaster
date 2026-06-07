@@ -5,14 +5,14 @@
   --radius-card: 5px;
   --radius-panel: 6px;
   --app-font-family: "Bahnschrift", "Aptos", "Segoe UI", sans-serif;
-  --app-font-size: 12px;
+  --app-font-size: 14px;
   --text-rendering-mode: auto;
   --motion-fast: 120ms;
   --motion-normal: 180ms;
   --motion-page: 100ms;
-  --appearance-effect-opacity: 0.3;
-  --appearance-effect-accent: 10%;
-  --appearance-effect-success: 7%;
+  --appearance-effect-opacity: 0.4;
+  --appearance-effect-accent: 13%;
+  --appearance-effect-success: 9%;
   --appearance-surface-opacity: 0.7;
   --appearance-surface-opacity-percent: 70%;
   --app-logo-filter: hue-rotate(0deg) saturate(100%) brightness(100%);
