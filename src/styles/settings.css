@@ -162,7 +162,7 @@
 
 .settings-general-section.active {
   display: grid;
-  grid-template-rows: minmax(0, 5fr) minmax(0, 3fr);
+  grid-template-rows: minmax(280px, 5fr) minmax(204px, 3fr);
   gap: 12px;
 }
 
@@ -396,17 +396,17 @@
 .settings-startup-card {
   padding: 0;
   display: grid;
-  grid-template-rows: auto repeat(5, minmax(54px, 1fr));
+  grid-template-rows: auto repeat(5, minmax(48px, 1fr));
   gap: 0;
 }
 
 .settings-startup-row {
-  min-height: 54px;
+  min-height: 48px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px;
   gap: 18px;
   align-items: center;
-  padding: 9px 16px;
+  padding: 7px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--control-border) 48%, transparent);
 }
 
@@ -1339,7 +1339,7 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 .settings-update-card {
   padding: 0;
   display: grid;
-  grid-template-rows: auto minmax(54px, 1fr) minmax(56px, 1fr) minmax(46px, 1fr);
+  grid-template-rows: auto minmax(48px, 1fr) minmax(64px, auto) minmax(52px, auto);
   gap: 0;
 }
 
@@ -1352,9 +1352,9 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  min-height: 56px;
-  margin: 10px 16px 12px;
-  padding: 9px 14px;
+  min-height: 48px;
+  margin: 8px 16px;
+  padding: 7px 14px;
   border: 1px solid color-mix(in srgb, var(--control-border) 58%, transparent);
   border-radius: 5px;
   background:
@@ -1445,7 +1445,8 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 
 .settings-update-card > .settings-action {
   width: calc(100% - 32px);
-  margin: 0 16px 20px;
+  min-height: 40px;
+  margin: 0 16px 12px;
 }
 
 .settings-mini-toggle {
@@ -2451,6 +2452,46 @@ body[data-theme] {
       color-mix(in srgb, var(--surface-raised) 76%, transparent),
       color-mix(in srgb, var(--surface) 58%, transparent)
     );
+  --ambient-bindings-background:
+    radial-gradient(circle at 4% -12%, var(--ambient-glow-accent), transparent 34%),
+    radial-gradient(circle at 96% 112%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 82%, transparent),
+      color-mix(in srgb, var(--surface) 74%, transparent)
+    );
+  --ambient-bindings-toolbar-background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--ambient-glow-accent) 74%, transparent), transparent 38%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 88%, transparent),
+      color-mix(in srgb, var(--surface) 74%, transparent)
+    );
+  --ambient-binding-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 28%, transparent),
+      color-mix(in srgb, var(--surface) 16%, transparent)
+    );
+  --ambient-binding-row-background: color-mix(in srgb, var(--surface) 18%, transparent);
+  --ambient-binding-row-hover-background: color-mix(in srgb, var(--surface-muted) 42%, transparent);
+  --ambient-osd-card-background:
+    radial-gradient(circle at 6% -10%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 96% 108%, var(--ambient-glow-success), transparent 48%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 90%, transparent),
+      color-mix(in srgb, var(--surface) 84%, transparent)
+    );
+  --ambient-osd-preview-background:
+    radial-gradient(circle at 18% 10%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 82% 88%, var(--ambient-glow-success), transparent 44%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-muted) 78%, var(--theme-tint) 22%) 0%,
+      color-mix(in srgb, var(--surface) 80%, var(--theme-tint) 20%) 58%,
+      color-mix(in srgb, var(--surface-subtle) 80%, var(--theme-tint) 20%) 100%
+    );
 }
 
 body[data-theme="light"] {
@@ -2491,6 +2532,47 @@ body[data-theme="light"] {
       color-mix(in srgb, var(--surface-raised) 90%, var(--app-bg) 10%),
       color-mix(in srgb, var(--surface) 88%, var(--app-bg) 12%)
     );
+  --ambient-bindings-background:
+    radial-gradient(circle at 4% -12%, var(--ambient-glow-accent), transparent 34%),
+    radial-gradient(circle at 96% 112%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 78%, transparent),
+      color-mix(in srgb, var(--surface) 66%, transparent)
+    );
+  --ambient-bindings-toolbar-background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--ambient-glow-accent) 82%, transparent), transparent 38%),
+    radial-gradient(circle at 100% 115%, color-mix(in srgb, var(--ambient-glow-success) 58%, transparent), transparent 48%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 86%, transparent),
+      color-mix(in srgb, var(--surface) 78%, transparent)
+    );
+  --ambient-binding-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 18%, transparent),
+      color-mix(in srgb, var(--surface) 8%, transparent)
+    );
+  --ambient-binding-row-background: color-mix(in srgb, var(--surface-raised) 8%, transparent);
+  --ambient-binding-row-hover-background: color-mix(in srgb, var(--surface-muted) 34%, transparent);
+  --ambient-osd-card-background:
+    radial-gradient(circle at 7% -8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 98% 108%, var(--ambient-glow-success), transparent 48%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 90%, transparent),
+      color-mix(in srgb, var(--surface) 82%, transparent)
+    );
+  --ambient-osd-preview-background:
+    radial-gradient(circle at 18% 8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 80% 88%, var(--ambient-glow-success), transparent 44%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 78%, transparent) 0%,
+      color-mix(in srgb, var(--surface) 70%, var(--theme-tint) 30%) 58%,
+      color-mix(in srgb, var(--surface-muted) 68%, transparent) 100%
+    );
 }
 
 body[data-theme] .bindings-card,
@@ -2499,6 +2581,31 @@ body[data-theme] .alert-panel-content,
 body[data-theme] .learn-panel-content {
   background: var(--ambient-panel-background);
   background-clip: padding-box;
+}
+
+body[data-theme] #main-screen {
+  background: var(--ambient-bindings-background);
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  background-clip: padding-box;
+  overflow: hidden;
+}
+
+body[data-theme] #main-screen > .page-heading-row,
+body[data-theme] #main-screen .bindings-card {
+  background: transparent;
+  border-color: transparent;
+}
+
+body[data-theme] #main-screen > .page-heading-row {
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--control-border) 44%, transparent);
+  border-radius: 0;
+}
+
+body[data-theme] #main-screen .bindings-card {
+  border: 0;
+  border-radius: 0;
 }
 
 body[data-theme] .settings-card,
@@ -2538,12 +2645,16 @@ body[data-theme] .settings-card-section-heading {
   background: var(--ambient-header-background);
 }
 
+body[data-theme] .binding-headers {
+  background: var(--ambient-binding-header-background);
+}
+
 body[data-theme] .list-item.binding-item {
   background: transparent;
 }
 
 body[data-theme] .binding-row {
-  background: var(--ambient-row-background);
+  background: var(--ambient-binding-row-background, var(--ambient-row-background));
 }
 
 body[data-theme] .list-item.binding-item:hover {
@@ -2552,7 +2663,16 @@ body[data-theme] .list-item.binding-item:hover {
 
 body[data-theme] .binding-row:hover,
 body[data-theme] .list-item.binding-item:hover .binding-row {
-  background: var(--ambient-row-hover-background);
+  background: var(--ambient-binding-row-hover-background, var(--ambient-row-hover-background));
+}
+
+body[data-theme] .settings-osd-section .settings-card {
+  background: var(--ambient-osd-card-background);
+  background-clip: padding-box;
+}
+
+body[data-theme] .settings-osd-preview-screen {
+  background: var(--ambient-osd-preview-background);
 }
 
 body[data-theme] .settings-action,
