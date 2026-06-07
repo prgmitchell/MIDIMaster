@@ -170,20 +170,35 @@ body[data-theme] .profile-select .dropdown-item {
   color: var(--text-primary);
 }
 
-body[data-theme] .profile-select .dropdown-item:not(.create):hover,
 body[data-theme] .profile-select .dropdown-item.selected {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
 
-body[data-theme] .profile-select .dropdown-item button:first-child {
+body[data-theme] .profile-select .dropdown-item:not(.create):hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] .profile-select .dropdown-item.selected:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+body[data-theme] .profile-select .dropdown-item:not(.create) button:first-child {
+  background: transparent;
+  border-color: transparent;
   color: var(--text-primary);
   font-weight: 500;
 }
 
-body[data-theme] .profile-select .dropdown-item.selected button:first-child {
+body[data-theme] .profile-select .dropdown-item:not(.create) button:first-child:hover {
   background: transparent;
   border-color: transparent;
+  color: var(--text-primary);
+}
+
+body[data-theme] .profile-select .dropdown-item.selected button:first-child {
   color: var(--accent);
   font-weight: 500;
 }
