@@ -228,6 +228,47 @@ function testSavedRoutesKeepUnavailableRowsWhenIdsAreReused() {
   assert.equal(resolved.routes[1].outputMatch.id, "midi:10");
 }
 
+function testUsbReenumerationRediscoverRoutesBySavedName() {
+  const preference = {
+    routes: [
+      {
+        inputDeviceId: "midi:0",
+        outputDeviceId: "midi:1",
+        inputDeviceName: "Platform X+1 V2.13",
+        outputDeviceName: "Platform X+1 V2.13",
+      },
+      {
+        inputDeviceId: "midi:2",
+        outputDeviceId: "midi:3",
+        inputDeviceName: "MIDI Mix",
+        outputDeviceName: "MIDI Mix",
+      },
+    ],
+  };
+
+  const resolved = midiPreferences.resolvePreferredMidiDeviceRoutes({
+    inputs: [
+      { id: "midi:0", name: "Focusrite USB MIDI" },
+      { id: "midi:1", name: "MIDI Mix" },
+      { id: "midi:2", name: "Platform X+1 V2.13" },
+    ],
+    outputs: [
+      { id: "midi:0", name: "Microsoft GS Wavetable Synth" },
+      { id: "midi:1", name: "Focusrite USB MIDI" },
+      { id: "midi:2", name: "MIDI Mix" },
+      { id: "midi:3", name: "Platform X+1 V2.13" },
+    ],
+  }, preference);
+
+  assert.equal(resolved.available, true);
+  assert.equal(resolved.routes[0].inputMatch.id, "midi:2");
+  assert.equal(resolved.routes[0].outputMatch.id, "midi:3");
+  assert.equal(resolved.routes[0].inputMatch.name, "Platform X+1 V2.13");
+  assert.equal(resolved.routes[0].outputMatch.name, "Platform X+1 V2.13");
+  assert.equal(resolved.routes[1].inputMatch.id, "midi:1");
+  assert.equal(resolved.routes[1].outputMatch.id, "midi:2");
+}
+
 function testStartupPreferencesKeepUnavailableRowsWhenIdsAreReused() {
   const normalized = appPreferences.normalizeProfileMidiRoutes({
     routes: [
@@ -319,6 +360,14 @@ function testSuspectBackendHealthTriggersSamePairRecovery() {
     suspect: true,
     reason: "output_send_failed",
   }, connectedPreference), true);
+  assert.equal(midiPreferences.shouldRecoverSuspectMidiPair({
+    inputDeviceId: "midi:0",
+    outputDeviceId: "midi:1",
+    connected: false,
+    inputSuspect: true,
+    inputNameMismatch: true,
+    reason: "input_name_mismatch",
+  }, connectedPreference), true);
 
   const recovering = midiPreferences.resolveMidiDeviceDropdownState({
     selectedValue: connectedPreference.inputDeviceId,
@@ -355,6 +404,7 @@ testDuplicateInputsAndSharedOutputs();
 testTwoRoutesOneDisappearsOtherRemainsResolvable();
 testSavedRouteDoesNotMatchReusedIdWithDifferentName();
 testSavedRoutesKeepUnavailableRowsWhenIdsAreReused();
+testUsbReenumerationRediscoverRoutesBySavedName();
 testStartupPreferencesKeepUnavailableRowsWhenIdsAreReused();
 testHotplugStatusFlow();
 testSuspectBackendHealthTriggersSamePairRecovery();

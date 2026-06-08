@@ -8,8 +8,11 @@ use midir::{
     MidiOutputPort,
 };
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex, OnceLock,
+};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const MIDI_PORT_PREFIX: &str = "midi:";
 const LOG_MIDI_MESSAGES: bool = false;
@@ -20,6 +23,8 @@ const OUTPUT_RECONNECT_SKIPPED_LOG_INTERVAL: Duration = Duration::from_secs(30);
 const MAX_OUTPUT_RECONNECT_FAILURES: u32 = 3;
 static INPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
 static OUTPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
+static INPUT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(0);
+static OUTPUT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(0);
 static EMPTY_INPUT_ENUMERATION_LOG_STATE: OnceLock<Mutex<EmptyEnumerationLogState>> =
     OnceLock::new();
 static INPUT_DIAGNOSTICS: OnceLock<Mutex<HashMap<MidiDiagnosticKey, MidiDiagnosticState>>> =
@@ -69,6 +74,15 @@ pub struct MidiConnectionHealth {
     pub connected: bool,
     pub suspect: bool,
     pub reason: String,
+    pub input_suspect: bool,
+    pub input_name_mismatch: bool,
+    pub expected_input_name: Option<String>,
+    pub actual_input_name: Option<String>,
+    pub last_input_seen_at: Option<u64>,
+    pub output_suspect: bool,
+    pub output_name_mismatch: bool,
+    pub expected_output_name: Option<String>,
+    pub actual_output_name: Option<String>,
 }
 
 pub struct MidiManager {
@@ -79,7 +93,12 @@ pub struct MidiManager {
 struct MidiInputRoute {
     input_connection: Option<MidiInputConnection<()>>,
     input_device_id: String,
+    input_device_name: String,
     output_device_id: String,
+    input_connection_suspect: bool,
+    input_connection_suspect_reason: Option<String>,
+    input_inventory_generation: u64,
+    last_input_seen_at_ms: Arc<AtomicU64>,
 }
 
 struct MidiOutputRoute {
@@ -90,6 +109,14 @@ struct MidiOutputRoute {
     reconnect_failures: u32,
     connection_suspect: bool,
     connection_suspect_reason: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct PreparedMidiRoute {
+    input_device_id: String,
+    output_device_id: String,
+    input_device_name: Option<String>,
+    output_device_name: Option<String>,
 }
 
 impl MidiManager {
@@ -170,7 +197,7 @@ impl MidiManager {
         self.input_routes.len()
     }
 
-    pub fn connection_health(&self) -> MidiConnectionHealth {
+    pub fn connection_health(&mut self) -> MidiConnectionHealth {
         self.route_health()
             .into_iter()
             .next()
@@ -180,20 +207,65 @@ impl MidiManager {
                 connected: false,
                 suspect: false,
                 reason: String::new(),
+                input_suspect: false,
+                input_name_mismatch: false,
+                expected_input_name: None,
+                actual_input_name: None,
+                last_input_seen_at: None,
+                output_suspect: false,
+                output_name_mismatch: false,
+                expected_output_name: None,
+                actual_output_name: None,
             })
     }
 
-    pub fn route_health(&self) -> Vec<MidiConnectionHealth> {
+    pub fn route_health(&mut self) -> Vec<MidiConnectionHealth> {
+        self.refresh_route_health_state();
         let mut health = self
             .input_routes
             .values()
             .map(|route| {
                 let output = self.output_routes.get(&route.output_device_id);
-                let suspect = output
+                let expected_input_name =
+                    clean_expected_device_name(Some(&route.input_device_name));
+                let actual_input_name = expected_input_name
+                    .as_ref()
+                    .and_then(|_| current_input_port_name(&route.input_device_id).ok());
+                let input_name_mismatch = device_name_mismatch(
+                    expected_input_name.as_deref(),
+                    actual_input_name.as_deref(),
+                );
+                let input_suspect = route.input_connection_suspect || input_name_mismatch;
+                let input_reason = route.input_connection_suspect_reason.clone().or_else(|| {
+                    if input_name_mismatch {
+                        Some("input_name_mismatch".to_string())
+                    } else {
+                        None
+                    }
+                });
+
+                let expected_output_name = output
+                    .and_then(|route| clean_expected_device_name(Some(&route.output_device_name)));
+                let actual_output_name = expected_output_name
+                    .as_ref()
+                    .and_then(|_| current_output_port_name(&route.output_device_id).ok());
+                let output_name_mismatch = device_name_mismatch(
+                    expected_output_name.as_deref(),
+                    actual_output_name.as_deref(),
+                );
+                let output_suspect = output
                     .map(|output| output.connection_suspect)
-                    .unwrap_or(true);
-                let reason = output
+                    .unwrap_or(true)
+                    || output_name_mismatch;
+                let output_reason = output
                     .and_then(|output| output.connection_suspect_reason.clone())
+                    .or_else(|| {
+                        if output_name_mismatch {
+                            Some("output_name_mismatch".to_string())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or_else(|| {
                         if output.is_none() {
                             "output_not_connected".to_string()
@@ -201,20 +273,97 @@ impl MidiManager {
                             String::new()
                         }
                     });
+                let suspect = input_suspect || output_suspect;
+                let reason = input_reason.unwrap_or(output_reason);
                 MidiConnectionHealth {
                     input_device_id: route.input_device_id.clone(),
                     output_device_id: route.output_device_id.clone(),
                     connected: route.input_connection.is_some()
+                        && !input_suspect
                         && output
-                            .map(|output| output.output_connection.is_some() && !suspect)
+                            .map(|output| output.output_connection.is_some() && !output_suspect)
                             .unwrap_or(false),
                     suspect,
                     reason,
+                    input_suspect,
+                    input_name_mismatch,
+                    expected_input_name,
+                    actual_input_name,
+                    last_input_seen_at: atomic_millis_to_option(&route.last_input_seen_at_ms),
+                    output_suspect,
+                    output_name_mismatch,
+                    expected_output_name,
+                    actual_output_name,
                 }
             })
             .collect::<Vec<_>>();
         health.sort_by(|a, b| a.input_device_id.cmp(&b.input_device_id));
         health
+    }
+
+    fn refresh_route_health_state(&mut self) {
+        let input_generation = inventory_generation("input");
+        let input_device_ids = self.input_routes.keys().cloned().collect::<Vec<_>>();
+        for input_device_id in input_device_ids {
+            let Some((expected_name, route_generation, has_connection)) =
+                self.input_routes.get(&input_device_id).map(|route| {
+                    (
+                        clean_expected_device_name(Some(&route.input_device_name)),
+                        route.input_inventory_generation,
+                        route.input_connection.is_some(),
+                    )
+                })
+            else {
+                continue;
+            };
+
+            if let Some(expected_name) = expected_name.as_deref() {
+                match current_input_port_name(&input_device_id) {
+                    Ok(actual_name) if actual_name != expected_name => {
+                        log_route_device_mismatch(
+                            "input",
+                            &input_device_id,
+                            expected_name,
+                            Some(&actual_name),
+                        );
+                        self.mark_input_suspect(
+                            &input_device_id,
+                            "input_name_mismatch",
+                            Some(&actual_name),
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(_) => {
+                        log_route_device_mismatch("input", &input_device_id, expected_name, None);
+                        self.mark_input_suspect(&input_device_id, "input_port_missing", None);
+                    }
+                }
+            }
+
+            if has_connection && input_generation != route_generation {
+                self.mark_input_suspect(&input_device_id, "input_inventory_changed", None);
+            }
+        }
+
+        let output_device_ids = self.output_routes.keys().cloned().collect::<Vec<_>>();
+        for output_device_id in output_device_ids {
+            let Some(expected_name) = self.output_expected_name(&output_device_id) else {
+                continue;
+            };
+            match current_output_port_name(&output_device_id) {
+                Ok(actual_name) if actual_name != expected_name => {
+                    self.mark_output_name_mismatch(
+                        &output_device_id,
+                        &expected_name,
+                        Some(&actual_name),
+                    );
+                }
+                Ok(_) => {}
+                Err(_) => {
+                    self.mark_output_name_mismatch(&output_device_id, &expected_name, None);
+                }
+            }
+        }
     }
 
     fn mark_output_suspect(&mut self, output_device_id: &str, reason: &str) {
@@ -225,38 +374,126 @@ impl MidiManager {
         route.connection_suspect_reason = Some(reason.to_string());
     }
 
+    fn mark_input_suspect(
+        &mut self,
+        input_device_id: &str,
+        reason: &str,
+        actual_input_name: Option<&str>,
+    ) {
+        let Some(route) = self.input_routes.get_mut(input_device_id) else {
+            return;
+        };
+        let should_log = !route.input_connection_suspect
+            || route.input_connection_suspect_reason.as_deref() != Some(reason);
+        route.input_connection_suspect = true;
+        route.input_connection_suspect_reason = Some(reason.to_string());
+        if should_log {
+            run_logger::warn(
+                "midi",
+                "input_marked_suspect",
+                &format!(
+                    "input_device_id={} output_device_id={} expected_input_name={} actual_input_name={} reason={}",
+                    route.input_device_id,
+                    route.output_device_id,
+                    route.input_device_name,
+                    actual_input_name.unwrap_or("<unknown>"),
+                    reason
+                ),
+            );
+        }
+    }
+
     fn clear_output_suspect(route: &mut MidiOutputRoute) {
         route.connection_suspect = false;
         route.connection_suspect_reason = None;
         route.last_reconnect_skipped_log = None;
     }
 
-    fn open_output_connection(output_device_id: &str) -> Result<(MidiOutputConnection, String)> {
-        let output_port_index = output_device_id
-            .strip_prefix(MIDI_PORT_PREFIX)
-            .ok_or_else(|| anyhow!("Invalid output device id"))?
-            .parse::<usize>()?;
+    fn open_output_connection(
+        output_device_id: &str,
+        expected_output_device_name: Option<&str>,
+    ) -> Result<(MidiOutputConnection, String)> {
         let midi_out = MidiOutput::new("MIDIMaster")?;
-        let output_port = find_output_port(&midi_out, output_port_index)?;
-        let output_port_name = midi_out
-            .port_name(&output_port)
-            .unwrap_or_else(|_| format!("Output {}", output_port_index));
+        let (output_port, output_port_name) =
+            resolve_output_port(&midi_out, output_device_id, expected_output_device_name)?;
         let output_connection = midi_out
             .connect(&output_port, "midimaster-output")
             .map_err(|e| anyhow!("Failed to connect to output: {}", e))?;
         Ok((output_connection, output_port_name))
     }
 
-    fn ensure_output_connected(&mut self, output_device_id: &str) -> Result<()> {
-        if self
-            .output_routes
-            .get(output_device_id)
-            .map(|route| route.output_connection.is_some())
-            .unwrap_or(false)
-        {
-            return Ok(());
+    fn ensure_output_connected(
+        &mut self,
+        output_device_id: &str,
+        expected_output_device_name: Option<&str>,
+    ) -> Result<()> {
+        let expected_output_device_name = clean_expected_device_name(expected_output_device_name)
+            .or_else(|| {
+                self.output_routes
+                    .get(output_device_id)
+                    .and_then(|route| clean_expected_device_name(Some(&route.output_device_name)))
+            });
+        if let Some(route) = self.output_routes.get_mut(output_device_id) {
+            if route.output_connection.is_some() {
+                if let Some(expected_name) = expected_output_device_name.as_deref() {
+                    match current_output_port_name(output_device_id) {
+                        Ok(actual_name) => {
+                            if actual_name != expected_name {
+                                log_route_device_mismatch(
+                                    "output",
+                                    output_device_id,
+                                    expected_name,
+                                    Some(&actual_name),
+                                );
+                                route.connection_suspect = true;
+                                route.connection_suspect_reason =
+                                    Some("output_name_mismatch".to_string());
+                                return Err(anyhow!(
+                                    "MIDI output device id {} now resolves to '{}' instead of '{}'",
+                                    output_device_id,
+                                    actual_name,
+                                    expected_name
+                                ));
+                            }
+                            route.output_device_name = actual_name;
+                        }
+                        Err(err) => {
+                            log_route_device_mismatch(
+                                "output",
+                                output_device_id,
+                                expected_name,
+                                None,
+                            );
+                            route.connection_suspect = true;
+                            route.connection_suspect_reason =
+                                Some("output_port_missing".to_string());
+                            return Err(err);
+                        }
+                    }
+                }
+                Self::clear_output_suspect(route);
+                route.reconnect_failures = 0;
+                return Ok(());
+            }
         }
-        let (output_connection, output_port_name) = Self::open_output_connection(output_device_id)?;
+        let (output_connection, output_port_name) =
+            Self::open_output_connection(output_device_id, expected_output_device_name.as_deref())?;
+        if let Some(expected_name) = expected_output_device_name.as_deref() {
+            if output_port_name != expected_name {
+                log_route_device_mismatch(
+                    "output",
+                    output_device_id,
+                    expected_name,
+                    Some(&output_port_name),
+                );
+                return Err(anyhow!(
+                    "MIDI output device id {} now resolves to '{}' instead of '{}'",
+                    output_device_id,
+                    output_port_name,
+                    expected_name
+                ));
+            }
+        }
         match self.output_routes.get_mut(output_device_id) {
             Some(route) => {
                 route.output_connection = Some(output_connection);
@@ -290,10 +527,44 @@ impl MidiManager {
         Ok(())
     }
 
+    fn force_output_reconnect(&mut self, output_device_id: &str) {
+        if let Some(route) = self.output_routes.get_mut(output_device_id) {
+            route.output_connection = None;
+            route.last_reconnect_skipped_log = None;
+        }
+    }
+
+    fn output_expected_name(&self, output_device_id: &str) -> Option<String> {
+        self.output_routes
+            .get(output_device_id)
+            .and_then(|route| clean_expected_device_name(Some(&route.output_device_name)))
+    }
+
+    fn mark_output_name_mismatch(
+        &mut self,
+        output_device_id: &str,
+        expected_name: &str,
+        actual_name: Option<&str>,
+    ) {
+        log_route_device_mismatch("output", output_device_id, expected_name, actual_name);
+        if let Some(route) = self.output_routes.get_mut(output_device_id) {
+            route.connection_suspect = true;
+            route.connection_suspect_reason = Some(
+                if actual_name.is_some() {
+                    "output_name_mismatch"
+                } else {
+                    "output_port_missing"
+                }
+                .to_string(),
+            );
+        }
+    }
+
     pub fn set_device_routes(
         &mut self,
         routes: &[MidiDeviceRoute],
-        on_event: std::sync::Arc<dyn Fn(MidiEvent) + Send + Sync + 'static>,
+        on_event: Arc<dyn Fn(MidiEvent) + Send + Sync + 'static>,
+        force_reconnect: bool,
     ) -> Result<()> {
         let mut next_routes = Vec::new();
         let mut seen_inputs = std::collections::HashSet::new();
@@ -309,12 +580,17 @@ impl MidiManager {
             if !seen_inputs.insert(input_device_id.clone()) {
                 return Err(anyhow!("Duplicate MIDI input route: {}", input_device_id));
             }
-            next_routes.push((input_device_id, output_device_id));
+            next_routes.push(PreparedMidiRoute {
+                input_device_id,
+                output_device_id,
+                input_device_name: clean_expected_device_name(route.input_device_name.as_deref()),
+                output_device_name: clean_expected_device_name(route.output_device_name.as_deref()),
+            });
         }
 
         let desired_inputs = next_routes
             .iter()
-            .map(|(input, _)| input.clone())
+            .map(|route| route.input_device_id.clone())
             .collect::<std::collections::HashSet<_>>();
         let existing_inputs = self.input_routes.keys().cloned().collect::<Vec<_>>();
         for input_device_id in existing_inputs {
@@ -328,29 +604,121 @@ impl MidiManager {
             }
         }
 
-        for (_, output_device_id) in &next_routes {
-            self.ensure_output_connected(output_device_id)?;
+        for route in &next_routes {
+            if force_reconnect {
+                self.force_output_reconnect(&route.output_device_id);
+            }
+            self.ensure_output_connected(
+                &route.output_device_id,
+                route.output_device_name.as_deref(),
+            )?;
         }
 
-        for (input_device_id, output_device_id) in next_routes {
-            if let Some(existing) = self.input_routes.get_mut(&input_device_id) {
-                if existing.output_device_id != output_device_id {
+        let input_inventory_generation = inventory_generation("input");
+        for route in next_routes {
+            let expected_input_device_name = route.input_device_name.clone().or_else(|| {
+                self.input_routes
+                    .get(&route.input_device_id)
+                    .and_then(|existing| {
+                        clean_expected_device_name(Some(&existing.input_device_name))
+                    })
+            });
+            let needs_reconnect = if let Some(existing) =
+                self.input_routes.get_mut(&route.input_device_id)
+            {
+                if let Some(expected_name) = expected_input_device_name.as_deref() {
+                    existing.input_device_name = expected_name.to_string();
+                }
+                if existing.output_device_id != route.output_device_id {
                     run_logger::info(
                         "midi",
                         "input_route_output_changed",
                         &format!(
                             "input_device_id={} previous_output={} next_output={}",
-                            input_device_id, existing.output_device_id, output_device_id
+                            route.input_device_id,
+                            existing.output_device_id,
+                            route.output_device_id
                         ),
                     );
-                    existing.output_device_id = output_device_id;
+                    existing.output_device_id = route.output_device_id.clone();
                 }
+                if input_inventory_generation != existing.input_inventory_generation {
+                    existing.input_connection_suspect = true;
+                    existing.input_connection_suspect_reason =
+                        Some("input_inventory_changed".to_string());
+                    run_logger::warn(
+                        "midi",
+                        "input_marked_suspect",
+                        &format!(
+                            "input_device_id={} output_device_id={} expected_input_name={} actual_input_name=<unknown> reason=input_inventory_changed previous_generation={} current_generation={}",
+                            existing.input_device_id,
+                            existing.output_device_id,
+                            existing.input_device_name,
+                            existing.input_inventory_generation,
+                            input_inventory_generation
+                        ),
+                    );
+                }
+                force_reconnect
+                    || existing.input_connection.is_none()
+                    || existing.input_connection_suspect
+                    || input_inventory_generation != existing.input_inventory_generation
+            } else {
+                true
+            };
+            if !needs_reconnect {
                 continue;
             }
 
-            let route =
-                self.connect_input_route(&input_device_id, &output_device_id, on_event.clone())?;
-            self.input_routes.insert(input_device_id, route);
+            let reconnecting = self.input_routes.remove(&route.input_device_id).is_some();
+            if reconnecting {
+                run_logger::warn(
+                    "midi",
+                    "input_reconnect_attempt",
+                    &format!(
+                        "input_device_id={} output_device_id={} expected_input_name={}",
+                        route.input_device_id,
+                        route.output_device_id,
+                        expected_input_device_name.as_deref().unwrap_or("")
+                    ),
+                );
+            }
+            let input_route = match self.connect_input_route(
+                &route.input_device_id,
+                &route.output_device_id,
+                expected_input_device_name.as_deref(),
+                on_event.clone(),
+            ) {
+                Ok(route) => route,
+                Err(err) => {
+                    run_logger::error(
+                        "midi",
+                        "input_reconnect_failed",
+                        &format!(
+                            "input_device_id={} output_device_id={} expected_input_name={} error={}",
+                            route.input_device_id,
+                            route.output_device_id,
+                            expected_input_device_name.as_deref().unwrap_or(""),
+                            err
+                        ),
+                    );
+                    return Err(err);
+                }
+            };
+            self.input_routes
+                .insert(route.input_device_id.clone(), input_route);
+            if reconnecting {
+                run_logger::info(
+                    "midi",
+                    "input_reconnected",
+                    &format!(
+                        "input_device_id={} output_device_id={} expected_input_name={}",
+                        route.input_device_id,
+                        route.output_device_id,
+                        expected_input_device_name.as_deref().unwrap_or("")
+                    ),
+                );
+            }
         }
 
         let referenced_outputs = self
@@ -377,18 +745,13 @@ impl MidiManager {
         &self,
         input_device_id: &str,
         output_device_id: &str,
-        on_event: std::sync::Arc<dyn Fn(MidiEvent) + Send + Sync + 'static>,
+        expected_input_device_name: Option<&str>,
+        on_event: Arc<dyn Fn(MidiEvent) + Send + Sync + 'static>,
     ) -> Result<MidiInputRoute> {
-        let input_port_index = input_device_id
-            .strip_prefix(MIDI_PORT_PREFIX)
-            .ok_or_else(|| anyhow!("Invalid input device id"))?
-            .parse::<usize>()?;
         let mut midi_in = MidiInput::new("MIDIMaster")?;
         midi_in.ignore(Ignore::None);
-        let input_port = find_input_port(&midi_in, input_port_index)?;
-        let input_port_name = midi_in
-            .port_name(&input_port)
-            .unwrap_or_else(|_| format!("Input {}", input_port_index));
+        let (input_port, input_port_name) =
+            resolve_input_port(&midi_in, input_device_id, expected_input_device_name)?;
         run_logger::info(
             "midi",
             "start_route_requested",
@@ -399,11 +762,14 @@ impl MidiManager {
         );
 
         let event_device_id = input_device_id.to_string();
+        let last_input_seen_at_ms = Arc::new(AtomicU64::new(0));
+        let callback_last_input_seen_at_ms = Arc::clone(&last_input_seen_at_ms);
 
         let connection = midi_in.connect(
             &input_port,
             "midimaster-input",
             move |_timestamp, message, _| {
+                callback_last_input_seen_at_ms.store(now_epoch_millis(), Ordering::Relaxed);
                 if LOG_MIDI_MESSAGES {
                     run_logger::debug("midi", "raw_message", &format!("bytes={:?}", message));
                 }
@@ -427,7 +793,12 @@ impl MidiManager {
         Ok(MidiInputRoute {
             input_connection: Some(connection),
             input_device_id: input_device_id.to_string(),
+            input_device_name: input_port_name,
             output_device_id: output_device_id.to_string(),
+            input_connection_suspect: false,
+            input_connection_suspect_reason: None,
+            input_inventory_generation: inventory_generation("input"),
+            last_input_seen_at_ms,
         })
     }
 
@@ -688,7 +1059,7 @@ impl MidiManager {
             if let Some(route) = self.output_routes.get_mut(&output_device_id) {
                 route.output_connection = None;
             }
-            match self.ensure_output_connected(&output_device_id) {
+            match self.ensure_output_connected(&output_device_id, Some(&output_device_name)) {
                 Ok(_) => {
                     run_logger::info(
                         "midi",
@@ -1228,6 +1599,11 @@ fn log_inventory_if_changed(kind: &str, devices: &[DeviceInfo]) {
         }
         *last = signature;
     }
+    if kind == "input" {
+        INPUT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
+    } else {
+        OUTPUT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
 
     run_logger::info(
         "midi",
@@ -1241,6 +1617,152 @@ fn log_inventory_if_changed(kind: &str, devices: &[DeviceInfo]) {
             &format!("{}_port", kind),
             &format!("index={} id={} name={}", index, device.id, device.name),
         );
+    }
+}
+
+fn clean_expected_device_name(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn parse_midi_port_index(device_id: &str, kind: &str) -> Result<usize> {
+    device_id
+        .strip_prefix(MIDI_PORT_PREFIX)
+        .ok_or_else(|| anyhow!("Invalid MIDI {} device id: {}", kind, device_id))?
+        .parse::<usize>()
+        .map_err(|err| anyhow!("Invalid MIDI {} device id {}: {}", kind, device_id, err))
+}
+
+fn validate_expected_device_name(
+    kind: &str,
+    device_id: &str,
+    expected_name: Option<&str>,
+    actual_name: &str,
+) -> Result<()> {
+    let Some(expected_name) = clean_expected_device_name(expected_name) else {
+        return Ok(());
+    };
+    if expected_name == actual_name {
+        return Ok(());
+    }
+
+    log_route_device_mismatch(kind, device_id, &expected_name, Some(actual_name));
+    Err(anyhow!(
+        "MIDI {} device id {} now resolves to '{}' instead of '{}'",
+        kind,
+        device_id,
+        actual_name,
+        expected_name
+    ))
+}
+
+fn device_name_mismatch(expected_name: Option<&str>, actual_name: Option<&str>) -> bool {
+    match (
+        clean_expected_device_name(expected_name),
+        actual_name.and_then(|name| clean_expected_device_name(Some(name))),
+    ) {
+        (Some(expected), Some(actual)) => expected != actual,
+        (Some(_), None) => true,
+        _ => false,
+    }
+}
+
+fn log_route_device_mismatch(
+    kind: &str,
+    device_id: &str,
+    expected_name: &str,
+    actual_name: Option<&str>,
+) {
+    run_logger::warn(
+        "midi",
+        "route_device_mismatch",
+        &format!(
+            "kind={} device_id={} expected_name={} actual_name={}",
+            kind,
+            device_id,
+            expected_name,
+            actual_name.unwrap_or("<missing>")
+        ),
+    );
+}
+
+fn resolve_input_port(
+    midi_in: &MidiInput,
+    input_device_id: &str,
+    expected_input_device_name: Option<&str>,
+) -> Result<(MidiInputPort, String)> {
+    let input_port_index = parse_midi_port_index(input_device_id, "input")?;
+    let input_port = find_input_port(midi_in, input_port_index)?;
+    let input_port_name = midi_in
+        .port_name(&input_port)
+        .unwrap_or_else(|_| format!("Input {}", input_port_index));
+    validate_expected_device_name(
+        "input",
+        input_device_id,
+        expected_input_device_name,
+        &input_port_name,
+    )?;
+    Ok((input_port, input_port_name))
+}
+
+fn resolve_output_port(
+    midi_out: &MidiOutput,
+    output_device_id: &str,
+    expected_output_device_name: Option<&str>,
+) -> Result<(MidiOutputPort, String)> {
+    let output_port_index = parse_midi_port_index(output_device_id, "output")?;
+    let output_port = find_output_port(midi_out, output_port_index)?;
+    let output_port_name = midi_out
+        .port_name(&output_port)
+        .unwrap_or_else(|_| format!("Output {}", output_port_index));
+    validate_expected_device_name(
+        "output",
+        output_device_id,
+        expected_output_device_name,
+        &output_port_name,
+    )?;
+    Ok((output_port, output_port_name))
+}
+
+fn current_input_port_name(input_device_id: &str) -> Result<String> {
+    let input_port_index = parse_midi_port_index(input_device_id, "input")?;
+    let midi_in = MidiInput::new("MIDIMaster")?;
+    let input_port = find_input_port(&midi_in, input_port_index)?;
+    Ok(midi_in
+        .port_name(&input_port)
+        .unwrap_or_else(|_| format!("Input {}", input_port_index)))
+}
+
+fn current_output_port_name(output_device_id: &str) -> Result<String> {
+    let output_port_index = parse_midi_port_index(output_device_id, "output")?;
+    let midi_out = MidiOutput::new("MIDIMaster")?;
+    let output_port = find_output_port(&midi_out, output_port_index)?;
+    Ok(midi_out
+        .port_name(&output_port)
+        .unwrap_or_else(|_| format!("Output {}", output_port_index)))
+}
+
+fn inventory_generation(kind: &str) -> u64 {
+    if kind == "input" {
+        INPUT_DEVICE_GENERATION.load(Ordering::Relaxed)
+    } else {
+        OUTPUT_DEVICE_GENERATION.load(Ordering::Relaxed)
+    }
+}
+
+fn now_epoch_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
+        .unwrap_or(0)
+}
+
+fn atomic_millis_to_option(value: &AtomicU64) -> Option<u64> {
+    match value.load(Ordering::Relaxed) {
+        0 => None,
+        millis => Some(millis),
     }
 }
 
@@ -1352,14 +1874,19 @@ mod tests {
             MidiInputRoute {
                 input_connection: None,
                 input_device_id: input_device_id.to_string(),
+                input_device_name: String::new(),
                 output_device_id: output_device_id.to_string(),
+                input_connection_suspect: false,
+                input_connection_suspect_reason: None,
+                input_inventory_generation: inventory_generation("input"),
+                last_input_seen_at_ms: Arc::new(AtomicU64::new(0)),
             },
         );
         manager.output_routes.insert(
             output_device_id.to_string(),
             MidiOutputRoute {
                 output_connection: None,
-                output_device_name: "Test Output".to_string(),
+                output_device_name: String::new(),
                 last_reconnect_attempt: None,
                 last_reconnect_skipped_log: None,
                 reconnect_failures: 0,
@@ -1458,6 +1985,69 @@ mod tests {
     }
 
     #[test]
+    fn expected_device_name_validation_rejects_reused_output_id() {
+        validate_expected_device_name(
+            "output",
+            "midi:1",
+            Some("Platform X+1 V2.13"),
+            "Platform X+1 V2.13",
+        )
+        .expect("matching output name should pass");
+
+        let err = validate_expected_device_name(
+            "output",
+            "midi:1",
+            Some("Platform X+1 V2.13"),
+            "Focusrite USB MIDI",
+        )
+        .expect_err("reused id with a different output name should be rejected");
+
+        let message = err.to_string();
+        assert!(message.contains("midi:1"));
+        assert!(message.contains("Focusrite USB MIDI"));
+        assert!(message.contains("Platform X+1 V2.13"));
+    }
+
+    #[test]
+    fn device_name_mismatch_requires_known_expected_name() {
+        assert!(!device_name_mismatch(None, Some("Focusrite USB MIDI")));
+        assert!(!device_name_mismatch(
+            Some("Platform X+1 V2.13"),
+            Some("Platform X+1 V2.13")
+        ));
+        assert!(device_name_mismatch(
+            Some("Platform X+1 V2.13"),
+            Some("Focusrite USB MIDI")
+        ));
+        assert!(device_name_mismatch(Some("Platform X+1 V2.13"), None));
+    }
+
+    #[test]
+    fn route_health_reports_input_suspect_fields() {
+        let mut manager = manager_with_test_route("midi:998", "midi:999");
+        let route = manager
+            .input_routes
+            .get_mut("midi:998")
+            .expect("test input route");
+        route.input_device_name = "Platform X+1 V2.13".to_string();
+        route.input_connection_suspect = true;
+        route.input_connection_suspect_reason = Some("input_inventory_changed".to_string());
+        route.last_input_seen_at_ms.store(1234, Ordering::Relaxed);
+
+        let health = manager.connection_health();
+
+        assert_eq!(health.input_device_id, "midi:998");
+        assert!(health.suspect);
+        assert!(health.input_suspect);
+        assert_eq!(health.reason, "input_port_missing");
+        assert_eq!(
+            health.expected_input_name.as_deref(),
+            Some("Platform X+1 V2.13")
+        );
+        assert_eq!(health.last_input_seen_at, Some(1234));
+    }
+
+    #[test]
     fn connection_health_marks_suspect_pair() {
         let mut manager = manager_with_test_route("midi:0", "midi:1");
 
@@ -1549,7 +2139,7 @@ mod tests {
         manager.mark_output_suspect("midi:1", "output_send_failed");
 
         manager
-            .set_device_routes(&[], std::sync::Arc::new(|_| {}))
+            .set_device_routes(&[], std::sync::Arc::new(|_| {}), false)
             .expect("empty route sync");
 
         let health = manager.connection_health();

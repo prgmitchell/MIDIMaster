@@ -473,20 +473,14 @@ pub fn list_midi_output_devices(state: State<AppState>) -> Result<Vec<DeviceInfo
 
 #[tauri::command]
 pub fn get_midi_connection_health(state: State<AppState>) -> Result<MidiConnectionHealth, String> {
-    Ok(state
-        .midi
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?
-        .connection_health())
+    let mut midi = state.midi.lock().map_err(|_| "Lock poisoned".to_string())?;
+    Ok(midi.connection_health())
 }
 
 #[tauri::command]
 pub fn get_midi_route_health(state: State<AppState>) -> Result<Vec<MidiConnectionHealth>, String> {
-    Ok(state
-        .midi
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?
-        .route_health())
+    let mut midi = state.midi.lock().map_err(|_| "Lock poisoned".to_string())?;
+    Ok(midi.route_health())
 }
 
 #[tauri::command]
@@ -511,7 +505,7 @@ pub fn start_midi_device(
         output_device_name: None,
         enabled: true,
     };
-    start_midi_device_routes(app, state, vec![route])
+    start_midi_device_routes(app, state, vec![route], None)
 }
 
 #[tauri::command]
@@ -519,7 +513,9 @@ pub fn start_midi_device_routes(
     app: AppHandle,
     state: State<AppState>,
     routes: Vec<MidiDeviceRoute>,
+    force: Option<bool>,
 ) -> Result<(), String> {
+    let force_reconnect = force.unwrap_or(false);
     let enabled_routes = routes
         .iter()
         .filter_map(|route| route.normalized())
@@ -557,7 +553,11 @@ pub fn start_midi_device_routes(
             .midi
             .lock()
             .map_err(|_| "Lock poisoned".to_string())?
-            .set_device_routes(&enabled_routes, midi_event_callback(app_handle))
+            .set_device_routes(
+                &enabled_routes,
+                midi_event_callback(app_handle),
+                force_reconnect,
+            )
             .map_err(|err| err.to_string())
         {
             run_logger::error(

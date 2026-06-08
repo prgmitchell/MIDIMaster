@@ -211,9 +211,20 @@ export function shouldRecoverSuspectMidiPair(health, preference) {
   const pref = normalizeMidiPreference(preference);
   const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
   const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
+  const suspect = Boolean(
+    current.suspect
+    || current.inputSuspect
+    || current.input_suspect
+    || current.inputNameMismatch
+    || current.input_name_mismatch
+    || current.outputSuspect
+    || current.output_suspect
+    || current.outputNameMismatch
+    || current.output_name_mismatch
+  );
 
   return Boolean(
-    current.suspect
+    suspect
     && pref.inputDeviceId
     && pref.outputDeviceId
     && inputDeviceId === pref.inputDeviceId

@@ -895,6 +895,28 @@ export function createMidiFeature({
     }
   }
 
+  function routeHealthNeedsRecovery(health) {
+    return Boolean(
+      health?.suspect
+      || health?.inputSuspect
+      || health?.inputNameMismatch
+      || health?.outputSuspect
+      || health?.outputNameMismatch
+    );
+  }
+
+  function routeHealthNeedsRediscovery(health) {
+    const reason = String(health?.reason || "");
+    return Boolean(
+      health?.inputNameMismatch
+      || health?.outputNameMismatch
+      || reason === "input_port_missing"
+      || reason === "output_port_missing"
+      || reason === "input_name_mismatch"
+      || reason === "output_name_mismatch"
+    );
+  }
+
   function refreshDevicesIfStale(reason) {
     if (Date.now() - lastDeviceRefreshAt < MIDI_ENUM_STALE_MS) return;
     refreshMidiDevices({ force: true, reason }).catch(() => { });
@@ -1060,7 +1082,10 @@ export function createMidiFeature({
 
     stopSessionRefresh();
     try {
-      await invoke("start_midi_device_routes", { routes: buildPersistedMidiRoutes(routesToStart) });
+      await invoke("start_midi_device_routes", {
+        routes: buildPersistedMidiRoutes(routesToStart),
+        force: Boolean(options.force),
+      });
     } catch (error) {
       routeDrafts = previousDrafts;
       setConnectedRoutes(previousConnectedRoutes);
@@ -1226,7 +1251,7 @@ export function createMidiFeature({
       if (currentlyConnected) {
         const routeHealth = await getMidiRouteHealth();
         const suspectRoute = routeHealth.find((health) =>
-          health?.suspect
+          routeHealthNeedsRecovery(health)
           && connectedRoutes.some((route) =>
             route.inputDeviceId === health.inputDeviceId
             && route.outputDeviceId === health.outputDeviceId
@@ -1234,7 +1259,29 @@ export function createMidiFeature({
         );
         if (suspectRoute && prefAvailable && !suspendProfileAutoReconnect) {
           try {
-            await applyRoutes(currentRoutesForSave(), { auto: true, fromProfile: true, force: true });
+            let routesToRecover = currentRoutesForSave();
+            let allowPartialUnavailable = false;
+            if (routeHealthNeedsRediscovery(suspectRoute)) {
+              let resolvedRoutes = resolvePreferredMidiDeviceRoutes(deviceSnapshot, pref);
+              if (!resolvedRoutes.available) {
+                const refreshed = await refreshMidiDevices({ force: true, reason: "suspect_reconnect" });
+                resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, pref);
+              }
+              const anyRouteAvailable = resolvedRoutes.routes.some((route) =>
+                route.preference.enabled !== false && route.inputMatch && route.outputMatch
+              );
+              if (resolvedRoutes.available || anyRouteAvailable) {
+                routesToRecover = routesFromResolvedPreferences(resolvedRoutes);
+                allowPartialUnavailable = !resolvedRoutes.available;
+              }
+            }
+            await applyRoutes(routesToRecover, {
+              auto: true,
+              fromProfile: true,
+              force: true,
+              allowPartialUnavailable,
+              partialUnavailableStatus: t("midi.savedUnavailable"),
+            });
             if (d.midiStatus) {
               d.midiStatus.textContent = t("midi.reconnectedProfile");
             }
