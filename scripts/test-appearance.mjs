@@ -9,7 +9,7 @@ function testAppearanceDefaultsIncludePolishControls() {
   const defaults = appearance.defaultAppearanceSettings();
 
   assert.equal(defaults.backgroundEffects, true);
-  assert.equal(defaults.effectIntensity, 40);
+  assert.equal(defaults.effectIntensity, 30);
   assert.equal(defaults.surfaceContrast, 50);
   assert.equal(defaults.iconGlow, 50);
   assert.equal(defaults.fontSize, 14);

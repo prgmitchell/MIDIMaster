@@ -24,7 +24,7 @@ fn default_true() -> bool {
 }
 
 fn default_effect_intensity() -> f64 {
-    40.0
+    30.0
 }
 
 fn default_surface_contrast() -> f64 {

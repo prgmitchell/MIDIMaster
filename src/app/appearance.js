@@ -671,7 +671,7 @@ export function defaultAppearanceSettings() {
     cornerRadius: 4,
     animations: true,
     backgroundEffects: true,
-    effectIntensity: 40,
+    effectIntensity: 30,
     surfaceContrast: 50,
     iconGlow: 50,
     transparency: 30,
@@ -686,12 +686,12 @@ export function defaultAppearanceSettings() {
 export function appearanceBackgroundGlowValue(appearance) {
   const settings = normalizeAppearanceSettings(appearance);
   return settings.backgroundEffects
-    ? Math.round(clampNumber(settings.effectIntensity, 0, 100, 40))
+    ? Math.round(clampNumber(settings.effectIntensity, 0, 100, 30))
     : 0;
 }
 
 export function appearanceBackgroundGlowPatch(value) {
-  const glow = Math.round(clampNumber(value, 0, 100, 40));
+  const glow = Math.round(clampNumber(value, 0, 100, 30));
   return {
     backgroundEffects: glow > 0,
     effectIntensity: glow,
@@ -714,7 +714,7 @@ export function normalizeCustomTheme(theme, index = 0) {
     cornerRadius: clampNumber(source.cornerRadius ?? source.corner_radius, 0, 16, 4),
     animations: normalizeBoolean(source.animations, true),
     backgroundEffects: normalizeBoolean(source.backgroundEffects ?? source.background_effects, true),
-    effectIntensity: clampNumber(source.effectIntensity ?? source.effect_intensity, 0, 100, 40),
+    effectIntensity: clampNumber(source.effectIntensity ?? source.effect_intensity, 0, 100, 30),
     surfaceContrast: clampNumber(source.surfaceContrast ?? source.surface_contrast, 0, 100, 50),
     iconGlow: clampNumber(source.iconGlow ?? source.icon_glow, 0, 100, 50),
     transparency: clampNumber(source.transparency, 0, 80, 30),
