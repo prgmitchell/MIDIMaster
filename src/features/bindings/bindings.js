@@ -773,6 +773,7 @@ export function createBindingsFeature({
 
   let configBindingId = null;
   let configDraft = null;
+  let configPreviewOriginalBindings = null;
   let configLearnField = null;
   let configLearnTimer = null;
   let transferPrompt = null;
@@ -1156,6 +1157,124 @@ export function createBindingsFeature({
     return configDraft;
   }
 
+  function cloneBindingsList(list) {
+    return (Array.isArray(list) ? list : [])
+      .map((binding) => cloneBindingDraft(binding))
+      .filter(Boolean);
+  }
+
+  function rememberConfigPreviewOriginalBindings() {
+    if (!configPreviewOriginalBindings) {
+      configPreviewOriginalBindings = cloneBindingsList(getB());
+    }
+  }
+
+  function bindingSnapshotKey(binding) {
+    try {
+      return JSON.stringify(binding);
+    } catch {
+      return "";
+    }
+  }
+
+  function applyPrimaryPreviewFields(baseBinding, draftBinding) {
+    const next = cloneBindingDraft(baseBinding) || cloneBindingDraft(draftBinding);
+    if (!next || !draftBinding) return next;
+    next.device_id = draftBinding.device_id;
+    next.control = draftBinding.control && typeof draftBinding.control === "object"
+      ? { ...draftBinding.control }
+      : draftBinding.control;
+    next.control_kind = normalizeControlKind(draftBinding.control_kind);
+    next.mode = draftBinding.mode === "Relative" ? "Relative" : "Absolute";
+    next.relative_format = normalizeRelativeFormat(draftBinding.relative_format);
+    if (Number.isFinite(Number(draftBinding.deadzone))) {
+      next.deadzone = Number(draftBinding.deadzone);
+    }
+    if (Number.isFinite(Number(draftBinding.debounce_ms))) {
+      next.debounce_ms = Number(draftBinding.debounce_ms);
+    }
+    ensureBindingShape(next);
+    return next;
+  }
+
+  function applyPreviewConflict(nextBindings, conflict) {
+    if (!conflict?.binding?.id || !conflict.field) return nextBindings;
+    const conflictId = conflict.binding.id;
+    if (conflict.field === "control") {
+      return nextBindings.filter((binding) => binding.id !== conflictId);
+    }
+    return nextBindings.map((binding) => {
+      if (binding.id !== conflictId) return binding;
+      const next = cloneBindingDraft(binding);
+      next[conflict.field] = null;
+      return next;
+    });
+  }
+
+  function buildPrimaryControlPreviewBindings() {
+    const draft = getConfigBinding();
+    if (!draft || !configBindingId) return null;
+    rememberConfigPreviewOriginalBindings();
+    let nextBindings = cloneBindingsList(configPreviewOriginalBindings);
+    for (const entry of configAcceptedTransfers.values()) {
+      if (entry.field === "control") {
+        nextBindings = applyPreviewConflict(nextBindings, entry.conflict);
+      }
+    }
+    const bindingIndex = nextBindings.findIndex((binding) => binding.id === configBindingId);
+    if (bindingIndex < 0) return null;
+    nextBindings[bindingIndex] = applyPrimaryPreviewFields(nextBindings[bindingIndex], draft);
+    return nextBindings;
+  }
+
+  async function persistBindingsDiff(previousBindings, nextBindings, reason) {
+    const previous = cloneBindingsList(previousBindings);
+    const next = cloneBindingsList(nextBindings);
+    const nextById = new Map(next.map((binding) => [binding.id, binding]));
+    const previousById = new Map(previous.map((binding) => [binding.id, binding]));
+
+    for (const binding of previous) {
+      if (!nextById.has(binding.id)) {
+        await invoke("remove_binding", { binding });
+      }
+    }
+
+    for (const binding of next) {
+      const previousBinding = previousById.get(binding.id);
+      if (!previousBinding || bindingSnapshotKey(previousBinding) !== bindingSnapshotKey(binding)) {
+        await persistBindingBackend(binding);
+      }
+    }
+  }
+
+  async function applyPrimaryControlPreview() {
+    const nextBindings = buildPrimaryControlPreviewBindings();
+    if (!nextBindings) return;
+    const previousBindings = cloneBindingsList(getB());
+    setB(cloneBindingsList(nextBindings));
+    renderBindings();
+    syncPluginHostBindings();
+    try {
+      await persistBindingsDiff(previousBindings, nextBindings, "control preview");
+    } catch (err) {
+      console.error("Failed to apply control preview:", err);
+    }
+  }
+
+  async function restoreConfigPreviewBindings() {
+    if (!configPreviewOriginalBindings) return;
+    const previousBindings = cloneBindingsList(getB());
+    const restoredBindings = cloneBindingsList(configPreviewOriginalBindings);
+    setB(restoredBindings);
+    renderBindings();
+    syncPluginHostBindings();
+    try {
+      await persistBindingsDiff(previousBindings, restoredBindings, "control preview rollback");
+    } catch (err) {
+      console.error("Failed to restore control preview:", err);
+    }
+  }
+
   function stopConfigPreviewTimer() {
     if (!configPreviewTimer) return;
     cancelAnimationFrame(configPreviewTimer);
@@ -1453,7 +1572,7 @@ export function createBindingsFeature({
     renderConfigPreview();
   }
 
-  function closeConfigModal() {
+  async function closeConfigModal({ commit = false } = {}) {
     stopHotkeyLearn();
     stopAuxLearn();
     clearTransferPrompt();
@@ -1461,6 +1580,10 @@ export function createBindingsFeature({
     closeAssignModeMenu();
     stopConfigPreviewTimer();
     customCurvePointer = null;
+    if (!commit) {
+      await restoreConfigPreviewBindings();
+    }
+    configPreviewOriginalBindings = null;
     configAcceptedTransfers.clear();
     configDraft = null;
     configBindingId = null;
@@ -1474,7 +1597,7 @@ export function createBindingsFeature({
   function renderConfigModal() {
     const binding = getConfigBinding();
     if (!binding) {
-      closeConfigModal();
+      closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
       return;
     }
     closeAssignModeMenu();
@@ -1603,7 +1726,7 @@ export function createBindingsFeature({
   }
 
   function findMappingConflict(bindingId, field, mapping) {
-    const bindings = getB();
+    const bindings = configPreviewOriginalBindings || getB();
     for (const binding of bindings) {
       if (binding.id === bindingId && field !== "control" && controlsEqual(binding[field], mapping)) {
         continue;
@@ -1649,6 +1772,9 @@ export function createBindingsFeature({
       binding[field] = mapping;
     }
     configAcceptedTransfers.set(field, { field, mapping, conflict });
+    if (field === "control") {
+      await applyPrimaryControlPreview();
+    }
     hideLearnPanel();
     renderConfigModal();
   }
@@ -1693,6 +1819,9 @@ export function createBindingsFeature({
       binding[field] = mapping;
     }
     configAcceptedTransfers.delete(field);
+    if (field === "control") {
+      await applyPrimaryControlPreview();
+    }
     hideLearnPanel();
     renderConfigModal();
   }
@@ -1789,7 +1918,7 @@ export function createBindingsFeature({
     setB(nextBindings);
     await persistBindingBackend(nextBinding);
     renderBindings();
-    closeConfigModal();
+    await closeConfigModal({ commit: true });
     finishBindingUiMutation("config save");
   }
 
@@ -2737,15 +2866,19 @@ export function createBindingsFeature({
     if (d.bindingConfigPanel) {
       d.bindingConfigPanel.addEventListener("click", (event) => {
         if (event.target === d.bindingConfigPanel) {
-          closeConfigModal();
+          closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
         }
       });
     }
     if (d.bindingConfigClose) {
-      d.bindingConfigClose.addEventListener("click", closeConfigModal);
+      d.bindingConfigClose.addEventListener("click", () => {
+        closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
+      });
     }
     if (d.bindingConfigCancel) {
-      d.bindingConfigCancel.addEventListener("click", closeConfigModal);
+      d.bindingConfigCancel.addEventListener("click", () => {
+        closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
+      });
     }
     if (d.bindingConfigSave) {
       d.bindingConfigSave.addEventListener("click", async () => {
@@ -2784,7 +2917,7 @@ export function createBindingsFeature({
     document.addEventListener("keydown", (event) => {
       if (!configBindingId || event.key !== "Escape") return;
       if (transferPrompt || configLearnField || hotkeyLearnBindingId) return;
-      closeConfigModal();
+      closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
     });
     if (d.bindingConfigCustomReset) {
       d.bindingConfigCustomReset.addEventListener("click", () => {
