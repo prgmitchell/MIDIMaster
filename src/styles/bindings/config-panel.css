@@ -4,6 +4,7 @@
   max-height: calc(100vh - 20px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .binding-config-body {
