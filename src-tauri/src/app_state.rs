@@ -271,7 +271,7 @@ impl AppState {
         self.binding_state
             .lock()
             .ok()
-            .and_then(|states| states.get(key).map(|state| state.last_value > 0.5))
+            .and_then(|states| states.get(key).map(|state| state.last_value > 0.0))
             .unwrap_or(false)
     }
 
@@ -305,7 +305,7 @@ impl AppState {
                 std::collections::hash_map::Entry::Occupied(mut entry) => {
                     let state = entry.get_mut();
                     let user_active = match key.msg_type {
-                        model::MidiMessageType::Note => state.last_value > 0.5,
+                        model::MidiMessageType::Note => state.last_value > 0.0,
                         _ => state.last_update.elapsed().as_millis() < 500,
                     };
                     if !user_active {

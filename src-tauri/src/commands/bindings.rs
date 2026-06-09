@@ -825,6 +825,10 @@ mod tests {
             &binding_state(1.0, 10),
             true
         ));
+        assert!(feedback::binding_state_user_active(
+            &binding_state(63.0 / 127.0, 10),
+            true
+        ));
         assert!(!feedback::binding_state_user_active(
             &binding_state(0.0, 10),
             true

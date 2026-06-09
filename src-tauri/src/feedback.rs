@@ -49,7 +49,7 @@ pub struct FeedbackSendOptions<'a> {
 
 pub fn binding_state_user_active(state: &BindingState, is_note: bool) -> bool {
     if is_note {
-        return state.last_value > 0.5;
+        return state.last_value > 0.0;
     }
     state.last_update.elapsed().as_millis() < 500
 }

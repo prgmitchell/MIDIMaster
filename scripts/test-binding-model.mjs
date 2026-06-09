@@ -91,6 +91,8 @@ function testMomentaryButtonFollowsInputValue() {
   const binding = buttonBinding();
 
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 1 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 63 / 127 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 1 / 127 }), true);
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0 }), false);
 }
 
@@ -109,6 +111,23 @@ function testToggleMuteFollowsMutedState() {
   assert.equal(bindingModel.buttonVisualBehavior(binding), "stateful");
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: true }), true);
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: false }), false);
+}
+
+function testStatefulButtonKeepsHalfThreshold() {
+  const binding = buttonBinding({
+    action: "Volume",
+    target: {
+      Integration: {
+        integration_id: "obs",
+        kind: "action",
+        data: { action: "ToggleRecording", action_kind: "stateful" },
+      },
+    },
+  });
+
+  assert.equal(bindingModel.buttonVisualBehavior(binding), "stateful");
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { stateValue: 0.49 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { stateValue: 0.51 }), true);
 }
 
 function testUnsetToggleMuteButtonIsMomentary() {
@@ -190,6 +209,7 @@ testWaveLinkSetMainOutputIsMomentary();
 testMomentaryButtonFollowsInputValue();
 testMappedLightDoesNotControlButtonVisualState();
 testToggleMuteFollowsMutedState();
+testStatefulButtonKeepsHalfThreshold();
 testUnsetToggleMuteButtonIsMomentary();
 testIntegrationVisualBehaviorKinds();
 testNormalizeBindingPreservesAutoHotkeyScriptMapping();

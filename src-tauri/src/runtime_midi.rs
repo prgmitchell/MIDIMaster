@@ -114,7 +114,7 @@ fn activity_button_light_hold_should_continue(
     binding_state
         .lock()
         .ok()
-        .and_then(|states| states.get(key).map(|state| state.last_value > 0.5))
+        .and_then(|states| states.get(key).map(|state| state.last_value > 0.0))
         .unwrap_or(false)
 }
 
@@ -153,7 +153,7 @@ fn send_activity_button_light_hold_feedback_if_current(
         .binding_state
         .lock()
         .ok()
-        .and_then(|states| states.get(&context.key).map(|state| state.last_value > 0.5))
+        .and_then(|states| states.get(&context.key).map(|state| state.last_value > 0.0))
         .unwrap_or(false);
     if !still_pressed {
         return false;
@@ -997,7 +997,7 @@ mod tests {
             states.insert(
                 key.clone(),
                 BindingState {
-                    last_value: 1.0,
+                    last_value: 63.0 / 127.0,
                     last_update: Instant::now(),
                     relative_auto_format: None,
                     relative_seen_midpoint: false,

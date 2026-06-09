@@ -98,6 +98,13 @@ function activeFromNumeric(value) {
   return next > 0.5;
 }
 
+function activeFromInputValue(value) {
+  if (value == null) return null;
+  const next = Number(value);
+  if (!Number.isFinite(next)) return null;
+  return next > 0;
+}
+
 function activeFromStateValue(value) {
   if (typeof value === "boolean") return value;
   return activeFromNumeric(value);
@@ -108,7 +115,7 @@ export function resolveButtonVisualActive(binding, options = {}) {
   if (!behavior) return false;
 
   if (behavior === "momentary") {
-    return activeFromNumeric(options.inputValue) === true;
+    return activeFromInputValue(options.inputValue) === true;
   }
 
   const stateActive = activeFromStateValue(options.stateValue);
