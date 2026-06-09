@@ -1257,12 +1257,12 @@ midiFeature = createMidiFeature({
       bindings.push(binding);
       await invoke("add_binding", { binding });
       hideCreateLearnPanel();
-      editingBindingId = binding.id;
-      pendingFocusBindingId = binding.id;
-      bindingsFeature?.queueBindingReveal?.(binding.id);
+      editingBindingId = null;
+      pendingFocusBindingId = null;
       renderBindings();
       syncPluginHostBindings();
       scheduleBindingsSave("add binding learn");
+      bindingsFeature?.openBindingTargetPicker?.(binding.id);
     } catch (error) {
       hideCreateLearnPanel();
       showAlert(t("bindings.createFailedTitle"), String(error));

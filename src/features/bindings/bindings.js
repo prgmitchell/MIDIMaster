@@ -285,6 +285,67 @@ export function createBindingsFeature({
     });
   }
 
+  function ensureBindingVisibleForPicker(bindingId) {
+    const binding = getBindingById(bindingId);
+    let needsRender = false;
+    if (d.bindingSearchInput && String(d.bindingSearchInput.value || "").trim()) {
+      d.bindingSearchInput.value = "";
+      needsRender = true;
+    }
+    if (binding && !bindingMatchesTypeFilter(binding, getBindingTypeFilter())) {
+      bindingTypeFilter = "all";
+      updateBindingTypeFilterUi();
+      needsRender = true;
+    }
+    if (needsRender) {
+      renderBindings();
+    }
+  }
+
+  function openBindingTargetPicker(bindingId) {
+    const targetId = String(bindingId || "");
+    if (!targetId) return;
+    setEditingId(null);
+    setPendingFocusId(null);
+    ensureBindingVisibleForPicker(targetId);
+
+    const openRenderedPicker = () => {
+      const item = findRenderedBindingItem(targetId);
+      if (!item) return false;
+      const reduceMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+      item.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+      item.classList.remove("binding-item-revealed");
+      void item.offsetWidth;
+      item.classList.add("binding-item-revealed");
+      clearTimeout(item.__bindingRevealTimer);
+      item.__bindingRevealTimer = setTimeout(() => {
+        item.classList.remove("binding-item-revealed");
+      }, reduceMotion ? 700 : 1800);
+
+      const targetDropdown = item.querySelector(".binding-target-dropdown");
+      if (typeof targetDropdown?.openTargetPicker === "function") {
+        targetDropdown.openTargetPicker();
+        return true;
+      }
+      const targetButton = targetDropdown?.querySelector?.(".target-button");
+      if (targetButton) {
+        targetButton.click();
+        return true;
+      }
+      return false;
+    };
+
+    requestAnimationFrame(() => {
+      if (!openRenderedPicker()) {
+        setTimeout(openRenderedPicker, 0);
+      }
+    });
+  }
+
   function displayModeName(binding) {
     if (effectiveIsButton(binding) && binding?.action === "ToggleMute") {
       return muteBehaviorLabel(binding?.mute_behavior);
@@ -2950,6 +3011,7 @@ export function createBindingsFeature({
     syncButtonVisualState,
     setButtonVisualState,
     queueBindingReveal,
+    openBindingTargetPicker,
     beginBindingEdit,
     renderBindings,
     startBindingDrag,

@@ -1280,8 +1280,8 @@ export function createTargetsFeature({
     }
     syncContainerValue(false);
 
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
+    const openTargetPicker = (event = null) => {
+      event?.stopPropagation?.();
       const { options } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
 
       const buildButtonActionOptions = (targetOption) => {
@@ -1629,9 +1629,12 @@ export function createTargetsFeature({
       };
 
       openRootTargetPanel();
-    });
+    };
+
+    button.addEventListener("click", openTargetPicker);
 
     container.appendChild(button);
+    container.openTargetPicker = () => openTargetPicker();
     container.setHotkeyDisplay = (nextDisplay = "") => {
       hotkeyDisplay = String(nextDisplay || "");
       setDisplay();
