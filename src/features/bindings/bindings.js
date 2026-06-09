@@ -409,6 +409,7 @@ export function createBindingsFeature({
 
   function buttonUsesPressReleaseCommand(binding) {
     if (buttonVisualBehavior(binding) !== "momentary") return false;
+    if (!getTargets(binding).some(targetIsNonUnset)) return true;
     const target = getPrimaryTarget(binding);
     const integration = target?.Integration || target?.integration;
     if (String(integration?.integration_id || "").toLowerCase() !== "obs") return false;

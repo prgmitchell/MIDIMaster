@@ -111,6 +111,18 @@ function testToggleMuteFollowsMutedState() {
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: false }), false);
 }
 
+function testUnsetToggleMuteButtonIsMomentary() {
+  const binding = buttonBinding({
+    action: "ToggleMute",
+    target: "Unset",
+    targets: ["Unset"],
+  });
+
+  assert.equal(bindingModel.buttonVisualBehavior(binding), "momentary");
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 1 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0, muted: true }), false);
+}
+
 function testIntegrationVisualBehaviorKinds() {
   const stateful = buttonBinding({
     action: "Volume",
@@ -178,6 +190,7 @@ testWaveLinkSetMainOutputIsMomentary();
 testMomentaryButtonFollowsInputValue();
 testMappedLightDoesNotControlButtonVisualState();
 testToggleMuteFollowsMutedState();
+testUnsetToggleMuteButtonIsMomentary();
 testIntegrationVisualBehaviorKinds();
 testNormalizeBindingPreservesAutoHotkeyScriptMapping();
 

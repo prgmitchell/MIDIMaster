@@ -45,6 +45,15 @@ function integrationFromTarget(target) {
   return target?.Integration || target?.integration || null;
 }
 
+function targetIsAssigned(target) {
+  return Boolean(
+    target
+    && target !== "Unset"
+    && !("Unset" in Object(target))
+    && !("unset" in Object(target))
+  );
+}
+
 function integrationVisualBehavior(integration) {
   if (!integration || typeof integration !== "object") return null;
   const integrationId = String(integration.integration_id || "").toLowerCase();
@@ -66,10 +75,12 @@ export function buttonVisualBehavior(binding) {
   if (!bindingLooksLikeButton(binding)) return null;
 
   const action = String(binding?.action || "");
+  const targets = getBindingTargets(binding);
+  if (!targets.some(targetIsAssigned)) return "momentary";
   if (action === "ToggleMute" || action === "ToggleEffect") return "stateful";
 
   let momentaryIntegration = false;
-  for (const target of getBindingTargets(binding)) {
+  for (const target of targets) {
     const behavior = integrationVisualBehavior(integrationFromTarget(target));
     if (behavior === "stateful") return "stateful";
     if (behavior === "momentary") momentaryIntegration = true;

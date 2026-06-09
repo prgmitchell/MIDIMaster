@@ -311,6 +311,27 @@ pub(crate) fn apply_midi_event(
         None => return Ok(()),
     };
 
+    if binding_is_button(&binding)
+        && targets
+            .iter()
+            .all(|target| matches!(target, model::BindingTarget::Unset))
+    {
+        let feedback_value = if event.value > 0 { 1.0 } else { 0.0 };
+        state.set_binding_action_value(&key, feedback_value);
+        if let Ok(mut feedback) = state.feedback_values.lock() {
+            feedback.insert(key.clone(), feedback_value);
+        }
+        if let Ok(mut midi) = state.midi.lock() {
+            let _ = midi.send_binding_feedback(&binding, feedback_value);
+        }
+        run_logger::debug(
+            "bindings",
+            "unassigned_button_activity_feedback",
+            &format!("binding_id={} value={}", binding.id, feedback_value),
+        );
+        return Ok(());
+    }
+
     if actions::handle_special_action(state, app, &binding, &targets, &event)? {
         return Ok(());
     }
