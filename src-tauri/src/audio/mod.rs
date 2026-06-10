@@ -2,6 +2,9 @@ use crate::model::SessionInfo;
 
 pub trait AudioBackend: Send + Sync {
     fn list_sessions(&self) -> anyhow::Result<Vec<SessionInfo>>;
+    fn list_session_states(&self) -> anyhow::Result<Vec<SessionInfo>> {
+        self.list_sessions()
+    }
     fn list_playback_devices(&self) -> anyhow::Result<Vec<crate::model::PlaybackDeviceInfo>>;
     fn list_recording_devices(&self) -> anyhow::Result<Vec<crate::model::PlaybackDeviceInfo>>;
     fn set_master_volume(&self, volume: f32) -> anyhow::Result<()>;
@@ -10,6 +13,9 @@ pub trait AudioBackend: Send + Sync {
     fn set_focused_session_volume(&self, volume: f32) -> anyhow::Result<()>;
     fn set_application_volume(&self, name: &str, volume: f32) -> anyhow::Result<()>;
     fn focused_session(&self) -> anyhow::Result<Option<SessionInfo>>;
+    fn focused_session_state(&self) -> anyhow::Result<Option<SessionInfo>> {
+        self.focused_session()
+    }
 
     // Mute methods
     fn set_master_mute(&self, muted: bool) -> anyhow::Result<()>;

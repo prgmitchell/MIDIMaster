@@ -231,9 +231,12 @@ body.osd-only[data-anchor="bottom-right"] .osd-card {
 
 .osd-bar-fill {
   height: 100%;
-  width: 0;
+  width: 100%;
   background: linear-gradient(90deg, #4fa4ff, #75c3ff);
-  transition: width 0.08s linear;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.08s linear;
+  will-change: transform;
 }
 
 body[data-osd-style="glass"] .osd-card {

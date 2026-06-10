@@ -7,6 +7,8 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use windows::core::{IUnknown_Vtbl, Interface, GUID, HRESULT, PCWSTR};
 use windows::Win32::Foundation::{PROPERTYKEY, RPC_E_CHANGED_MODE};
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
@@ -39,6 +41,86 @@ const PKEY_DEVICE_CLASS_ICON_PATH: PROPERTYKEY = PROPERTYKEY {
     pid: 12,
 };
 
+const PROCESS_IDENTITY_CACHE_TTL: Duration = Duration::from_secs(30);
+const PROCESS_IDENTITY_CACHE_MAX: usize = 512;
+
+#[derive(Clone)]
+struct CachedProcessIdentity {
+    identity: ProcessIdentity,
+    updated_at: Instant,
+}
+
+fn shared_icon_cache() -> &'static Mutex<HashMap<String, Option<String>>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn shared_process_identity_cache() -> &'static Mutex<HashMap<u32, CachedProcessIdentity>> {
+    static CACHE: OnceLock<Mutex<HashMap<u32, CachedProcessIdentity>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn shared_package_display_cache() -> &'static Mutex<HashMap<String, Option<String>>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn with_shared_icon_cache<T>(f: impl FnOnce(&mut HashMap<String, Option<String>>) -> T) -> T {
+    if let Ok(mut cache) = shared_icon_cache().lock() {
+        f(&mut cache)
+    } else {
+        let mut cache = HashMap::new();
+        f(&mut cache)
+    }
+}
+
+fn query_effective_process_identity_cached(process_id: u32) -> ProcessIdentity {
+    let now = Instant::now();
+    if let Ok(cache) = shared_process_identity_cache().lock() {
+        if let Some(cached) = cache.get(&process_id) {
+            if now.duration_since(cached.updated_at) < PROCESS_IDENTITY_CACHE_TTL {
+                return cached.identity.clone();
+            }
+        }
+    }
+
+    let identity = query_effective_process_identity(process_id);
+    if let Ok(mut cache) = shared_process_identity_cache().lock() {
+        if cache.len() >= PROCESS_IDENTITY_CACHE_MAX {
+            cache.retain(|_, cached| {
+                now.duration_since(cached.updated_at) < PROCESS_IDENTITY_CACHE_TTL
+            });
+            if cache.len() >= PROCESS_IDENTITY_CACHE_MAX {
+                cache.clear();
+            }
+        }
+        cache.insert(
+            process_id,
+            CachedProcessIdentity {
+                identity: identity.clone(),
+                updated_at: now,
+            },
+        );
+    }
+    identity
+}
+
+fn package_display_name_cached(identity: &ProcessIdentity) -> Option<String> {
+    let package_full_name = identity.package_full_name.as_deref()?;
+    let key = package_full_name.to_ascii_lowercase();
+    if let Ok(cache) = shared_package_display_cache().lock() {
+        if let Some(cached) = cache.get(&key) {
+            return cached.clone();
+        }
+    }
+
+    let display_name = package_display_name(identity);
+    if let Ok(mut cache) = shared_package_display_cache().lock() {
+        cache.insert(key, display_name.clone());
+    }
+    display_name
+}
+
 pub struct WindowsAudioBackend;
 
 impl WindowsAudioBackend {
@@ -47,30 +129,29 @@ impl WindowsAudioBackend {
     }
 }
 
-impl AudioBackend for WindowsAudioBackend {
-    fn list_sessions(&self) -> Result<Vec<SessionInfo>> {
-        let _com = init_com()?;
-        let enumerator = get_device_enumerator()?;
-        let default_device = get_default_device_from(&enumerator)?;
-        let default_device_id = device_id_string(&default_device);
-        let endpoint = get_endpoint_volume(&default_device)?;
-        let master_volume = unsafe { endpoint.GetMasterVolumeLevelScalar() }?;
-        let master_muted = unsafe { endpoint.GetMute() }?.as_bool();
+fn list_sessions_with_visuals(include_visuals: bool) -> Result<Vec<SessionInfo>> {
+    let _com = init_com()?;
+    let enumerator = get_device_enumerator()?;
+    let default_device = get_default_device_from(&enumerator)?;
+    let default_device_id = device_id_string(&default_device);
+    let endpoint = get_endpoint_volume(&default_device)?;
+    let master_volume = unsafe { endpoint.GetMasterVolumeLevelScalar() }?;
+    let master_muted = unsafe { endpoint.GetMute() }?.as_bool();
 
-        let mut sessions = vec![SessionInfo {
-            id: "master".to_string(),
-            display_name: "Master".to_string(),
-            application_key: None,
-            process_name: None,
-            process_path: None,
-            icon_data: None,
-            volume: master_volume,
-            is_muted: master_muted,
-            is_master: true,
-        }];
+    let mut sessions = vec![SessionInfo {
+        id: "master".to_string(),
+        display_name: "Master".to_string(),
+        application_key: None,
+        process_name: None,
+        process_path: None,
+        icon_data: None,
+        volume: master_volume,
+        is_muted: master_muted,
+        is_master: true,
+    }];
 
-        let mut seen_ids = HashSet::new();
-        let mut icon_cache = HashMap::new();
+    let mut seen_ids = HashSet::new();
+    with_shared_icon_cache(|icon_cache| {
         for (device, device_id) in enumerate_active_devices(&enumerator, eRender)? {
             let default_id = default_device_id.as_deref();
             let _ = collect_device_sessions(
@@ -79,11 +160,52 @@ impl AudioBackend for WindowsAudioBackend {
                 default_id,
                 &mut sessions,
                 &mut seen_ids,
-                &mut icon_cache,
+                icon_cache,
+                include_visuals,
             );
         }
+        Ok::<(), anyhow::Error>(())
+    })?;
 
-        Ok(sessions)
+    Ok(sessions)
+}
+
+fn focused_session_with_visuals(include_visuals: bool) -> Result<Option<SessionInfo>> {
+    let _com = init_com()?;
+    let process_id = match foreground_process_id() {
+        Some(process_id) => process_id,
+        None => return Ok(None),
+    };
+    let process_identity = query_effective_process_identity_cached(process_id);
+    let enumerator = get_device_enumerator()?;
+    let default_device = get_default_device_from(&enumerator)?;
+    let default_device_id = device_id_string(&default_device);
+    with_shared_icon_cache(|icon_cache| {
+        for (device, device_id) in enumerate_active_devices(&enumerator, eRender)? {
+            if let Some(session) = session_info_for_process(
+                &device,
+                &device_id,
+                default_device_id.as_deref(),
+                process_id,
+                &process_identity,
+                icon_cache,
+                include_visuals,
+            )? {
+                return Ok(Some(session));
+            }
+        }
+
+        Ok(None)
+    })
+}
+
+impl AudioBackend for WindowsAudioBackend {
+    fn list_sessions(&self) -> Result<Vec<SessionInfo>> {
+        list_sessions_with_visuals(true)
+    }
+
+    fn list_session_states(&self) -> Result<Vec<SessionInfo>> {
+        list_sessions_with_visuals(false)
     }
 
     fn list_playback_devices(&self) -> Result<Vec<PlaybackDeviceInfo>> {
@@ -91,7 +213,9 @@ impl AudioBackend for WindowsAudioBackend {
         let enumerator = get_device_enumerator()?;
         let default_device = get_default_device_from_flow(&enumerator, eRender)?;
         let default_id = device_id_string(&default_device);
-        list_devices_for_flow(&enumerator, eRender, default_id)
+        with_shared_icon_cache(|icon_cache| {
+            list_devices_for_flow(&enumerator, eRender, default_id, icon_cache)
+        })
     }
 
     fn list_recording_devices(&self) -> Result<Vec<PlaybackDeviceInfo>> {
@@ -99,7 +223,9 @@ impl AudioBackend for WindowsAudioBackend {
         let enumerator = get_device_enumerator()?;
         let default_device = get_default_device_from_flow(&enumerator, eCapture)?;
         let default_id = device_id_string(&default_device);
-        list_devices_for_flow(&enumerator, eCapture, default_id)
+        with_shared_icon_cache(|icon_cache| {
+            list_devices_for_flow(&enumerator, eCapture, default_id, icon_cache)
+        })
     }
 
     fn set_master_volume(&self, volume: f32) -> Result<()> {
@@ -176,7 +302,7 @@ impl AudioBackend for WindowsAudioBackend {
         let _com = init_com()?;
         let process_id =
             foreground_process_id().ok_or_else(|| anyhow!("No focused application"))?;
-        let process_identity = query_effective_process_identity(process_id);
+        let process_identity = query_effective_process_identity_cached(process_id);
         let enumerator = get_device_enumerator()?;
         let target_volume = volume.clamp(0.0, 1.0);
         let mut updated = false;
@@ -219,31 +345,11 @@ impl AudioBackend for WindowsAudioBackend {
     }
 
     fn focused_session(&self) -> Result<Option<SessionInfo>> {
-        let _com = init_com()?;
-        let process_id = match foreground_process_id() {
-            Some(process_id) => process_id,
-            None => return Ok(None),
-        };
-        let process_identity = query_effective_process_identity(process_id);
-        let enumerator = get_device_enumerator()?;
-        let default_device = get_default_device_from(&enumerator)?;
-        let default_device_id = device_id_string(&default_device);
-        let mut icon_cache = HashMap::new();
+        focused_session_with_visuals(true)
+    }
 
-        for (device, device_id) in enumerate_active_devices(&enumerator, eRender)? {
-            if let Some(session) = session_info_for_process(
-                &device,
-                &device_id,
-                default_device_id.as_deref(),
-                process_id,
-                &process_identity,
-                &mut icon_cache,
-            )? {
-                return Ok(Some(session));
-            }
-        }
-
-        Ok(None)
+    fn focused_session_state(&self) -> Result<Option<SessionInfo>> {
+        focused_session_with_visuals(false)
     }
 
     fn set_master_mute(&self, muted: bool) -> Result<()> {
@@ -258,7 +364,7 @@ impl AudioBackend for WindowsAudioBackend {
         let _com = init_com()?;
         let process_id =
             foreground_process_id().ok_or_else(|| anyhow!("No focused application"))?;
-        let process_identity = query_effective_process_identity(process_id);
+        let process_identity = query_effective_process_identity_cached(process_id);
         let enumerator = get_device_enumerator()?;
         let mut updated = false;
 
@@ -482,8 +588,8 @@ fn list_devices_for_flow(
     enumerator: &IMMDeviceEnumerator,
     flow: EDataFlow,
     default_id: Option<String>,
+    icon_cache: &mut HashMap<String, Option<String>>,
 ) -> Result<Vec<PlaybackDeviceInfo>> {
-    let mut icon_cache = HashMap::new();
     let mut devices = Vec::new();
 
     for (device, device_id) in enumerate_active_devices(enumerator, flow)? {
@@ -492,7 +598,7 @@ fn list_devices_for_flow(
         let icon_path = get_device_property_string(&device, &PKEY_DEVICE_CLASS_ICON_PATH);
         let icon_data = icon_path
             .as_deref()
-            .and_then(|path| icon_data_for_icon_path(path, &mut icon_cache));
+            .and_then(|path| icon_data_for_icon_path(path, icon_cache));
         let endpoint = get_endpoint_volume(&device)?;
         let volume = unsafe { endpoint.GetMasterVolumeLevelScalar() }?;
         let is_muted = unsafe { endpoint.GetMute() }?.as_bool();
@@ -521,6 +627,7 @@ fn collect_device_sessions(
     sessions: &mut Vec<SessionInfo>,
     seen_ids: &mut HashSet<String>,
     icon_cache: &mut HashMap<String, Option<String>>,
+    include_visuals: bool,
 ) -> Result<()> {
     let session_manager = get_session_manager(device)?;
     let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
@@ -540,9 +647,14 @@ fn collect_device_sessions(
             format!("{}|{}", device_id, base_id)
         };
 
-        if let Some(session) =
-            session_info_from_control(&control2, &simple, session_id, process_id, icon_cache)?
-        {
+        if let Some(session) = session_info_from_control(
+            &control2,
+            &simple,
+            session_id,
+            process_id,
+            icon_cache,
+            include_visuals,
+        )? {
             if !seen_ids.insert(session.id.clone()) {
                 continue;
             }
@@ -560,6 +672,7 @@ fn session_info_for_process(
     process_id: u32,
     process_identity: &ProcessIdentity,
     icon_cache: &mut HashMap<String, Option<String>>,
+    include_visuals: bool,
 ) -> Result<Option<SessionInfo>> {
     let session_manager = get_session_manager(device)?;
     let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
@@ -575,7 +688,7 @@ fn session_info_for_process(
 
         // Fallback: Check process path if PID mismatch
         if !matches && session_process_id != 0 {
-            let session_identity = query_effective_process_identity(session_process_id);
+            let session_identity = query_effective_process_identity_cached(session_process_id);
             matches = process_identities_match(&session_identity, process_identity);
         }
 
@@ -597,6 +710,7 @@ fn session_info_for_process(
             session_id,
             session_process_id,
             icon_cache,
+            include_visuals,
         )? {
             return Ok(Some(session));
         }
@@ -611,12 +725,13 @@ fn session_info_from_control(
     session_id: String,
     process_id: u32,
     icon_cache: &mut HashMap<String, Option<String>>,
+    include_visuals: bool,
 ) -> Result<Option<SessionInfo>> {
     let raw_display_name = unsafe { control2.GetDisplayName() }
         .ok()
         .and_then(owned_pwstr_to_string);
     let display_name = session_display_name(raw_display_name.as_deref());
-    let identity = query_effective_process_identity(process_id);
+    let identity = query_effective_process_identity_cached(process_id);
     let process_path = identity.path.clone();
     let process_name = process_path
         .as_ref()
@@ -629,12 +744,23 @@ fn session_info_from_control(
         process_name.as_deref(),
         display_name.as_deref(),
     );
-    let friendly_name = friendly_session_name(
-        display_name.as_deref(),
-        process_path.as_deref(),
-        process_name.as_deref(),
-        &identity,
-    );
+    let friendly_name = if include_visuals {
+        friendly_session_name(
+            display_name.as_deref(),
+            process_path.as_deref(),
+            process_name.as_deref(),
+            &identity,
+        )
+    } else {
+        display_name
+            .as_deref()
+            .filter(|name| !is_resource_display_name(name))
+            .map(|name| name.to_string())
+            .or_else(|| process_path.as_deref().and_then(friendly_process_label))
+            .or_else(|| process_name.as_deref().map(humanize_label))
+            .or_else(|| application_key.clone())
+            .unwrap_or_else(|| "Unknown".to_string())
+    };
 
     if should_skip_session(
         process_id,
@@ -648,11 +774,15 @@ fn session_info_from_control(
         return Ok(None);
     }
 
-    let icon_data = icon_data_for_package(&identity, icon_cache).or_else(|| {
-        process_path
-            .as_ref()
-            .and_then(|path| icon_data_for_path(path, icon_cache))
-    });
+    let icon_data = if include_visuals {
+        icon_data_for_package(&identity, icon_cache).or_else(|| {
+            process_path
+                .as_ref()
+                .and_then(|path| icon_data_for_path(path, icon_cache))
+        })
+    } else {
+        None
+    };
     let volume = unsafe { simple.GetMasterVolume() }?;
     let is_muted = unsafe { simple.GetMute() }?.as_bool();
 
@@ -675,7 +805,7 @@ fn friendly_session_name(
     process_name: Option<&str>,
     identity: &ProcessIdentity,
 ) -> String {
-    package_display_name(identity)
+    package_display_name_cached(identity)
         .or_else(|| {
             display_name
                 .filter(|name| !is_resource_display_name(name))
@@ -767,7 +897,7 @@ fn set_session_volume_for_process(
         let mut matches = session_process_id == process_id;
 
         if !matches && session_process_id != 0 {
-            let session_identity = query_effective_process_identity(session_process_id);
+            let session_identity = query_effective_process_identity_cached(session_process_id);
             matches = process_identities_match(&session_identity, process_identity);
         }
 
@@ -800,7 +930,7 @@ fn set_session_mute_for_process(
         let mut matches = session_process_id == process_id;
 
         if !matches && session_process_id != 0 {
-            let session_identity = query_effective_process_identity(session_process_id);
+            let session_identity = query_effective_process_identity_cached(session_process_id);
             matches = process_identities_match(&session_identity, process_identity);
         }
 
@@ -852,7 +982,7 @@ fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Re
         let simple: ISimpleAudioVolume = control.cast()?;
 
         let process_id = unsafe { control2.GetProcessId() }?;
-        let identity = query_effective_process_identity(process_id);
+        let identity = query_effective_process_identity_cached(process_id);
         let process_path = identity.path.clone();
         let process_name = process_path
             .as_ref()
@@ -860,18 +990,25 @@ fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Re
             .and_then(|name| name.to_str())
             .map(|name| name.to_string());
 
-        let display_name = unsafe { control2.GetDisplayName() }
-            .ok()
-            .and_then(owned_pwstr_to_string)
-            .and_then(|name| session_display_name(Some(&name)));
-
         let matches = session_matches_application_name(
             name,
             process_path.as_deref(),
             process_name.as_deref(),
-            display_name.as_deref(),
+            None,
             &identity,
-        );
+        ) || {
+            let display_name = unsafe { control2.GetDisplayName() }
+                .ok()
+                .and_then(owned_pwstr_to_string)
+                .and_then(|name| session_display_name(Some(&name)));
+            session_matches_application_name(
+                name,
+                process_path.as_deref(),
+                process_name.as_deref(),
+                display_name.as_deref(),
+                &identity,
+            )
+        };
 
         if matches {
             unsafe { simple.SetMasterVolume(volume, std::ptr::null()) }?;
@@ -915,7 +1052,7 @@ fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Resu
         let simple: ISimpleAudioVolume = control.cast()?;
 
         let process_id = unsafe { control2.GetProcessId() }?;
-        let identity = query_effective_process_identity(process_id);
+        let identity = query_effective_process_identity_cached(process_id);
         let process_path = identity.path.clone();
         let process_name = process_path
             .as_ref()
@@ -923,18 +1060,25 @@ fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Resu
             .and_then(|name| name.to_str())
             .map(|name| name.to_string());
 
-        let display_name = unsafe { control2.GetDisplayName() }
-            .ok()
-            .and_then(owned_pwstr_to_string)
-            .and_then(|name| session_display_name(Some(&name)));
-
         let matches = session_matches_application_name(
             name,
             process_path.as_deref(),
             process_name.as_deref(),
-            display_name.as_deref(),
+            None,
             &identity,
-        );
+        ) || {
+            let display_name = unsafe { control2.GetDisplayName() }
+                .ok()
+                .and_then(owned_pwstr_to_string)
+                .and_then(|name| session_display_name(Some(&name)));
+            session_matches_application_name(
+                name,
+                process_path.as_deref(),
+                process_name.as_deref(),
+                display_name.as_deref(),
+                &identity,
+            )
+        };
 
         if matches {
             unsafe { simple.SetMute(muted, std::ptr::null()) }?;

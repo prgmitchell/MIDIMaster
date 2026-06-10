@@ -36,6 +36,11 @@ import {
 } from "./app/appearance.js";
 import { createSessionRefresher } from "./app/session_refresh.js";
 import { createPluginRuntime } from "./app/plugin_runtime.js";
+import {
+  createFrameBatcher,
+  midiPayloadControlKey,
+  volumePayloadKey,
+} from "./app/render_batching.js";
 import { createDomRefs } from "./app/dom_refs.js";
 import { createAppShell } from "./app/app_shell.js";
 import {
@@ -270,6 +275,7 @@ const sidebarCollapsedStorageKey = "sidebarCollapsed";
 const midiInputStorageKey = "midiDeviceId";
 const BACKEND_ECHO_SUPPRESSION_MS = 220;
 const INTEGRATION_ACTIVE_ECHO_SUPPRESSION_MS = 1000;
+const FADER_TRIGGER_FLASH_MIN_MS = 120;
 const midiOutputStorageKey = "midiOutputDeviceId";
 const midiInputNameStorageKey = "midiDeviceName";
 const midiOutputNameStorageKey = "midiOutputDeviceName";
@@ -730,8 +736,17 @@ function setBindingSliderVolume(slider, volume, options = {}) {
   }
 }
 
-function flashBindingTrigger(bindingId) {
+function flashBindingTrigger(bindingId, options = {}) {
   if (!bindingId) return;
+  const rateLimitMs = Number(options.rateLimitMs || 0);
+  if (rateLimitMs > 0) {
+    const now = Date.now();
+    const previous = Number(bindingTriggerFlashTimes[bindingId] || 0);
+    if (previous > 0 && now - previous < rateLimitMs) {
+      return;
+    }
+    bindingTriggerFlashTimes[bindingId] = now;
+  }
   const selector = `.binding-item[data-binding-id="${CSS.escape(String(bindingId))}"]`;
   document.querySelectorAll(selector).forEach((el) => {
     el.classList.add("triggered");
@@ -745,17 +760,39 @@ function findBindingSlider(bindingId) {
   return document.querySelector(`.binding-volume-slider[data-binding-id="${CSS.escape(String(bindingId))}"]`);
 }
 
-function queueMidiUiEvent(payload) {
-  if (!payload || typeof payload !== "object") return;
-  pendingMidiUiEvents.push(payload);
-  if (midiUiFlushQueued) return;
-  midiUiFlushQueued = true;
-  requestAnimationFrame(flushMidiUiEvents);
+function bindingIsButtonLike(binding, payload = null) {
+  const controlKind = String(binding?.control_kind || binding?.controlKind || "Auto");
+  if (controlKind === "Button") return true;
+  if (controlKind === "Continuous") return false;
+  const msgType = normalizeMidiMessageType(
+    binding?.control?.msg_type
+      || binding?.control?.msgType
+      || payload?.msg_type
+      || payload?.msgType,
+  );
+  return msgType === "Note" || msgType === "ProgramChange";
 }
 
-function flushMidiUiEvents() {
-  midiUiFlushQueued = false;
-  const events = pendingMidiUiEvents.splice(0);
+function shouldPreserveMidiUiEvent(payload) {
+  return bindingIsButtonLike(findBindingForEvent(payload), payload);
+}
+
+function getMidiUiBatcher() {
+  if (!midiUiBatcher) {
+    midiUiBatcher = createFrameBatcher({
+      keyFor: midiPayloadControlKey,
+      shouldPreserve: shouldPreserveMidiUiEvent,
+      onFlush: flushMidiUiEvents,
+    });
+  }
+  return midiUiBatcher;
+}
+
+function queueMidiUiEvent(payload) {
+  getMidiUiBatcher().queue(payload);
+}
+
+function flushMidiUiEvents(events) {
   for (const payload of events) {
     applyMidiUiEvent(payload);
   }
@@ -817,10 +854,11 @@ const sessionRefresher = createSessionRefresher({
     updateBindingValues,
     updateBindingTargetDisplays: () => bindingsFeature?.updateBindingTargetDisplays?.(),
   },
+  getLastVolumeUpdateAt: () => lastVolumeUpdateAt,
 });
 
-async function refreshSessions() {
-  return sessionRefresher.refreshSessions();
+async function refreshSessions(options = {}) {
+  return sessionRefresher.refreshSessions(options);
 }
 
 async function refreshOsdDataIfStale(force = false) {
@@ -833,7 +871,7 @@ async function refreshOsdDataIfStale(force = false) {
     return osdDataRefreshInFlight;
   }
 
-  osdDataRefreshInFlight = refreshSessions()
+  osdDataRefreshInFlight = refreshSessions({ force })
     .then((result) => {
       lastOsdDataRefreshAt = Date.now();
       return result;
@@ -857,9 +895,10 @@ let dragState = null;
 const bindingInteractionTimes = {}; // Track last interaction time per binding ID
 const bindingLastValues = {}; // Track last valid volume per binding ID
 const bindingMuteValues = {}; // Track last known mute per binding ID (from feedback)
+const bindingTriggerFlashTimes = {};
 const liveMidiValuesByControl = new Map();
-const pendingMidiUiEvents = [];
-let midiUiFlushQueued = false;
+let midiUiBatcher = null;
+let volumeUpdateBatcher = null;
 
 function midiControlSignature(deviceId, control) {
   if (!control) return "";
@@ -1472,7 +1511,10 @@ function applyMidiUiEvent(payload) {
   if (!binding || getBindingTargets(binding).length === 0) {
     return;
   }
-  flashBindingTrigger(binding.id);
+  const buttonLike = bindingIsButtonLike(binding, payload);
+  flashBindingTrigger(binding.id, {
+    rateLimitMs: buttonLike ? 0 : FADER_TRIGGER_FLASH_MIN_MS,
+  });
   const handledButtonVisual = updateButtonVisualFromMidiEvent(binding, payload, normalizedLiveValue);
   if (binding.action === "ToggleMute") {
     return;
@@ -1497,6 +1539,125 @@ function applyMidiUiEvent(payload) {
 
   if (!bindingHasIntegrationTarget(binding)) {
     showVolumeOsd(getPrimaryBindingTarget(binding), volume);
+  }
+}
+
+function getVolumeUpdateBatcher() {
+  if (!volumeUpdateBatcher) {
+    volumeUpdateBatcher = createFrameBatcher({
+      keyFor: volumePayloadKey,
+      onFlush: flushVolumeUpdatePayloads,
+    });
+  }
+  return volumeUpdateBatcher;
+}
+
+function queueVolumeUpdatePayload(payload) {
+  if (!payload || typeof payload !== "object") return;
+  lastVolumeUpdateAt = Date.now();
+  getVolumeUpdateBatcher().queue(payload);
+}
+
+function volumeSliderEntries() {
+  return Array.from(document.querySelectorAll(".binding-volume-slider")).map((slider) => {
+    let target = null;
+    try {
+      target = JSON.parse(slider.dataset.targetJson || "null");
+    } catch {
+      target = null;
+    }
+    return {
+      slider,
+      bindingId: String(slider.dataset.bindingId || ""),
+      target,
+      lastMidiUpdate: Number(slider.dataset.lastMidiUpdate || 0),
+    };
+  });
+}
+
+function flushVolumeUpdatePayloads(payloads) {
+  if (!Array.isArray(payloads) || payloads.length === 0) return;
+  if (isOsdWindow) {
+    refreshOsdDataIfStale().catch((error) => {
+      diagnosticError("osd_event_refresh_sessions_failed", error);
+    });
+  }
+
+  const now = Date.now();
+  const sliderEntries = volumeSliderEntries();
+  const slidersByBinding = new Map();
+  sliderEntries.forEach((entry) => {
+    if (entry.bindingId && !slidersByBinding.has(entry.bindingId)) {
+      slidersByBinding.set(entry.bindingId, entry);
+    }
+  });
+  const bindingsById = new Map(bindings.map((binding) => [String(binding.id), binding]));
+  const shouldSuppressIntegrationEcho = (entry) => {
+    const bindingId = entry.bindingId;
+    if (!bindingId) return false;
+    const binding = bindingsById.get(bindingId);
+    if (!binding || !bindingHasIntegrationTarget(binding)) return false;
+    const lastInteraction = Number(bindingInteractionTimes[bindingId] || 0);
+    return lastInteraction > 0 && (now - lastInteraction) < INTEGRATION_ACTIVE_ECHO_SUPPRESSION_MS;
+  };
+  const canAcceptBackendVolume = (entry) => (
+    entry
+    && now - entry.lastMidiUpdate > BACKEND_ECHO_SUPPRESSION_MS
+    && !shouldSuppressIntegrationEcho(entry)
+  );
+
+  for (const payload of payloads) {
+    applyVolumeUpdatePayload(payload, {
+      sliderEntries,
+      slidersByBinding,
+      canAcceptBackendVolume,
+    });
+  }
+}
+
+function applyVolumeUpdatePayload(payload, context) {
+  updateIntegrationStateFromEventPayload(payload);
+  if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
+    updateFocusedSessionState(payload.focus_session);
+  }
+
+  const buttonInputValue = typeof payload.input_value === "number" ? payload.input_value : null;
+  const feedbackBinding = payload.binding_id
+    ? bindings.find((binding) => binding && String(binding.id) === String(payload.binding_id))
+    : null;
+  const feedbackButtonBehavior = feedbackBinding ? buttonVisualBehavior(feedbackBinding) : null;
+
+  if (payload.binding_id && feedbackButtonBehavior) {
+    if (feedbackButtonBehavior === "momentary") {
+      if (buttonInputValue != null) {
+        bindingLastValues[payload.binding_id] = buttonInputValue;
+        syncButtonValueVisual(payload.binding_id, { inputValue: buttonInputValue });
+      }
+    } else if (typeof payload.volume === "number") {
+      bindingLastValues[payload.binding_id] = payload.volume;
+      syncButtonValueVisual(payload.binding_id, { stateValue: payload.volume });
+    }
+  }
+
+  if (payload.binding_id) {
+    const direct = context.slidersByBinding.get(String(payload.binding_id));
+    if (context.canAcceptBackendVolume(direct)) {
+      setBindingSliderVolume(direct.slider, payload.volume, { bindingId: payload.binding_id });
+    }
+  }
+
+  for (const entry of context.sliderEntries) {
+    if (payload.binding_id && entry.bindingId === String(payload.binding_id)) continue;
+    if (!context.canAcceptBackendVolume(entry)) continue;
+    if (entry.target && targetsMatch(entry.target, payload.target)) {
+      setBindingSliderVolume(entry.slider, payload.volume);
+    }
+  }
+
+  if (!payload.silent) {
+    showVolumeOsd(payload.target, payload.volume, payload.focus_session, {
+      inputValue: buttonInputValue,
+    });
   }
 }
 
@@ -2264,88 +2425,7 @@ async function setupListeners() {
     if (!payload || typeof payload !== "object") {
       return;
     }
-    if (isOsdWindow) {
-      refreshOsdDataIfStale().catch((error) => {
-        diagnosticError("osd_event_refresh_sessions_failed", error);
-      });
-    }
-    updateIntegrationStateFromEventPayload(payload);
-    if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
-      updateFocusedSessionState(payload.focus_session);
-    }
-
-    const buttonInputValue = typeof payload.input_value === "number" ? payload.input_value : null;
-    const feedbackBinding = payload.binding_id
-      ? bindings.find((b) => b && String(b.id) === String(payload.binding_id))
-      : null;
-    const feedbackButtonBehavior = feedbackBinding ? buttonVisualBehavior(feedbackBinding) : null;
-
-    if (payload.binding_id && feedbackButtonBehavior) {
-      if (feedbackButtonBehavior === "momentary") {
-        if (buttonInputValue != null) {
-          bindingLastValues[payload.binding_id] = buttonInputValue;
-          syncButtonValueVisual(payload.binding_id, { inputValue: buttonInputValue });
-        }
-      } else if (typeof payload.volume === "number") {
-        bindingLastValues[payload.binding_id] = payload.volume;
-        syncButtonValueVisual(payload.binding_id, { stateValue: payload.volume });
-      }
-    }
-
-    // Update timestamp to signal that a volume change just happened
-    lastVolumeUpdateAt = Date.now();
-
-    // Backend Event Update
-    // Similar logic to polling: respect local MIDI updates to prevent jitter
-    const shouldSuppressIntegrationEcho = (slider) => {
-      const bindingId = String(slider?.dataset?.bindingId || "");
-      if (!bindingId) return false;
-      const binding = bindings.find((b) => b && String(b.id) === bindingId);
-      if (!binding || !bindingHasIntegrationTarget(binding)) return false;
-      const lastInteraction = Number(bindingInteractionTimes[bindingId] || 0);
-      return lastInteraction > 0 && (Date.now() - lastInteraction) < INTEGRATION_ACTIVE_ECHO_SUPPRESSION_MS;
-    };
-
-    // 1. Direct update if ID available
-    if (payload.binding_id) {
-      const s = findBindingSlider(payload.binding_id);
-      if (s) {
-        const lastMidi = Number(s.dataset.lastMidiUpdate || 0);
-        // Ignore immediate backend echo briefly so hardware feedback does not
-        // fight the active user move, but release control quickly afterward.
-        if (
-          Date.now() - lastMidi > BACKEND_ECHO_SUPPRESSION_MS
-          && !shouldSuppressIntegrationEcho(s)
-        ) {
-          setBindingSliderVolume(s, payload.volume, { bindingId: payload.binding_id });
-        }
-      }
-    }
-
-    // 2. Sync others
-    const allSliders = document.querySelectorAll(".binding-volume-slider");
-    allSliders.forEach(slider => {
-      if (payload.binding_id && slider.dataset.bindingId === payload.binding_id) return;
-
-      const lastMidi = Number(slider.dataset.lastMidiUpdate || 0);
-      if (
-        Date.now() - lastMidi > BACKEND_ECHO_SUPPRESSION_MS
-        && !shouldSuppressIntegrationEcho(slider)
-      ) {
-        try {
-          const t = JSON.parse(slider.dataset.targetJson);
-          if (targetsMatch(t, payload.target)) {
-            setBindingSliderVolume(slider, payload.volume);
-          }
-        } catch (e) { }
-      }
-    });
-
-    if (!payload.silent) {
-      showVolumeOsd(payload.target, payload.volume, payload.focus_session, {
-        inputValue: buttonInputValue,
-      });
-    }
+    queueVolumeUpdatePayload(payload);
   });
 
   // Plugin host starts after the active profile loads (see startMainApp).

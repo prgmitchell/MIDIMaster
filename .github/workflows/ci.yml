@@ -50,6 +50,12 @@ jobs:
       - name: Test frontend binding value sync
         run: node scripts/test-binding-value-sync.mjs
 
+      - name: Test frontend render batching
+        run: node scripts/test-render-batching.mjs
+
+      - name: Test frontend session refresh
+        run: node scripts/test-session-refresh.mjs
+
       - name: Test frontend focus target core
         run: node scripts/test-target-core-focus.mjs
 

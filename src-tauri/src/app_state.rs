@@ -414,7 +414,7 @@ impl AppState {
     pub(crate) fn sync_feedback_values(&self, profile: &Profile) -> FeedbackSyncSnapshot {
         let needs = feedback_sync_needs(profile);
         let sessions = if needs.sessions {
-            match self.audio.list_sessions() {
+            match self.audio.list_session_states() {
                 Ok(sessions) => sessions,
                 Err(_) => {
                     return FeedbackSyncSnapshot {
@@ -426,7 +426,7 @@ impl AppState {
             Vec::new()
         };
         let focused_session = if needs.focused_session {
-            self.audio.focused_session().ok().flatten()
+            self.audio.focused_session_state().ok().flatten()
         } else {
             None
         };

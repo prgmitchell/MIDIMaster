@@ -1,21 +1,54 @@
 use crate::model::OsdSettings;
 use crate::monitors::resolve_monitor_for_osd;
 use crate::AppState;
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager};
 
 pub(crate) fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
+    apply_osd_settings_if_needed(app, settings, true);
+}
+
+#[derive(Default)]
+struct OsdWindowCache {
+    placement_signature: Option<String>,
+    topmost_applied: bool,
+}
+
+fn osd_window_cache() -> &'static Mutex<OsdWindowCache> {
+    static CACHE: OnceLock<Mutex<OsdWindowCache>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(OsdWindowCache::default()))
+}
+
+fn reset_osd_window_cache() {
+    if let Ok(mut cache) = osd_window_cache().lock() {
+        cache.placement_signature = None;
+        cache.topmost_applied = false;
+    }
+}
+
+fn apply_osd_settings_if_needed(app: &AppHandle, settings: &OsdSettings, force: bool) {
     let Some(osd_window) = app.get_webview_window("osd") else {
         return;
     };
 
     if !settings.enabled {
         let _ = osd_window.hide();
+        reset_osd_window_cache();
         return;
     }
 
-    let _ = osd_window.set_always_on_top(true);
-    force_topmost(&osd_window);
+    let topmost_needed = osd_window_cache()
+        .lock()
+        .map(|cache| force || !cache.topmost_applied)
+        .unwrap_or(true);
+    if topmost_needed {
+        let _ = osd_window.set_always_on_top(true);
+        force_topmost(&osd_window);
+        if let Ok(mut cache) = osd_window_cache().lock() {
+            cache.topmost_applied = true;
+        }
+    }
 
     let selected = resolve_monitor_for_osd(app, settings);
     if let Some(selected) = selected {
@@ -24,6 +57,26 @@ pub(crate) fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
         let size = monitor.size();
         let position = monitor.position();
         let scale = settings.scale.clamp(0.75, 1.5);
+        let monitor_name = monitor.name().map(String::as_str).unwrap_or_default();
+        let signature = format!(
+            "anchor={} scale={:.3} monitor={} pos={}x{} size={}x{} sf={:.3}",
+            settings.anchor,
+            scale,
+            monitor_name,
+            position.x,
+            position.y,
+            size.width,
+            size.height,
+            scale_factor
+        );
+        let placement_needed = osd_window_cache()
+            .lock()
+            .map(|cache| force || cache.placement_signature.as_deref() != Some(signature.as_str()))
+            .unwrap_or(true);
+        if !placement_needed {
+            return;
+        }
+
         let padding = 24.0;
         let logical_width = size.width as f64 / scale_factor;
         let logical_height = size.height as f64 / scale_factor;
@@ -78,6 +131,13 @@ pub(crate) fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
         y = y.clamp(min_y, max_y);
         let _ = osd_window.set_size(LogicalSize::new(width, height));
         let _ = osd_window.set_position(LogicalPosition::new(x, y));
+        if let Ok(mut cache) = osd_window_cache().lock() {
+            cache.placement_signature = Some(signature);
+        }
+    } else if force {
+        if let Ok(mut cache) = osd_window_cache().lock() {
+            cache.placement_signature = None;
+        }
     }
 }
 
@@ -106,15 +166,15 @@ pub(crate) fn emit_osd_update(
         *last_update = Some(Instant::now());
     }
 
-    apply_osd_settings(app, &settings);
-
     let Some(osd_window) = app.get_webview_window("osd") else {
         return;
     };
 
-    let _ = osd_window.show();
-    let _ = osd_window.set_always_on_top(true);
-    force_topmost(&osd_window);
+    let was_visible = osd_window.is_visible().unwrap_or(false);
+    if !was_visible {
+        let _ = osd_window.show();
+    }
+    apply_osd_settings_if_needed(app, &settings, !was_visible);
 
     let mut osd_payload = payload.clone();
     if let Some(map) = osd_payload.as_object_mut() {
@@ -128,13 +188,6 @@ pub(crate) fn emit_osd_update(
             "volume_update"
         };
     let _ = osd_window.emit(event_name, osd_payload.clone());
-    if let Ok(payload_json) = serde_json::to_string(&osd_payload) {
-        let script = format!(
-            "window.__OSD_UPDATE__ && window.__OSD_UPDATE__({});",
-            payload_json
-        );
-        let _ = osd_window.eval(&script);
-    }
 }
 
 #[cfg(target_os = "windows")]

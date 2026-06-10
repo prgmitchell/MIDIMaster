@@ -16,6 +16,21 @@ export function createOsdFeature({
   const keyForTarget = (typeof resolveTargetKey === "function") ? resolveTargetKey : (() => null);
 
   const activeOsdCards = new Map();
+  const pendingVolumeUpdates = new Map();
+  let volumeRenderQueued = false;
+
+  function scheduleVolumeRender() {
+    if (volumeRenderQueued) return;
+    volumeRenderQueued = true;
+    requestAnimationFrame(() => {
+      volumeRenderQueued = false;
+      const updates = Array.from(pendingVolumeUpdates.values());
+      pendingVolumeUpdates.clear();
+      updates.forEach((update) => {
+        renderVolumeOsd(update.target, update.volume, update.focusSession, update.options);
+      });
+    });
+  }
 
   function renderLabelWithTags(host, rawLabel) {
     host.innerHTML = "";
@@ -123,7 +138,7 @@ export function createOsdFeature({
     }, 250);
   }
 
-  function showVolumeOsd(target, volume, focusSession, options = null) {
+  function renderVolumeOsd(target, volume, focusSession, options = null) {
     if (!osd) return;
 
     const display = resolveDisplay(target, focusSession);
@@ -149,14 +164,26 @@ export function createOsdFeature({
       refs.card.classList.add("visible");
     }
 
-    renderLabelWithTags(refs.labelSpan, displayLabelForTarget(display, target));
-    refs.iconDiv.innerHTML = "";
-    const icon = iconFor({ label: display.label, icon_data: display.icon_data });
-    refs.iconDiv.appendChild(icon);
+    const displayLabel = displayLabelForTarget(display, target);
+    const displaySignature = [
+      displayLabel,
+      String(display?.label || ""),
+      String(display?.icon_data || ""),
+    ].join("|");
+    if (item.displaySignature !== displaySignature) {
+      item.displaySignature = displaySignature;
+      renderLabelWithTags(refs.labelSpan, displayLabel);
+      refs.iconDiv.innerHTML = "";
+      const icon = iconFor({ label: display.label, icon_data: display.icon_data });
+      refs.iconDiv.appendChild(icon);
+
+      refs.fillDiv.style.backgroundColor = "";
+      refs.iconDiv.style.fontSize = "";
+      refs.iconDiv.style.marginRight = "";
+      refs.valueSpan.style.fontSize = "";
+    }
 
     refs.fillDiv.style.backgroundColor = "";
-    refs.iconDiv.style.fontSize = "";
-    refs.iconDiv.style.marginRight = "";
     refs.valueSpan.style.fontSize = "";
 
     const valueText = osdValueTextForTarget(target, options);
@@ -165,7 +192,7 @@ export function createOsdFeature({
       : (valueText ? 1.0 : volume);
     const clampedVolume = Math.min(1, Math.max(0, Number(fillSource) || 0));
     const percent = Math.round(clampedVolume * 100);
-    refs.fillDiv.style.width = `${percent}%`;
+    refs.fillDiv.style.transform = `scaleX(${clampedVolume})`;
     refs.valueSpan.textContent = valueText || `${percent}%`;
 
     if (!osdDebugAlways) {
@@ -173,6 +200,12 @@ export function createOsdFeature({
         removeOsdCard(key);
       }, 1500);
     }
+  }
+
+  function showVolumeOsd(target, volume, focusSession, options = null) {
+    if (!osd) return;
+    pendingVolumeUpdates.set(getOsdKey(target), { target, volume, focusSession, options });
+    scheduleVolumeRender();
   }
 
   function showMuteOsd(target, muted, focusSession) {
@@ -201,12 +234,13 @@ export function createOsdFeature({
       refs.card.classList.add("visible");
     }
 
+    item.displaySignature = null;
     renderLabelWithTags(refs.labelSpan, display.label);
     refs.iconDiv.innerHTML = "";
     const icon = iconFor(display);
     refs.iconDiv.appendChild(icon);
 
-    refs.fillDiv.style.width = muted ? "0%" : "100%";
+    refs.fillDiv.style.transform = muted ? "scaleX(0)" : "scaleX(1)";
     refs.fillDiv.style.backgroundColor = muted ? "#ff4444" : "";
     refs.valueSpan.textContent = muted ? "\ud83d\udd07" : "\ud83d\udd0a";
     refs.valueSpan.style.fontSize = "24px";
@@ -219,6 +253,7 @@ export function createOsdFeature({
   }
 
   function hideVolumeOsd() {
+    pendingVolumeUpdates.clear();
     for (const key of activeOsdCards.keys()) {
       removeOsdCard(key);
     }
