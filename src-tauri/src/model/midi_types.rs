@@ -37,6 +37,7 @@ pub enum MidiMessageType {
     ControlChange,
     Note,
     PitchBend,
+    ProgramChange,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]

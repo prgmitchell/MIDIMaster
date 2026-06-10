@@ -98,7 +98,13 @@ export function createBindingsFeature({
     : ((_b, i) => `Binding ${i + 1}`);
   const labelForControl = (typeof controlLabel === "function")
     ? controlLabel
-    : ((c) => `Ch ${c?.channel ?? "?"} CC ${c?.controller ?? "?"}`);
+    : ((c) => {
+      const msgType = String(c?.msg_type || c?.msgType || "ControlChange");
+      const label = msgType === "PitchBend"
+        ? "Pitch Bend"
+        : (msgType === "Note" ? "Note" : (msgType === "ProgramChange" ? "Program" : "CC"));
+      return `Ch ${c?.channel ?? "?"} ${label} ${msgType === "PitchBend" ? "" : (c?.controller ?? "?")}`.trim();
+    });
   const labelForMidiDevice = (typeof getMidiDeviceLabel === "function")
     ? getMidiDeviceLabel
     : ((deviceId) => String(deviceId || "").trim());
@@ -1048,7 +1054,7 @@ export function createBindingsFeature({
     if (!control) return "Not mapped";
     const msg = control.msg_type === "PitchBend"
       ? "PB"
-      : (control.msg_type === "Note" ? "Note" : "CC");
+      : (control.msg_type === "Note" ? "Note" : (control.msg_type === "ProgramChange" ? "Program" : "CC"));
     return `Ch ${control.channel} ${msg} ${control.controller}`;
   }
 

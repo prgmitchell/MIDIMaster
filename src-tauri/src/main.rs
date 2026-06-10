@@ -672,6 +672,13 @@ mod tests {
     }
 
     #[test]
+    fn learn_program_change_is_classified_as_button() {
+        let candidate = candidate_with_values(model::MidiMessageType::ProgramChange, false, true);
+        let learned = classify_learned_control(&candidate);
+        assert_eq!(learned.control_kind, model::BindingControlKind::Button);
+    }
+
+    #[test]
     fn learn_cc_127_and_0_is_classified_as_button() {
         let candidate = candidate_with_values(model::MidiMessageType::ControlChange, true, true);
         let learned = classify_learned_control(&candidate);

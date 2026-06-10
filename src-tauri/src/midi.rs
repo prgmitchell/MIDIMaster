@@ -868,6 +868,18 @@ impl MidiManager {
         msg_type: MidiMessageType,
         binding: Option<&Binding>,
     ) -> Result<()> {
+        if matches!(msg_type, MidiMessageType::ProgramChange) {
+            run_logger::debug(
+                "midi",
+                "feedback_skipped_program_change",
+                &format!(
+                    "input_device_id={} logical_channel={} logical_controller={} logical_msg_type={:?} normalized_value={:.4}",
+                    device_id, channel, controller, msg_type, value
+                ),
+            );
+            return Ok(());
+        }
+
         let resolved_route = self
             .input_routes
             .get(device_id)
@@ -1309,6 +1321,17 @@ fn build_direct_feedback_bytes(
                 raw_midi_value: value7 as u16,
             }
         }
+        MidiMessageType::ProgramChange => {
+            let status = 0xC0 | (channel & 0x0F);
+            FeedbackBytes {
+                bytes: vec![status, controller & 0x7F],
+                channel: channel & 0x0F,
+                controller: controller & 0x7F,
+                msg_type: msg_type.clone(),
+                normalized_value,
+                raw_midi_value: (controller & 0x7F) as u16,
+            }
+        }
     }
 }
 
@@ -1489,7 +1512,9 @@ fn diagnostic_log_reason(
 fn diagnostic_max_value(msg_type: &MidiMessageType) -> u16 {
     match msg_type {
         MidiMessageType::PitchBend => 16383,
-        MidiMessageType::ControlChange | MidiMessageType::Note => 127,
+        MidiMessageType::ControlChange | MidiMessageType::Note | MidiMessageType::ProgramChange => {
+            127
+        }
     }
 }
 
@@ -1783,7 +1808,7 @@ fn find_output_port(midi_out: &MidiOutput, index: usize) -> Result<MidiOutputPor
 }
 
 fn parse_midi_message(device_id: &str, message: &[u8]) -> Option<MidiEvent> {
-    if message.len() < 3 {
+    if message.is_empty() {
         return None;
     }
     let status = message[0];
@@ -1791,7 +1816,7 @@ fn parse_midi_message(device_id: &str, message: &[u8]) -> Option<MidiEvent> {
     let channel = status & 0x0F;
 
     match command {
-        0xB0 => Some(MidiEvent {
+        0xB0 if message.len() >= 3 => Some(MidiEvent {
             device_id: device_id.to_string(),
             channel,
             controller: message[1],
@@ -1799,7 +1824,7 @@ fn parse_midi_message(device_id: &str, message: &[u8]) -> Option<MidiEvent> {
             value_14: None,
             msg_type: MidiMessageType::ControlChange,
         }),
-        0x90 | 0x80 => Some(MidiEvent {
+        0x90 | 0x80 if message.len() >= 3 => Some(MidiEvent {
             device_id: device_id.to_string(),
             channel,
             controller: message[1],                              // Note number
@@ -1807,7 +1832,15 @@ fn parse_midi_message(device_id: &str, message: &[u8]) -> Option<MidiEvent> {
             value_14: None,
             msg_type: MidiMessageType::Note,
         }),
-        0xE0 => {
+        0xC0 if message.len() >= 2 => Some(MidiEvent {
+            device_id: device_id.to_string(),
+            channel,
+            controller: message[1],
+            value: 127,
+            value_14: None,
+            msg_type: MidiMessageType::ProgramChange,
+        }),
+        0xE0 if message.len() >= 3 => {
             let lsb = message[1] as u16;
             let msb = message[2] as u16;
             let value_14 = (msb << 7) | lsb;
@@ -1860,6 +1893,36 @@ mod tests {
             normalized_value,
             protocol: "direct",
         }
+    }
+
+    #[test]
+    fn parses_program_change_zero_as_button_press() {
+        let event = parse_midi_message("midi:0", &[0xC0, 0x00]).expect("program change event");
+
+        assert_eq!(event.device_id, "midi:0");
+        assert_eq!(event.channel, 0);
+        assert_eq!(event.controller, 0);
+        assert_eq!(event.value, 127);
+        assert_eq!(event.value_14, None);
+        assert_eq!(event.msg_type, MidiMessageType::ProgramChange);
+    }
+
+    #[test]
+    fn parses_program_change_program_number_and_channel() {
+        let event = parse_midi_message("midi:1", &[0xC3, 0x7C]).expect("program change event");
+
+        assert_eq!(event.device_id, "midi:1");
+        assert_eq!(event.channel, 3);
+        assert_eq!(event.controller, 0x7C);
+        assert_eq!(event.value, 127);
+        assert_eq!(event.value_14, None);
+        assert_eq!(event.msg_type, MidiMessageType::ProgramChange);
+    }
+
+    #[test]
+    fn ignores_truncated_three_byte_messages_without_dropping_program_change() {
+        assert!(parse_midi_message("midi:0", &[0xB0, 0x07]).is_none());
+        assert!(parse_midi_message("midi:0", &[0xC0, 0x05]).is_some());
     }
 
     fn manager_with_test_route(input_device_id: &str, output_device_id: &str) -> MidiManager {

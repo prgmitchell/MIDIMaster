@@ -1326,13 +1326,19 @@ function cancelBindingDrag() {
 }
 
 function controlLabel(control) {
-  if (control.controller === 224) {
-    return `Ch ${control.channel} Pitch Bend`;
+  const msgType = normalizeMidiMessageType(control?.msg_type || control?.msgType);
+  const channel = control?.channel ?? "?";
+  const controller = control?.controller ?? "?";
+  if (msgType === "PitchBend" || controller === 224) {
+    return `Ch ${channel} Pitch Bend`;
   }
-  if (control.msg_type === "Note") {
-    return `Ch ${control.channel} Note ${control.controller}`;
+  if (msgType === "Note") {
+    return `Ch ${channel} Note ${controller}`;
   }
-  return `Ch ${control.channel} CC ${control.controller}`;
+  if (msgType === "ProgramChange") {
+    return `Ch ${channel} Program ${controller}`;
+  }
+  return `Ch ${channel} CC ${controller}`;
 }
 
 function closeTargetMenus(except = null) {
@@ -1829,7 +1835,8 @@ async function promptCreateLearnTransfer(message) {
 function createBindingFromLearn(payload) {
   const msgType = payload.msg_type || "ControlChange";
   const controlKind = payload.control_kind || "Auto";
-  const isButton = controlKind === "Button" || (controlKind === "Auto" && msgType === "Note");
+  const isButton = controlKind === "Button"
+    || (controlKind === "Auto" && (msgType === "Note" || msgType === "ProgramChange"));
   const control = {
     channel: payload.channel,
     controller: payload.controller,

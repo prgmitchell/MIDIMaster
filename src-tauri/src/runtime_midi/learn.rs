@@ -27,7 +27,10 @@ pub(super) fn handle_learn_event(state: &AppState, event: &MidiEvent) -> Result<
         control_kind: model::BindingControlKind::Auto,
     };
 
-    if matches!(msg_type, model::MidiMessageType::Note) {
+    if matches!(
+        msg_type,
+        model::MidiMessageType::Note | model::MidiMessageType::ProgramChange
+    ) {
         if let Ok(mut candidate_guard) = state.learn_candidate.lock() {
             let now = Instant::now();
             *candidate_guard = Some(LearnCandidate {

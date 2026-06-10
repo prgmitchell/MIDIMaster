@@ -471,7 +471,9 @@ pub(crate) fn cc_learn_value_is_definitely_continuous(value: u8) -> bool {
 pub(crate) fn classify_learned_control(candidate: &LearnCandidate) -> LearnedControl {
     let mut learned = candidate.control.clone();
     learned.control_kind = match learned.msg_type {
-        model::MidiMessageType::Note => model::BindingControlKind::Button,
+        model::MidiMessageType::Note | model::MidiMessageType::ProgramChange => {
+            model::BindingControlKind::Button
+        }
         model::MidiMessageType::ControlChange => {
             classify_cc_candidate(candidate.saw_zero, candidate.saw_max)
         }

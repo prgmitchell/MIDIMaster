@@ -87,6 +87,26 @@ function testWaveLinkSetMainOutputIsMomentary() {
   assert.equal(bindingModel.buttonVisualBehavior(buttonBinding()), "momentary");
 }
 
+function testProgramChangeAutoBindingIsButton() {
+  const binding = buttonBinding({
+    control_kind: "Auto",
+    control: { msg_type: "ProgramChange", channel: 0, controller: 124 },
+  });
+
+  assert.equal(bindingModel.buttonVisualBehavior(binding), "momentary");
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 1 }), true);
+}
+
+function testProgramChangeButtonBindingIsButton() {
+  const binding = buttonBinding({
+    control_kind: "Button",
+    control: { msg_type: "ProgramChange", channel: 0, controller: 0 },
+  });
+
+  assert.equal(bindingModel.buttonVisualBehavior(binding), "momentary");
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 1 }), true);
+}
+
 function testMomentaryButtonFollowsInputValue() {
   const binding = buttonBinding();
 
@@ -206,6 +226,8 @@ testAutoDetectionMatchesBackendMidpointRule();
 testAutoDetectionUsesSignMagnitudeWithoutMidpoint();
 testAutoDetectionUsesTwosComplementForHighNegativeBand();
 testWaveLinkSetMainOutputIsMomentary();
+testProgramChangeAutoBindingIsButton();
+testProgramChangeButtonBindingIsButton();
 testMomentaryButtonFollowsInputValue();
 testMappedLightDoesNotControlButtonVisualState();
 testToggleMuteFollowsMutedState();

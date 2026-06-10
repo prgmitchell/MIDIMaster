@@ -164,7 +164,7 @@ export function effectiveIsButton(binding) {
   const controlKind = normalizeControlKind(binding?.control_kind);
   if (controlKind === "Button") return true;
   if (controlKind === "Continuous") return false;
-  return binding?.control?.msg_type === "Note";
+  return binding?.control?.msg_type === "Note" || binding?.control?.msg_type === "ProgramChange";
 }
 
 export function isHotkeyTarget(target) {

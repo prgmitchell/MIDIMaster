@@ -478,7 +478,10 @@ impl Binding {
     pub fn is_button_binding(&self) -> bool {
         matches!(self.control_kind, BindingControlKind::Button)
             || (matches!(self.control_kind, BindingControlKind::Auto)
-                && matches!(self.control.msg_type, MidiMessageType::Note))
+                && matches!(
+                    self.control.msg_type,
+                    MidiMessageType::Note | MidiMessageType::ProgramChange
+                ))
     }
 
     pub fn mapped_button_light_feedback_value(&self) -> Option<f32> {

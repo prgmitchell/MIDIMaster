@@ -121,7 +121,7 @@ impl MidiEventQueue {
 
 fn should_preserve_event(event: &MidiEvent) -> bool {
     match event.msg_type {
-        MidiMessageType::Note => true,
+        MidiMessageType::Note | MidiMessageType::ProgramChange => true,
         MidiMessageType::ControlChange => event.value == 0 || event.value == 127,
         MidiMessageType::PitchBend => false,
     }
@@ -170,8 +170,27 @@ mod tests {
         }
     }
 
+    fn program_change(program: u8) -> MidiEvent {
+        MidiEvent {
+            device_id: "midi:0".to_string(),
+            channel: 0,
+            controller: program,
+            value: 127,
+            value_14: None,
+            msg_type: MidiMessageType::ProgramChange,
+        }
+    }
+
     fn drained_values(queue: &mut MidiEventQueue) -> Vec<u8> {
         queue.drain().into_iter().map(|event| event.value).collect()
+    }
+
+    fn drained_controllers(queue: &mut MidiEventQueue) -> Vec<u8> {
+        queue
+            .drain()
+            .into_iter()
+            .map(|event| event.controller)
+            .collect()
     }
 
     #[test]
@@ -224,6 +243,17 @@ mod tests {
         queue.enqueue(cc(41, 0));
 
         assert_eq!(drained_values(&mut queue), vec![127, 0, 127, 0]);
+        assert_eq!(queue.take_stats().coalesced, 0);
+    }
+
+    #[test]
+    fn program_change_events_are_preserved_in_order() {
+        let mut queue = MidiEventQueue::new(16, 16);
+        queue.enqueue(program_change(0));
+        queue.enqueue(program_change(0));
+        queue.enqueue(program_change(124));
+
+        assert_eq!(drained_controllers(&mut queue), vec![0, 0, 124]);
         assert_eq!(queue.take_stats().coalesced, 0);
     }
 

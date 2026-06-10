@@ -20,7 +20,10 @@ mod learn;
 fn binding_is_button(binding: &model::Binding) -> bool {
     matches!(binding.control_kind, model::BindingControlKind::Button)
         || (matches!(binding.control_kind, model::BindingControlKind::Auto)
-            && matches!(binding.control.msg_type, model::MidiMessageType::Note))
+            && matches!(
+                binding.control.msg_type,
+                model::MidiMessageType::Note | model::MidiMessageType::ProgramChange
+            ))
 }
 
 fn resolve_integration_button_event(
@@ -177,6 +180,16 @@ pub(super) fn update_activity_button_light_hold_feedback(
     key: BindingKey,
     input_active: bool,
 ) {
+    if matches!(
+        binding.control.msg_type,
+        model::MidiMessageType::ProgramChange
+    ) {
+        if let Ok(mut generations) = state.activity_button_light_generations.lock() {
+            cancel_activity_button_light_generation(&mut generations, &key);
+        }
+        return;
+    }
+
     if binding
         .activity_button_light_feedback_value(input_active)
         .is_none()
