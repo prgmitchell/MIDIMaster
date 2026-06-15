@@ -734,6 +734,7 @@ mod tests {
         model::Binding {
             id: "binding-1".to_string(),
             name: "Binding 1".to_string(),
+            macro_name: String::new(),
             device_id: device_id.to_string(),
             control: model::MidiControl {
                 channel: 2,
@@ -758,6 +759,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            macro_steps: Vec::new(),
         }
     }
 

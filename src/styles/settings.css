@@ -2838,6 +2838,19 @@ body[data-theme="light"] #binding-config-panel {
   --binding-config-control-bg: color-mix(in srgb, var(--control-bg) 80%, transparent);
 }
 
+body[data-theme] #binding-config-panel.binding-config-panel--macro-page .binding-config-section--macro {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-theme="light"] #binding-config-panel.binding-config-panel--macro-page .binding-config-macro-steps-panel,
+body[data-theme="light"] #binding-config-panel.binding-config-panel--macro-page .binding-config-macro-properties-panel {
+  background: var(--binding-config-card-bg);
+  border-color: var(--binding-config-border-soft);
+}
+
 body.dark-mode:not([data-theme]) #target-panel {
   background: rgba(7, 11, 24, 0.64);
 }

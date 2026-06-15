@@ -5,9 +5,11 @@ mod profile_types;
 
 #[allow(unused_imports)]
 pub use binding_types::{
-    AssignMode, AutoHotkeyScriptMapping, AuxiliaryControl, Binding, BindingAction,
-    BindingControlKind, BindingTarget, ButtonLightMode, FaderCurve, FaderCurvePoint, HotkeyMapping,
-    MidiMode, MuteBehavior, OpenApplicationMapping, RelativeFormat,
+    normalize_macro_draft_steps, normalize_macro_steps, AssignMode, AutoHotkeyScriptMapping,
+    AuxiliaryControl, Binding, BindingAction, BindingControlKind, BindingTarget, ButtonLightMode,
+    FaderCurve, FaderCurvePoint, HotkeyMapping, MacroActionState, MacroActionStep, MacroStep,
+    MidiMode, MuteBehavior, OpenApplicationMapping, RelativeFormat, MACRO_MAX_PARALLEL_STEPS,
+    MACRO_MAX_TOP_LEVEL_STEPS, MACRO_MAX_WAIT_MS,
 };
 #[allow(unused_imports)]
 pub use midi_types::{

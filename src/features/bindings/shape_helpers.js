@@ -4,14 +4,35 @@ import {
   buttonVisualBehavior as coreButtonVisualBehavior,
   getBindingTargets,
   getPrimaryBindingTarget,
+  MACRO_MAX_PARALLEL_STEPS,
+  MACRO_MAX_TOP_LEVEL_STEPS,
+  MACRO_MAX_WAIT_MS,
   normalizeButtonLightMode as normalizeCoreButtonLightMode,
   normalizeCustomCurvePoints,
   normalizeFaderCurve as normalizeCoreFaderCurve,
+  normalizeMacroActionState,
+  normalizeMacroActionStep,
+  normalizeMacroDraftStep,
+  normalizeMacroDraftSteps,
+  normalizeMacroStep,
+  normalizeMacroSteps,
   normalizeRelativeFormat as normalizeCoreRelativeFormat,
   presetCurvePoints as corePresetCurvePoints,
   resolveButtonVisualActive as coreResolveButtonVisualActive,
   setBindingTargets,
 } from "../../core/binding_model.js";
+
+export {
+  MACRO_MAX_PARALLEL_STEPS,
+  MACRO_MAX_TOP_LEVEL_STEPS,
+  MACRO_MAX_WAIT_MS,
+  normalizeMacroActionState,
+  normalizeMacroActionStep,
+  normalizeMacroDraftStep,
+  normalizeMacroDraftSteps,
+  normalizeMacroStep,
+  normalizeMacroSteps,
+};
 
 export function normalizeControlKind(raw) {
   const value = String(raw || "Auto");
@@ -147,6 +168,7 @@ export function applyCurveToNormalized(binding, normalized) {
 
 export function ensureBindingShape(binding) {
   if (!binding || typeof binding !== "object") return;
+  binding.macro_name = String(binding.macro_name || "").trim().slice(0, 80);
   if (!binding.mode || (binding.mode !== "Absolute" && binding.mode !== "Relative")) {
     binding.mode = "Absolute";
   }
@@ -158,6 +180,15 @@ export function ensureBindingShape(binding) {
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
   }
+  if (getBindingTargets(binding).some(isMacroTarget)) {
+    binding.action = "Macro";
+  }
+  if (binding.action === "Macro" && !getBindingTargets(binding).some(isMacroTarget)) {
+    setBindingTargets(binding, ["Macro"]);
+  }
+  binding.macro_steps = binding.action === "Macro" || getBindingTargets(binding).some(isMacroTarget)
+    ? normalizeMacroDraftSteps(binding.macro_steps)
+    : normalizeMacroSteps(binding.macro_steps);
 }
 
 export function effectiveIsButton(binding) {
@@ -177,6 +208,10 @@ export function isOpenApplicationTarget(target) {
 
 export function isAutoHotkeyScriptTarget(target) {
   return target === "AutoHotkeyScript";
+}
+
+export function isMacroTarget(target) {
+  return target === "Macro";
 }
 
 export function getTargets(binding) {

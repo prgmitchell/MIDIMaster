@@ -4,6 +4,20 @@ import { readFile } from "node:fs/promises";
 const source = await readFile(new URL("../src/core/binding_model.js", import.meta.url), "utf8");
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
 const bindingModel = await import(moduleUrl);
+const targetCoreSource = await readFile(new URL("../src/core/target_core.js", import.meta.url), "utf8");
+const targetCoreUrl = `data:text/javascript;base64,${Buffer.from(targetCoreSource).toString("base64")}`;
+const { createTargetCore } = await import(targetCoreUrl);
+const targetCore = createTargetCore({
+  masterIconData: null,
+  focusIconData: null,
+  mediaPlayPauseIconData: null,
+  getSessions: () => [],
+  getPlaybackDevices: () => [],
+  getRecordingDevices: () => [],
+  getFocusedSession: () => null,
+  getPluginHost: () => null,
+  getIntegrationTargetState: () => null,
+});
 
 function relativeBinding(overrides = {}) {
   return {
@@ -220,6 +234,172 @@ function testNormalizeBindingPreservesAutoHotkeyScriptMapping() {
   assert.equal(bindingModel.buttonVisualBehavior(normalized), "momentary");
 }
 
+function testNormalizeMacroStepsClampsAndLimitsShape() {
+  const manyWaits = Array.from({ length: 30 }, () => ({
+    kind: "wait",
+    duration_ms: 999999,
+  }));
+  const normalized = bindingModel.normalizeMacroSteps(manyWaits);
+
+  assert.equal(normalized.length, bindingModel.MACRO_MAX_TOP_LEVEL_STEPS);
+  assert.equal(normalized[0].duration_ms, bindingModel.MACRO_MAX_WAIT_MS);
+}
+
+function testNormalizeMacroStepsFiltersInvalidNestedActions() {
+  const normalized = bindingModel.normalizeMacroSteps([
+    {
+      kind: "parallel",
+      steps: [
+        { action: "Macro", targets: ["Macro"] },
+        { action: "ToggleMute", targets: ["Macro"] },
+        { action: "ToggleMute", targets: ["Master"], state: "Mute" },
+        ...Array.from({ length: 12 }, () => ({ action: "MediaPlayPause", targets: ["MediaControl"] })),
+      ],
+    },
+  ]);
+
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].kind, "parallel");
+  assert.equal(normalized[0].steps.length, bindingModel.MACRO_MAX_PARALLEL_STEPS);
+  assert.equal(normalized[0].steps[0].action, "ToggleMute");
+  assert.equal(normalized[0].steps[0].state, "Mute");
+}
+
+function testNormalizeMacroStepStateAndValueMapping() {
+  const normalized = bindingModel.normalizeMacroSteps([
+    {
+      kind: "action",
+      action: "Volume",
+      targets: ["Master"],
+      value: 3,
+      state: "Wat",
+    },
+  ]);
+
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].value, 1);
+  assert.equal(normalized[0].state, "Default");
+}
+
+function testNormalizeMacroStepPreservesActionMetadata() {
+  const normalized = bindingModel.normalizeMacroSteps([
+    {
+      kind: "action",
+      action: "Volume",
+      targets: ["Master"],
+      value: 0.42,
+      action_role: "value",
+      action_label: "Set Value",
+      value_kind: "percent",
+    },
+  ]);
+
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].action_role, "value");
+  assert.equal(normalized[0].action_label, "Set Value");
+  assert.equal(normalized[0].value_kind, "percent");
+  assert.equal(normalized[0].value, 0.42);
+}
+
+function testIntegrationTargetKeyIgnoresActionSelectionMetadata() {
+  const baseHue = {
+    integration_id: "hue",
+    kind: "light",
+    data: { id: "1", label: "Bedroom" },
+  };
+  const hueTurnOn = {
+    integration_id: "hue",
+    kind: "light",
+    data: {
+      id: "1",
+      label: "Bedroom",
+      action_label: "Turn On",
+      action_value: "Volume",
+      action_kind: "momentary",
+      button_action: "turn_on",
+      osd_value_text: "ON",
+    },
+  };
+  const obsStart = {
+    integration_id: "obs",
+    kind: "action",
+    data: { action: "StartRecord", action_kind: "momentary" },
+  };
+  const obsStop = {
+    integration_id: "obs",
+    kind: "action",
+    data: { action: "StopRecord", action_kind: "momentary" },
+  };
+
+  assert.equal(targetCore.integrationTargetKey(baseHue), targetCore.integrationTargetKey(hueTurnOn));
+  assert.notEqual(targetCore.integrationTargetKey(obsStart), targetCore.integrationTargetKey(obsStop));
+}
+
+function testNormalizeBindingPreservesMacroDraftShape() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "Macro",
+    target: "Macro",
+    targets: ["Macro"],
+    macro_steps: [
+      { kind: "action", action: "", targets: [] },
+      { kind: "wait", duration_ms: -25 },
+      {
+        kind: "action",
+        action: "Hotkey",
+        targets: ["Hotkey"],
+        hotkey: { keys: ["Ctrl", "S"], display: "Ctrl+S" },
+      },
+      {
+        kind: "parallel",
+        steps: [
+          { action: "", targets: [] },
+          { action: "", targets: [] },
+        ],
+      },
+    ],
+  }));
+
+  assert.equal(normalized.action, "Macro");
+  assert.deepEqual(normalized.targets, ["Macro"]);
+  assert.equal(normalized.macro_steps.length, 4);
+  assert.deepEqual(normalized.macro_steps[0], {
+    kind: "action",
+    action: "Volume",
+    targets: [],
+    state: "Default",
+  });
+  assert.equal(normalized.macro_steps[1].duration_ms, 0);
+  assert.deepEqual(normalized.macro_steps[2].hotkey, { keys: ["Ctrl", "S"], display: "Ctrl+S" });
+  assert.equal(normalized.macro_steps[3].kind, "parallel");
+  assert.equal(normalized.macro_steps[3].steps.length, 2);
+  assert.deepEqual(
+    bindingModel.normalizeMacroSteps(normalized.macro_steps).map((step) => step.kind),
+    ["wait", "action"],
+  );
+  assert.equal(bindingModel.buttonVisualBehavior(normalized), "momentary");
+}
+
+function testNormalizeBindingPreservesMacroName() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "Macro",
+    target: "Macro",
+    targets: ["Macro"],
+    macro_name: "  Game Mix Macro  ",
+  }));
+
+  assert.equal(normalized.macro_name, "Game Mix Macro");
+}
+
+function testNormalizeBindingDefaultsLegacyMacroName() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "Macro",
+    target: "Macro",
+    targets: ["Macro"],
+  }));
+
+  assert.equal(normalized.macro_name, "");
+}
+
 testNormalizeBindingPreservesExplicitRelativeFormat();
 testExplicitRelativeFormatsDecodeWithoutAutoState();
 testAutoDetectionMatchesBackendMidpointRule();
@@ -235,5 +415,13 @@ testStatefulButtonKeepsHalfThreshold();
 testUnsetToggleMuteButtonIsMomentary();
 testIntegrationVisualBehaviorKinds();
 testNormalizeBindingPreservesAutoHotkeyScriptMapping();
+testNormalizeMacroStepsClampsAndLimitsShape();
+testNormalizeMacroStepsFiltersInvalidNestedActions();
+testNormalizeMacroStepStateAndValueMapping();
+testNormalizeMacroStepPreservesActionMetadata();
+testIntegrationTargetKeyIgnoresActionSelectionMetadata();
+testNormalizeBindingPreservesMacroDraftShape();
+testNormalizeBindingPreservesMacroName();
+testNormalizeBindingDefaultsLegacyMacroName();
 
 console.log("Binding model tests passed");

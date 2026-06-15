@@ -99,6 +99,7 @@ fn serialize_binding_uses_targets_not_target() {
     let binding = Binding {
         id: "b2".to_string(),
         name: "Binding 2".to_string(),
+        macro_name: String::new(),
         device_id: "midi-dev".to_string(),
         control: MidiControl {
             channel: 0,
@@ -123,6 +124,7 @@ fn serialize_binding_uses_targets_not_target() {
         hotkey: None,
         open_application: None,
         autohotkey_script: None,
+        macro_steps: Vec::new(),
     };
 
     let json = serde_json::to_value(binding).expect("binding should serialize");
@@ -150,6 +152,162 @@ fn deserialize_open_application_action() {
 
     let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
     assert_eq!(binding.action, BindingAction::OpenApplication);
+}
+
+#[test]
+fn deserialize_macro_binding_defaults_steps_without_breaking_profiles() {
+    let mut json = binding_base_json();
+    json.as_object_mut()
+        .unwrap()
+        .insert("action".to_string(), serde_json::json!("Macro"));
+
+    let mut binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+    binding.ensure_targets();
+
+    assert_eq!(binding.action, BindingAction::Macro);
+    assert_eq!(binding.targets, vec![BindingTarget::Macro]);
+    assert_eq!(binding.macro_name, "");
+    assert!(binding.macro_steps.is_empty());
+}
+
+#[test]
+fn deserialize_macro_binding_preserves_macro_name() {
+    let mut json = binding_base_json();
+    json.as_object_mut()
+        .unwrap()
+        .insert("action".to_string(), serde_json::json!("Macro"));
+    json.as_object_mut()
+        .unwrap()
+        .insert("macro_name".to_string(), serde_json::json!("Game Mix"));
+
+    let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+
+    assert_eq!(binding.macro_name, "Game Mix");
+    let serialized = serde_json::to_value(binding).expect("binding should serialize");
+    assert_eq!(serialized.get("macro_name"), Some(&serde_json::json!("Game Mix")));
+}
+
+#[test]
+fn normalize_macro_steps_clamps_waits_and_limits_top_level_steps() {
+    let steps = vec![
+        MacroStep::Wait {
+            duration_ms: MACRO_MAX_WAIT_MS + 1,
+        };
+        MACRO_MAX_TOP_LEVEL_STEPS + 4
+    ];
+
+    let normalized = normalize_macro_steps(&steps);
+
+    assert_eq!(normalized.len(), MACRO_MAX_TOP_LEVEL_STEPS);
+    assert_eq!(
+        normalized[0],
+        MacroStep::Wait {
+            duration_ms: MACRO_MAX_WAIT_MS
+        }
+    );
+}
+
+#[test]
+fn normalize_macro_steps_filters_nested_macro_targets_and_limits_parallel_children() {
+    let mut children = vec![
+        MacroActionStep {
+            action: BindingAction::Macro,
+            targets: vec![BindingTarget::Macro],
+            ..Default::default()
+        },
+        MacroActionStep {
+            action: BindingAction::ToggleMute,
+            targets: vec![BindingTarget::Macro],
+            ..Default::default()
+        },
+    ];
+    for _ in 0..(MACRO_MAX_PARALLEL_STEPS + 2) {
+        children.push(MacroActionStep {
+            action: BindingAction::ToggleMute,
+            targets: vec![BindingTarget::Master],
+            state: MacroActionState::Mute,
+            ..Default::default()
+        });
+    }
+
+    let normalized = normalize_macro_steps(&[MacroStep::Parallel { steps: children }]);
+
+    assert_eq!(normalized.len(), 1);
+    let MacroStep::Parallel { steps } = &normalized[0] else {
+        panic!("expected parallel macro step");
+    };
+    assert_eq!(steps.len(), MACRO_MAX_PARALLEL_STEPS);
+    assert!(steps
+        .iter()
+        .all(|step| step.action == BindingAction::ToggleMute));
+    assert!(steps
+        .iter()
+        .all(|step| step.targets == vec![BindingTarget::Master]));
+}
+
+#[test]
+fn normalize_macro_steps_preserves_action_metadata() {
+    let normalized = normalize_macro_steps(&[MacroStep::Action(MacroActionStep {
+        action: BindingAction::Volume,
+        targets: vec![BindingTarget::Master],
+        value: Some(0.42),
+        action_role: Some("value".to_string()),
+        action_label: Some("Set Value".to_string()),
+        value_kind: Some("percent".to_string()),
+        ..Default::default()
+    })]);
+
+    assert_eq!(normalized.len(), 1);
+    let MacroStep::Action(step) = &normalized[0] else {
+        panic!("expected action macro step");
+    };
+    assert_eq!(step.action_role.as_deref(), Some("value"));
+    assert_eq!(step.action_label.as_deref(), Some("Set Value"));
+    assert_eq!(step.value_kind.as_deref(), Some("percent"));
+    assert_eq!(step.value, Some(0.42));
+}
+
+#[test]
+fn ensure_targets_preserves_macro_draft_placeholders() {
+    let mut binding = mapped_button_binding(BindingAction::Macro, vec![BindingTarget::Macro]);
+    binding.macro_steps = vec![
+        MacroStep::Action(MacroActionStep::default()),
+        MacroStep::Wait { duration_ms: 500 },
+        MacroStep::Parallel {
+            steps: vec![MacroActionStep::default(), MacroActionStep::default()],
+        },
+    ];
+
+    binding.ensure_targets();
+
+    assert_eq!(binding.macro_steps.len(), 3);
+    assert_eq!(
+        binding.macro_steps[0],
+        MacroStep::Action(MacroActionStep::default())
+    );
+    let MacroStep::Parallel { steps } = &binding.macro_steps[2] else {
+        panic!("expected parallel macro draft step");
+    };
+    assert_eq!(steps.len(), 2);
+    assert!(normalize_macro_steps(&binding.macro_steps)
+        .iter()
+        .all(|step| matches!(step, MacroStep::Wait { .. })));
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
+}
+
+#[test]
+fn mapped_button_light_requires_macro_steps() {
+    let mut binding = mapped_button_binding(BindingAction::Macro, vec![BindingTarget::Macro]);
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(0.0));
+
+    binding.macro_steps = normalize_macro_steps(&[MacroStep::Action(MacroActionStep {
+        action: BindingAction::ToggleMute,
+        targets: vec![BindingTarget::Master],
+        state: MacroActionState::Toggle,
+        ..Default::default()
+    })]);
+
+    assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
 }
 
 #[test]

@@ -1,9 +1,10 @@
 use crate::model::{self, Binding, BindingTarget};
 use crate::run_logger;
 use crate::runtime_helpers::{
-    focus_window_by_process_name, open_path_with_shell_association, send_hotkey,
+    focus_window_by_process_name, open_path_with_shell_association, send_hotkey, send_media_key,
 };
 use std::path::Path;
+use std::process::Command as ProcessCommand;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -243,6 +244,40 @@ fn autohotkey_script_display(binding: &Binding) -> String {
         .unwrap_or_else(|| "AutoHotkey script".to_string())
 }
 
+fn open_application_display(binding: &Binding) -> String {
+    binding
+        .open_application
+        .as_ref()
+        .map(|mapping| {
+            let display = mapping.display.trim();
+            if display.is_empty() {
+                mapping.path.trim()
+            } else {
+                display
+            }
+            .to_string()
+        })
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "application".to_string())
+}
+
+fn is_press_only_button_action(action: &model::BindingAction) -> bool {
+    matches!(
+        action,
+        model::BindingAction::MediaPlayPause
+            | model::BindingAction::MediaNextTrack
+            | model::BindingAction::MediaPrevTrack
+            | model::BindingAction::MediaStop
+            | model::BindingAction::Hotkey
+            | model::BindingAction::OpenApplication
+            | model::BindingAction::FocusWindow
+            | model::BindingAction::FullScreenshot
+            | model::BindingAction::SnipScreenshot
+            | model::BindingAction::ToggleScreenRecording
+            | model::BindingAction::RunAutoHotkeyScript
+    )
+}
+
 pub fn run_autohotkey_script_action(app: &AppHandle, binding: &Binding, log_target: &str) {
     let Some(script) = binding.autohotkey_script.as_ref() else {
         run_logger::warn(
@@ -343,11 +378,115 @@ pub fn apply_special_button_action(
     value: f32,
     log_target: &str,
 ) -> bool {
-    if value <= 0.0 {
+    if value <= 0.0 && is_press_only_button_action(action) {
         return true;
     }
 
     match action {
+        model::BindingAction::MediaPlayPause
+        | model::BindingAction::MediaNextTrack
+        | model::BindingAction::MediaPrevTrack
+        | model::BindingAction::MediaStop => {
+            let vk: u16 = match action {
+                model::BindingAction::MediaPlayPause => 0xB3,
+                model::BindingAction::MediaNextTrack => 0xB0,
+                model::BindingAction::MediaPrevTrack => 0xB1,
+                model::BindingAction::MediaStop => 0xB2,
+                _ => unreachable!(),
+            };
+            send_media_key(vk);
+            run_logger::info(
+                log_target,
+                "media_action_sent",
+                &format!(
+                    "binding_id={} action={:?} keycode={}",
+                    binding.id, action, vk
+                ),
+            );
+            true
+        }
+        model::BindingAction::Hotkey => {
+            if let Some(hotkey) = &binding.hotkey {
+                if !hotkey.keys.is_empty() {
+                    send_hotkey(&hotkey.keys);
+                    run_logger::info(
+                        log_target,
+                        "hotkey_action_sent",
+                        &format!(
+                            "binding_id={} action={:?} hotkey={}",
+                            binding.id, action, hotkey.display
+                        ),
+                    );
+                }
+            }
+            true
+        }
+        model::BindingAction::OpenApplication => {
+            let Some(open_app) = binding.open_application.as_ref() else {
+                run_logger::warn(
+                    log_target,
+                    "open_application_missing_config",
+                    &format!("binding_id={}", binding.id),
+                );
+                let _ = app.emit(
+                    "binding_action_error",
+                    serde_json::json!({
+                        "reason": "open_application_missing_config",
+                        "binding_id": binding.id,
+                        "title": "Open Application Not Configured",
+                        "message": "Choose an executable for this binding's Open Application action.",
+                    }),
+                );
+                return true;
+            };
+
+            let app_path = open_app.path.trim();
+            if app_path.is_empty() || !Path::new(app_path).is_file() {
+                let display = open_application_display(binding);
+                run_logger::warn(
+                    log_target,
+                    "open_application_path_missing",
+                    &format!("binding_id={} path={}", binding.id, app_path),
+                );
+                let _ = app.emit(
+                    "binding_action_error",
+                    serde_json::json!({
+                        "reason": "open_application_path_missing",
+                        "binding_id": binding.id,
+                        "title": "Application Not Found",
+                        "message": format!("MIDIMaster couldn't find \"{}\". Re-select the .exe path in this binding.", display),
+                    }),
+                );
+                return true;
+            }
+
+            match ProcessCommand::new(app_path).spawn() {
+                Ok(_) => {
+                    run_logger::info(
+                        log_target,
+                        "open_application_launched",
+                        &format!("binding_id={} path={}", binding.id, app_path),
+                    );
+                }
+                Err(err) => {
+                    run_logger::error(
+                        log_target,
+                        "open_application_launch_failed",
+                        &format!("binding_id={} path={} error={}", binding.id, app_path, err),
+                    );
+                    let _ = app.emit(
+                        "binding_action_error",
+                        serde_json::json!({
+                            "reason": "open_application_launch_failed",
+                            "binding_id": binding.id,
+                            "title": "Launch Failed",
+                            "message": format!("MIDIMaster couldn't open this application: {}", err),
+                        }),
+                    );
+                }
+            }
+            true
+        }
         model::BindingAction::FocusWindow => {
             let Some(process_name) = binding_focus_target_name(binding) else {
                 emit_localized_action_error(

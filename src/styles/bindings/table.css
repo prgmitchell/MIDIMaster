@@ -248,6 +248,32 @@
   justify-content: flex-start;
 }
 
+.binding-value-cell--macro .binding-momentary-value {
+  min-width: 112px;
+  max-width: none;
+}
+
+.binding-macro-edit-button {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.binding-macro-edit-button:hover,
+.binding-macro-edit-button:focus-visible {
+  border-color: var(--accent);
+  background: var(--control-bg-hover);
+  color: var(--text);
+  outline: none;
+}
+
 .binding-value-cell--button .binding-toggle-value {
   flex: 1 1 auto;
   width: 100%;
@@ -260,6 +286,11 @@
   width: 100%;
   min-width: 112px;
   max-width: 204px;
+}
+
+.binding-value-cell--macro .binding-momentary-value {
+  min-width: 112px;
+  max-width: none;
 }
 
 .binding-momentary-value {
@@ -1292,6 +1323,11 @@ body[data-theme] .binding-value-cell--button {
   justify-content: flex-start;
 }
 
+body[data-theme] .binding-value-cell--macro .binding-momentary-value {
+  min-width: 112px;
+  max-width: none;
+}
+
 body[data-theme] .binding-value-cell--button .binding-toggle-value {
   flex: 1 1 auto;
   width: 100%;
@@ -1304,6 +1340,11 @@ body[data-theme] .binding-value-cell--button .binding-momentary-value {
   width: 100%;
   min-width: 112px;
   max-width: 204px;
+}
+
+body[data-theme] .binding-value-cell--macro .binding-momentary-value {
+  min-width: 112px;
+  max-width: none;
 }
 
 body[data-theme] .binding-momentary-value {

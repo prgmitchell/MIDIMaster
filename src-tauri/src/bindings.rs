@@ -270,6 +270,7 @@ mod tests {
         Binding {
             id: "test-binding".to_string(),
             name: "Test".to_string(),
+            macro_name: String::new(),
             device_id: "midi:0".to_string(),
             control: MidiControl {
                 channel: 0,
@@ -294,6 +295,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            macro_steps: Vec::new(),
         }
     }
 

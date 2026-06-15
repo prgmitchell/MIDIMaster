@@ -643,6 +643,11 @@
   <div id="binding-config-panel" class="target-panel hidden">
     <div class="target-panel-content binding-config-content">
       <div class="target-panel-header">
+        <button id="binding-config-back" type="button" class="target-panel-back binding-config-back hidden" aria-label="Back">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+        </button>
         <span id="binding-config-title" data-i18n="bindings.faderConfiguration">Fader Configuration</span>
         <button id="binding-config-close" type="button" class="target-panel-close">x</button>
       </div>
@@ -683,6 +688,28 @@
                   <span id="binding-config-button-learn-status" data-i18n="bindings.waitingMidiInput">Waiting for MIDI input...</span>
                 </div>
               </div>
+            </section>
+
+            <section id="binding-config-macro-summary-section" class="binding-config-section binding-config-section--macro-summary hidden">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title">Macro</span>
+                <div class="binding-config-title-actions">
+                  <button id="binding-config-macro-edit" type="button" class="binding-config-button binding-config-button--primary">Edit Macro</button>
+                </div>
+              </div>
+              <div id="binding-config-macro-summary" class="binding-config-macro-summary"></div>
+            </section>
+
+            <section id="binding-config-macro-section" class="binding-config-section binding-config-section--macro hidden">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title">Macro</span>
+                <div class="binding-config-title-actions">
+                  <button id="binding-config-macro-add-action" type="button" class="binding-config-button binding-config-button--secondary">Action</button>
+                  <button id="binding-config-macro-add-wait" type="button" class="binding-config-button binding-config-button--secondary">Wait</button>
+                  <button id="binding-config-macro-add-parallel" type="button" class="binding-config-button binding-config-button--secondary">Parallel</button>
+                </div>
+              </div>
+              <div id="binding-config-macro-list" class="binding-config-macro-list"></div>
             </section>
 
             <section id="binding-config-curve-section" class="binding-config-section binding-config-section--curve">

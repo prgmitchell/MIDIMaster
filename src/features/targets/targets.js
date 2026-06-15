@@ -36,6 +36,7 @@ export function createTargetsFeature({
   const HOTKEY_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2' y='4' width='16' height='12' rx='3' fill='%231a2446' stroke='%2398a6cc' stroke-width='1.2'/><rect x='4' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='7' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='10' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='13' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='5.2' y='10.6' width='9.6' height='2.2' rx='0.8' fill='%23c7d2f3'/></svg>";
   const OPEN_APPLICATION_TARGET_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='3.6' width='15.6' height='12.8' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6.2 7.3h4.9M6.2 10h7.6M6.2 12.7h5.7' stroke='%23c7d2f3' stroke-width='1.3' stroke-linecap='round'/><path d='M12.3 5.2l2.9 2.9-2.9 2.9' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const AUTOHOTKEY_SCRIPT_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 2.8h7.1L16 6.7v10.5H5V2.8z' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M12.1 2.8v4h3.9' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M7.3 12.6l1.9-4.2 1.9 4.2M8 11.1h2.4M12.6 9.1v3.5' stroke='%238fd5ff' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+  const MACRO_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M4 5.5h4.4M11.6 5.5H16M4 10h12M4 14.5h4.4M11.6 14.5H16' stroke='%2398a6cc' stroke-width='1.2' stroke-linecap='round'/><path d='M8.8 3.7 11.2 5.5 8.8 7.3M8.8 12.7l2.4 1.8-2.4 1.8' stroke='%238fd5ff' stroke-width='1.35' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const TOGGLE_MUTE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M3 8.2v3.6h2.6l3.3 2.8V5.4L5.6 8.2H3z' fill='%23c7d2f3'/><path d='M12.4 7.1l4.5 5.8M16.9 7.1l-4.5 5.8' stroke='%23f7a7a7' stroke-width='1.5' stroke-linecap='round'/></svg>";
   const SET_DEFAULT_DEVICE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='5' width='15.6' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6 10h4.6M8.6 7.4L11.2 10l-2.6 2.6' stroke='%23c7d2f3' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/><path d='M13.7 8.1v3.8M15.6 10l-1.9 1.9M11.8 10l1.9 1.9' stroke='%2386d6a7' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const WINDOW_FOCUS_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.5' y='4' width='15' height='12' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M2.5 7.5h15' stroke='%2398a6cc' stroke-width='1.2'/><path d='M8 11h4M10 9v4' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round'/></svg>";
@@ -225,7 +226,7 @@ export function createTargetsFeature({
     if (option.category) return option.category;
     if (option.integrationId || option.integration_id) return "integrations";
     if (option.kind === "master" || option.kind === "focus") return "builtIn";
-    if (option.kind === "media-control" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
+    if (option.kind === "media-control" || option.kind === "capture-control" || option.kind === "macro-target" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
     if (option.kind === "integration-root" || option.kind === "integration-target" || option.kind === "integration-nav") return "integrations";
     if (option.kind === "session") return "applications";
     if (option.kind === "device") {
@@ -244,6 +245,8 @@ export function createTargetsFeature({
     if (option?.kind === "master") return t("targets.description.master");
     if (option?.kind === "focus") return t("targets.description.focus");
     if (option?.kind === "media-control") return t("targets.description.mediaControl");
+    if (option?.kind === "capture-control") return t("targets.description.captureControls");
+    if (option?.kind === "macro-target") return "Run an ordered action macro from this button.";
     if (option?.kind === "hotkey-target") return t("targets.description.hotkey");
     if (option?.kind === "open-application-target") return t("targets.description.openApplication");
     if (option?.kind === "autohotkey-script-target") return t("targets.description.autoHotkeyScript");
@@ -372,6 +375,7 @@ export function createTargetsFeature({
       return;
     }
     d.targetPanel.classList.add("hidden");
+    d.targetPanel.classList.remove("target-panel--over-config");
     if (d.targetPanelList) {
       d.targetPanelList.innerHTML = "";
     }
@@ -644,26 +648,26 @@ export function createTargetsFeature({
     const selectedDeviceId = currentTarget?.Device?.device_id || currentTarget?.device?.device_id;
 
     const isUnset = currentTarget == null || currentTarget === "" || currentTarget === "Unset";
-    const selectedKind = isUnset
-      ? "placeholder"
-      : (integration ? "integration-target"
-        : (currentTarget?.Session || currentTarget?.session || currentTarget?.Application || currentTarget?.application) ? "session"
-          : (currentTarget?.Device || currentTarget?.device) ? "device"
-            : (currentTarget === "Master" || currentTarget?.Master != null) ? "master"
-              : (currentTarget === "Focus" || currentTarget?.Focus != null) ? "focus"
-                : currentTarget === "MediaControl" ? "media-control"
-                  : currentTarget === "CaptureControl" ? "capture-control"
-                  : currentTarget === "Hotkey" ? "hotkey-target"
-                    : currentTarget === "OpenApplication" ? "open-application-target"
-                      : currentTarget === "AutoHotkeyScript" ? "autohotkey-script-target"
-                : "placeholder"
-      );
+    let selectedKind = "placeholder";
+    if (!isUnset) {
+      if (integration) selectedKind = "integration-target";
+      else if (currentTarget?.Session || currentTarget?.session || currentTarget?.Application || currentTarget?.application) selectedKind = "session";
+      else if (currentTarget?.Device || currentTarget?.device) selectedKind = "device";
+      else if (currentTarget === "Master" || currentTarget?.Master != null) selectedKind = "master";
+      else if (currentTarget === "Focus" || currentTarget?.Focus != null) selectedKind = "focus";
+      else if (currentTarget === "MediaControl") selectedKind = "media-control";
+      else if (currentTarget === "CaptureControl") selectedKind = "capture-control";
+      else if (currentTarget === "Macro") selectedKind = "macro-target";
+      else if (currentTarget === "Hotkey") selectedKind = "hotkey-target";
+      else if (currentTarget === "OpenApplication") selectedKind = "open-application-target";
+      else if (currentTarget === "AutoHotkeyScript") selectedKind = "autohotkey-script-target";
+    }
 
     let selectedValue = "";
     if (selectedKind === "integration-target") selectedValue = targetKey(integration);
     else if (selectedKind === "session") selectedValue = selectedAppKey || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
-    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
+    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "macro-target" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
     const options = [
@@ -682,6 +686,12 @@ export function createTargetsFeature({
     ];
 
     if (isButton) {
+      options.push({
+        value: "macro-target",
+        label: "Macro",
+        icon_data: MACRO_ICON_DATA,
+        kind: "macro-target",
+      });
       options.push({
         value: "media-control",
         label: t("targets.mediaControls"),
@@ -867,9 +877,25 @@ export function createTargetsFeature({
     currentHotkeyDisplay = "",
     currentOpenApplication = null,
     currentAutoHotkeyScript = null,
+    selectOptions = {},
   ) {
     const container = document.createElement("div");
     container.className = "target-dropdown binding-target-dropdown";
+    const allowEmptyInitial = Boolean(selectOptions?.allowEmptyInitial);
+    const excludeMacroTarget = Boolean(selectOptions?.excludeMacroTarget);
+    const overConfigModal = Boolean(selectOptions?.overConfigModal);
+    const includeValueAction = Boolean(selectOptions?.includeValueAction);
+    const targetOnly = Boolean(selectOptions?.targetOnly);
+    const includeWindowFocusAction = Boolean(selectOptions?.includeWindowFocusAction);
+    const macroDisplayName = String(selectOptions?.macroDisplayName || "").trim();
+    const suppressActionTags = Boolean(selectOptions?.suppressActionTags);
+    const macroAlreadyConfigured = Boolean(selectOptions?.macroAlreadyConfigured);
+    const onMacroAlreadyConfigured = (typeof selectOptions?.onMacroAlreadyConfigured === "function")
+      ? selectOptions.onMacroAlreadyConfigured
+      : null;
+
+    const filterPickerOptions = (list) => (Array.isArray(list) ? list : [])
+      .filter((option) => !(excludeMacroTarget && option?.kind === "macro-target"));
 
     const button = document.createElement("button");
     button.type = "button";
@@ -901,6 +927,7 @@ export function createTargetsFeature({
       if (target === "Focus" || target?.Focus != null) return "focus";
       if (target === "MediaControl") return "media-control";
       if (target === "CaptureControl") return "capture-control";
+      if (target === "Macro") return "macro-target";
       if (target === "Hotkey") return "hotkey-target";
       if (target === "OpenApplication") return "open-application-target";
       if (target === "AutoHotkeyScript") return "autohotkey-script-target";
@@ -924,8 +951,12 @@ export function createTargetsFeature({
     let selectedTargets = normalizeTargets(currentTarget);
     let hotkeyDisplay = String(currentHotkeyDisplay || "");
     const targetDisplayCache = new Map();
+    let selectedTargetOption = null;
     let selectedAction = isBindingButton ? (currentAction || "ToggleMute") : "Volume";
     let selectedActionKind = "";
+    let selectedActionRole = String(selectOptions?.currentActionRole || "").trim().toLowerCase();
+    let selectedActionLabel = String(selectOptions?.currentActionLabel || "").trim();
+    let selectedValueKind = String(selectOptions?.currentValueKind || "").trim();
     let selectedOpenApplication = isBindingButton
       ? normalizeOpenApplication(currentOpenApplication)
       : null;
@@ -933,7 +964,13 @@ export function createTargetsFeature({
       ? normalizeAutoHotkeyScript(currentAutoHotkeyScript)
       : null;
 
-    const { options, selectedValue, selectedKind, activeIntegrationOption } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
+    const {
+      options: rawOptions,
+      selectedValue,
+      selectedKind,
+      activeIntegrationOption,
+    } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
+    const options = filterPickerOptions(rawOptions);
     const placeholderOption = {
       value: "",
       label: t("targets.selectApplicationOrDevice"),
@@ -956,9 +993,34 @@ export function createTargetsFeature({
 
     selectedActionKind = String(integrationFromTarget(selectedTargets[0])?.data?.action_kind || "").trim();
 
-      const actionLabel = (action, target = null) => {
-        const integ = integrationFromTarget(target);
-        const persistedActionLabel = String(integ?.data?.action_label || "").trim();
+    const normalizeActionRole = (role, action = "") => {
+      const value = String(role || "").trim().toLowerCase();
+      if (value === "value" || value === "state" || value === "momentary" || value === "command") return value;
+      if (action === "ToggleMute" || action === "ToggleEffect") return "state";
+      return "command";
+    };
+
+    if (!selectedActionRole && selectedAction === "Volume") {
+      const integ = integrationFromTarget(selectedTargets[0]);
+      const data = integ?.data || {};
+      selectedActionRole = integ && (
+        data.action_label
+        || data.action_value
+        || data.action_kind
+        || data.button_action
+        || data.osd_value_text
+      ) ? "command" : "value";
+    }
+
+    const actionLabel = (action, target = null) => {
+      const integ = integrationFromTarget(target);
+      if (action === "Volume" && selectedActionRole === "value") {
+        return t("targets.action.setValue");
+      }
+      if (selectedActionLabel) {
+        return selectedActionLabel;
+      }
+      const persistedActionLabel = String(integ?.data?.action_label || "").trim();
       if (persistedActionLabel) {
         const display = cachedDisplayForTarget(target);
         const targetLabel = String(display?.label || "").replace(/\s*\([^()]+\)\s*$/g, "").trim();
@@ -985,6 +1047,7 @@ export function createTargetsFeature({
       if (action === "FullScreenshot") return t("targets.action.fullScreenshot");
       if (action === "SnipScreenshot") return t("targets.action.snipScreenshot");
       if (action === "ToggleScreenRecording") return t("targets.action.toggleScreenRecording");
+      if (action === "Macro") return "Macro";
       if (action === "Hotkey") return t("targets.hotkey");
       if (action === "RunAutoHotkeyScript") return t("targets.autoHotkeyScript");
       if (action === "ToggleMute") return t("targets.action.toggleMute");
@@ -993,6 +1056,7 @@ export function createTargetsFeature({
       if (action === "Volume" && isBindingButton) {
         const targetKind = String(integ?.kind || "").toLowerCase();
         if (targetKind === "action" || targetKind === "scene") return "";
+        if (includeValueAction && !integ) return t("targets.action.setValue");
         return t("targets.action.trigger");
       }
       return action;
@@ -1030,6 +1094,12 @@ export function createTargetsFeature({
           icon_data: CAPTURE_ICON_DATA,
         };
       }
+      if (target === "Macro") {
+        return {
+          label: macroDisplayName || "Macro",
+          icon_data: MACRO_ICON_DATA,
+        };
+      }
       const resolved = resolveDisplay(target);
       const merged = {
         label: (resolved?.label || cached?.label || "Target"),
@@ -1038,6 +1108,82 @@ export function createTargetsFeature({
       };
       targetDisplayCache.set(key, merged);
       return merged;
+    };
+
+    const optionForTarget = (target) => {
+      if (!target || target === "Unset") return null;
+      const displayOption = cachedDisplayForTarget(target);
+      if (target === "Master" || target?.Master != null) {
+        return { value: "master", label: t("targets.master"), icon_data: masterIconData, kind: "master" };
+      }
+      if (target === "Focus" || target?.Focus != null) {
+        return { value: "focus", label: t("targets.focus"), icon_data: focusIconData, kind: "focus" };
+      }
+      if (target === "MediaControl") {
+        return { value: "media-control", label: t("targets.mediaControls"), icon_data: mediaPlayPauseIconData, kind: "media-control" };
+      }
+      if (target === "CaptureControl") {
+        return { value: "capture-control", label: t("targets.captureControls"), icon_data: CAPTURE_ICON_DATA, kind: "capture-control" };
+      }
+      if (target === "Hotkey") {
+        return { value: "hotkey-target", label: t("targets.hotkey"), icon_data: HOTKEY_ICON_DATA, kind: "hotkey-target" };
+      }
+      if (target === "OpenApplication") {
+        return { value: "open-application-target", label: t("targets.openApplication"), icon_data: OPEN_APPLICATION_TARGET_ICON_DATA, kind: "open-application-target" };
+      }
+      if (target === "AutoHotkeyScript") {
+        return { value: "autohotkey-script-target", label: t("targets.autoHotkeyScript"), icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA, kind: "autohotkey-script-target" };
+      }
+      const integration = target?.Integration || target?.integration;
+      if (integration) {
+        const data = integration.data || {};
+        return {
+          value: targetKey(integration),
+          label: displayOption?.label || t("targets.integrationTarget"),
+          icon_data: displayOption?.icon_data || null,
+          kind: "integration-target",
+          target,
+          integrationId: integration.integration_id,
+          __valueCapable: selectedActionRole === "value" || (
+            selectedAction === "Volume"
+            && !data.action_label
+            && !data.action_value
+            && !data.action_kind
+            && !data.button_action
+            && !data.osd_value_text
+          ),
+        };
+      }
+      const app = target?.Application || target?.application;
+      if (app?.name) {
+        return {
+          value: String(app.name).toLowerCase(),
+          label: displayOption?.label || app.display_name || app.name,
+          display_name: app.display_name || displayOption?.label || app.name,
+          icon_data: displayOption?.icon_data || app.icon_data || null,
+          kind: "session",
+        };
+      }
+      const session = target?.Session || target?.session;
+      if (session?.session_id || session?.sessionId) {
+        return {
+          value: String(session.session_id ?? session.sessionId),
+          label: displayOption?.label || t("targets.category.applications"),
+          icon_data: displayOption?.icon_data || null,
+          kind: "session",
+        };
+      }
+      const device = target?.Device || target?.device;
+      if (device?.device_id || device?.deviceId) {
+        const deviceId = device.device_id ?? device.deviceId;
+        return {
+          value: deviceId,
+          label: displayOption?.label || t("targets.category.devices"),
+          icon_data: displayOption?.icon_data || null,
+          kind: "device",
+        };
+      }
+      return null;
     };
 
     const renderChip = (target, index) => {
@@ -1055,7 +1201,7 @@ export function createTargetsFeature({
 
       const label = document.createElement("span");
       label.className = "target-chip-label";
-      const actionTags = (isBindingButton && selectedAction)
+      const actionTags = (isBindingButton && selectedAction && !suppressActionTags)
         ? [actionLabel(selectedAction, target)]
         : [];
       renderLabelFromRawWithTags(label, {
@@ -1145,8 +1291,14 @@ export function createTargetsFeature({
       if (option.kind === "media-control") {
         return "MediaControl";
       }
+      if (option.kind === "capture-control") {
+        return "CaptureControl";
+      }
       if (option.kind === "capture-action") {
         return "CaptureControl";
+      }
+      if (option.kind === "macro-target") {
+        return "Macro";
       }
       if (option.kind === "hotkey-target") {
         return "Hotkey";
@@ -1175,9 +1327,290 @@ export function createTargetsFeature({
       return selectedTargets[0] || "Unset";
     };
 
+    const actionKeyForOption = (option) => [
+      String(option?.value || ""),
+      String(option?.role || ""),
+      String(option?.behavior || ""),
+      String(option?.label || ""),
+    ].join("\u0000");
+
+    const pushUniqueAction = (actions, option) => {
+      if (!option) return;
+      const key = actionKeyForOption(option);
+      if (actions.some((existing) => actionKeyForOption(existing) === key)) return;
+      actions.push(option);
+    };
+
+    const normalizeButtonActionOption = (action, targetOption, extra = {}) => {
+      const value = String(action?.value || "Volume");
+      const behavior = String(action?.behavior || action?.action_kind || "").trim();
+      const role = normalizeActionRole(
+        action?.role
+          || action?.action_role
+          || (behavior.toLowerCase() === "stateful" ? "state" : "")
+          || (behavior.toLowerCase() === "momentary" ? "momentary" : ""),
+        value,
+      );
+      return {
+        label: action?.label || value || t("targets.category.actions"),
+        value,
+        kind: "action",
+        icon_data: action?.icon_data || targetOption?.icon_data || null,
+        behavior,
+        role,
+        value_kind: action?.value_kind || action?.valueKind || "",
+        targetOption: extra.targetOption || action?.targetOption || null,
+      };
+    };
+
+    const valueActionOption = (targetOption) => ({
+      label: t("targets.action.setValue"),
+      value: "Volume",
+      kind: "action",
+      icon_data: targetOption?.icon_data || null,
+      role: "value",
+      value_kind: "percent",
+    });
+
+    const addValueAction = (actions, targetOption) => {
+      if (!includeValueAction || !targetOption?.__valueCapable) return;
+      const option = valueActionOption(targetOption);
+      if (actions.some((existing) => existing?.value === "Volume" && existing?.role === "value")) return;
+      actions.unshift(option);
+    };
+
+    const captureActionOptions = () => [
+      {
+        value: "FullScreenshot",
+        label: t("targets.action.fullScreenshot"),
+        kind: "action",
+        icon_data: CAPTURE_ICON_DATA,
+        role: "command",
+      },
+      {
+        value: "SnipScreenshot",
+        label: t("targets.action.snipScreenshot"),
+        kind: "action",
+        icon_data: SNIP_ICON_DATA,
+        role: "command",
+      },
+      {
+        value: "ToggleScreenRecording",
+        label: t("targets.action.toggleScreenRecording"),
+        kind: "action",
+        icon_data: RECORD_ICON_DATA,
+        role: "command",
+      },
+    ];
+
+    const collectIntegrationTargetOptions = async (handler, integrationId, controlType) => {
+      if (!handler || typeof handler.getTargetOptions !== "function") return [];
+      const collected = [];
+      const queue = [null];
+      const seen = new Set();
+      let guard = 0;
+      while (queue.length > 0 && guard < 64) {
+        guard += 1;
+        const nav = queue.shift();
+        const key = JSON.stringify(nav || null);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        let list = [];
+        try {
+          const res = handler.getTargetOptions({
+            sessions: getSess(),
+            playbackDevices: getPlayback(),
+            recordingDevices: getRecording(),
+            controlType,
+            nav,
+          });
+          list = (res && typeof res.then === "function") ? (await res) : (res || []);
+        } catch {
+          list = [];
+        }
+        (Array.isArray(list) ? list : []).forEach((raw) => {
+          if (!raw || typeof raw !== "object") return;
+          if (raw.nav) {
+            queue.push(raw.nav);
+            return;
+          }
+          if (!raw.target) return;
+          collected.push({
+            label: raw.label || t("targets.integrationTarget"),
+            icon_data: raw.icon_data || handler?.icon_data || null,
+            kind: raw.kind || "integration-target",
+            value: targetKey((raw.target?.Integration || raw.target?.integration) || {}),
+            target: raw.target,
+            category: raw.category || "integrations",
+            integrationId,
+            buttonActions: Array.isArray(raw.buttonActions) ? raw.buttonActions : [],
+          });
+        });
+      }
+      return collected;
+    };
+
+    const hydrateIntegrationActionsForTarget = async (targetOption, actions) => {
+      const integ = targetOption?.target?.Integration || targetOption?.target?.integration;
+      if (!integ?.integration_id) return;
+      const handler = getHost()?.getIntegration?.(integ.integration_id);
+      if (!handler) return;
+      const identity = targetIdentity(targetOption.target);
+      const [buttonOptions, faderOptions] = await Promise.all([
+        collectIntegrationTargetOptions(handler, integ.integration_id, "button"),
+        includeValueAction
+          ? collectIntegrationTargetOptions(handler, integ.integration_id, "fader")
+          : Promise.resolve([]),
+      ]);
+
+      if (includeValueAction && faderOptions.some((option) => targetIdentity(option.target) === identity)) {
+        targetOption.__valueCapable = true;
+        addValueAction(actions, targetOption);
+      }
+
+      buttonOptions
+        .filter((option) => targetIdentity(option.target) === identity)
+        .forEach((option) => {
+          option.buttonActions.forEach((action) => {
+            pushUniqueAction(actions, normalizeButtonActionOption(action, option, { targetOption: option }));
+          });
+        });
+    };
+
+    const loadMacroNavActionOptionsForDropdown = async (targetOption) => {
+      if (!includeValueAction || !targetOption?.macroActionNav || !targetOption?.integrationId) return [];
+      const pluginHost = getHost();
+      const handler = pluginHost?.getIntegration(targetOption.integrationId);
+      if (!handler || typeof handler.getTargetOptions !== "function") return [];
+      let sub = [];
+      try {
+        const res = handler.getTargetOptions({
+          sessions: getSess(),
+          playbackDevices: getPlayback(),
+          recordingDevices: getRecording(),
+          controlType: "button",
+          nav: targetOption.macroActionNav,
+        });
+        sub = (res && typeof res.then === "function") ? (await res) : (res || []);
+      } catch {
+        sub = [];
+      }
+      const targetIdentityKey = targetIdentity(targetOption.target);
+      return (Array.isArray(sub) ? sub : [])
+        .filter((raw) => raw && raw.target && Array.isArray(raw.buttonActions) && raw.buttonActions.length > 0)
+        .map((raw) => {
+          const mapped = {
+            label: raw.label || targetOption.label || t("targets.integrationTarget"),
+            icon_data: raw.icon_data || targetOption.icon_data || handler?.icon_data || null,
+            kind: raw.kind || "integration-target",
+            value: targetKey((raw.target?.Integration || raw.target?.integration) || {}),
+            target: raw.target,
+            category: raw.category || "integrations",
+            integrationId: targetOption.integrationId,
+            buttonActions: raw.buttonActions,
+          };
+          return targetIdentity(mapped.target) === targetIdentityKey ? mapped : null;
+        })
+        .filter(Boolean)
+        .flatMap((mapped) => mapped.buttonActions.map((action) => (
+          normalizeButtonActionOption(action, mapped, { targetOption: mapped })
+        )));
+    };
+
+    const buildActionOptionsForTargetOption = async (targetOption) => {
+      if (!targetOption) return [];
+      if (targetOption.kind === "hotkey-target") {
+        return [{ label: t("targets.hotkey"), value: "Hotkey", kind: "action", icon_data: HOTKEY_ICON_DATA, role: "command" }];
+      }
+      if (targetOption.kind === "open-application-target") {
+        return [{ label: t("targets.openApplication"), value: "OpenApplication", kind: "action", icon_data: OPEN_APPLICATION_TARGET_ICON_DATA, role: "command" }];
+      }
+      if (targetOption.kind === "autohotkey-script-target") {
+        return [{ label: t("targets.autoHotkeyScript"), value: "RunAutoHotkeyScript", kind: "action", icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA, role: "command" }];
+      }
+      if (targetOption.kind === "capture-control") {
+        return captureActionOptions();
+      }
+      if (targetOption.kind === "media-control") {
+        return [
+          { label: t("targets.action.mediaPlayPause"), value: "MediaPlayPause", kind: "action", icon_data: mediaPlayPauseIconData, role: "command" },
+          { label: t("targets.action.mediaNextTrack"), value: "MediaNextTrack", kind: "action", icon_data: mediaNextTrackIconData, role: "command" },
+          { label: t("targets.action.mediaPrevTrack"), value: "MediaPrevTrack", kind: "action", icon_data: mediaPrevTrackIconData, role: "command" },
+          { label: t("targets.action.mediaStop"), value: "MediaStop", kind: "action", icon_data: mediaStopIconData, role: "command" },
+        ];
+      }
+      if (
+        targetOption.kind === "master"
+        || targetOption.kind === "focus"
+        || targetOption.kind === "session"
+        || targetOption.kind === "application"
+      ) {
+        const actions = [{
+          label: t("targets.action.toggleMute"),
+          value: "ToggleMute",
+          kind: "action",
+          icon_data: TOGGLE_MUTE_ICON_DATA,
+          role: "state",
+        }];
+        if (includeWindowFocusAction && (targetOption.kind === "session" || targetOption.kind === "application")) {
+          actions.push({
+            label: t("targets.action.focusWindow"),
+            value: "FocusWindow",
+            kind: "action",
+            icon_data: WINDOW_FOCUS_ICON_DATA,
+            role: "command",
+          });
+        }
+        if (includeValueAction) {
+          actions.push(valueActionOption(targetOption));
+        }
+        return actions;
+      }
+      if (targetOption.kind === "device") {
+        const actions = [
+          {
+            label: t("targets.action.toggleMute"),
+            value: "ToggleMute",
+            kind: "action",
+            icon_data: TOGGLE_MUTE_ICON_DATA,
+            role: "state",
+          },
+          {
+            label: t("targets.action.setDefaultDevice"),
+            value: "SetDefaultDevice",
+            kind: "action",
+            icon_data: SET_DEFAULT_DEVICE_ICON_DATA,
+            role: "command",
+          },
+        ];
+        if (includeValueAction) {
+          actions.splice(1, 0, valueActionOption(targetOption));
+        }
+        return actions;
+      }
+
+      const actions = [];
+      addValueAction(actions, targetOption);
+      if (Array.isArray(targetOption.buttonActions)) {
+        targetOption.buttonActions.forEach((action) => pushUniqueAction(actions, normalizeButtonActionOption(action, targetOption)));
+      }
+      const navActions = await loadMacroNavActionOptionsForDropdown(targetOption);
+      navActions.forEach((action) => pushUniqueAction(actions, action));
+      await hydrateIntegrationActionsForTarget(targetOption, actions);
+      const integ = targetOption?.target?.Integration || targetOption?.target?.integration;
+      if (integ?.integration_id) {
+        const handler = getHost()?.getIntegration?.(integ.integration_id);
+        if (Array.isArray(handler?.buttonActions)) {
+          handler.buttonActions.forEach((action) => pushUniqueAction(actions, normalizeButtonActionOption(action, targetOption)));
+        }
+      }
+      return actions;
+    };
+
     const syncContainerValue = (markUnavailable = false) => {
       container.__selectedTargets = [...selectedTargets];
       container.__selectedTarget = selectedTargets[0] || "Unset";
+      container.__selectedTargetOption = selectedTargetOption || optionForTarget(selectedTargets[0]);
       container.__openApplication = selectedOpenApplication;
       container.__autoHotkeyScript = selectedAutoHotkeyScript;
       container.value = selectedTargets.length ? targetIdentity(selectedTargets[0]) : "";
@@ -1185,20 +1618,32 @@ export function createTargetsFeature({
       container.classList.toggle("target-unavailable", Boolean(markUnavailable && selectedTargets.length <= 1));
       container.dataset.action = selectedAction;
       container.dataset.actionKind = selectedActionKind;
+      container.dataset.actionRole = selectedActionRole;
+      container.dataset.actionLabel = selectedActionLabel;
+      container.dataset.valueKind = selectedValueKind;
       setDisplay();
     };
 
     const selectOption = (option, actionChoice = null, emit = true) => {
       let nextActionValue = null;
       let nextActionLabel = null;
+      let nextActionRole = null;
+      let nextValueKind = null;
+      let actionTargetOption = null;
       if (typeof actionChoice === "string") {
         nextActionValue = actionChoice;
       } else if (actionChoice && typeof actionChoice === "object") {
         nextActionValue = String(actionChoice.value || "");
         nextActionLabel = String(actionChoice.label || "").trim() || null;
+        nextActionRole = normalizeActionRole(actionChoice.role || actionChoice.action_role, nextActionValue);
+        nextValueKind = String(actionChoice.value_kind || actionChoice.valueKind || "").trim() || null;
+        actionTargetOption = actionChoice.targetOption || actionChoice.target_option || null;
       }
       if (nextActionValue) {
         selectedAction = nextActionValue;
+        selectedActionRole = nextActionRole || normalizeActionRole(null, nextActionValue);
+        selectedActionLabel = nextActionLabel || "";
+        selectedValueKind = nextValueKind || "";
       }
       selectedActionKind = String(actionChoice?.behavior || actionChoice?.action_kind || "").trim();
       if (nextActionValue !== "OpenApplication") {
@@ -1219,19 +1664,29 @@ export function createTargetsFeature({
       if (chosenAutoHotkeyScript) {
         selectedAutoHotkeyScript = chosenAutoHotkeyScript;
       }
-      if (nextActionLabel && option && typeof option === "object") {
-        option.__selectedActionLabel = nextActionLabel;
+      const targetSourceOption = actionTargetOption || option;
+      if (nextActionLabel && selectedActionRole !== "value" && targetSourceOption && typeof targetSourceOption === "object") {
+        targetSourceOption.__selectedActionLabel = nextActionLabel;
       }
-      if (nextActionValue && option && typeof option === "object") {
-        option.__selectedActionValue = nextActionValue;
+      if (nextActionValue && targetSourceOption && typeof targetSourceOption === "object") {
+        targetSourceOption.__selectedActionValue = nextActionValue;
       }
-      if (selectedActionKind && option && typeof option === "object") {
-        option.__selectedActionKind = selectedActionKind;
+      if (selectedActionKind && targetSourceOption && typeof targetSourceOption === "object") {
+        targetSourceOption.__selectedActionKind = selectedActionKind;
       }
 
-      const mapped = mapOptionToTarget(option);
+      const mapped = mapOptionToTarget(targetSourceOption);
+      if (mapped === "Macro" && macroAlreadyConfigured) {
+        onMacroAlreadyConfigured?.();
+        closeTargetPanel();
+        syncContainerValue(false);
+        return;
+      }
       if (mapped === "Hotkey") {
         selectedAction = "Hotkey";
+      }
+      if (mapped === "Macro") {
+        selectedAction = "Macro";
       }
       if (mapped === "OpenApplication") {
         selectedAction = "OpenApplication";
@@ -1240,18 +1695,23 @@ export function createTargetsFeature({
         selectedAction = "RunAutoHotkeyScript";
       }
       const key = targetIdentity(mapped);
-      const cachedLabel = String(option?.label || "").trim();
-      if (cachedLabel || option?.icon_data) {
+      selectedTargetOption = (targetSourceOption && typeof targetSourceOption === "object" && targetSourceOption.kind !== "placeholder")
+        ? targetSourceOption
+        : null;
+      const cachedLabel = String(targetSourceOption?.label || option?.label || "").trim();
+      if (cachedLabel || targetSourceOption?.icon_data || option?.icon_data) {
         targetDisplayCache.set(key, {
           label: cachedLabel || t("common.target"),
-          icon_data: option?.icon_data ?? null,
+          icon_data: targetSourceOption?.icon_data ?? option?.icon_data ?? null,
         });
       }
       const exists = selectedTargets.findIndex((t) => targetIdentity(t) === key);
-      const updatesExistingAction = exists >= 0 && nextActionValue && option?.kind === "capture-action";
+      const updatesExistingAction = exists >= 0 && nextActionValue;
       const updatesExistingFileTarget = exists >= 0
         && (option?.kind === "open-application-target" || option?.kind === "autohotkey-script-target");
-      if (updatesExistingAction || updatesExistingFileTarget) {
+      if (mapped === "Macro") {
+        selectedTargets = [mapped];
+      } else if (updatesExistingAction || updatesExistingFileTarget) {
         selectedTargets[exists] = mapped;
       } else if (exists >= 0) {
         selectedTargets.splice(exists, 1);
@@ -1275,22 +1735,128 @@ export function createTargetsFeature({
     }
 
     container.dataset.action = selectedAction;
-    if (selectedTargets.length === 0 && initial && initial.kind !== "placeholder") {
+    if (!allowEmptyInitial && selectedTargets.length === 0 && initial && initial.kind !== "placeholder") {
       selectedTargets = [mapOptionToTarget(initial)];
+      selectedTargetOption = initial;
     }
     syncContainerValue(false);
 
+    container.getActionOptions = async () => {
+      const targetOption = selectedTargetOption || optionForTarget(selectedTargets[0]);
+      return buildActionOptionsForTargetOption(targetOption);
+    };
+
+    container.setActionOption = (actionOption, emit = true) => {
+      const targetOption = selectedTargetOption || optionForTarget(selectedTargets[0]);
+      if (!targetOption) return;
+      selectOption(targetOption, actionOption, emit);
+    };
+
     const openTargetPicker = (event = null) => {
       event?.stopPropagation?.();
-      const { options } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
+      d.targetPanel?.classList.toggle("target-panel--over-config", overConfigModal);
+      const { options: rawPickerOptions } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
+      const options = filterPickerOptions(rawPickerOptions);
 
-      const buildButtonActionOptions = (targetOption) => {
+      const actionKeyForOption = (option) => [
+        String(option?.value || ""),
+        String(option?.role || ""),
+        String(option?.behavior || ""),
+        String(option?.label || ""),
+      ].join("\u0000");
+
+      const pushUniqueAction = (actions, option) => {
+        if (!option) return;
+        const key = actionKeyForOption(option);
+        if (actions.some((existing) => actionKeyForOption(existing) === key)) return;
+        actions.push(option);
+      };
+
+      const valueActionOption = (targetOption) => ({
+        label: t("targets.action.setValue"),
+        value: "Volume",
+        kind: "action",
+        icon_data: targetOption?.icon_data || null,
+        role: "value",
+        value_kind: "percent",
+      });
+
+      const addValueAction = (actions, targetOption) => {
+        if (!includeValueAction || !targetOption?.__valueCapable) return;
+        const option = valueActionOption(targetOption);
+        if (actions.some((existing) => existing?.value === "Volume" && existing?.role === "value")) return;
+        actions.unshift(option);
+      };
+
+      const normalizeButtonActionOption = (action, targetOption, extra = {}) => {
+        const value = String(action?.value || "Volume");
+        const behavior = String(action?.behavior || action?.action_kind || "").trim();
+        const role = normalizeActionRole(
+          action?.role
+            || action?.action_role
+            || (behavior.toLowerCase() === "stateful" ? "state" : "")
+            || (behavior.toLowerCase() === "momentary" ? "momentary" : ""),
+          value,
+        );
+        return {
+          label: action?.label || value || t("targets.category.actions"),
+          value,
+          kind: "action",
+          icon_data: action?.icon_data || targetOption?.icon_data || null,
+          behavior,
+          role,
+          value_kind: action?.value_kind || action?.valueKind || "",
+          targetOption: extra.targetOption || action?.targetOption || null,
+        };
+      };
+
+      const loadMacroNavActionOptions = async (targetOption) => {
+        if (!includeValueAction || !targetOption?.macroActionNav || !targetOption?.integrationId) return [];
+        const pluginHost = getHost();
+        const handler = pluginHost?.getIntegration(targetOption.integrationId);
+        if (!handler || typeof handler.getTargetOptions !== "function") return [];
+        let sub = [];
+        try {
+          const res = handler.getTargetOptions({
+            sessions: getSess(),
+            playbackDevices: getPlayback(),
+            recordingDevices: getRecording(),
+            controlType: "button",
+            nav: targetOption.macroActionNav,
+          });
+          sub = (res && typeof res.then === "function") ? (await res) : (res || []);
+        } catch {
+          sub = [];
+        }
+        const targetIdentityKey = targetIdentity(targetOption.target);
+        return (Array.isArray(sub) ? sub : [])
+          .filter((raw) => raw && raw.target && Array.isArray(raw.buttonActions) && raw.buttonActions.length > 0)
+          .map((raw) => {
+            const mapped = {
+              label: raw.label || targetOption.label || t("targets.integrationTarget"),
+              icon_data: raw.icon_data || targetOption.icon_data || handler?.icon_data || null,
+              kind: raw.kind || "integration-target",
+              value: targetKey((raw.target?.Integration || raw.target?.integration) || {}),
+              target: raw.target,
+              category: raw.category || "integrations",
+              integrationId: targetOption.integrationId,
+              buttonActions: raw.buttonActions,
+            };
+            return targetIdentity(mapped.target) === targetIdentityKey ? mapped : null;
+          })
+          .filter(Boolean)
+          .flatMap((mapped) => mapped.buttonActions.map((action) => (
+            normalizeButtonActionOption(action, mapped, { targetOption: mapped })
+          )));
+      };
+
+      const buildButtonActionOptions = async (targetOption) => {
         if (targetOption?.kind === "media-control") {
           return [
-            { label: t("targets.action.mediaPlayPause"), value: "MediaPlayPause", kind: "action", icon_data: mediaPlayPauseIconData },
-            { label: t("targets.action.mediaNextTrack"), value: "MediaNextTrack", kind: "action", icon_data: mediaNextTrackIconData },
-            { label: t("targets.action.mediaPrevTrack"), value: "MediaPrevTrack", kind: "action", icon_data: mediaPrevTrackIconData },
-            { label: t("targets.action.mediaStop"), value: "MediaStop", kind: "action", icon_data: mediaStopIconData },
+            { label: t("targets.action.mediaPlayPause"), value: "MediaPlayPause", kind: "action", icon_data: mediaPlayPauseIconData, role: "command" },
+            { label: t("targets.action.mediaNextTrack"), value: "MediaNextTrack", kind: "action", icon_data: mediaNextTrackIconData, role: "command" },
+            { label: t("targets.action.mediaPrevTrack"), value: "MediaPrevTrack", kind: "action", icon_data: mediaPrevTrackIconData, role: "command" },
+            { label: t("targets.action.mediaStop"), value: "MediaStop", kind: "action", icon_data: mediaStopIconData, role: "command" },
           ];
         }
         if (
@@ -1299,39 +1865,66 @@ export function createTargetsFeature({
           || targetOption?.kind === "session"
           || targetOption?.kind === "application"
         ) {
-          return [{
+          const actions = [{
             label: t("targets.action.toggleMute"),
             value: "ToggleMute",
             kind: "action",
             icon_data: TOGGLE_MUTE_ICON_DATA,
+            role: "state",
           }];
+          if (includeValueAction) {
+            actions.push({
+              label: t("targets.action.setValue"),
+              value: "Volume",
+              kind: "action",
+              icon_data: targetOption?.icon_data || null,
+              role: "value",
+              value_kind: "percent",
+            });
+          }
+          return actions;
         }
         if (targetOption?.kind === "device") {
-          return [
+          const actions = [
             {
               label: t("targets.action.toggleMute"),
               value: "ToggleMute",
               kind: "action",
               icon_data: TOGGLE_MUTE_ICON_DATA,
+              role: "state",
             },
             {
               label: t("targets.action.setDefaultDevice"),
               value: "SetDefaultDevice",
               kind: "action",
               icon_data: SET_DEFAULT_DEVICE_ICON_DATA,
+              role: "command",
             },
           ];
+          if (includeValueAction) {
+            actions.splice(1, 0, {
+              label: t("targets.action.setValue"),
+              value: "Volume",
+              kind: "action",
+              icon_data: targetOption?.icon_data || null,
+              role: "value",
+              value_kind: "percent",
+            });
+          }
+          return actions;
         }
+
+        const actions = [];
+        addValueAction(actions, targetOption);
 
         // Check per-target buttonActions first (set by plugins in getTargetOptions)
         if (Array.isArray(targetOption?.buttonActions) && targetOption.buttonActions.length > 0) {
-          return targetOption.buttonActions.map((a) => ({
-            label: a.label || a.value || t("targets.category.actions"),
-            value: a.value || "Volume",
-            kind: "action",
-            icon_data: a.icon_data || targetOption.icon_data || null,
-            behavior: a.behavior || a.action_kind || "",
-          }));
+          targetOption.buttonActions.forEach((action) => {
+            pushUniqueAction(actions, normalizeButtonActionOption(action, targetOption));
+          });
+          const navActions = await loadMacroNavActionOptions(targetOption);
+          navActions.forEach((action) => pushUniqueAction(actions, action));
+          return actions;
         }
 
         // Then check integration-level buttonActions (set by plugins in registerIntegration)
@@ -1340,21 +1933,18 @@ export function createTargetsFeature({
           const pluginHost = getHost();
           const handler = pluginHost?.getIntegration(integ.integration_id);
           if (Array.isArray(handler?.buttonActions) && handler.buttonActions.length > 0) {
-            return handler.buttonActions.map((a) => ({
-              label: a.label || a.value || t("targets.category.actions"),
-              value: a.value || "Volume",
-              kind: "action",
-              icon_data: a.icon_data || targetOption.icon_data || null,
-              behavior: a.behavior || a.action_kind || "",
-            }));
+            handler.buttonActions.forEach((action) => {
+              pushUniqueAction(actions, normalizeButtonActionOption(action, targetOption));
+            });
+            const navActions = await loadMacroNavActionOptions(targetOption);
+            navActions.forEach((action) => pushUniqueAction(actions, action));
+            return actions;
           }
         }
 
-        // Default fallback for integrations without declared actions
-        return [
-          { label: t("targets.action.trigger"), value: "Volume", kind: "action" },
-          { label: t("targets.action.toggleMute"), value: "ToggleMute", kind: "action" },
-        ];
+        const navActions = await loadMacroNavActionOptions(targetOption);
+        navActions.forEach((action) => pushUniqueAction(actions, action));
+        return actions;
       };
 
       const buildWindowFocusOptions = () => {
@@ -1411,6 +2001,10 @@ export function createTargetsFeature({
           null,
           null,
           (option) => {
+            if (targetOnly) {
+              selectOption(option);
+              return;
+            }
             selectOption(option, {
               value: "FocusWindow",
               label: t("targets.action.focusWindow"),
@@ -1454,8 +2048,25 @@ export function createTargetsFeature({
             }
 
             if (targetOption.kind === "action-root" && targetOption.value === "capture") {
+              if (targetOnly) {
+                selectOption({
+                  value: "capture-control",
+                  label: t("targets.captureControls"),
+                  kind: "capture-control",
+                  icon_data: CAPTURE_ICON_DATA,
+                });
+                return true;
+              }
               showCaptureSubmenu();
               return false;
+            }
+
+            if (isBindingButton && targetOption.kind === "macro-target") {
+              selectOption(targetOption, {
+                value: "Macro",
+                label: "Macro",
+              });
+              return true;
             }
 
             if (isBindingButton && targetOption.kind === "open-application-target") {
@@ -1490,6 +2101,11 @@ export function createTargetsFeature({
               return false;
             }
 
+            if (isBindingButton && targetOnly) {
+              selectOption(targetOption);
+              return true;
+            }
+
             if (isBindingButton && targetOption.kind !== "hotkey-target") {
               return chooseButtonTarget(targetOption, openRootTargetPanel);
             }
@@ -1502,39 +2118,87 @@ export function createTargetsFeature({
       };
 
       const chooseButtonTarget = (targetOption, onBack = openRootTargetPanel) => {
-        const actionOptions = buildButtonActionOptions(targetOption);
-        if (actionOptions.length === 0) {
-          selectOption(targetOption);
-          return true;
-        }
-        setTimeout(() => {
+        (async () => {
+          const actionOptions = await buildButtonActionOptions(targetOption);
+          if (actionOptions.length === 0) {
+            selectOption(targetOption);
+            closeTargetPanel();
+            return;
+          }
           openTargetPanel(actionOptions, selectedAction, "action", (actionOption) => {
             selectOption(targetOption, actionOption);
           }, t("targets.selectAction"), { onBack });
-        }, 10);
+        })();
         return false;
       };
 
       const showIntegrationSubmenu = async (integrationId, navStack = [], navState = null) => {
         const pluginHost = getHost();
         const handler = pluginHost?.getIntegration(integrationId);
-        let sub = [];
-        try {
+        const loadSubOptions = async (controlType) => {
           const sessions = getSess();
           const playbackDevices = getPlayback();
           const recordingDevices = getRecording();
-          const res = handler?.getTargetOptions?.({
-            sessions,
-            playbackDevices,
-            recordingDevices,
-            controlType: isBindingButton ? "button" : "fader",
-            nav: navState,
-          });
-          sub = (res && typeof res.then === "function") ? (await res) : (res || []);
-        } catch {
-          sub = [];
-        }
-        if (!Array.isArray(sub) || sub.length === 0) {
+          try {
+            const res = handler?.getTargetOptions?.({
+              sessions,
+              playbackDevices,
+              recordingDevices,
+              controlType,
+              nav: navState,
+            });
+            const loaded = (res && typeof res.then === "function") ? (await res) : (res || []);
+            return Array.isArray(loaded) ? loaded : [];
+          } catch {
+            return [];
+          }
+        };
+
+        const mapIntegrationOption = (o) => {
+          if (!o || typeof o !== "object") return null;
+          if (o.nav) {
+            return {
+              label: o.label || t("common.open"),
+              icon_data: o.icon_data || handler?.icon_data || null,
+              kind: "integration-nav",
+              value: JSON.stringify(o.nav),
+              nav: o.nav,
+              category: "integrations",
+              integrationId,
+              description: o.description || null,
+              tags: Array.isArray(o.tags) ? o.tags : [],
+            };
+          }
+          const mapped = {
+            label: o.label || t("targets.integrationTarget"),
+            icon_data: o.icon_data || handler?.icon_data || null,
+            kind: o.kind || "integration-target",
+            value: targetKey((o.target?.Integration || o.target?.integration) || {}),
+            target: o.target,
+            category: o.category || "integrations",
+            integrationId,
+            description: o.description || null,
+            tags: Array.isArray(o.tags) ? o.tags : [],
+            suppressUnavailableTag: Boolean(o.suppressUnavailableTag),
+          };
+          // Carry per-target buttonActions from plugin's getTargetOptions.
+          if (Array.isArray(o.buttonActions) && o.buttonActions.length > 0) {
+            mapped.buttonActions = o.buttonActions;
+          }
+          return mapped;
+        };
+
+        const labelKey = (option) => stripUnavailableSuffix(option?.label || "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+
+        let buttonSub = await loadSubOptions(isBindingButton ? "button" : "fader");
+        let faderSub = (isBindingButton && includeValueAction)
+          ? await loadSubOptions("fader")
+          : [];
+
+        if ((!Array.isArray(buttonSub) || buttonSub.length === 0) && (!Array.isArray(faderSub) || faderSub.length === 0)) {
           let isDisconnected = true;
           try {
             const desc = handler?.describeTarget?.({});
@@ -1542,7 +2206,7 @@ export function createTargetsFeature({
               isDisconnected = desc.ghost;
             }
           } catch { }
-          sub = [{
+          buttonSub = [{
             label: isDisconnected
               ? t("targets.integrationNotConnected")
               : t("targets.noCompatibleTargets"),
@@ -1556,40 +2220,65 @@ export function createTargetsFeature({
           }];
         }
 
-        const subOptions = sub
-          .filter((o) => o && typeof o === "object")
-          .map((o) => {
-            if (o.nav) {
-              return {
-                label: o.label || t("common.open"),
-                icon_data: o.icon_data || handler?.icon_data || null,
-                kind: "integration-nav",
-                value: JSON.stringify(o.nav),
-                nav: o.nav,
-                category: "integrations",
-                integrationId,
-                description: o.description || null,
-                tags: Array.isArray(o.tags) ? o.tags : [],
-              };
+        const buttonOptions = (Array.isArray(buttonSub) ? buttonSub : [])
+          .map(mapIntegrationOption)
+          .filter(Boolean);
+        const faderOptions = (Array.isArray(faderSub) ? faderSub : [])
+          .map(mapIntegrationOption)
+          .filter(Boolean);
+        const faderByKey = new Map();
+        const faderByLabel = new Map();
+        faderOptions.forEach((option) => {
+          if (!option?.target) return;
+          const key = targetIdentity(option.target);
+          if (!key) return;
+          option.__valueCapable = true;
+          faderByKey.set(key, option);
+          const normalizedLabel = labelKey(option);
+          if (normalizedLabel && !faderByLabel.has(normalizedLabel)) {
+            faderByLabel.set(normalizedLabel, option);
+          }
+        });
+
+        const matchedFaderKeys = new Set();
+        const subOptions = [];
+        buttonOptions.forEach((option) => {
+          if (option.kind === "integration-nav" && includeValueAction) {
+            const matchingFader = faderByLabel.get(labelKey(option));
+            if (matchingFader) {
+              const key = targetIdentity(matchingFader.target);
+              matchedFaderKeys.add(key);
+              subOptions.push({
+                ...matchingFader,
+                description: option.description || matchingFader.description,
+                tags: Array.isArray(option.tags) && option.tags.length > 0 ? option.tags : matchingFader.tags,
+                macroActionNav: option.nav,
+                __valueCapable: true,
+              });
+              return;
             }
-            const mapped = {
-              label: o.label || t("targets.integrationTarget"),
-              icon_data: o.icon_data || handler?.icon_data || null,
-              kind: o.kind || "integration-target",
-              value: targetKey((o.target?.Integration || o.target?.integration) || {}),
-              target: o.target,
-              category: o.category || "integrations",
-              integrationId,
-              description: o.description || null,
-              tags: Array.isArray(o.tags) ? o.tags : [],
-              suppressUnavailableTag: Boolean(o.suppressUnavailableTag),
-            };
-            // Carry per-target buttonActions from plugin's getTargetOptions
-            if (Array.isArray(o.buttonActions) && o.buttonActions.length > 0) {
-              mapped.buttonActions = o.buttonActions;
+          }
+
+          if (option.target) {
+            const key = targetIdentity(option.target);
+            if (faderByKey.has(key)) {
+              option.__valueCapable = true;
+              matchedFaderKeys.add(key);
             }
-            return mapped;
-          });
+          }
+          subOptions.push(option);
+        });
+        faderOptions.forEach((option) => {
+          if (!option?.target) return;
+          const key = targetIdentity(option.target);
+          if (!key || matchedFaderKeys.has(key)) return;
+          subOptions.push(option);
+        });
+        if (subOptions.length === 0) {
+          const placeholder = buttonOptions.find((option) => option?.kind === "placeholder")
+            || faderOptions.find((option) => option?.kind === "placeholder");
+          if (placeholder) subOptions.push(placeholder);
+        }
 
         openTargetPanel(
           subOptions,
@@ -1600,6 +2289,11 @@ export function createTargetsFeature({
               const nextStack = navStack.concat([opt.nav]);
               showIntegrationSubmenu(integrationId, nextStack, opt.nav).catch(() => { });
               return false;
+            }
+
+            if (isBindingButton && targetOnly) {
+              selectOption(opt);
+              return true;
             }
 
             if (isBindingButton) {

@@ -24,6 +24,11 @@ function integrationTargetKey(integration) {
   delete stableData.iconData;
   delete stableData.display_label;
   delete stableData.displayLabel;
+  delete stableData.action_label;
+  delete stableData.action_value;
+  delete stableData.action_kind;
+  delete stableData.button_action;
+  delete stableData.osd_value_text;
   return `${id}:${kind}:${stableStringify(stableData)}`;
 }
 
@@ -142,6 +147,18 @@ export function createTargetCore({
       if (target === "MediaControl") {
         return { label: "Media Controls", icon_data: mediaPlayPauseIconData || null };
       }
+      if (target === "CaptureControl") {
+        return { label: "Capture Controls", icon_data: null };
+      }
+      if (target === "Macro") {
+        return { label: "Macro", icon_data: null };
+      }
+      if (target === "Hotkey") {
+        return { label: "Hotkey", icon_data: null };
+      }
+      if (target === "OpenApplication") {
+        return { label: "Open Application", icon_data: null };
+      }
       if (target === "AutoHotkeyScript") {
         return { label: "AutoHotkey Script", icon_data: null };
       }
@@ -253,6 +270,10 @@ export function createTargetCore({
     if (target === "Master" || target.Master !== undefined) return "::master::";
     if (target === "Focus" || target.Focus !== undefined) return "::focus::";
     if (target === "MediaControl") return "::media-control::";
+    if (target === "CaptureControl") return "::capture-control::";
+    if (target === "Macro") return "::macro::";
+    if (target === "Hotkey") return "::hotkey::";
+    if (target === "OpenApplication") return "::open-application::";
     if (target === "AutoHotkeyScript") return "::autohotkey-script::";
 
     const integration = getIntegrationTarget(target);
@@ -350,7 +371,7 @@ export function createTargetCore({
     if (target === "Focus" || target?.Focus != null) {
       return currentFocusSession?.volume ?? null;
     }
-    if (target === "MediaControl") {
+    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication") {
       return null;
     }
 
@@ -420,7 +441,7 @@ export function createTargetCore({
       return currentFocusSession?.volume ?? null;
     }
 
-    if (target === "MediaControl") {
+    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication") {
       return null;
     }
 
@@ -485,7 +506,7 @@ export function createTargetCore({
       return Boolean(currentFocusSession?.is_muted ?? currentFocusSession?.muted ?? false);
     }
 
-    if (target === "MediaControl") {
+    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication") {
       return false;
     }
 

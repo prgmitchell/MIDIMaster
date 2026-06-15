@@ -27,6 +27,7 @@ export function createDomRefs() {
   const targetPanelClose = document.getElementById("target-panel-close");
   const targetPanelBack = document.getElementById("target-panel-back");
   const bindingConfigPanel = document.getElementById("binding-config-panel");
+  const bindingConfigBack = document.getElementById("binding-config-back");
   const bindingConfigTitle = document.getElementById("binding-config-title");
   const bindingConfigClose = document.getElementById("binding-config-close");
   const bindingConfigCancel = document.getElementById("binding-config-cancel");
@@ -39,6 +40,14 @@ export function createDomRefs() {
   const bindingConfigButtonLearnButton = document.getElementById("binding-config-button-learn-button");
   const bindingConfigButtonLearnIndicator = document.getElementById("binding-config-button-learn-indicator");
   const bindingConfigButtonLearnStatus = document.getElementById("binding-config-button-learn-status");
+  const bindingConfigMacroSummarySection = document.getElementById("binding-config-macro-summary-section");
+  const bindingConfigMacroSummary = document.getElementById("binding-config-macro-summary");
+  const bindingConfigMacroEdit = document.getElementById("binding-config-macro-edit");
+  const bindingConfigMacroSection = document.getElementById("binding-config-macro-section");
+  const bindingConfigMacroList = document.getElementById("binding-config-macro-list");
+  const bindingConfigMacroAddAction = document.getElementById("binding-config-macro-add-action");
+  const bindingConfigMacroAddWait = document.getElementById("binding-config-macro-add-wait");
+  const bindingConfigMacroAddParallel = document.getElementById("binding-config-macro-add-parallel");
   const bindingConfigCurveSection = document.getElementById("binding-config-curve-section");
   const bindingConfigMuteSection = document.getElementById("binding-config-mute-section");
   const bindingConfigAssignSection = document.getElementById("binding-config-assign-section");
@@ -196,6 +205,7 @@ export function createDomRefs() {
     targetPanelClose,
     targetPanelBack,
     bindingConfigPanel,
+    bindingConfigBack,
     bindingConfigTitle,
     bindingConfigClose,
     bindingConfigCancel,
@@ -208,6 +218,14 @@ export function createDomRefs() {
     bindingConfigButtonLearnButton,
     bindingConfigButtonLearnIndicator,
     bindingConfigButtonLearnStatus,
+    bindingConfigMacroSummarySection,
+    bindingConfigMacroSummary,
+    bindingConfigMacroEdit,
+    bindingConfigMacroSection,
+    bindingConfigMacroList,
+    bindingConfigMacroAddAction,
+    bindingConfigMacroAddWait,
+    bindingConfigMacroAddParallel,
     bindingConfigCurveSection,
     bindingConfigMuteSection,
     bindingConfigAssignSection,

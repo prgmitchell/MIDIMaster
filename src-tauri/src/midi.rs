@@ -1963,6 +1963,7 @@ mod tests {
         Binding {
             id: "binding-1".to_string(),
             name: "Binding 1".to_string(),
+            macro_name: String::new(),
             device_id: "midi:0".to_string(),
             control: MidiControl {
                 channel: 0,
@@ -1987,6 +1988,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            macro_steps: Vec::new(),
         }
     }
 

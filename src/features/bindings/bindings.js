@@ -20,7 +20,11 @@ import {
   getTargets,
   isAutoHotkeyScriptTarget,
   isHotkeyTarget,
+  isMacroTarget,
   isOpenApplicationTarget,
+  MACRO_MAX_PARALLEL_STEPS,
+  MACRO_MAX_TOP_LEVEL_STEPS,
+  MACRO_MAX_WAIT_MS,
   modeTooltip,
   muteBehaviorLabel,
   muteBehaviorTooltip,
@@ -28,6 +32,9 @@ import {
   normalizeControlKind,
   normalizeCustomCurve,
   normalizeFaderCurve,
+  normalizeMacroActionState,
+  normalizeMacroActionStep,
+  normalizeMacroSteps,
   normalizeMuteBehavior,
   normalizeRelativeFormat,
   presetCurvePoints,
@@ -73,6 +80,7 @@ export function createBindingsFeature({
   resolveOsdTarget,
   showChoices,
   showConfirm,
+  showAlert,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createBindingsFeature: invoke is required");
@@ -135,6 +143,13 @@ export function createBindingsFeature({
       }
       return false;
     };
+  const alertAction = (typeof showAlert === "function")
+    ? showAlert
+    : ((title = "", message = "") => {
+      if (typeof window !== "undefined" && typeof window.alert === "function") {
+        window.alert([title, message].filter(Boolean).join("\n\n"));
+      }
+    });
   const getEditingId = (typeof getEditingBindingId === "function") ? getEditingBindingId : (() => null);
   const setEditingId = (typeof setEditingBindingId === "function") ? setEditingBindingId : (() => { });
   const getPendingFocusId = (typeof getPendingFocusBindingId === "function") ? getPendingFocusBindingId : (() => null);
@@ -157,6 +172,13 @@ export function createBindingsFeature({
 
   function getBindingTypeFilter() {
     return normalizeBindingTypeFilter(bindingTypeFilter);
+  }
+
+  function showMacroAlreadyConfiguredError() {
+    alertAction(
+      t("dialogs.macroAlreadyConfiguredTitle"),
+      t("dialogs.macroAlreadyConfiguredMessage"),
+    );
   }
 
   function bindingTypeFilterOptions() {
@@ -438,6 +460,7 @@ export function createBindingsFeature({
       || target === "Focus"
       || target === "MediaControl"
       || target === "CaptureControl"
+      || target === "Macro"
     ) {
       return true;
     }
@@ -469,6 +492,10 @@ export function createBindingsFeature({
     if (action === "Hotkey") {
       return targets.some(isHotkeyTarget)
         && Boolean(normalizeHotkeyMapping(binding?.hotkey)?.keys?.length);
+    }
+    if (action === "Macro") {
+      return targets.some(isMacroTarget)
+        && normalizeMacroSteps(binding?.macro_steps).length > 0;
     }
     if (
       action === "MediaPlayPause"
@@ -779,6 +806,9 @@ export function createBindingsFeature({
 
   let configBindingId = null;
   let configDraft = null;
+  let configMacroPageOpen = false;
+  let configMacroSelectedPath = null;
+  let configMacroPendingSelectedScroll = false;
   let configPreviewOriginalBindings = null;
   let configLearnField = null;
   let configLearnTimer = null;
@@ -786,6 +816,7 @@ export function createBindingsFeature({
   const configAcceptedTransfers = new Map();
   let configPreviewTimer = null;
   let customCurvePointer = null;
+  let macroDragState = null;
   let hotkeyLearnBindingId = null;
   let hotkeyLearnCleanup = null;
   const hotkeyModifiers = ["Ctrl", "Shift", "Alt", "Meta"];
@@ -887,6 +918,1758 @@ export function createBindingsFeature({
     const path = String(rawScript.path || "").trim();
     const display = String(rawScript.display || "").trim();
     return path ? { path, display: display || path } : null;
+  }
+
+  function clonePlain(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function normalizeMacroName(raw) {
+    return String(raw || "").trim().slice(0, 80);
+  }
+
+  function defaultMacroName(binding) {
+    const name = String(binding?.name || "").trim();
+    return name && !/^Binding\s+\d+$/i.test(name) ? name.slice(0, 80) : "My Macro";
+  }
+
+  function ensureMacroName(binding, { defaultIfBlank = false } = {}) {
+    if (!binding || typeof binding !== "object") return "";
+    const normalized = normalizeMacroName(binding.macro_name);
+    binding.macro_name = normalized || (defaultIfBlank ? defaultMacroName(binding) : "");
+    return binding.macro_name;
+  }
+
+  function blankMacroActionStep({ includeKind = true } = {}) {
+    const step = {
+      action: "",
+      targets: [],
+      state: "Default",
+    };
+    return includeKind ? { kind: "action", ...step } : step;
+  }
+
+  function defaultMacroActionStep() {
+    return blankMacroActionStep();
+  }
+
+  function defaultMacroParallelActionStep() {
+    return blankMacroActionStep({ includeKind: false });
+  }
+
+  function defaultMacroWaitStep() {
+    return {
+      kind: "wait",
+      duration_ms: 500,
+    };
+  }
+
+  function defaultMacroParallelStep() {
+    return {
+      kind: "parallel",
+      steps: [
+        defaultMacroParallelActionStep(),
+        defaultMacroParallelActionStep(),
+      ],
+    };
+  }
+
+  function macroDraftHasCommandMetadata(step) {
+    const explicit = String(step?.action_label || step?.actionLabel || "").trim();
+    if (explicit) return true;
+    const targets = Array.isArray(step?.targets) ? step.targets : [];
+    return targets.some((target) => {
+      const integration = target?.Integration || target?.integration;
+      const data = integration?.data || {};
+      return Boolean(
+        data.action_label
+        || data.action_value
+        || data.action_kind
+        || data.button_action
+        || data.osd_value_text
+      );
+    });
+  }
+
+  function macroDraftLooksLikeLegacyTriggerPlaceholder(step) {
+    if (String(step?.action || "") !== "Volume") return false;
+    const role = String(step?.action_role || step?.actionRole || "").trim().toLowerCase();
+    return role !== "value" && !macroDraftHasCommandMetadata(step);
+  }
+
+  function normalizeMacroDraftActionStep(step, { includeKind = false } = {}) {
+    if (macroDraftLooksLikeLegacyTriggerPlaceholder(step)) {
+      const draft = blankMacroActionStep({ includeKind });
+      draft.targets = (Array.isArray(step?.targets) ? step.targets : [])
+        .filter((target) => target && target !== "Unset" && !isMacroTarget(target))
+        .slice(0, 8);
+      draft.state = normalizeMacroActionState(step?.state || "Default");
+      return draft;
+    }
+    const normalized = normalizeMacroActionStep(step);
+    if (normalized) {
+      return includeKind ? { kind: "action", ...normalized } : normalized;
+    }
+    const draft = blankMacroActionStep({ includeKind });
+    const targets = (Array.isArray(step?.targets) ? step.targets : [])
+      .filter((target) => target && target !== "Unset" && !isMacroTarget(target))
+      .slice(0, 8);
+    if (targets.length > 0) {
+      draft.targets = targets;
+      draft.action = "";
+      draft.state = normalizeMacroActionState(step?.state || "Default");
+      draft.hotkey = normalizeHotkeyMapping(step?.hotkey);
+      draft.open_application = normalizeOpenApplicationMapping(step?.open_application);
+      draft.autohotkey_script = normalizeAutoHotkeyScriptMapping(step?.autohotkey_script);
+    }
+    return draft;
+  }
+
+  function normalizeMacroDraftStep(step) {
+    if (!step || typeof step !== "object") return null;
+    const kind = String(step.kind || "action");
+    if (kind === "wait") {
+      const durationMs = Math.round(Number(step.duration_ms ?? step.durationMs ?? 0));
+      return {
+        kind: "wait",
+        duration_ms: Math.min(MACRO_MAX_WAIT_MS, Math.max(0, Number.isFinite(durationMs) ? durationMs : 0)),
+      };
+    }
+    if (kind === "parallel") {
+      const steps = (Array.isArray(step.steps) ? step.steps : [])
+        .map((child) => normalizeMacroDraftActionStep(child))
+        .slice(0, MACRO_MAX_PARALLEL_STEPS);
+      return {
+        kind: "parallel",
+        steps: steps.length > 0 ? steps : [defaultMacroParallelActionStep()],
+      };
+    }
+    return normalizeMacroDraftActionStep(step, { includeKind: true });
+  }
+
+  function normalizeMacroDraftSteps(steps) {
+    return (Array.isArray(steps) ? steps : [])
+      .map(normalizeMacroDraftStep)
+      .filter(Boolean)
+      .slice(0, MACRO_MAX_TOP_LEVEL_STEPS);
+  }
+
+  function prepareMacroDraftBinding(binding, { preservePlaceholders = false } = {}) {
+    if (!binding || typeof binding !== "object") return;
+    binding.action = "Macro";
+    setTargets(binding, ["Macro"]);
+    binding.hotkey = null;
+    binding.open_application = null;
+    binding.autohotkey_script = null;
+    ensureMacroName(binding, { defaultIfBlank: preservePlaceholders });
+    binding.macro_steps = preservePlaceholders
+      ? normalizeMacroDraftSteps(binding.macro_steps)
+      : normalizeMacroSteps(binding.macro_steps);
+  }
+
+  function clearMacroActionStep(step) {
+    Object.keys(step).forEach((key) => delete step[key]);
+    Object.assign(step, blankMacroActionStep());
+  }
+
+  function macroActionHasTarget(step) {
+    return Array.isArray(step?.targets) && step.targets.some((target) => target && target !== "Unset" && !isMacroTarget(target));
+  }
+
+  function macroIntegrationTarget(step) {
+    const targets = Array.isArray(step?.targets) ? step.targets : [];
+    const target = targets.find((candidate) => candidate?.Integration || candidate?.integration);
+    return target?.Integration || target?.integration || null;
+  }
+
+  function macroIntegrationActionLabel(step) {
+    const stepLabel = String(step?.action_label || step?.actionLabel || "").trim();
+    if (stepLabel) return stepLabel;
+    const integration = macroIntegrationTarget(step);
+    const data = integration?.data || {};
+    const explicit = String(data.action_label || "").trim();
+    if (explicit) return explicit;
+    const buttonAction = String(data.button_action || data.action_value || data.action || "").trim();
+    const normalized = buttonAction.toLowerCase().replace(/[-\s]+/g, "_");
+    if (normalized === "turn_on" || normalized === "on") return "Turn On";
+    if (normalized === "turn_off" || normalized === "off") return "Turn Off";
+    if (normalized === "toggle" || normalized === "toggle_on_off") return "Toggle";
+    const osdText = String(data.osd_value_text || "").trim().toUpperCase();
+    if (osdText === "ON") return "Turn On";
+    if (osdText === "OFF") return "Turn Off";
+    return "";
+  }
+
+  function macroActionRole(step) {
+    const role = String(step?.action_role || step?.actionRole || "").trim().toLowerCase();
+    if (role) return role;
+    if (String(step?.action || "") !== "Volume") return "";
+    const integration = macroIntegrationTarget(step);
+    if (!integration) return "value";
+    const data = integration?.data || {};
+    if (
+      data.action_label
+      || data.action_value
+      || data.action_kind
+      || data.button_action
+      || data.osd_value_text
+    ) {
+      return "command";
+    }
+    return typeof step?.value === "number" ? "value" : "command";
+  }
+
+  function macroActionUsesValue(step) {
+    if (String(step?.action || "") !== "Volume") return false;
+    return macroActionRole(step) === "value";
+  }
+
+  function macroActionIsLegacyTriggerPlaceholder(step) {
+    return String(step?.action || "") === "Volume"
+      && !macroActionUsesValue(step)
+      && !macroIntegrationActionLabel(step);
+  }
+
+  function macroActionTitle(action, step = null) {
+    const explicit = String(step?.action_label || step?.actionLabel || "").trim();
+    if (explicit && !(String(action || "") === "Volume" && macroActionUsesValue(step))) {
+      return explicit;
+    }
+    switch (String(action || "")) {
+      case "": return "Choose Action";
+      case "Volume": return step && !macroActionUsesValue(step)
+        ? (macroIntegrationActionLabel(step) || "Choose Action")
+        : "Set Value";
+      case "ToggleMute": return "Mute";
+      case "ToggleEffect": return "State";
+      case "SetMainOutputDevice": return "Trigger";
+      case "SetDefaultDevice": return "Set Default Device";
+      case "FocusWindow": return "Focus Window";
+      case "FullScreenshot": return "Full Screenshot";
+      case "SnipScreenshot": return "Snip";
+      case "ToggleScreenRecording": return "Screen Recording";
+      case "MediaPlayPause": return "Play/Pause";
+      case "MediaNextTrack": return "Next Track";
+      case "MediaPrevTrack": return "Previous Track";
+      case "MediaStop": return "Stop";
+      case "Hotkey": return "Hotkey";
+      case "OpenApplication": return "Open App";
+      case "RunAutoHotkeyScript": return "AutoHotkey";
+      default: return String(action || "Action");
+    }
+  }
+
+  function macroTargetTitle(step) {
+    const targets = Array.isArray(step?.targets) ? step.targets : [];
+    if (targets.length === 0) {
+      return "No target selected";
+    }
+    if (step?.action === "Hotkey") {
+      return step?.hotkey?.display || "Hotkey";
+    }
+    if (step?.action === "OpenApplication") {
+      return step?.open_application?.display || step?.open_application?.path || "Application";
+    }
+    if (step?.action === "RunAutoHotkeyScript") {
+      return step?.autohotkey_script?.display || step?.autohotkey_script?.path || "Script";
+    }
+    const display = resolveTargetDisplay(targets[0]);
+    const label = String(display?.label || "").replace(/\s*\([^()]+\)\s*$/g, "").trim();
+    if (targets.length > 1) return `${label || "Targets"} +${targets.length - 1}`;
+    return label || "Target";
+  }
+
+  function macroStepSummary(step) {
+    if (!step) return "";
+    if (step.kind === "wait") {
+      return `Wait ${((Number(step.duration_ms) || 0) / 1000).toFixed(1).replace(/\.0$/, "")}s`;
+    }
+    if (step.kind === "parallel") {
+      const count = Array.isArray(step.steps) ? step.steps.length : 0;
+      return `Parallel ${count} action${count === 1 ? "" : "s"}`;
+    }
+    if (!String(step.action || "").trim() || !macroActionHasTarget(step)) {
+      return "Choose an action";
+    }
+    return `${macroActionTitle(step.action, step)} - ${macroTargetTitle(step)}`;
+  }
+
+  function macroStepCountLabel(binding) {
+    const count = normalizeMacroSteps(binding?.macro_steps).length;
+    return `${count} step${count === 1 ? "" : "s"}`;
+  }
+
+  function renderMacroSummary(binding) {
+    const root = d.bindingConfigMacroSummary;
+    if (!root) return;
+    const steps = normalizeMacroSteps(binding?.macro_steps);
+    root.innerHTML = "";
+
+    const count = document.createElement("div");
+    count.className = "binding-config-macro-summary-count";
+    count.textContent = macroStepCountLabel(binding);
+    root.appendChild(count);
+
+    if (steps.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "binding-config-macro-summary-empty";
+      empty.textContent = "No macro steps configured.";
+      root.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "binding-config-macro-summary-list";
+    steps.slice(0, 4).forEach((step, index) => {
+      const item = document.createElement("div");
+      item.className = "binding-config-macro-summary-item";
+      const number = document.createElement("span");
+      number.className = "binding-config-macro-summary-number";
+      number.textContent = String(index + 1);
+      const label = document.createElement("span");
+      label.className = "binding-config-macro-summary-label";
+      label.textContent = macroStepSummary(step);
+      item.appendChild(number);
+      item.appendChild(label);
+      list.appendChild(item);
+    });
+    if (steps.length > 4) {
+      const more = document.createElement("div");
+      more.className = "binding-config-macro-summary-more";
+      more.textContent = `+${steps.length - 4} more`;
+      list.appendChild(more);
+    }
+    root.appendChild(list);
+  }
+
+  function macroPathKey(path) {
+    if (!path) return "";
+    return path.type === "parallel"
+      ? `parallel:${path.groupIndex}:${path.index}`
+      : `top:${path.index}`;
+  }
+
+  function macroPathsEqual(a, b) {
+    return macroPathKey(a) === macroPathKey(b);
+  }
+
+  function macroPathForFirstStep(binding) {
+    const steps = Array.isArray(binding?.macro_steps) ? binding.macro_steps : [];
+    return steps.length > 0 ? { type: "top", index: 0 } : null;
+  }
+
+  function normalizeMacroSelectedPath(binding, preferred = configMacroSelectedPath) {
+    const steps = Array.isArray(binding?.macro_steps) ? binding.macro_steps : [];
+    if (steps.length === 0) {
+      configMacroSelectedPath = null;
+      return null;
+    }
+    const path = preferred || { type: "top", index: 0 };
+    if (path.type === "parallel") {
+      const groupIndex = Math.min(Math.max(Number(path.groupIndex) || 0, 0), steps.length - 1);
+      const group = steps[groupIndex];
+      if (group?.kind === "parallel" && Array.isArray(group.steps) && group.steps.length > 0) {
+        configMacroSelectedPath = {
+          type: "parallel",
+          groupIndex,
+          index: Math.min(Math.max(Number(path.index) || 0, 0), group.steps.length - 1),
+        };
+        return configMacroSelectedPath;
+      }
+    }
+    configMacroSelectedPath = {
+      type: "top",
+      index: Math.min(Math.max(Number(path.index) || 0, 0), steps.length - 1),
+    };
+    return configMacroSelectedPath;
+  }
+
+  function getMacroStepAtPath(binding, path = configMacroSelectedPath) {
+    const steps = Array.isArray(binding?.macro_steps) ? binding.macro_steps : [];
+    const normalized = normalizeMacroSelectedPath(binding, path);
+    if (!normalized) return null;
+    if (normalized.type === "parallel") {
+      return steps[normalized.groupIndex]?.steps?.[normalized.index] || null;
+    }
+    return steps[normalized.index] || null;
+  }
+
+  function scrollSelectedMacroStepIntoView() {
+    if (!configMacroPendingSelectedScroll) return;
+    configMacroPendingSelectedScroll = false;
+    const section = d.bindingConfigMacroSection;
+    requestAnimationFrame(() => {
+      const selected = section?.querySelector?.(".binding-config-macro-step-card.is-selected");
+      if (!selected) return;
+      const reduceMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+      selected.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    });
+  }
+
+  function findMacroPathForStep(steps, stepRef) {
+    if (!stepRef || !Array.isArray(steps)) return null;
+    for (let index = 0; index < steps.length; index += 1) {
+      if (steps[index] === stepRef) return { type: "top", index };
+      if (steps[index]?.kind === "parallel" && Array.isArray(steps[index].steps)) {
+        const childIndex = steps[index].steps.findIndex((child) => child === stepRef);
+        if (childIndex >= 0) return { type: "parallel", groupIndex: index, index: childIndex };
+      }
+    }
+    return null;
+  }
+
+  function macroStepOrdinalLabel(path) {
+    if (!path) return "";
+    return path.type === "parallel"
+      ? `${(Number(path.groupIndex) || 0) + 1}.${(Number(path.index) || 0) + 1}`
+      : `${(Number(path.index) || 0) + 1}`;
+  }
+
+  function createBindingConfigButton(id, text, variant = "secondary") {
+    const button = document.createElement("button");
+    button.id = id;
+    button.type = "button";
+    button.className = `binding-config-button binding-config-button--${variant}`;
+    button.textContent = text;
+    return button;
+  }
+
+  function wireMacroButton(button, handler) {
+    if (!button || button.__macroConfigBound) return;
+    button.__macroConfigBound = true;
+    button.addEventListener("click", handler);
+  }
+
+  function wireMacroConfigControls() {
+    wireMacroButton(d.bindingConfigBack, (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMacroConfigPage();
+    });
+    wireMacroButton(d.bindingConfigMacroAddAction, () => {
+      updateMacroDraft((steps) => {
+        if (steps.length >= MACRO_MAX_TOP_LEVEL_STEPS) return;
+        steps.push(defaultMacroActionStep());
+        configMacroSelectedPath = { type: "top", index: steps.length - 1 };
+      }, { scrollSelected: true });
+    });
+    wireMacroButton(d.bindingConfigMacroAddWait, () => {
+      updateMacroDraft((steps) => {
+        if (steps.length >= MACRO_MAX_TOP_LEVEL_STEPS) return;
+        steps.push(defaultMacroWaitStep());
+        configMacroSelectedPath = { type: "top", index: steps.length - 1 };
+      }, { scrollSelected: true });
+    });
+    wireMacroButton(d.bindingConfigMacroAddParallel, () => {
+      updateMacroDraft((steps) => {
+        if (steps.length >= MACRO_MAX_TOP_LEVEL_STEPS) return;
+        steps.push(defaultMacroParallelStep());
+        configMacroSelectedPath = { type: "top", index: steps.length - 1 };
+      }, { scrollSelected: true });
+    });
+    wireMacroButton(d.bindingConfigMacroEdit, (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMacroConfigPage();
+    });
+  }
+
+  function ensureMacroConfigDom() {
+    const panel = d.bindingConfigPanel;
+    const main = panel?.querySelector?.(".binding-config-main-column");
+    const header = panel?.querySelector?.(".target-panel-header");
+
+    if (panel) {
+      d.bindingConfigBack ||= panel.querySelector("#binding-config-back");
+      d.bindingConfigMacroSummarySection ||= panel.querySelector("#binding-config-macro-summary-section");
+      d.bindingConfigMacroSummary ||= panel.querySelector("#binding-config-macro-summary");
+      d.bindingConfigMacroEdit ||= panel.querySelector("#binding-config-macro-edit");
+      d.bindingConfigMacroSection ||= panel.querySelector("#binding-config-macro-section");
+      d.bindingConfigMacroList ||= panel.querySelector("#binding-config-macro-list");
+      d.bindingConfigMacroAddAction ||= panel.querySelector("#binding-config-macro-add-action");
+      d.bindingConfigMacroAddWait ||= panel.querySelector("#binding-config-macro-add-wait");
+      d.bindingConfigMacroAddParallel ||= panel.querySelector("#binding-config-macro-add-parallel");
+    }
+
+    if (!d.bindingConfigBack && header) {
+      const back = document.createElement("button");
+      back.id = "binding-config-back";
+      back.type = "button";
+      back.className = "target-panel-back binding-config-back hidden";
+      back.setAttribute("aria-label", "Back");
+      back.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6" /></svg>';
+      header.insertBefore(back, d.bindingConfigTitle || header.firstChild);
+      d.bindingConfigBack = back;
+    }
+
+    if (main && !d.bindingConfigMacroSummarySection) {
+      const summarySection = document.createElement("section");
+      summarySection.id = "binding-config-macro-summary-section";
+      summarySection.className = "binding-config-section binding-config-section--macro-summary hidden";
+
+      const titleRow = document.createElement("div");
+      titleRow.className = "binding-config-title-row";
+      const title = document.createElement("span");
+      title.className = "binding-config-title";
+      title.textContent = "Macro";
+      const actions = document.createElement("div");
+      actions.className = "binding-config-title-actions";
+      const edit = createBindingConfigButton("binding-config-macro-edit", "Edit Macro", "primary");
+      actions.appendChild(edit);
+      titleRow.appendChild(title);
+      titleRow.appendChild(actions);
+
+      const summary = document.createElement("div");
+      summary.id = "binding-config-macro-summary";
+      summary.className = "binding-config-macro-summary";
+      summarySection.appendChild(titleRow);
+      summarySection.appendChild(summary);
+
+      main.insertBefore(summarySection, d.bindingConfigCurveSection || null);
+      d.bindingConfigMacroSummarySection = summarySection;
+      d.bindingConfigMacroSummary = summary;
+      d.bindingConfigMacroEdit = edit;
+    }
+
+    if (main && !d.bindingConfigMacroSection) {
+      const macroSection = document.createElement("section");
+      macroSection.id = "binding-config-macro-section";
+      macroSection.className = "binding-config-section binding-config-section--macro hidden";
+
+      const titleRow = document.createElement("div");
+      titleRow.className = "binding-config-title-row";
+      const title = document.createElement("span");
+      title.className = "binding-config-title";
+      title.textContent = "Macro";
+      const actions = document.createElement("div");
+      actions.className = "binding-config-title-actions";
+      const addAction = createBindingConfigButton("binding-config-macro-add-action", "Action");
+      const addWait = createBindingConfigButton("binding-config-macro-add-wait", "Wait");
+      const addParallel = createBindingConfigButton("binding-config-macro-add-parallel", "Parallel");
+      actions.appendChild(addAction);
+      actions.appendChild(addWait);
+      actions.appendChild(addParallel);
+      titleRow.appendChild(title);
+      titleRow.appendChild(actions);
+
+      const list = document.createElement("div");
+      list.id = "binding-config-macro-list";
+      list.className = "binding-config-macro-list";
+      macroSection.appendChild(titleRow);
+      macroSection.appendChild(list);
+
+      main.insertBefore(macroSection, d.bindingConfigCurveSection || null);
+      d.bindingConfigMacroSection = macroSection;
+      d.bindingConfigMacroList = list;
+      d.bindingConfigMacroAddAction = addAction;
+      d.bindingConfigMacroAddWait = addWait;
+      d.bindingConfigMacroAddParallel = addParallel;
+    }
+
+    wireMacroConfigControls();
+  }
+
+  function openMacroConfigPage() {
+    const binding = getConfigBinding();
+    if (!binding || binding.action !== "Macro") return;
+    ensureMacroConfigDom();
+    prepareMacroDraftBinding(binding, { preservePlaceholders: true });
+    normalizeMacroSelectedPath(binding, configMacroSelectedPath || macroPathForFirstStep(binding));
+    configMacroPageOpen = true;
+    renderConfigModal();
+  }
+
+  function closeMacroConfigPage() {
+    configMacroPageOpen = false;
+    configMacroSelectedPath = null;
+    renderConfigModal();
+  }
+
+  function updateMacroDraft(mutator, options = {}) {
+    const binding = getConfigBinding();
+    if (!binding || binding.action !== "Macro") return;
+    const steps = Array.isArray(binding.macro_steps) ? binding.macro_steps : [];
+    mutator(steps);
+    binding.macro_steps = normalizeMacroDraftSteps(steps);
+    normalizeMacroSelectedPath(binding, options.selectPath || configMacroSelectedPath);
+    if (options.scrollSelected) configMacroPendingSelectedScroll = true;
+    renderMacroEditor(binding);
+    renderConfigPreview();
+  }
+
+  function commitMacroDraftEdit(binding, { rerender = true } = {}) {
+    if (!binding || binding.action !== "Macro") return;
+    binding.macro_steps = normalizeMacroDraftSteps(binding.macro_steps);
+    normalizeMacroSelectedPath(binding);
+    if (rerender) renderMacroEditor(binding);
+    renderConfigPreview();
+  }
+
+  function setMacroActionFromTargetSelect(step, targetSelect, previous = {}) {
+    const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
+      ? targetSelect.__selectedTargets
+      : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
+    if (selectedTargets.some(isMacroTarget) || targetSelect.dataset.action === "Macro") {
+      Object.assign(step, previous);
+      return false;
+    }
+    const usableTargets = selectedTargets.filter((target) => target && target !== "Unset" && !isMacroTarget(target));
+    if (usableTargets.length === 0) {
+      clearMacroActionStep(step);
+      return true;
+    }
+
+    const hasHotkeyTarget = usableTargets.some(isHotkeyTarget);
+    const hasOpenApplicationTarget = usableTargets.some(isOpenApplicationTarget);
+    const hasAutoHotkeyScriptTarget = usableTargets.some(isAutoHotkeyScriptTarget);
+    step.targets = usableTargets;
+    step.action = hasHotkeyTarget
+      ? "Hotkey"
+      : hasOpenApplicationTarget
+        ? "OpenApplication"
+        : hasAutoHotkeyScriptTarget
+          ? "RunAutoHotkeyScript"
+          : (targetSelect.dataset.action || step.action || "ToggleMute");
+
+    const usesDirectUtilityTarget = hasHotkeyTarget || hasOpenApplicationTarget || hasAutoHotkeyScriptTarget;
+    const actionRole = usesDirectUtilityTarget ? "" : String(targetSelect.dataset.actionRole || "").trim().toLowerCase();
+    const actionLabel = usesDirectUtilityTarget ? "" : String(targetSelect.dataset.actionLabel || "").trim();
+    const valueKind = usesDirectUtilityTarget ? "" : String(targetSelect.dataset.valueKind || "").trim();
+    if (actionRole) step.action_role = actionRole;
+    else delete step.action_role;
+    if (actionLabel) step.action_label = actionLabel;
+    else delete step.action_label;
+    if (valueKind) step.value_kind = valueKind;
+    else delete step.value_kind;
+    if (step.action === "Volume" && step.action_role === "value") {
+      step.value = Math.min(1, Math.max(0, Number(step.value ?? previous.value ?? 1)));
+    } else {
+      delete step.value;
+    }
+
+    step.hotkey = step.action === "Hotkey" ? normalizeHotkeyMapping(step.hotkey) : null;
+    step.open_application = step.action === "OpenApplication"
+      ? normalizeOpenApplicationMapping(targetSelect?.getOpenApplication?.() || targetSelect?.__openApplication)
+      : null;
+    step.autohotkey_script = step.action === "RunAutoHotkeyScript"
+      ? normalizeAutoHotkeyScriptMapping(targetSelect?.getAutoHotkeyScript?.() || targetSelect?.__autoHotkeyScript)
+      : null;
+    step.state = normalizeMacroActionState(step.state || (step.action === "ToggleMute" || step.action === "ToggleEffect" ? "Toggle" : "Default"));
+    return true;
+  }
+
+  function sameMacroTargets(a = [], b = []) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((target, index) => JSON.stringify(target) === JSON.stringify(b[index]));
+  }
+
+  function setMacroActionTargetFromTargetSelect(step, targetSelect, previous = {}) {
+    const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
+      ? targetSelect.__selectedTargets
+      : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
+    if (selectedTargets.some(isMacroTarget) || targetSelect.dataset.action === "Macro") {
+      Object.assign(step, previous);
+      return false;
+    }
+    const usableTargets = selectedTargets.filter((target) => target && target !== "Unset" && !isMacroTarget(target));
+    if (usableTargets.length === 0) {
+      clearMacroActionStep(step);
+      return true;
+    }
+
+    const targetChanged = !sameMacroTargets(previous.targets || [], usableTargets);
+    const hasHotkeyTarget = usableTargets.some(isHotkeyTarget);
+    const hasOpenApplicationTarget = usableTargets.some(isOpenApplicationTarget);
+    const hasAutoHotkeyScriptTarget = usableTargets.some(isAutoHotkeyScriptTarget);
+    step.targets = usableTargets;
+    if (targetChanged && !hasHotkeyTarget && !hasOpenApplicationTarget && !hasAutoHotkeyScriptTarget) {
+      step.action = "";
+      delete step.action_role;
+      delete step.action_label;
+      delete step.value_kind;
+      delete step.value;
+      step.state = "Default";
+      step.hotkey = null;
+      step.open_application = null;
+      step.autohotkey_script = null;
+      return true;
+    }
+
+    if (hasHotkeyTarget) {
+      step.action = "Hotkey";
+      step.hotkey = normalizeHotkeyMapping(step.hotkey);
+    } else if (hasOpenApplicationTarget) {
+      step.action = "OpenApplication";
+      step.open_application = normalizeOpenApplicationMapping(
+        targetSelect?.getOpenApplication?.() || targetSelect?.__openApplication,
+      );
+    } else if (hasAutoHotkeyScriptTarget) {
+      step.action = "RunAutoHotkeyScript";
+      step.autohotkey_script = normalizeAutoHotkeyScriptMapping(
+        targetSelect?.getAutoHotkeyScript?.() || targetSelect?.__autoHotkeyScript,
+      );
+    }
+    return true;
+  }
+
+  function applyMacroActionOptionToStep(step, actionOption, targetSelect = null) {
+    if (!step || !actionOption) return;
+    const action = String(actionOption.value || "");
+    step.action = action;
+    const role = String(actionOption.role || actionOption.action_role || "").trim().toLowerCase();
+    const label = String(actionOption.label || "").trim();
+    const valueKind = String(actionOption.value_kind || actionOption.valueKind || "").trim();
+    if (role) step.action_role = role;
+    else delete step.action_role;
+    if (label && role !== "value") step.action_label = label;
+    else delete step.action_label;
+    if (valueKind) step.value_kind = valueKind;
+    else delete step.value_kind;
+    if (action === "Volume" && role === "value") {
+      step.value = Math.min(1, Math.max(0, Number(step.value ?? 1)));
+    } else {
+      delete step.value;
+    }
+    step.state = normalizeMacroActionState(step.state || (action === "ToggleMute" || action === "ToggleEffect" ? "Toggle" : "Default"));
+    step.hotkey = action === "Hotkey" ? normalizeHotkeyMapping(step.hotkey) : null;
+    step.open_application = action === "OpenApplication"
+      ? normalizeOpenApplicationMapping(targetSelect?.getOpenApplication?.() || targetSelect?.__openApplication || step.open_application)
+      : null;
+    step.autohotkey_script = action === "RunAutoHotkeyScript"
+      ? normalizeAutoHotkeyScriptMapping(targetSelect?.getAutoHotkeyScript?.() || targetSelect?.__autoHotkeyScript || step.autohotkey_script)
+      : null;
+  }
+
+  function buildMacroStateSelect(step, onChange) {
+    const select = document.createElement("select");
+    select.className = "binding-config-macro-select";
+    const isMute = step.action === "ToggleMute";
+    const options = isMute
+      ? [
+        ["Toggle", "Toggle"],
+        ["Mute", "Mute"],
+        ["Unmute", "Unmute"],
+      ]
+      : [
+        ["Toggle", "Toggle"],
+        ["On", "On"],
+        ["Off", "Off"],
+      ];
+    options.forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      select.appendChild(option);
+    });
+    select.value = options.some(([value]) => value === step.state) ? step.state : "Toggle";
+    select.addEventListener("change", () => {
+      step.state = select.value;
+      onChange({ rerender: false });
+    });
+    return select;
+  }
+
+  function buildMacroActionControls(step, onChange) {
+    const controls = document.createElement("div");
+    controls.className = "binding-config-macro-controls";
+
+    if (!String(step.action || "").trim() || !macroActionHasTarget(step)) {
+      return controls;
+    }
+
+    if (macroActionUsesValue(step)) {
+      const label = document.createElement("label");
+      label.className = "binding-config-macro-number";
+      const text = document.createElement("span");
+      text.textContent = "Value";
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.max = "100";
+      input.step = "1";
+      input.value = String(Math.round(Math.min(1, Math.max(0, Number(step.value ?? 1))) * 100));
+      input.addEventListener("input", () => {
+        step.value = Math.min(1, Math.max(0, (Number(input.value) || 0) / 100));
+        onChange({ rerender: false });
+      });
+      label.appendChild(text);
+      label.appendChild(input);
+      const suffix = document.createElement("span");
+      suffix.textContent = "%";
+      label.appendChild(suffix);
+      controls.appendChild(label);
+    }
+
+    if (step.action === "ToggleMute" || step.action === "ToggleEffect") {
+      controls.appendChild(buildMacroStateSelect(step, onChange));
+    }
+
+    if (step.action === "Hotkey") {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "binding-config-button binding-config-button--secondary";
+      button.textContent = step.hotkey?.display ? "Change Hotkey" : "Learn Hotkey";
+      button.addEventListener("click", async () => {
+        const binding = getConfigBinding();
+        const learned = await startHotkeyLearn({ id: `${binding?.id || "macro"}-hotkey` });
+        if (!learned) return;
+        step.hotkey = learned;
+        onChange({ rerender: true });
+      });
+      controls.appendChild(button);
+    }
+
+    return controls;
+  }
+
+  function moveMacroItem(items, fromIndex, toIndex) {
+    if (!Array.isArray(items)) return;
+    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) return;
+    const [moved] = items.splice(fromIndex, 1);
+    items.splice(toIndex, 0, moved);
+  }
+
+  function macroDragItemSelector(type) {
+    return type === "parallel" ? ".binding-config-macro-action" : ".binding-config-macro-step";
+  }
+
+  function macroDragContainerForItem(item, dragInfo) {
+    if (!item || !dragInfo) return null;
+    if (dragInfo.type === "parallel") {
+      return item.closest(".binding-config-macro-parallel-children");
+    }
+    return d.bindingConfigMacroList;
+  }
+
+  function macroPlaceholderIndex(state = macroDragState) {
+    if (!state?.container || !state?.placeholder) return null;
+    let index = 0;
+    for (const child of state.container.children) {
+      if (child === state.placeholder) return index;
+      if (child.matches?.(state.itemSelector)) {
+        index += 1;
+      }
+    }
+    return null;
+  }
+
+  function cleanupMacroDragState({ reorder = false } = {}) {
+    const state = macroDragState;
+    if (!state) return;
+    const newIndex = reorder && state.active ? macroPlaceholderIndex(state) : null;
+    macroDragState = null;
+    state.item.style.display = "";
+    state.item.classList.remove("is-dragging");
+    state.ghost.remove();
+    if (state.active) {
+      state.placeholder.remove();
+    }
+    document.body.classList.remove("dragging-binding");
+
+    if (!reorder || !state.active || newIndex === null || newIndex === state.index) {
+      return;
+    }
+
+    const insertIndex = newIndex > state.index ? newIndex - 1 : newIndex;
+    const binding = getConfigBinding();
+    const selectedStepRef = getMacroStepAtPath(binding);
+    updateMacroDraft((draftSteps) => {
+      if (state.type === "top") {
+        moveMacroItem(draftSteps, state.index, insertIndex);
+      } else {
+        const group = draftSteps[state.groupIndex];
+        if (!group || !Array.isArray(group.steps)) return;
+        moveMacroItem(group.steps, state.index, insertIndex);
+      }
+      configMacroSelectedPath = findMacroPathForStep(draftSteps, selectedStepRef) || configMacroSelectedPath;
+    });
+  }
+
+  function cancelMacroDrag() {
+    cleanupMacroDragState();
+  }
+
+  function endMacroDrag() {
+    cleanupMacroDragState({ reorder: true });
+  }
+
+  function startMacroDrag(item, dragInfo, event) {
+    if (!item || !dragInfo || event.button !== 0) return;
+    const container = macroDragContainerForItem(item, dragInfo);
+    if (!container) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const rect = item.getBoundingClientRect();
+    const ghost = item.cloneNode(true);
+    ghost.classList.add("binding-config-macro-ghost");
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.left = `${rect.left}px`;
+    ghost.style.top = `${rect.top}px`;
+    ghost.style.opacity = "0";
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "binding-config-macro-placeholder";
+    placeholder.style.height = `${rect.height}px`;
+
+    document.body.appendChild(ghost);
+    macroDragState = {
+      ...dragInfo,
+      item,
+      container,
+      ghost,
+      placeholder,
+      itemSelector: macroDragItemSelector(dragInfo.type),
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    };
+
+    item.classList.add("is-dragging");
+    document.body.classList.add("dragging-binding");
+  }
+
+  function updateMacroDrag(event) {
+    const state = macroDragState;
+    if (!state) return;
+
+    const deltaX = event.clientX - state.startX;
+    const deltaY = event.clientY - state.startY;
+    if (!state.active) {
+      if (Math.hypot(deltaX, deltaY) < 6) {
+        return;
+      }
+      state.active = true;
+      state.item.style.display = "none";
+      state.container.insertBefore(state.placeholder, state.item.nextSibling);
+      state.ghost.style.opacity = "0.85";
+    }
+
+    state.ghost.style.left = `${event.clientX - state.offsetX}px`;
+    state.ghost.style.top = `${event.clientY - state.offsetY}px`;
+
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const macroItem = target?.closest?.(state.itemSelector);
+    if (!macroItem || macroItem === state.item || macroItem.parentElement !== state.container) {
+      return;
+    }
+
+    const rect = macroItem.getBoundingClientRect();
+    const insertBefore = event.clientY < rect.top + rect.height / 2;
+    const reference = insertBefore ? macroItem : macroItem.nextSibling;
+    if (reference !== state.placeholder) {
+      state.container.insertBefore(state.placeholder, reference);
+    }
+  }
+
+  function createMacroDragHandle(label, dragInfo) {
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "binding-config-macro-drag";
+    handle.title = label;
+    handle.setAttribute("aria-label", label);
+    const grip = document.createElement("span");
+    grip.className = "drag-grip";
+    grip.setAttribute("aria-hidden", "true");
+    handle.appendChild(grip);
+    handle.addEventListener("pointerdown", (event) => {
+      const item = handle.closest(macroDragItemSelector(dragInfo?.type));
+      handle.setPointerCapture?.(event.pointerId);
+      startMacroDrag(item, dragInfo, event);
+    });
+    handle.addEventListener("pointerup", (event) => {
+      handle.releasePointerCapture?.(event.pointerId);
+    });
+    return handle;
+  }
+
+  function renderMacroActionEditor({
+    parent,
+    binding,
+    step,
+    indexLabel,
+    dragHandle = null,
+    canMoveUp = false,
+    canMoveDown = false,
+    onChange,
+    onMoveUp = null,
+    onMoveDown = null,
+    onDuplicate = null,
+    onDelete = null,
+  }) {
+    const row = document.createElement("div");
+    row.className = "binding-config-macro-action";
+
+    const header = document.createElement("div");
+    header.className = "binding-config-macro-row-header";
+    if (dragHandle) {
+      header.classList.add("has-drag-handle");
+      header.appendChild(dragHandle);
+    }
+    const title = document.createElement("span");
+    title.className = "binding-config-macro-row-title";
+    title.textContent = `Action ${indexLabel}`;
+    const summary = document.createElement("span");
+    summary.className = "binding-config-macro-row-summary";
+    summary.textContent = macroStepSummary(step);
+    header.appendChild(title);
+    header.appendChild(summary);
+    row.appendChild(header);
+
+    const targetSelect = buildTarget(
+      step.targets,
+      true,
+      step.action || "",
+      step.hotkey?.display || "",
+      step.open_application || null,
+      step.autohotkey_script || null,
+      {
+        allowEmptyInitial: true,
+        excludeMacroTarget: true,
+        includeValueAction: true,
+        overConfigModal: true,
+        currentActionRole: step.action_role || "",
+        currentActionLabel: step.action_label || "",
+        currentValueKind: step.value_kind || "",
+      },
+    );
+    targetSelect.addEventListener("change", async () => {
+      const previous = clonePlain(step);
+      const changed = setMacroActionFromTargetSelect(step, targetSelect, previous);
+      if (!changed) {
+        onChange({ rerender: true });
+        return;
+      }
+      const newlyHotkey = step.action === "Hotkey" && !previous.hotkey;
+      if (newlyHotkey) {
+        const learned = await startHotkeyLearn({ id: `${binding.id}-macro-${indexLabel}` });
+        if (learned) {
+          step.hotkey = learned;
+        } else {
+          Object.assign(step, previous);
+        }
+      }
+      onChange({ rerender: true });
+    });
+    row.appendChild(targetSelect);
+    row.appendChild(buildMacroActionControls(step, onChange));
+
+    const actions = document.createElement("div");
+    actions.className = "binding-config-macro-row-actions";
+    [
+      ["Up", canMoveUp, onMoveUp],
+      ["Down", canMoveDown, onMoveDown],
+      ["Duplicate", Boolean(onDuplicate), onDuplicate],
+      ["Delete", Boolean(onDelete), onDelete],
+    ].forEach(([label, enabled, handler]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "binding-config-button binding-config-button--secondary";
+      button.textContent = label;
+      button.disabled = !enabled;
+      button.addEventListener("click", () => handler?.());
+      actions.appendChild(button);
+    });
+    row.appendChild(actions);
+    parent.appendChild(row);
+  }
+
+  function macroSelectablePaths(binding) {
+    const steps = Array.isArray(binding?.macro_steps) ? binding.macro_steps : [];
+    const paths = [];
+    steps.forEach((step, index) => {
+      paths.push({ type: "top", index });
+      if (step?.kind === "parallel" && Array.isArray(step.steps)) {
+        step.steps.forEach((_child, childIndex) => {
+          paths.push({ type: "parallel", groupIndex: index, index: childIndex });
+        });
+      }
+    });
+    return paths;
+  }
+
+  function macroPathListIndex(binding, path) {
+    const key = macroPathKey(path);
+    return macroSelectablePaths(binding).findIndex((candidate) => macroPathKey(candidate) === key);
+  }
+
+  function macroStepTitle(step) {
+    if (step?.kind === "wait") return "Wait";
+    if (step?.kind === "parallel") return "Parallel Group";
+    return "Action";
+  }
+
+  function macroStepMeta(step) {
+    if (step?.kind === "wait") return macroStepSummary(step).replace(/^Wait\s*/i, "") || "0 ms";
+    if (step?.kind === "parallel") {
+      const count = Array.isArray(step.steps) ? step.steps.length : 0;
+      return `${count} action${count === 1 ? "" : "s"}`;
+    }
+    if (!macroActionHasTarget(step)) return "Select target";
+    if (!String(step.action || "").trim()) return `${macroTargetTitle(step)} -> Choose action`;
+    const suffix = macroActionUsesValue(step) && typeof step.value === "number"
+      ? ` -> ${Math.round(step.value * 100)}%`
+      : "";
+    return `${macroTargetTitle(step)} -> ${macroActionTitle(step.action, step)}${suffix}`;
+  }
+
+  function macroIconSvg(kind) {
+    if (kind === "wait") return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>';
+    if (kind === "parallel") return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 4 7 4-7 4-7-4 7-4Z"></path><path d="m5 12 7 4 7-4"></path><path d="m5 16 7 4 7-4"></path></svg>';
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h3M17 12h3M8 7v10M12 5v14M16 8v8"></path></svg>';
+  }
+
+  function createMacroIconButton(label, svg) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "binding-config-macro-icon-button";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.innerHTML = svg;
+    return button;
+  }
+
+  function duplicateMacroStep(path) {
+    updateMacroDraft((steps) => {
+      if (path.type === "parallel") {
+        const group = steps[path.groupIndex];
+        if (!group || !Array.isArray(group.steps) || group.steps.length >= MACRO_MAX_PARALLEL_STEPS) return;
+        group.steps.splice(path.index + 1, 0, clonePlain(group.steps[path.index]));
+        configMacroSelectedPath = { type: "parallel", groupIndex: path.groupIndex, index: path.index + 1 };
+        return;
+      }
+      if (steps.length >= MACRO_MAX_TOP_LEVEL_STEPS) return;
+      steps.splice(path.index + 1, 0, clonePlain(steps[path.index]));
+      configMacroSelectedPath = { type: "top", index: path.index + 1 };
+    }, { scrollSelected: true });
+  }
+
+  function deleteMacroStep(path) {
+    updateMacroDraft((steps) => {
+      if (path.type === "parallel") {
+        const group = steps[path.groupIndex];
+        if (!group || !Array.isArray(group.steps)) return;
+        group.steps.splice(path.index, 1);
+        if (group.steps.length === 0) {
+          steps.splice(path.groupIndex, 1);
+          configMacroSelectedPath = { type: "top", index: Math.max(0, Math.min(path.groupIndex, steps.length - 1)) };
+        } else {
+          configMacroSelectedPath = {
+            type: "parallel",
+            groupIndex: path.groupIndex,
+            index: Math.max(0, Math.min(path.index, group.steps.length - 1)),
+          };
+        }
+        return;
+      }
+      steps.splice(path.index, 1);
+      configMacroSelectedPath = steps.length > 0
+        ? { type: "top", index: Math.max(0, Math.min(path.index, steps.length - 1)) }
+        : null;
+    });
+  }
+
+  function positionMacroOverflowMenu(menu, button) {
+    if (!menu || !button || menu.classList.contains("hidden")) return;
+    menu.classList.remove("is-open-up");
+    const scrollContainer = menu.closest(".binding-config-macro-timeline")
+      || menu.closest(".binding-config-macro-steps-panel");
+    if (!scrollContainer) return;
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    const menuHeight = menu.offsetHeight || 72;
+    const availableBelow = containerRect.bottom - buttonRect.bottom - 6;
+    const availableAbove = buttonRect.top - containerRect.top - 6;
+    if (availableBelow < menuHeight && availableAbove > availableBelow) {
+      menu.classList.add("is-open-up");
+    }
+  }
+
+  function renderMacroOverflow(row, path) {
+    const wrap = document.createElement("div");
+    wrap.className = "binding-config-macro-overflow";
+    const button = createMacroIconButton("Step actions", '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>');
+    const menu = document.createElement("div");
+    menu.className = "binding-config-macro-overflow-menu hidden";
+    [
+      {
+        label: "Duplicate",
+        icon: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M5 15V7a2 2 0 0 1 2-2h8"></path></svg>',
+        handler: () => duplicateMacroStep(path),
+      },
+      {
+        label: "Delete",
+        icon: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4h6v3"></path></svg>',
+        danger: true,
+        handler: () => deleteMacroStep(path),
+      },
+    ].forEach(({ label, icon, danger = false, handler }) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = danger ? "is-danger" : "";
+      const iconEl = document.createElement("span");
+      iconEl.className = "binding-config-macro-menu-icon";
+      iconEl.innerHTML = icon;
+      const labelEl = document.createElement("span");
+      labelEl.textContent = label;
+      item.appendChild(iconEl);
+      item.appendChild(labelEl);
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        menu.classList.add("hidden");
+        handler();
+      });
+      menu.appendChild(item);
+    });
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const opening = menu.classList.contains("hidden");
+      d.bindingConfigMacroSection?.querySelectorAll(".binding-config-macro-overflow-menu").forEach((existing) => {
+        if (existing !== menu) {
+          existing.classList.add("hidden");
+          existing.classList.remove("is-open-up");
+        }
+      });
+      menu.classList.toggle("hidden", !opening);
+      if (opening) {
+        requestAnimationFrame(() => positionMacroOverflowMenu(menu, button));
+      } else {
+        menu.classList.remove("is-open-up");
+      }
+    });
+    wrap.appendChild(button);
+    wrap.appendChild(menu);
+    return wrap;
+  }
+
+  function renderMacroStepCard(parent, binding, step, path, { child = false } = {}) {
+    const row = document.createElement("div");
+    row.className = child ? "binding-config-macro-action binding-config-macro-step-card" : "binding-config-macro-step binding-config-macro-step-card";
+    row.classList.toggle("is-selected", macroPathsEqual(path, configMacroSelectedPath));
+    row.dataset.path = macroPathKey(path);
+    row.addEventListener("click", (event) => {
+      if (event.target?.closest?.(".binding-config-macro-drag, .binding-config-macro-overflow, .binding-config-macro-overflow-menu")) return;
+      configMacroSelectedPath = path;
+      renderMacroEditor(binding);
+    });
+
+    const dragInfo = child
+      ? { type: "parallel", groupIndex: path.groupIndex, index: path.index }
+      : { type: "top", index: path.index };
+    row.appendChild(createMacroDragHandle(child ? "Drag parallel action" : "Drag step", dragInfo));
+
+    const number = document.createElement("button");
+    number.type = "button";
+    number.className = "binding-config-macro-step-number";
+    number.textContent = macroStepOrdinalLabel(path);
+    number.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      configMacroSelectedPath = path;
+      renderMacroEditor(binding);
+    });
+    row.appendChild(number);
+
+    const icon = document.createElement("span");
+    icon.className = `binding-config-macro-step-icon binding-config-macro-step-icon--${step?.kind || "action"}`;
+    icon.innerHTML = macroIconSvg(step?.kind || "action");
+    row.appendChild(icon);
+
+    const copy = document.createElement("div");
+    copy.className = "binding-config-macro-step-copy";
+    const title = document.createElement("span");
+    title.className = "binding-config-macro-row-title";
+    title.textContent = macroStepTitle(step);
+    const meta = document.createElement("span");
+    meta.className = "binding-config-macro-row-summary";
+    meta.textContent = macroStepMeta(step);
+    copy.appendChild(title);
+    copy.appendChild(meta);
+    row.appendChild(copy);
+
+    row.appendChild(renderMacroOverflow(row, path));
+    parent.appendChild(row);
+  }
+
+  function createMacroField(labelText) {
+    const field = document.createElement("label");
+    field.className = "binding-config-macro-property-field";
+    const label = document.createElement("span");
+    label.className = "binding-config-macro-property-label";
+    label.textContent = labelText;
+    field.appendChild(label);
+    return field;
+  }
+
+  function macroActionOptionMatchesStep(option, step) {
+    if (!option || !step) return false;
+    if (String(option.value || "") !== String(step.action || "")) return false;
+    if (String(step.action || "") === "Volume") {
+      return String(option.role || "") === macroActionRole(step);
+    }
+    const stepLabel = String(step.action_label || "").trim();
+    return !stepLabel || String(option.label || "").trim() === stepLabel;
+  }
+
+  function macroActionOptionBadge(option) {
+    const role = String(option?.role || "").trim().toLowerCase();
+    if (role === "value") return { text: "Value", kind: "mix" };
+    if (role === "state") return { text: "State", kind: "state" };
+    return null;
+  }
+
+  function renderMacroActionOptionLabel(container, option, placeholder = "Choose action") {
+    if (!container) return;
+    container.innerHTML = "";
+    if (!option) {
+      const label = document.createElement("span");
+      label.className = "target-placeholder";
+      label.textContent = placeholder;
+      container.appendChild(label);
+      return;
+    }
+    renderLabelWithBadges(container, {
+      text: option.label || option.value || "Action",
+      badges: [macroActionOptionBadge(option)].filter(Boolean),
+      truncate: true,
+    });
+  }
+
+  function renderMacroActionTypeDropdown(slot, {
+    options = [],
+    selectedOption = null,
+    disabled = false,
+    placeholder = "Choose action",
+    emptyLabel = "No actions available",
+    onSelect = null,
+  } = {}) {
+    if (!slot) return;
+    slot.innerHTML = "";
+
+    const root = document.createElement("div");
+    root.className = "target-dropdown binding-config-macro-action-dropdown";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "target-button";
+    button.disabled = disabled;
+    button.setAttribute("aria-haspopup", "listbox");
+    button.setAttribute("aria-expanded", "false");
+    const display = document.createElement("span");
+    display.className = "target-display";
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    caret.textContent = "\u25be";
+    button.appendChild(display);
+    button.appendChild(caret);
+
+    const menu = document.createElement("div");
+    menu.className = "target-menu hidden";
+    menu.setAttribute("role", "listbox");
+
+    renderMacroActionOptionLabel(display, selectedOption, placeholder);
+
+    if (!disabled && options.length > 0) {
+      options.forEach((option) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "target-option";
+        item.setAttribute("role", "option");
+        if (macroActionOptionMatchesStep(option, { action: selectedOption?.value, action_role: selectedOption?.role, action_label: selectedOption?.label })) {
+          item.classList.add("selected");
+          item.setAttribute("aria-selected", "true");
+        }
+        const label = document.createElement("span");
+        label.className = "target-label";
+        renderMacroActionOptionLabel(label, option);
+        item.appendChild(label);
+        item.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          root.classList.remove("open");
+          menu.classList.add("hidden");
+          button.setAttribute("aria-expanded", "false");
+          onSelect?.(option);
+        });
+        menu.appendChild(item);
+      });
+    } else {
+      const empty = document.createElement("button");
+      empty.type = "button";
+      empty.className = "target-option is-disabled";
+      empty.disabled = true;
+      empty.textContent = disabled ? placeholder : emptyLabel;
+      menu.appendChild(empty);
+    }
+
+    root.__positionDropdownMenu = () => {
+      positionFloatingDropdownMenu({
+        menu,
+        trigger: button,
+        minHeight: 120,
+        maxHeight: 260,
+      });
+    };
+
+    if (!disabled) {
+      wireDropdownToggle({ root, menu, trigger: button });
+    }
+    root.appendChild(button);
+    root.appendChild(menu);
+    slot.appendChild(root);
+  }
+
+  function renderMacroActionProperties(panel, binding, step, path) {
+    const targetField = createMacroField("Target");
+    const targetSelect = buildTarget(
+      step.targets,
+      true,
+      step.action || "",
+      step.hotkey?.display || "",
+      step.open_application || null,
+      step.autohotkey_script || null,
+      {
+        allowEmptyInitial: true,
+        excludeMacroTarget: true,
+        includeValueAction: true,
+        includeWindowFocusAction: true,
+        overConfigModal: true,
+        targetOnly: true,
+        suppressActionTags: true,
+        currentActionRole: step.action_role || "",
+        currentActionLabel: step.action_label || "",
+        currentValueKind: step.value_kind || "",
+      },
+    );
+    targetSelect.addEventListener("change", async () => {
+      const previous = clonePlain(step);
+      const changed = setMacroActionTargetFromTargetSelect(step, targetSelect, previous);
+      if (!changed) {
+        commitMacroDraftEdit(binding);
+        return;
+      }
+      const newlyHotkey = step.action === "Hotkey" && !previous.hotkey;
+      if (newlyHotkey) {
+        const learned = await startHotkeyLearn({ id: `${binding.id}-macro-${macroStepOrdinalLabel(path)}` });
+        if (learned) step.hotkey = learned;
+        else Object.assign(step, previous);
+      }
+      commitMacroDraftEdit(binding);
+    });
+    targetField.appendChild(targetSelect);
+    panel.appendChild(targetField);
+
+    const actionField = createMacroField("Action Type");
+    const hasTarget = macroActionHasTarget(step);
+    const actionSlot = document.createElement("div");
+    actionSlot.className = "binding-config-macro-action-type-slot";
+    renderMacroActionTypeDropdown(actionSlot, {
+      disabled: true,
+      placeholder: hasTarget ? "Loading actions..." : "Select a target first",
+    });
+    actionField.appendChild(actionSlot);
+    panel.appendChild(actionField);
+
+    if (hasTarget) {
+      targetSelect.getActionOptions?.().then((loadedOptions = []) => {
+        if (!actionSlot.isConnected) return;
+        const options = [...loadedOptions];
+        if (
+          step.action
+          && !macroActionIsLegacyTriggerPlaceholder(step)
+          && !options.some((option) => macroActionOptionMatchesStep(option, step))
+        ) {
+          options.unshift({
+            label: macroActionTitle(step.action, step),
+            value: step.action,
+            kind: "action",
+            role: macroActionRole(step) || "command",
+            value_kind: step.value_kind || "",
+          });
+        }
+        renderMacroActionTypeDropdown(actionSlot, {
+          options,
+          selectedOption: options.find((option) => macroActionOptionMatchesStep(option, step)) || null,
+          disabled: options.length === 0,
+          placeholder: options.length === 0 ? "No actions available" : "Choose action",
+          onSelect: (option) => {
+            targetSelect.setActionOption?.(option, false);
+            const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
+              ? targetSelect.__selectedTargets.filter((target) => target && target !== "Unset" && !isMacroTarget(target))
+              : [];
+            if (selectedTargets.length > 0) step.targets = selectedTargets;
+            applyMacroActionOptionToStep(step, option, targetSelect);
+            commitMacroDraftEdit(binding);
+          },
+        });
+      }).catch(() => {
+        if (actionSlot.isConnected) {
+          renderMacroActionTypeDropdown(actionSlot, {
+            disabled: true,
+            placeholder: "No actions available",
+          });
+        }
+      });
+    }
+
+    if (macroActionUsesValue(step)) {
+      const valueField = createMacroField("Value");
+      const control = document.createElement("div");
+      control.className = "binding-config-macro-value-editor";
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.max = "100";
+      input.step = "1";
+      input.value = String(Math.round(Math.min(1, Math.max(0, Number(step.value ?? 1))) * 100));
+      const suffix = document.createElement("span");
+      suffix.textContent = "%";
+      const range = document.createElement("input");
+      range.type = "range";
+      range.min = "0";
+      range.max = "100";
+      range.step = "1";
+      range.value = input.value;
+      const syncValue = (raw) => {
+        const value = Math.min(100, Math.max(0, Number(raw) || 0));
+        input.value = String(Math.round(value));
+        range.value = String(Math.round(value));
+        step.value = value / 100;
+        commitMacroDraftEdit(binding, { rerender: false });
+      };
+      input.addEventListener("input", () => syncValue(input.value));
+      range.addEventListener("input", () => syncValue(range.value));
+      input.addEventListener("change", () => renderMacroEditor(binding));
+      range.addEventListener("change", () => renderMacroEditor(binding));
+      control.appendChild(input);
+      control.appendChild(suffix);
+      valueField.appendChild(control);
+      valueField.appendChild(range);
+      panel.appendChild(valueField);
+    }
+
+    if (step.action === "ToggleMute" || step.action === "ToggleEffect") {
+      const stateField = createMacroField("State");
+      stateField.appendChild(buildMacroStateSelect(step, () => commitMacroDraftEdit(binding)));
+      panel.appendChild(stateField);
+    }
+
+    if (step.action === "Hotkey") {
+      const hotkeyButton = createBindingConfigButton("", step.hotkey?.display ? "Change Hotkey" : "Learn Hotkey", "secondary");
+      hotkeyButton.addEventListener("click", async () => {
+        const learned = await startHotkeyLearn({ id: `${binding.id}-macro-${macroStepOrdinalLabel(path)}` });
+        if (!learned) return;
+        step.hotkey = learned;
+        commitMacroDraftEdit(binding);
+      });
+      panel.appendChild(hotkeyButton);
+    }
+  }
+
+  function renderMacroWaitProperties(panel, binding, step) {
+    const secondsField = createMacroField("Seconds");
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.max = "60";
+    input.step = "0.1";
+    input.value = String((Number(step.duration_ms) || 0) / 1000);
+    input.addEventListener("input", () => {
+      step.duration_ms = Math.min(MACRO_MAX_WAIT_MS, Math.max(0, Math.round((Number(input.value) || 0) * 1000)));
+      commitMacroDraftEdit(binding, { rerender: false });
+    });
+    input.addEventListener("change", () => renderMacroEditor(binding));
+    secondsField.appendChild(input);
+    panel.appendChild(secondsField);
+  }
+
+  function renderMacroParallelProperties(panel, binding, step, path) {
+    const count = Array.isArray(step.steps) ? step.steps.length : 0;
+    const summary = document.createElement("div");
+    summary.className = "binding-config-macro-info-box";
+    summary.textContent = `This group runs ${count} action${count === 1 ? "" : "s"} at the same time, then the macro continues.`;
+    panel.appendChild(summary);
+    const addChild = createBindingConfigButton("", "Add Action", "secondary");
+    addChild.disabled = count >= MACRO_MAX_PARALLEL_STEPS;
+    addChild.addEventListener("click", () => updateMacroDraft((steps) => {
+      const group = steps[path.index];
+      if (!group || group.kind !== "parallel") return;
+      group.steps = Array.isArray(group.steps) ? group.steps : [];
+      if (group.steps.length >= MACRO_MAX_PARALLEL_STEPS) return;
+      group.steps.push(defaultMacroParallelActionStep());
+      configMacroSelectedPath = { type: "parallel", groupIndex: path.index, index: group.steps.length - 1 };
+    }, { scrollSelected: true }));
+    panel.appendChild(addChild);
+  }
+
+  function renderMacroProperties(panel, binding) {
+    panel.innerHTML = "";
+    const path = normalizeMacroSelectedPath(binding);
+    const step = getMacroStepAtPath(binding, path);
+    const paths = macroSelectablePaths(binding);
+
+    const header = document.createElement("div");
+    header.className = "binding-config-macro-properties-header";
+    const title = document.createElement("span");
+    title.textContent = "Step Properties";
+    const nav = document.createElement("div");
+    nav.className = "binding-config-macro-properties-nav";
+    const currentIndex = macroPathListIndex(binding, path);
+    const position = document.createElement("span");
+    position.textContent = currentIndex >= 0 ? `Step ${currentIndex + 1} of ${paths.length}` : "No step";
+    const prev = createMacroIconButton("Previous step", '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 6-6 6 6 6"></path></svg>');
+    const next = createMacroIconButton("Next step", '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"></path></svg>');
+    prev.disabled = currentIndex <= 0;
+    next.disabled = currentIndex < 0 || currentIndex >= paths.length - 1;
+    prev.addEventListener("click", () => {
+      configMacroSelectedPath = paths[currentIndex - 1];
+      renderMacroEditor(binding);
+    });
+    next.addEventListener("click", () => {
+      configMacroSelectedPath = paths[currentIndex + 1];
+      renderMacroEditor(binding);
+    });
+    nav.appendChild(position);
+    nav.appendChild(prev);
+    nav.appendChild(next);
+    header.appendChild(title);
+    header.appendChild(nav);
+    panel.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "binding-config-macro-properties-body";
+    if (!step) {
+      const empty = document.createElement("div");
+      empty.className = "binding-config-macro-empty";
+      empty.textContent = "Add a step to configure this macro.";
+      body.appendChild(empty);
+      panel.appendChild(body);
+      return;
+    }
+
+    const type = document.createElement("div");
+    type.className = "binding-config-macro-selected-type";
+    type.innerHTML = `<span class="binding-config-macro-step-icon binding-config-macro-step-icon--${step.kind || "action"}">${macroIconSvg(step.kind || "action")}</span><span>${macroStepTitle(step)} ${macroStepOrdinalLabel(path)}</span>`;
+    body.appendChild(type);
+    if (step.kind === "wait") renderMacroWaitProperties(body, binding, step, path);
+    else if (step.kind === "parallel") renderMacroParallelProperties(body, binding, step, path);
+    else renderMacroActionProperties(body, binding, step, path);
+    panel.appendChild(body);
+  }
+
+  function renderMacroEditor(binding) {
+    const section = d.bindingConfigMacroSection;
+    if (!section) return;
+    prepareMacroDraftBinding(binding, { preservePlaceholders: true });
+    normalizeMacroSelectedPath(binding, configMacroSelectedPath || macroPathForFirstStep(binding));
+    section.innerHTML = "";
+
+    const shell = document.createElement("div");
+    shell.className = "binding-config-macro-designer";
+
+    const header = document.createElement("div");
+    header.className = "binding-config-macro-designer-header";
+    const nameField = document.createElement("label");
+    nameField.className = "binding-config-macro-name-field";
+    const nameLabel = document.createElement("span");
+    nameLabel.textContent = "Macro Name";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.maxLength = 80;
+    nameInput.value = ensureMacroName(binding, { defaultIfBlank: true });
+    nameInput.addEventListener("input", () => {
+      binding.macro_name = normalizeMacroName(nameInput.value);
+      renderConfigPreview();
+    });
+    nameField.appendChild(nameLabel);
+    nameField.appendChild(nameInput);
+    header.appendChild(nameField);
+
+    const addGroup = document.createElement("div");
+    addGroup.className = "binding-config-macro-add-group";
+    const addLabel = document.createElement("span");
+    addLabel.className = "binding-config-macro-add-label";
+    addLabel.textContent = "Add Step";
+    addGroup.appendChild(addLabel);
+
+    const addActions = document.createElement("div");
+    addActions.className = "binding-config-title-actions binding-config-macro-add-actions";
+    [
+      ["Add Action", defaultMacroActionStep],
+      ["Add Wait", defaultMacroWaitStep],
+      ["Add Parallel", defaultMacroParallelStep],
+    ].forEach(([label, factory]) => {
+      const button = createBindingConfigButton("", label, "secondary");
+      button.disabled = binding.macro_steps.length >= MACRO_MAX_TOP_LEVEL_STEPS;
+      button.addEventListener("click", () => updateMacroDraft((steps) => {
+        if (steps.length >= MACRO_MAX_TOP_LEVEL_STEPS) return;
+        steps.push(factory());
+        configMacroSelectedPath = { type: "top", index: steps.length - 1 };
+      }, { scrollSelected: true }));
+      addActions.appendChild(button);
+    });
+    addGroup.appendChild(addActions);
+    header.appendChild(addGroup);
+    shell.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "binding-config-macro-designer-body";
+    const stepsPanel = document.createElement("div");
+    stepsPanel.className = "binding-config-macro-steps-panel";
+    const stepsTitle = document.createElement("div");
+    stepsTitle.className = "binding-config-macro-panel-title";
+    const titleText = document.createElement("span");
+    titleText.textContent = "Macro Steps";
+    const count = document.createElement("span");
+    count.className = "binding-config-macro-count";
+    count.textContent = String(binding.macro_steps.length);
+    stepsTitle.appendChild(titleText);
+    stepsTitle.appendChild(count);
+    stepsPanel.appendChild(stepsTitle);
+    const list = document.createElement("div");
+    list.id = "binding-config-macro-list";
+    list.className = "binding-config-macro-list binding-config-macro-timeline";
+    d.bindingConfigMacroList = list;
+
+    binding.macro_steps.forEach((step, index) => {
+      const path = { type: "top", index };
+      renderMacroStepCard(list, binding, step, path);
+      if (step.kind === "parallel" && Array.isArray(step.steps) && step.steps.length > 0) {
+        const children = document.createElement("div");
+        children.className = "binding-config-macro-parallel-children";
+        step.steps.forEach((child, childIndex) => {
+          renderMacroStepCard(children, binding, child, { type: "parallel", groupIndex: index, index: childIndex }, { child: true });
+        });
+        list.appendChild(children);
+      }
+    });
+    if (binding.macro_steps.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "binding-config-macro-empty-state";
+      empty.textContent = "No steps yet. Add an action, wait, or parallel group.";
+      list.appendChild(empty);
+    }
+    stepsPanel.appendChild(list);
+
+    const propertiesPanel = document.createElement("div");
+    propertiesPanel.className = "binding-config-macro-properties-panel";
+    renderMacroProperties(propertiesPanel, binding);
+
+    body.appendChild(stepsPanel);
+    body.appendChild(propertiesPanel);
+    shell.appendChild(body);
+    section.appendChild(shell);
+    scrollSelectedMacroStepIntoView();
   }
 
   function normalizeHotkeyKey(event) {
@@ -1586,6 +3369,7 @@ export function createBindingsFeature({
     closeAssignModeMenu();
     stopConfigPreviewTimer();
     customCurvePointer = null;
+    cancelMacroDrag();
     if (!commit) {
       await restoreConfigPreviewBindings();
     }
@@ -1593,6 +3377,8 @@ export function createBindingsFeature({
     configAcceptedTransfers.clear();
     configDraft = null;
     configBindingId = null;
+    configMacroPageOpen = false;
+    configMacroSelectedPath = null;
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.add("hidden");
   }
 
@@ -1608,25 +3394,51 @@ export function createBindingsFeature({
     }
     closeAssignModeMenu();
     closeMuteModeMenu();
+    const preserveMacroDraftSteps = configMacroPageOpen && (binding.action === "Macro" || getTargets(binding).some(isMacroTarget))
+      ? clonePlain(binding.macro_steps || [])
+      : null;
     ensureAuxShape(binding);
     ensureBindingShape(binding);
+    if (preserveMacroDraftSteps) {
+      binding.macro_steps = normalizeMacroDraftSteps(preserveMacroDraftSteps);
+    }
+    ensureMacroConfigDom();
     const isButton = effectiveIsButton(binding);
+    const isMacroBinding = isButton && binding.action === "Macro";
+    const showMacroPage = isMacroBinding && configMacroPageOpen;
     if (d.bindingConfigTitle) {
-      d.bindingConfigTitle.textContent = isButton ? t("bindings.buttonConfiguration") : t("bindings.faderConfiguration");
+      d.bindingConfigTitle.textContent = showMacroPage
+        ? "Configure Macro"
+        : (isButton ? t("bindings.buttonConfiguration") : t("bindings.faderConfiguration"));
+    }
+    if (d.bindingConfigBack) {
+      d.bindingConfigBack.classList.add("hidden");
+      d.bindingConfigBack.disabled = true;
     }
     if (d.bindingConfigPanel) {
       d.bindingConfigPanel.classList.toggle("binding-config-panel--button", isButton);
       d.bindingConfigPanel.classList.toggle("binding-config-panel--fader", !isButton);
+      d.bindingConfigPanel.classList.toggle("binding-config-panel--macro-page", showMacroPage);
     }
-    if (d.bindingConfigButtonLightSection) d.bindingConfigButtonLightSection.classList.toggle("hidden", !isButton);
-    if (d.bindingConfigButtonLearnSection) d.bindingConfigButtonLearnSection.classList.toggle("hidden", !isButton);
-    if (d.bindingConfigPreviewLearnShell) d.bindingConfigPreviewLearnShell.classList.toggle("hidden", isButton);
-    if (d.bindingConfigCurveSection) d.bindingConfigCurveSection.classList.toggle("hidden", isButton);
-    if (d.bindingConfigMuteSection) d.bindingConfigMuteSection.classList.toggle("hidden", isButton);
-    if (d.bindingConfigAssignSection) d.bindingConfigAssignSection.classList.toggle("hidden", isButton);
+    const nameSection = d.bindingConfigName?.closest?.(".binding-config-section");
+    if (nameSection) nameSection.classList.toggle("hidden", showMacroPage);
+    if (d.bindingConfigButtonLightSection) d.bindingConfigButtonLightSection.classList.toggle("hidden", !isButton || showMacroPage);
+    if (d.bindingConfigButtonLearnSection) d.bindingConfigButtonLearnSection.classList.toggle("hidden", !isButton || showMacroPage);
+    if (d.bindingConfigMacroSummarySection) d.bindingConfigMacroSummarySection.classList.add("hidden");
+    if (d.bindingConfigMacroSection) d.bindingConfigMacroSection.classList.toggle("hidden", !showMacroPage);
+    if (d.bindingConfigPreviewLearnShell) d.bindingConfigPreviewLearnShell.classList.toggle("hidden", isButton || showMacroPage);
+    if (d.bindingConfigCurveSection) d.bindingConfigCurveSection.classList.toggle("hidden", isButton || showMacroPage);
+    if (d.bindingConfigMuteSection) d.bindingConfigMuteSection.classList.toggle("hidden", isButton || showMacroPage);
+    if (d.bindingConfigAssignSection) d.bindingConfigAssignSection.classList.toggle("hidden", isButton || showMacroPage);
     if (d.bindingConfigName) d.bindingConfigName.value = binding.name?.trim() || "";
     if (isButton) {
       syncButtonLightUi(binding);
+      if (showMacroPage) {
+        renderMacroEditor(binding);
+      } else if (d.bindingConfigMacroList) {
+        d.bindingConfigMacroList.innerHTML = "";
+        if (d.bindingConfigMacroSummary) d.bindingConfigMacroSummary.innerHTML = "";
+      }
     } else {
       renderCurveCards();
       renderCustomCurveEditor();
@@ -1882,11 +3694,16 @@ export function createBindingsFeature({
     }, 200);
   }
 
-  function openConfigModal(bindingId) {
+  function openConfigModal(bindingId, options = {}) {
     const binding = getBindingById(bindingId);
     if (!binding) return;
     configBindingId = bindingId;
     configDraft = cloneBindingDraft(binding);
+    ensureBindingShape(configDraft);
+    configMacroPageOpen = Boolean(
+      options.macroPage && (configDraft?.action === "Macro" || getTargets(configDraft).some(isMacroTarget)),
+    );
+    configMacroSelectedPath = configMacroPageOpen ? macroPathForFirstStep(configDraft) : null;
     configAcceptedTransfers.clear();
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.remove("hidden");
     startConfigPreviewTimer();
@@ -2281,40 +4098,77 @@ export function createBindingsFeature({
           binding.hotkey?.display || "",
           binding.open_application,
           binding.autohotkey_script,
+          {
+            macroDisplayName: binding.macro_name,
+            macroAlreadyConfigured: isButton && (
+              binding.action === "Macro" || getTargets(binding).some(isMacroTarget)
+            ),
+            onMacroAlreadyConfigured: showMacroAlreadyConfiguredError,
+          },
         );
         targetSelect.addEventListener("change", async () => {
           const previousTargets = getTargets(binding);
           const previousHadHotkeyTarget = previousTargets.some(isHotkeyTarget);
           const previousHadOpenApplicationTarget = previousTargets.some(isOpenApplicationTarget);
           const previousHadAutoHotkeyScriptTarget = previousTargets.some(isAutoHotkeyScriptTarget);
+          const previousHadMacroTarget = previousTargets.some(isMacroTarget);
           const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
             ? targetSelect.__selectedTargets
             : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
-          setTargets(binding, selectedTargets);
           const hasSelectedTarget = selectedTargets.some((target) => target && target !== "Unset");
           const hasHotkeyTarget = selectedTargets.some(isHotkeyTarget);
           const hasOpenApplicationTarget = selectedTargets.some(isOpenApplicationTarget);
           const hasAutoHotkeyScriptTarget = selectedTargets.some(isAutoHotkeyScriptTarget);
+          const hasMacroTarget = selectedTargets.some(isMacroTarget);
           const previousAction = binding.action;
           const previousHotkey = normalizeHotkeyMapping(binding.hotkey);
           const previousOpenApplication = normalizeOpenApplicationMapping(binding.open_application);
           const previousAutoHotkeyScript = normalizeAutoHotkeyScriptMapping(binding.autohotkey_script);
 
+          if (isButton && (previousHadMacroTarget || previousAction === "Macro") && hasMacroTarget) {
+            showMacroAlreadyConfiguredError();
+            renderBindings();
+            finishBindingUiMutation("macro target already configured");
+            return;
+          }
+
+          setTargets(binding, selectedTargets);
+
           if (isButton) {
-            binding.action = !hasSelectedTarget
-              ? "ToggleMute"
-              : hasHotkeyTarget
-              ? "Hotkey"
-              : hasOpenApplicationTarget
-                ? "OpenApplication"
-                : hasAutoHotkeyScriptTarget
-                  ? "RunAutoHotkeyScript"
-              : (targetSelect.dataset.action || binding.action || "ToggleMute");
+            if (!hasSelectedTarget) {
+              binding.action = "ToggleMute";
+            } else if (hasMacroTarget) {
+              binding.action = "Macro";
+            } else if (hasHotkeyTarget) {
+              binding.action = "Hotkey";
+            } else if (hasOpenApplicationTarget) {
+              binding.action = "OpenApplication";
+            } else if (hasAutoHotkeyScriptTarget) {
+              binding.action = "RunAutoHotkeyScript";
+            } else {
+              binding.action = targetSelect.dataset.action || binding.action || "ToggleMute";
+            }
           } else {
             binding.action = "Volume";
           }
 
-          if (isButton && !hasHotkeyTarget && previousHadHotkeyTarget) {
+          if (isButton && hasMacroTarget) {
+            setTargets(binding, ["Macro"]);
+            binding.macro_steps = previousHadMacroTarget
+              ? normalizeMacroSteps(binding.macro_steps)
+              : [];
+            ensureMacroName(binding, { defaultIfBlank: !previousHadMacroTarget });
+            binding.hotkey = null;
+            binding.open_application = null;
+            binding.autohotkey_script = null;
+          }
+
+          if (isButton && previousHadMacroTarget && !hasMacroTarget) {
+            binding.macro_steps = [];
+            binding.macro_name = "";
+          }
+
+          if (isButton && !hasMacroTarget && !hasHotkeyTarget && previousHadHotkeyTarget) {
             binding.hotkey = null;
             targetSelect?.setHotkeyDisplay?.("");
             if (binding.action === "Hotkey") {
@@ -2322,21 +4176,21 @@ export function createBindingsFeature({
             }
           }
 
-          if (isButton && !hasOpenApplicationTarget && previousHadOpenApplicationTarget) {
+          if (isButton && !hasMacroTarget && !hasOpenApplicationTarget && previousHadOpenApplicationTarget) {
             binding.open_application = null;
             if (binding.action === "OpenApplication") {
               binding.action = targetSelect.dataset.action || "ToggleMute";
             }
           }
 
-          if (isButton && !hasAutoHotkeyScriptTarget && previousHadAutoHotkeyScriptTarget) {
+          if (isButton && !hasMacroTarget && !hasAutoHotkeyScriptTarget && previousHadAutoHotkeyScriptTarget) {
             binding.autohotkey_script = null;
             if (binding.action === "RunAutoHotkeyScript") {
               binding.action = targetSelect.dataset.action || "ToggleMute";
             }
           }
 
-          if (isButton && hasHotkeyTarget && !previousHadHotkeyTarget) {
+          if (isButton && !hasMacroTarget && hasHotkeyTarget && !previousHadHotkeyTarget) {
             const learnedHotkey = await startHotkeyLearn(binding);
             if (!learnedHotkey) {
               setTargets(binding, previousTargets);
@@ -2421,6 +4275,9 @@ export function createBindingsFeature({
           await invoke("add_binding", { binding });
           renderBindings();
           finishBindingUiMutation("target change");
+          if (isButton && hasMacroTarget) {
+            openConfigModal(binding.id, { macroPage: true });
+          }
         });
 
         const volumeSlider = document.createElement("input");
@@ -2652,6 +4509,20 @@ export function createBindingsFeature({
             await releaseMomentary();
           });
           valueGroup.appendChild(pulse);
+          if (binding.action === "Macro") {
+            valueGroup.classList.add("binding-value-cell--macro");
+            const editMacroButton = document.createElement("button");
+            editMacroButton.type = "button";
+            editMacroButton.className = "binding-macro-edit-button";
+            editMacroButton.textContent = "Edit Macro";
+            editMacroButton.title = "Edit Macro";
+            editMacroButton.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openConfigModal(binding.id, { macroPage: true });
+            });
+            valueGroup.appendChild(editMacroButton);
+          }
           if (binding.action === "ToggleMute") {
             valueGroup.appendChild(muteButton);
           }
@@ -2881,6 +4752,7 @@ export function createBindingsFeature({
         closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
       });
     }
+    ensureMacroConfigDom();
     if (d.bindingConfigCancel) {
       d.bindingConfigCancel.addEventListener("click", () => {
         closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
@@ -3092,15 +4964,18 @@ export function createBindingsFeature({
     });
 
     document.addEventListener("pointermove", (event) => {
+      updateMacroDrag(event);
       if (!customCurvePointer) return;
       updateCustomCurveFromPointer(event);
     });
 
     document.addEventListener("pointerup", () => {
+      endMacroDrag();
       customCurvePointer = null;
     });
 
     document.addEventListener("pointercancel", () => {
+      cancelMacroDrag();
       customCurvePointer = null;
     });
   }

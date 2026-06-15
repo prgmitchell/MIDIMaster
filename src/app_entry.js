@@ -131,6 +131,7 @@ const {
   targetPanelClose,
   targetPanelBack,
   bindingConfigPanel,
+  bindingConfigBack,
   bindingConfigTitle,
   bindingConfigClose,
   bindingConfigCancel,
@@ -143,6 +144,14 @@ const {
   bindingConfigButtonLearnButton,
   bindingConfigButtonLearnIndicator,
   bindingConfigButtonLearnStatus,
+  bindingConfigMacroSummarySection,
+  bindingConfigMacroSummary,
+  bindingConfigMacroEdit,
+  bindingConfigMacroSection,
+  bindingConfigMacroList,
+  bindingConfigMacroAddAction,
+  bindingConfigMacroAddWait,
+  bindingConfigMacroAddParallel,
   bindingConfigCurveSection,
   bindingConfigMuteSection,
   bindingConfigAssignSection,
@@ -500,6 +509,11 @@ function integrationStateKeyForTarget(target) {
   delete data.iconData;
   delete data.display_label;
   delete data.displayLabel;
+  delete data.action_label;
+  delete data.action_value;
+  delete data.action_kind;
+  delete data.button_action;
+  delete data.osd_value_text;
   return `${id}:${kind}:${stableStringifyForIntegrationState(data)}`;
 }
 
@@ -1135,6 +1149,7 @@ bindingsFeature = createBindingsFeature({
     bindingTypeFilter,
     bindingSearchInput,
     bindingConfigPanel,
+    bindingConfigBack,
     bindingConfigTitle,
     bindingConfigClose,
     bindingConfigCancel,
@@ -1147,6 +1162,14 @@ bindingsFeature = createBindingsFeature({
     bindingConfigButtonLearnButton,
     bindingConfigButtonLearnIndicator,
     bindingConfigButtonLearnStatus,
+    bindingConfigMacroSummarySection,
+    bindingConfigMacroSummary,
+    bindingConfigMacroEdit,
+    bindingConfigMacroSection,
+    bindingConfigMacroList,
+    bindingConfigMacroAddAction,
+    bindingConfigMacroAddWait,
+    bindingConfigMacroAddParallel,
     bindingConfigCurveSection,
     bindingConfigMuteSection,
     bindingConfigAssignSection,
@@ -1234,6 +1257,7 @@ bindingsFeature = createBindingsFeature({
   getLiveMidiValueForControl,
   createTargetIcon,
   resolveOsdTarget,
+  showAlert: (title, message = "") => showAlert(title, message),
   showChoices: (options = {}) => alertsController?.showChoices?.(options) || Promise.resolve("close"),
   showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
 });
@@ -1887,6 +1911,7 @@ function buildTargetSelect(
   currentHotkeyDisplay = "",
   currentOpenApplication = null,
   currentAutoHotkeyScript = null,
+  selectOptions = {},
 ) {
   return targetsFeature?.buildTargetSelect?.(
     currentTarget,
@@ -1895,6 +1920,7 @@ function buildTargetSelect(
     currentHotkeyDisplay,
     currentOpenApplication,
     currentAutoHotkeyScript,
+    selectOptions,
   );
 }
 

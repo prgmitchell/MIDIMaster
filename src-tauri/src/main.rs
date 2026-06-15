@@ -149,6 +149,7 @@ fn main() {
                 feedback_values: Arc::new(Mutex::new(HashMap::new())),
                 binding_action_values: Arc::new(Mutex::new(HashMap::new())),
                 activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
+                running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
                 last_mute_input_active: Mutex::new(HashMap::new()),
                 focus_volume_failure_logs: Mutex::new(HashMap::new()),
                 mute_transition_until: Mutex::new(HashMap::new()),
@@ -525,6 +526,7 @@ mod tests {
             feedback_values: Arc::new(Mutex::new(HashMap::new())),
             binding_action_values: Arc::new(Mutex::new(HashMap::new())),
             activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
+            running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
             last_mute_input_active: Mutex::new(HashMap::new()),
             focus_volume_failure_logs: Mutex::new(HashMap::new()),
             mute_transition_until: Mutex::new(HashMap::new()),
@@ -576,6 +578,7 @@ mod tests {
         model::Binding {
             id: "binding-relative-app".to_string(),
             name: "Relative App".to_string(),
+            macro_name: String::new(),
             device_id: "device".to_string(),
             control: model::MidiControl {
                 channel: 0,
@@ -608,6 +611,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            macro_steps: Vec::new(),
         }
     }
 
@@ -615,6 +619,7 @@ mod tests {
         model::Binding {
             id: "binding-focus".to_string(),
             name: "Focused App".to_string(),
+            macro_name: String::new(),
             device_id: "device".to_string(),
             control: model::MidiControl {
                 channel: 0,
@@ -639,6 +644,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            macro_steps: Vec::new(),
         }
     }
 

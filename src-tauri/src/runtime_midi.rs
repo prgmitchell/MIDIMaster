@@ -26,6 +26,46 @@ fn binding_is_button(binding: &model::Binding) -> bool {
             ))
 }
 
+fn emit_macro_button_feedback(
+    state: &AppState,
+    app: &AppHandle,
+    binding: &model::Binding,
+    key: &BindingKey,
+    input_active: bool,
+) {
+    let input_value = if input_active { 1.0 } else { 0.0 };
+    let feedback_value = binding
+        .mapped_button_light_feedback_value()
+        .or_else(|| binding.activity_button_light_feedback_value(input_active))
+        .unwrap_or(input_value);
+
+    if !input_active {
+        update_activity_button_light_hold_feedback(state, binding, key.clone(), false);
+    }
+
+    state.set_binding_action_value(key, feedback_value);
+    if let Ok(mut feedback) = state.feedback_values.lock() {
+        feedback.insert(key.clone(), feedback_value);
+    }
+    if let Ok(mut midi) = state.midi.lock() {
+        let _ = midi.send_binding_feedback(binding, feedback_value);
+    }
+
+    if input_active {
+        update_activity_button_light_hold_feedback(state, binding, key.clone(), true);
+    }
+
+    let _ = app.emit(
+        "volume_update",
+        serde_json::json!({
+            "target": model::BindingTarget::Macro,
+            "volume": feedback_value,
+            "binding_id": binding.id,
+            "source": "macro_feedback",
+        }),
+    );
+}
+
 fn resolve_integration_button_event(
     state: &AppState,
     key: &BindingKey,
@@ -345,6 +385,31 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
 
+    if matches!(binding.action, model::BindingAction::Macro) {
+        if !binding_is_button(&binding) {
+            run_logger::warn(
+                "bindings",
+                "macro_non_button_ignored",
+                &format!("binding_id={}", binding.id),
+            );
+            return Ok(());
+        }
+
+        let input_active = event.value > 0;
+        emit_macro_button_feedback(state, app, &binding, &key, input_active);
+        if !input_active {
+            run_logger::debug(
+                "bindings",
+                "macro_release_ignored",
+                &format!("binding_id={}", binding.id),
+            );
+            return Ok(());
+        }
+
+        crate::commands::bindings::spawn_macro_binding(app.clone(), binding.id.clone(), false);
+        return Ok(());
+    }
+
     if actions::handle_special_action(state, app, &binding, &targets, &event)? {
         return Ok(());
     }
@@ -508,7 +573,8 @@ pub(crate) fn apply_midi_event(
                 | model::BindingTarget::CaptureControl
                 | model::BindingTarget::Hotkey
                 | model::BindingTarget::OpenApplication
-                | model::BindingTarget::AutoHotkeyScript => {}
+                | model::BindingTarget::AutoHotkeyScript
+                | model::BindingTarget::Macro => {}
             }
         }
 
@@ -848,7 +914,8 @@ pub(crate) fn apply_midi_event(
             | model::BindingTarget::CaptureControl
             | model::BindingTarget::Hotkey
             | model::BindingTarget::OpenApplication
-            | model::BindingTarget::AutoHotkeyScript => {}
+            | model::BindingTarget::AutoHotkeyScript
+            | model::BindingTarget::Macro => {}
         }
     }
 

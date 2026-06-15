@@ -85,6 +85,7 @@ pub(crate) struct AppState {
     pub(crate) feedback_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
     pub(crate) binding_action_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
     pub(crate) activity_button_light_generations: Arc<Mutex<HashMap<BindingKey, u64>>>,
+    pub(crate) running_macros: Arc<Mutex<std::collections::HashSet<String>>>,
     pub(crate) last_mute_input_active: Mutex<HashMap<BindingKey, bool>>,
     pub(crate) focus_volume_failure_logs: Mutex<HashMap<String, Instant>>,
     pub(crate) mute_transition_until: Mutex<HashMap<BindingKey, Instant>>,
@@ -142,6 +143,7 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
             | model::BindingTarget::Hotkey
             | model::BindingTarget::OpenApplication
             | model::BindingTarget::AutoHotkeyScript
+            | model::BindingTarget::Macro
             | model::BindingTarget::Integration { .. } => {}
         }
     }
@@ -547,6 +549,7 @@ impl AppState {
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::AutoHotkeyScript => None,
+                    model::BindingTarget::Macro => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             } else {
@@ -612,6 +615,7 @@ impl AppState {
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::AutoHotkeyScript => None,
+                    model::BindingTarget::Macro => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             };
