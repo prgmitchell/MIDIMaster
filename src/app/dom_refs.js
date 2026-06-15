@@ -159,6 +159,7 @@ export function createDomRefs() {
   const exitToTraySelect = document.getElementById("exit-to-tray");
   const languageSelect = document.getElementById("language-select");
   const autoCheckUpdatesButton = document.getElementById("auto-check-updates-button");
+  const midiDeviceInventoryConsentToggle = document.getElementById("midi-device-inventory-consent-toggle");
   const openLogsFolderButton = document.getElementById("open-logs-folder");
   const resetAppDataButton = document.getElementById("reset-app-data");
   const checkForUpdatesButton = document.getElementById("check-for-updates");
@@ -306,6 +307,7 @@ export function createDomRefs() {
     exitToTraySelect,
     languageSelect,
     autoCheckUpdatesButton,
+    midiDeviceInventoryConsentToggle,
     openLogsFolderButton,
     resetAppDataButton,
     checkForUpdatesButton,

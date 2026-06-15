@@ -498,7 +498,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -999,7 +1006,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1500,7 +1514,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2001,7 +2022,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2502,7 +2530,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3003,7 +3038,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3504,7 +3546,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4005,7 +4054,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4506,7 +4562,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5007,7 +5070,14 @@
     "macro.seconds": "381a8e9699052f3a958001510611a9634e7cef8aa6a1421cb7e7f6e119f91edc",
     "macro.changeHotkey": "fa5d5476370f7dc4f42f2cbf13686e470f59bd1e6051a85e9bcca29b0afa866b",
     "macro.learnHotkey": "99ce0c8f56423a01d18f7bd8d24c84121bfac26734e69c9f754297ecd156d2ec",
-    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4"
+    "macro.zeroMs": "ef9511d779cbce1ae384d17029cb17566c77ae37ff57354dfaafe9c7d7536ce4",
+    "settings.midiDeviceInventory": "e8af545101c6b6c140420404d7292b9ddec940d0009cb074673b7b2c0aa2ac3f",
+    "settings.midiDeviceInventoryDescription": "7c2c03cdce989a4b115a10bee4b400609f746c8f5696bf7295b154d13ed4857f",
+    "settings.midiDeviceInventoryToggle": "22e60a4924b3e82e9f56a7c0ae4fbbcb757d4ab6c3671e8446b07e05bf3aee8a",
+    "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
+    "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
+    "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

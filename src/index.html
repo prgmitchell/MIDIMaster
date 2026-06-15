@@ -566,6 +566,32 @@
                       </div>
                     </div>
 
+                    <div class="settings-card settings-maintenance-card settings-maintenance-card--privacy">
+                      <div class="settings-maintenance-card-top">
+                        <div class="settings-maintenance-card-main">
+                          <span class="settings-maintenance-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false">
+                              <path d="M12 3.75 5.25 6.5v5.1c0 4.25 2.7 7.55 6.75 8.65 4.05-1.1 6.75-4.4 6.75-8.65V6.5Z"></path>
+                              <path d="M9 12.25 11.1 14.25 15.25 9.75"></path>
+                            </svg>
+                          </span>
+                          <span class="settings-maintenance-copy">
+                            <span class="settings-maintenance-title" data-i18n="settings.midiDeviceInventory">MIDI Device Inventory</span>
+                            <span class="settings-maintenance-description" data-i18n="settings.midiDeviceInventoryDescription">When enabled, shares app version, privacy notice version, MIDI input/output names, local MIDI port IDs, selected routes, and counts.</span>
+                          </span>
+                        </div>
+                        <label class="settings-maintenance-toggle-control" title="Share MIDI device inventory" data-i18n-title="settings.midiDeviceInventoryToggle">
+                          <span class="settings-maintenance-toggle-copy">
+                            <span class="settings-maintenance-toggle-label" data-i18n="settings.midiDeviceInventoryToggle">Share inventory</span>
+                          </span>
+                          <span class="settings-toggle">
+                            <input id="midi-device-inventory-consent-toggle" type="checkbox" />
+                            <span class="plugins-toggle-ui" aria-hidden="true"></span>
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
                     <div class="settings-card settings-maintenance-card settings-maintenance-card--danger">
                       <div class="settings-maintenance-card-top">
                         <div class="settings-maintenance-card-main">

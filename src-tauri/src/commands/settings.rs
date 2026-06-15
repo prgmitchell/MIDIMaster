@@ -1,6 +1,8 @@
 use crate::{
     app_paths::app_data_root_dir,
-    app_settings::{AppAppearanceSettings, AppSettings, AppearanceTheme},
+    app_settings::{
+        AppAppearanceSettings, AppSettings, AppearanceTheme, MidiDeviceInventoryConsent,
+    },
     collect_monitor_descriptors,
     model::{MidiDevicePreference, MidiDeviceRoute, OsdSettings},
     run_logger, AppState,
@@ -284,6 +286,39 @@ pub fn update_app_settings(
         .map_err(|err| err.to_string())?;
     crate::AppState::apply_app_settings(&app, &updated);
     Ok(())
+}
+
+#[tauri::command]
+pub fn update_midi_device_inventory_consent(
+    state: State<AppState>,
+    consent: MidiDeviceInventoryConsent,
+    notice_version: Option<u32>,
+) -> Result<AppSettings, String> {
+    let notice_version =
+        notice_version.unwrap_or(crate::telemetry::MIDI_DEVICE_INVENTORY_NOTICE_VERSION);
+    run_logger::info(
+        "settings",
+        "update_midi_device_inventory_consent",
+        &format!("consent={:?} notice_version={}", consent, notice_version),
+    );
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    let consent_changed = settings.midi_device_inventory_consent != consent;
+    settings.midi_device_inventory_consent = consent;
+    settings.midi_device_inventory_notice_version = notice_version;
+    if consent_changed {
+        settings.midi_device_inventory_last_sent_hash = None;
+    }
+    let updated = settings.clone();
+    drop(settings);
+
+    state
+        .app_settings_store
+        .save(&updated)
+        .map_err(|err| err.to_string())?;
+    Ok(updated)
 }
 
 #[tauri::command]

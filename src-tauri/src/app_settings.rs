@@ -51,6 +51,15 @@ fn default_text_rendering() -> String {
     "auto".to_string()
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MidiDeviceInventoryConsent {
+    #[default]
+    Unknown,
+    Enabled,
+    Disabled,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppearanceTheme {
@@ -169,6 +178,9 @@ pub struct AppSettings {
     pub auto_check_updates: bool,
     pub language: String,
     pub appearance: AppAppearanceSettings,
+    pub midi_device_inventory_consent: MidiDeviceInventoryConsent,
+    pub midi_device_inventory_notice_version: u32,
+    pub midi_device_inventory_last_sent_hash: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -188,6 +200,9 @@ impl Default for AppSettings {
             auto_check_updates: true,
             language: "en".to_string(),
             appearance: AppAppearanceSettings::default(),
+            midi_device_inventory_consent: MidiDeviceInventoryConsent::Unknown,
+            midi_device_inventory_notice_version: 0,
+            midi_device_inventory_last_sent_hash: None,
         }
     }
 }
@@ -253,7 +268,10 @@ impl AppSettingsStore {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppAppearanceSettings, AppSettings, AppSettingsStore, AppearanceTheme};
+    use super::{
+        AppAppearanceSettings, AppSettings, AppSettingsStore, AppearanceTheme,
+        MidiDeviceInventoryConsent,
+    };
     use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -280,6 +298,12 @@ mod tests {
         assert_eq!(settings.appearance.font_size, 14.0);
         assert_eq!(settings.appearance.surface_contrast, 50.0);
         assert_eq!(settings.appearance.icon_glow, 50.0);
+        assert_eq!(
+            settings.midi_device_inventory_consent,
+            MidiDeviceInventoryConsent::Unknown
+        );
+        assert_eq!(settings.midi_device_inventory_notice_version, 0);
+        assert_eq!(settings.midi_device_inventory_last_sent_hash, None);
     }
 
     #[test]
@@ -300,6 +324,29 @@ mod tests {
         assert_eq!(loaded.language, "fr");
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn midi_device_inventory_consent_round_trips() {
+        let settings = AppSettings {
+            midi_device_inventory_consent: MidiDeviceInventoryConsent::Enabled,
+            midi_device_inventory_notice_version: 1,
+            midi_device_inventory_last_sent_hash: Some("abc123".to_string()),
+            ..AppSettings::default()
+        };
+
+        let json = serde_json::to_string(&settings).expect("serialize settings");
+        let loaded: AppSettings = serde_json::from_str(&json).expect("deserialize settings");
+
+        assert_eq!(
+            loaded.midi_device_inventory_consent,
+            MidiDeviceInventoryConsent::Enabled
+        );
+        assert_eq!(loaded.midi_device_inventory_notice_version, 1);
+        assert_eq!(
+            loaded.midi_device_inventory_last_sent_hash.as_deref(),
+            Some("abc123")
+        );
     }
 
     #[test]

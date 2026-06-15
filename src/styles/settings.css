@@ -1143,8 +1143,11 @@ body[data-theme="light"] .settings-osd-preview-stand {
 .settings-maintenance-layout {
   flex: 1 1 auto;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows:
+    minmax(168px, 1.05fr)
+    minmax(104px, 0.72fr)
+    minmax(168px, 1.18fr);
   gap: 12px;
 }
 
@@ -1156,11 +1159,19 @@ body[data-theme="light"] .settings-osd-preview-stand {
 
 .settings-maintenance-card--diagnostics {
   flex: 0 0 auto;
-  min-height: 196px;
+  min-height: 0;
+}
+
+.settings-maintenance-card--privacy {
+  flex: 0 0 auto;
+  justify-content: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 18%, transparent), transparent 42%),
+    var(--surface-raised);
 }
 
 .settings-maintenance-card--danger {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   background: var(--surface-raised);
 }
 
@@ -1273,6 +1284,56 @@ body[data-theme="light"] .settings-osd-preview-stand {
   text-overflow: ellipsis;
 }
 
+.settings-maintenance-card--privacy .settings-maintenance-icon {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--control-border));
+  background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface-raised));
+  color: var(--accent);
+}
+
+.settings-maintenance-card--privacy .settings-maintenance-copy {
+  max-width: 540px;
+}
+
+.settings-maintenance-toggle-control {
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+  flex: 0 0 240px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 0 14px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  background: color-mix(in srgb, var(--control-bg) 78%, var(--surface-raised));
+  cursor: pointer;
+}
+
+.settings-maintenance-toggle-control:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--control-border));
+  background: color-mix(in srgb, var(--control-bg-hover) 72%, var(--surface-raised));
+}
+
+.settings-maintenance-toggle-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-maintenance-toggle-label {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.settings-maintenance-toggle-control .settings-toggle {
+  flex: 0 0 44px;
+}
+
 .settings-maintenance-card--danger .settings-maintenance-icon {
   border-color: color-mix(in srgb, var(--danger) 32%, var(--control-border));
   background: color-mix(in srgb, var(--danger-soft) 58%, var(--surface-raised));
@@ -1302,13 +1363,13 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 }
 
 .settings-maintenance-inset {
-  flex: 0 0 auto;
-  min-height: 76px;
+  flex: 1 1 auto;
+  min-height: 62px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 5px;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-radius: 5px;
   border: 1px solid color-mix(in srgb, var(--control-border) 58%, transparent);
   background:
@@ -1317,7 +1378,7 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 }
 
 .settings-maintenance-inset--danger {
-  min-height: 112px;
+  min-height: 88px;
   border-color: color-mix(in srgb, var(--danger) 24%, var(--control-border));
   background: color-mix(in srgb, var(--danger-soft) 24%, var(--surface-raised));
 }
@@ -2350,10 +2411,21 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
     flex-wrap: wrap;
   }
 
+  .settings-maintenance-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
   .settings-maintenance-card-top {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
+  }
+
+  .settings-maintenance-toggle-control {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
   }
 
   .settings-maintenance-button {
@@ -2943,6 +3015,100 @@ body[data-theme] #plugins-page .plugins-browser-card,
 body[data-theme] .profile-page-row {
   background: var(--ambient-card-background);
   background-clip: padding-box;
+}
+
+body[data-theme] #alert-overlay.alert-overlay--privacy-consent {
+  background: color-mix(in srgb, var(--app-bg) 82%, transparent);
+}
+
+body[data-theme] .alert-panel-content.alert-panel-content--privacy-consent {
+  width: min(460px, calc(100vw - 48px));
+  max-width: calc(100vw - 48px);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 88%, var(--accent) 12%);
+  background: var(--surface-raised);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .target-panel-header {
+  min-height: 40px;
+  padding: 0 12px 0 14px;
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--surface) 8%);
+  border-bottom-color: color-mix(in srgb, var(--control-border) 76%, transparent);
+}
+
+body[data-theme] .alert-panel-content--privacy-consent #alert-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .target-panel-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 5px;
+  color: var(--text-secondary);
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-body {
+  max-width: none;
+  padding: 18px 20px 20px;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-body p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+  text-align: left;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions {
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions button {
+  min-width: 128px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions #alert-secondary,
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions #alert-ok {
+  min-width: 128px;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions .secondary {
+  background: color-mix(in srgb, var(--control-bg) 76%, var(--surface-raised) 24%);
+  border-color: color-mix(in srgb, var(--control-border) 84%, transparent);
+  color: var(--text-secondary);
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions .secondary:hover {
+  background: color-mix(in srgb, var(--control-bg-hover) 80%, var(--surface-raised) 20%);
+  border-color: var(--control-border-strong);
+  color: var(--text-primary);
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions .primary-button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+body[data-theme] .alert-panel-content--privacy-consent .alert-panel-actions .primary-button:hover {
+  background: color-mix(in srgb, var(--accent) 86%, var(--text-primary) 14%);
+  border-color: color-mix(in srgb, var(--accent) 88%, var(--text-primary) 12%);
+  color: #fff;
 }
 
 body[data-theme] .settings-maintenance-section,

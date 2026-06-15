@@ -22,6 +22,7 @@ mod run_logger;
 mod runtime_helpers;
 mod runtime_midi;
 mod store_api;
+mod telemetry;
 mod windows_autostart;
 mod windows_display;
 mod ws_bridge;
@@ -346,6 +347,7 @@ fn main() {
             get_app_settings,
             get_app_version,
             update_app_settings,
+            update_midi_device_inventory_consent,
             update_appearance_settings,
             export_appearance_theme,
             import_appearance_theme,
@@ -358,6 +360,7 @@ fn main() {
             open_logs_folder,
             pick_executable_path,
             pick_autohotkey_script_path,
+            submit_midi_device_inventory,
             focused_session,
             list_playback_devices,
             list_recording_devices,

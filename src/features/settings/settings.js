@@ -19,6 +19,11 @@ import {
   resolveAppearance,
   toBackendAppearanceSettings,
 } from "../../app/appearance.js";
+import {
+  MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+  normalizeMidiDeviceInventoryConsent,
+  normalizeMidiDeviceInventorySettings,
+} from "../../app/midi_device_inventory.js";
 
 export function createSettingsFeature({
   invoke,
@@ -33,6 +38,7 @@ export function createSettingsFeature({
   setAppSettings,
   applyAppearance,
   onUpdateAvailableClick,
+  onMidiDeviceInventoryConsentChanged,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createSettingsFeature: invoke is required");
@@ -889,6 +895,14 @@ export function createSettingsFeature({
     d.autoCheckUpdatesButton.checked = enabled;
   }
 
+  function syncMidiDeviceInventoryToggle(settings = null) {
+    if (!d.midiDeviceInventoryConsentToggle) return;
+    const current = settings || ((typeof getAppSettings === "function") ? (getAppSettings() || {}) : {});
+    const inventory = normalizeMidiDeviceInventorySettings(current);
+    d.midiDeviceInventoryConsentToggle.checked = inventory.consent === "enabled"
+      && inventory.noticeVersion >= MIDI_DEVICE_INVENTORY_NOTICE_VERSION;
+  }
+
   function formatUpdaterError(error) {
     const message = String(error || t("settings.updateCheckFailed"));
     const normalized = message.toLowerCase();
@@ -1539,6 +1553,7 @@ export function createSettingsFeature({
       d.languageSelect.value = normalizeLanguage(merged.language);
       renderSettingsSelectDropdown(d.languageSelect);
     }
+    syncMidiDeviceInventoryToggle(merged);
     renderUpdateUi();
   }
 
@@ -1582,6 +1597,14 @@ export function createSettingsFeature({
           exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
           autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
           language: normalizeLanguage(settings.language ?? settings.languageCode ?? "en"),
+          midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(
+            settings.midi_device_inventory_consent ?? settings.midiDeviceInventoryConsent,
+          ),
+          midiDeviceInventoryNoticeVersion: Number(
+            settings.midi_device_inventory_notice_version
+            ?? settings.midiDeviceInventoryNoticeVersion
+            ?? 0,
+          ),
           appearance: settings.appearance && typeof settings.appearance === "object"
             ? normalizeAppearanceSettings(settings.appearance)
             : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme),
@@ -1947,6 +1970,41 @@ export function createSettingsFeature({
         persistAppSettings();
         renderUpdateUi();
         ensureAutoUpdateCheck();
+      });
+    }
+    if (d.midiDeviceInventoryConsentToggle) {
+      d.midiDeviceInventoryConsentToggle.addEventListener("change", async () => {
+        const consent = d.midiDeviceInventoryConsentToggle.checked ? "enabled" : "disabled";
+        const previous = normalizeMidiDeviceInventorySettings(
+          (typeof getAppSettings === "function") ? (getAppSettings() || {}) : {},
+        );
+        syncAppSettingsUI({
+          midiDeviceInventoryConsent: consent,
+          midiDeviceInventoryNoticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+        });
+        try {
+          const updated = await invoke("update_midi_device_inventory_consent", {
+            consent,
+            noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+          });
+          const normalized = normalizeMidiDeviceInventorySettings(updated || {
+            consent,
+            noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+          });
+          syncAppSettingsUI({
+            midiDeviceInventoryConsent: normalized.consent,
+            midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
+          });
+          if (typeof onMidiDeviceInventoryConsentChanged === "function") {
+            onMidiDeviceInventoryConsentChanged(normalized);
+          }
+        } catch (error) {
+          console.error("Failed to update MIDI device inventory consent", error);
+          syncAppSettingsUI({
+            midiDeviceInventoryConsent: previous.consent,
+            midiDeviceInventoryNoticeVersion: previous.noticeVersion,
+          });
+        }
       });
     }
     if (d.checkForUpdatesButton) {

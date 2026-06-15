@@ -56,6 +56,9 @@ jobs:
       - name: Test frontend session refresh
         run: node scripts/test-session-refresh.mjs
 
+      - name: Test frontend MIDI device inventory consent
+        run: node scripts/test-midi-device-inventory-consent.mjs
+
       - name: Test frontend focus target core
         run: node scripts/test-target-core-focus.mjs
 

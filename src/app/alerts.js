@@ -9,6 +9,27 @@ export function createAlertsController({
 }) {
   let pendingChoiceResolve = null;
   let pendingMode = "alert";
+  let activeOverlayClass = "";
+  let activePanelClass = "";
+
+  const alertPanel = alertOverlay?.querySelector?.(".alert-panel-content") || null;
+
+  function setAlertClasses({ overlayClass = "", panelClass = "" } = {}) {
+    if (activeOverlayClass && alertOverlay) {
+      alertOverlay.classList.remove(activeOverlayClass);
+    }
+    if (activePanelClass && alertPanel) {
+      alertPanel.classList.remove(activePanelClass);
+    }
+    activeOverlayClass = overlayClass || "";
+    activePanelClass = panelClass || "";
+    if (activeOverlayClass && alertOverlay) {
+      alertOverlay.classList.add(activeOverlayClass);
+    }
+    if (activePanelClass && alertPanel) {
+      alertPanel.classList.add(activePanelClass);
+    }
+  }
 
   function resolveChoice(value) {
     if (!pendingChoiceResolve) return;
@@ -77,6 +98,7 @@ export function createAlertsController({
     if (alertTitle) {
       alertTitle.textContent = title;
     }
+    setAlertClasses();
     setActionsMode("alert");
     alertMessage.textContent = message;
     alertOverlay.classList.remove("hidden");
@@ -96,6 +118,7 @@ export function createAlertsController({
     if (alertTitle) {
       alertTitle.textContent = title;
     }
+    setAlertClasses();
     setActionsMode("confirm", { confirmLabel, cancelLabel, confirmVariant });
     alertMessage.textContent = message;
     alertOverlay.classList.remove("hidden");
@@ -108,6 +131,8 @@ export function createAlertsController({
     title = "Choose",
     message = "",
     options = [],
+    overlayClass = "",
+    panelClass = "",
   } = {}) {
     if (!alertOverlay || !alertMessage) {
       return Promise.resolve("close");
@@ -122,6 +147,7 @@ export function createAlertsController({
     if (alertTitle) {
       alertTitle.textContent = title;
     }
+    setAlertClasses({ overlayClass, panelClass });
     setActionsMode("choice", { options: safeOptions });
     alertMessage.textContent = message;
     alertOverlay.classList.remove("hidden");
@@ -135,6 +161,7 @@ export function createAlertsController({
     if (alertOverlay) {
       alertOverlay.classList.add("hidden");
     }
+    setAlertClasses();
     setActionsMode("alert");
   }
 
@@ -156,6 +183,7 @@ export function createAlertsController({
           if (alertOverlay) {
             alertOverlay.classList.add("hidden");
           }
+          setAlertClasses();
           setActionsMode("alert");
           return;
         }
@@ -170,6 +198,7 @@ export function createAlertsController({
           if (alertOverlay) {
             alertOverlay.classList.add("hidden");
           }
+          setAlertClasses();
           setActionsMode("alert");
           return;
         }
@@ -190,6 +219,7 @@ export function createAlertsController({
           if (alertOverlay) {
             alertOverlay.classList.add("hidden");
           }
+          setAlertClasses();
           setActionsMode("alert");
           return;
         }

@@ -34,6 +34,13 @@ import {
   defaultAppearanceSettings,
   normalizeAppearanceSettings,
 } from "./app/appearance.js";
+import {
+  MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+  canSubmitMidiDeviceInventory,
+  normalizeMidiDeviceInventoryConsent,
+  normalizeMidiDeviceInventorySettings,
+  shouldPromptMidiDeviceInventoryConsent,
+} from "./app/midi_device_inventory.js";
 import { createSessionRefresher } from "./app/session_refresh.js";
 import { createPluginRuntime } from "./app/plugin_runtime.js";
 import {
@@ -232,6 +239,7 @@ const {
   exitToTraySelect,
   languageSelect,
   autoCheckUpdatesButton,
+  midiDeviceInventoryConsentToggle,
   openLogsFolderButton,
   resetAppDataButton,
   checkForUpdatesButton,
@@ -445,6 +453,14 @@ async function hydrateClientPreferences() {
     appSettings = {
       ...appSettings,
       appearance: savedAppearance,
+      midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(
+        settings.midi_device_inventory_consent ?? settings.midiDeviceInventoryConsent,
+      ),
+      midiDeviceInventoryNoticeVersion: Number(
+        settings.midi_device_inventory_notice_version
+        ?? settings.midiDeviceInventoryNoticeVersion
+        ?? 0,
+      ),
     };
     applyAppearanceToDocument(savedAppearance, { matchMediaSource: window });
 
@@ -944,6 +960,8 @@ let appSettings = {
   autoCheckUpdates: true,
   language: "en",
   appearance: defaultAppearanceSettings(),
+  midiDeviceInventoryConsent: "unknown",
+  midiDeviceInventoryNoticeVersion: 0,
 };
 let appStarted = false;
 
@@ -1018,6 +1036,7 @@ settingsFeature = createSettingsFeature({
     exitToTraySelect,
     languageSelect,
     autoCheckUpdatesButton,
+    midiDeviceInventoryConsentToggle,
     openLogsFolderButton,
     checkForUpdatesButton,
     settingsUpdateStatus,
@@ -1040,6 +1059,9 @@ settingsFeature = createSettingsFeature({
   setAppSettings: (next) => { appSettings = next; },
   applyAppearance: applyGlobalAppearance,
   onUpdateAvailableClick: showUpdateAvailableDialog,
+  onMidiDeviceInventoryConsentChanged: () => {
+    queueMidiDeviceInventorySubmit("consent_changed");
+  },
 });
 diagnosticInfo("settings_factory_ok");
 diagnosticInfo("settings_bind_start");
@@ -1337,14 +1359,19 @@ midiFeature = createMidiFeature({
   clearSavedMidiDeviceIds,
   onConnected: (connection = {}) => {
     activeMidiRouteCount = enabledMidiRouteCount(connection.routes || []);
+    queueMidiDeviceInventorySubmit("midi_connected");
   },
   onDisconnected: () => {
     activeMidiRouteCount = 0;
+  },
+  onDeviceInventoryChanged: () => {
+    queueMidiDeviceInventorySubmit("device_inventory_changed");
   },
   onProfileDeviceSelected: async (nextPreference) => {
     const normalized = normalizeProfileMidiPreference(nextPreference);
     activeProfileMidiPreference = normalized;
     await profilesFeature?.updateProfileMidiPreference?.(normalized);
+    queueMidiDeviceInventorySubmit("midi_routes_changed");
   },
 });
 diagnosticInfo("midi_factory_ok");
@@ -1898,6 +1925,101 @@ if (resetAppDataButton) {
     localStorage.clear();
     window.location.reload();
   });
+}
+
+let midiDeviceInventorySubmitTimer = 0;
+let midiDeviceInventorySubmitInFlight = false;
+let midiDeviceInventorySubmitQueued = false;
+
+function applyMidiDeviceInventorySettings(settings = {}) {
+  const normalized = normalizeMidiDeviceInventorySettings(settings);
+  appSettings = {
+    ...appSettings,
+    midiDeviceInventoryConsent: normalized.consent,
+    midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
+  };
+  settingsFeature?.syncAppSettingsUI?.({
+    midiDeviceInventoryConsent: normalized.consent,
+    midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
+  });
+  return normalized;
+}
+
+async function updateMidiDeviceInventoryConsent(consent) {
+  const updated = await invoke("update_midi_device_inventory_consent", {
+    consent,
+    noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+  });
+  return applyMidiDeviceInventorySettings(updated || {
+    consent,
+    noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+  });
+}
+
+async function maybePromptMidiDeviceInventoryConsent() {
+  if (!shouldPromptMidiDeviceInventoryConsent(appSettings)) {
+    return;
+  }
+  const choice = await showChoices({
+    title: t("privacy.midiDeviceInventoryTitle"),
+    message: t("privacy.midiDeviceInventoryMessage"),
+    overlayClass: "alert-overlay--privacy-consent",
+    panelClass: "alert-panel-content--privacy-consent",
+    options: [
+      { id: "disabled", label: t("privacy.midiDeviceInventoryDecline"), variant: "secondary" },
+      { id: "enabled", label: t("privacy.midiDeviceInventoryAccept"), variant: "primary" },
+    ],
+  });
+  const consent = choice === "enabled" ? "enabled" : "disabled";
+  const normalized = await updateMidiDeviceInventoryConsent(consent).catch((error) => {
+    diagnosticError("midi_device_inventory_consent_update_failed", error);
+    return applyMidiDeviceInventorySettings({
+      consent: "disabled",
+      noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+    });
+  });
+  if (normalized.consent === "enabled") {
+    queueMidiDeviceInventorySubmit("consent_prompt_enabled");
+  }
+}
+
+function queueMidiDeviceInventorySubmit(reason = "unknown") {
+  if (!canSubmitMidiDeviceInventory(appSettings)) {
+    return;
+  }
+  midiDeviceInventorySubmitQueued = true;
+  if (midiDeviceInventorySubmitTimer) {
+    clearTimeout(midiDeviceInventorySubmitTimer);
+  }
+  midiDeviceInventorySubmitTimer = setTimeout(() => {
+    midiDeviceInventorySubmitTimer = 0;
+    flushMidiDeviceInventorySubmit(reason).catch((error) => {
+      diagnosticError("midi_device_inventory_submit_flush_failed", error);
+    });
+  }, 900);
+}
+
+async function flushMidiDeviceInventorySubmit(reason = "unknown") {
+  if (!midiDeviceInventorySubmitQueued || midiDeviceInventorySubmitInFlight) {
+    return;
+  }
+  midiDeviceInventorySubmitQueued = false;
+  if (!canSubmitMidiDeviceInventory(appSettings)) {
+    return;
+  }
+  midiDeviceInventorySubmitInFlight = true;
+  try {
+    await invoke("submit_midi_device_inventory");
+  } catch (error) {
+    diagnosticError(`midi_device_inventory_submit_failed_${reason}`, error);
+  } finally {
+    midiDeviceInventorySubmitInFlight = false;
+    if (midiDeviceInventorySubmitQueued) {
+      flushMidiDeviceInventorySubmit("queued").catch((error) => {
+        diagnosticError("midi_device_inventory_submit_flush_failed", error);
+      });
+    }
+  }
 }
 
 function buildTargetOptions(currentTarget, isButton = false) {
@@ -2562,6 +2684,7 @@ async function startMainApp() {
   if (usedLegacyFallback && savedDevice && midiStatus) {
     midiStatus.textContent = t("midi.selectAvailableReconnect");
   }
+  queueMidiDeviceInventorySubmit("startup");
 }
 
 async function init() {
@@ -2621,6 +2744,11 @@ async function init() {
   diagnosticInfo("start_main_app_start");
   await startMainApp();
   diagnosticInfo("start_main_app_done");
+  setTimeout(() => {
+    maybePromptMidiDeviceInventoryConsent().catch((error) => {
+      diagnosticError("midi_device_inventory_prompt_failed", error);
+    });
+  }, 0);
   try {
     const resetSkipOnceKey = "updaterResetSkipOnce";
     if (localStorage.getItem(resetSkipOnceKey) !== "1") {

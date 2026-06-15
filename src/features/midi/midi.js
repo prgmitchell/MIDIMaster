@@ -32,6 +32,7 @@ export function createMidiFeature({
   saveMidiDeviceRoutes,
   clearSavedMidiDeviceIds,
   onProfileDeviceSelected,
+  onDeviceInventoryChanged,
   i18n,
 }) {
   if (typeof invoke !== "function") {
@@ -60,6 +61,7 @@ export function createMidiFeature({
   let deviceRefreshInFlight = null;
   let lastDeviceRefreshAt = 0;
   let lastDeviceSnapshot = { inputs: [], outputs: [] };
+  let lastDeviceInventorySignature = "";
   let suspendProfileAutoReconnect = false;
   let applyInFlight = false;
   let queuedApply = null;
@@ -843,6 +845,20 @@ export function createMidiFeature({
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  function deviceInventorySignature(snapshot = {}) {
+    const compact = {
+      inputs: (Array.isArray(snapshot.inputs) ? snapshot.inputs : []).map((device) => ({
+        id: String(device?.id || ""),
+        name: String(device?.name || ""),
+      })),
+      outputs: (Array.isArray(snapshot.outputs) ? snapshot.outputs : []).map((device) => ({
+        id: String(device?.id || ""),
+        name: String(device?.name || ""),
+      })),
+    };
+    return JSON.stringify(compact);
+  }
+
   async function enumerateMidiDevices({ force = false, reason = "unknown" } = {}) {
     const now = Date.now();
     if (!force && now - lastDeviceRefreshAt < MIDI_ENUM_MIN_INTERVAL_MS) {
@@ -867,6 +883,13 @@ export function createMidiFeature({
           inputs: Array.isArray(inputs) ? inputs : [],
           outputs: Array.isArray(outputs) ? outputs : [],
         };
+        const signature = deviceInventorySignature(lastDeviceSnapshot);
+        if (signature !== lastDeviceInventorySignature) {
+          lastDeviceInventorySignature = signature;
+          if (typeof onDeviceInventoryChanged === "function") {
+            onDeviceInventoryChanged(lastDeviceSnapshot);
+          }
+        }
         lastDeviceRefreshAt = Date.now();
         return lastDeviceSnapshot;
       } finally {
