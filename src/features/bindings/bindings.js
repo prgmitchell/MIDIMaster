@@ -1182,21 +1182,29 @@ export function createBindingsFeature({
   function macroStepSummary(step) {
     if (!step) return "";
     if (step.kind === "wait") {
-      return `Wait ${((Number(step.duration_ms) || 0) / 1000).toFixed(1).replace(/\.0$/, "")}s`;
+      return t("macro.waitSummary", { duration: macroWaitDurationLabel(step) });
     }
     if (step.kind === "parallel") {
       const count = Array.isArray(step.steps) ? step.steps.length : 0;
-      return `Parallel ${count} action${count === 1 ? "" : "s"}`;
+      return t("macro.parallelSummary", { actions: macroActionCountLabel(count) });
     }
     if (!String(step.action || "").trim() || !macroActionHasTarget(step)) {
-      return "Choose an action";
+      return t("macro.chooseAction");
     }
     return `${macroActionTitle(step.action, step)} - ${macroTargetTitle(step)}`;
   }
 
+  function macroWaitDurationLabel(step) {
+    return `${((Number(step?.duration_ms) || 0) / 1000).toFixed(1).replace(/\.0$/, "")}s`;
+  }
+
+  function macroActionCountLabel(count) {
+    return t(count === 1 ? "macro.actionCountOne" : "macro.actionCountOther", { count });
+  }
+
   function macroStepCountLabel(binding) {
     const count = normalizeMacroSteps(binding?.macro_steps).length;
-    return `${count} step${count === 1 ? "" : "s"}`;
+    return t(count === 1 ? "macro.stepCountOne" : "macro.stepCountOther", { count });
   }
 
   function renderMacroSummary(binding) {
@@ -1213,7 +1221,7 @@ export function createBindingsFeature({
     if (steps.length === 0) {
       const empty = document.createElement("div");
       empty.className = "binding-config-macro-summary-empty";
-      empty.textContent = "No macro steps configured.";
+      empty.textContent = t("macro.noStepsConfigured");
       root.appendChild(empty);
       return;
     }
@@ -1236,7 +1244,7 @@ export function createBindingsFeature({
     if (steps.length > 4) {
       const more = document.createElement("div");
       more.className = "binding-config-macro-summary-more";
-      more.textContent = `+${steps.length - 4} more`;
+      more.textContent = t("macro.moreSteps", { count: steps.length - 4 });
       list.appendChild(more);
     }
     root.appendChild(list);
@@ -1400,7 +1408,8 @@ export function createBindingsFeature({
       back.id = "binding-config-back";
       back.type = "button";
       back.className = "target-panel-back binding-config-back hidden";
-      back.setAttribute("aria-label", "Back");
+      back.setAttribute("aria-label", t("common.back"));
+      back.dataset.i18nAriaLabel = "common.back";
       back.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6" /></svg>';
       header.insertBefore(back, d.bindingConfigTitle || header.firstChild);
       d.bindingConfigBack = back;
@@ -1415,10 +1424,12 @@ export function createBindingsFeature({
       titleRow.className = "binding-config-title-row";
       const title = document.createElement("span");
       title.className = "binding-config-title";
-      title.textContent = "Macro";
+      title.textContent = t("macro.title");
+      title.dataset.i18n = "macro.title";
       const actions = document.createElement("div");
       actions.className = "binding-config-title-actions";
-      const edit = createBindingConfigButton("binding-config-macro-edit", "Edit Macro", "primary");
+      const edit = createBindingConfigButton("binding-config-macro-edit", t("macro.edit"), "primary");
+      edit.dataset.i18n = "macro.edit";
       actions.appendChild(edit);
       titleRow.appendChild(title);
       titleRow.appendChild(actions);
@@ -1444,12 +1455,16 @@ export function createBindingsFeature({
       titleRow.className = "binding-config-title-row";
       const title = document.createElement("span");
       title.className = "binding-config-title";
-      title.textContent = "Macro";
+      title.textContent = t("macro.title");
+      title.dataset.i18n = "macro.title";
       const actions = document.createElement("div");
       actions.className = "binding-config-title-actions";
-      const addAction = createBindingConfigButton("binding-config-macro-add-action", "Action");
-      const addWait = createBindingConfigButton("binding-config-macro-add-wait", "Wait");
-      const addParallel = createBindingConfigButton("binding-config-macro-add-parallel", "Parallel");
+      const addAction = createBindingConfigButton("binding-config-macro-add-action", t("macro.step.action"));
+      const addWait = createBindingConfigButton("binding-config-macro-add-wait", t("macro.step.wait"));
+      const addParallel = createBindingConfigButton("binding-config-macro-add-parallel", t("macro.step.parallelGroup"));
+      addAction.dataset.i18n = "macro.step.action";
+      addWait.dataset.i18n = "macro.step.wait";
+      addParallel.dataset.i18n = "macro.step.parallelGroup";
       actions.appendChild(addAction);
       actions.appendChild(addWait);
       actions.appendChild(addParallel);
@@ -1916,7 +1931,7 @@ export function createBindingsFeature({
     }
     const title = document.createElement("span");
     title.className = "binding-config-macro-row-title";
-    title.textContent = `Action ${indexLabel}`;
+    title.textContent = t("macro.actionLabelWithIndex", { index: indexLabel });
     const summary = document.createElement("span");
     summary.className = "binding-config-macro-row-summary";
     summary.textContent = macroStepSummary(step);
@@ -2002,19 +2017,19 @@ export function createBindingsFeature({
   }
 
   function macroStepTitle(step) {
-    if (step?.kind === "wait") return "Wait";
-    if (step?.kind === "parallel") return "Parallel Group";
-    return "Action";
+    if (step?.kind === "wait") return t("macro.step.wait");
+    if (step?.kind === "parallel") return t("macro.step.parallelGroup");
+    return t("macro.step.action");
   }
 
   function macroStepMeta(step) {
-    if (step?.kind === "wait") return macroStepSummary(step).replace(/^Wait\s*/i, "") || "0 ms";
+    if (step?.kind === "wait") return macroWaitDurationLabel(step) || t("macro.zeroMs");
     if (step?.kind === "parallel") {
       const count = Array.isArray(step.steps) ? step.steps.length : 0;
-      return `${count} action${count === 1 ? "" : "s"}`;
+      return macroActionCountLabel(count);
     }
-    if (!macroActionHasTarget(step)) return "Select target";
-    if (!String(step.action || "").trim()) return `${macroTargetTitle(step)} -> Choose action`;
+    if (!macroActionHasTarget(step)) return t("macro.selectTarget");
+    if (!String(step.action || "").trim()) return `${macroTargetTitle(step)} -> ${t("macro.chooseAction")}`;
     const suffix = macroActionUsesValue(step) && typeof step.value === "number"
       ? ` -> ${Math.round(step.value * 100)}%`
       : "";
@@ -2229,7 +2244,7 @@ export function createBindingsFeature({
     return null;
   }
 
-  function renderMacroActionOptionLabel(container, option, placeholder = "Choose action") {
+  function renderMacroActionOptionLabel(container, option, placeholder = t("macro.chooseAction")) {
     if (!container) return;
     container.innerHTML = "";
     if (!option) {
@@ -2240,7 +2255,7 @@ export function createBindingsFeature({
       return;
     }
     renderLabelWithBadges(container, {
-      text: option.label || option.value || "Action",
+      text: option.label || option.value || t("macro.step.action"),
       badges: [macroActionOptionBadge(option)].filter(Boolean),
       truncate: true,
     });
@@ -2250,8 +2265,8 @@ export function createBindingsFeature({
     options = [],
     selectedOption = null,
     disabled = false,
-    placeholder = "Choose action",
-    emptyLabel = "No actions available",
+    placeholder = t("macro.chooseAction"),
+    emptyLabel = t("macro.noActionsAvailable"),
     onSelect = null,
   } = {}) {
     if (!slot) return;
@@ -2330,7 +2345,7 @@ export function createBindingsFeature({
   }
 
   function renderMacroActionProperties(panel, binding, step, path) {
-    const targetField = createMacroField("Target");
+    const targetField = createMacroField(t("macro.target"));
     const targetSelect = buildTarget(
       step.targets,
       true,
@@ -2369,13 +2384,13 @@ export function createBindingsFeature({
     targetField.appendChild(targetSelect);
     panel.appendChild(targetField);
 
-    const actionField = createMacroField("Action Type");
+    const actionField = createMacroField(t("macro.actionType"));
     const hasTarget = macroActionHasTarget(step);
     const actionSlot = document.createElement("div");
     actionSlot.className = "binding-config-macro-action-type-slot";
     renderMacroActionTypeDropdown(actionSlot, {
       disabled: true,
-      placeholder: hasTarget ? "Loading actions..." : "Select a target first",
+      placeholder: hasTarget ? t("macro.loadingActions") : t("macro.selectTargetFirst"),
     });
     actionField.appendChild(actionSlot);
     panel.appendChild(actionField);
@@ -2401,7 +2416,7 @@ export function createBindingsFeature({
           options,
           selectedOption: options.find((option) => macroActionOptionMatchesStep(option, step)) || null,
           disabled: options.length === 0,
-          placeholder: options.length === 0 ? "No actions available" : "Choose action",
+          placeholder: options.length === 0 ? t("macro.noActionsAvailable") : t("macro.chooseAction"),
           onSelect: (option) => {
             targetSelect.setActionOption?.(option, false);
             const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
@@ -2416,14 +2431,14 @@ export function createBindingsFeature({
         if (actionSlot.isConnected) {
           renderMacroActionTypeDropdown(actionSlot, {
             disabled: true,
-            placeholder: "No actions available",
+            placeholder: t("macro.noActionsAvailable"),
           });
         }
       });
     }
 
     if (macroActionUsesValue(step)) {
-      const valueField = createMacroField("Value");
+      const valueField = createMacroField(t("macro.value"));
       const control = document.createElement("div");
       control.className = "binding-config-macro-value-editor";
       const input = document.createElement("input");
@@ -2459,13 +2474,13 @@ export function createBindingsFeature({
     }
 
     if (step.action === "ToggleMute" || step.action === "ToggleEffect") {
-      const stateField = createMacroField("State");
+      const stateField = createMacroField(t("macro.state"));
       stateField.appendChild(buildMacroStateSelect(step, () => commitMacroDraftEdit(binding)));
       panel.appendChild(stateField);
     }
 
     if (step.action === "Hotkey") {
-      const hotkeyButton = createBindingConfigButton("", step.hotkey?.display ? "Change Hotkey" : "Learn Hotkey", "secondary");
+      const hotkeyButton = createBindingConfigButton("", step.hotkey?.display ? t("macro.changeHotkey") : t("macro.learnHotkey"), "secondary");
       hotkeyButton.addEventListener("click", async () => {
         const learned = await startHotkeyLearn({ id: `${binding.id}-macro-${macroStepOrdinalLabel(path)}` });
         if (!learned) return;
@@ -2477,7 +2492,7 @@ export function createBindingsFeature({
   }
 
   function renderMacroWaitProperties(panel, binding, step) {
-    const secondsField = createMacroField("Seconds");
+    const secondsField = createMacroField(t("macro.seconds"));
     const input = document.createElement("input");
     input.type = "number";
     input.min = "0";
@@ -2497,9 +2512,12 @@ export function createBindingsFeature({
     const count = Array.isArray(step.steps) ? step.steps.length : 0;
     const summary = document.createElement("div");
     summary.className = "binding-config-macro-info-box";
-    summary.textContent = `This group runs ${count} action${count === 1 ? "" : "s"} at the same time, then the macro continues.`;
+    summary.textContent = t(
+      count === 1 ? "macro.parallelInfoOne" : "macro.parallelInfoOther",
+      { count },
+    );
     panel.appendChild(summary);
-    const addChild = createBindingConfigButton("", "Add Action", "secondary");
+    const addChild = createBindingConfigButton("", t("macro.addAction"), "secondary");
     addChild.disabled = count >= MACRO_MAX_PARALLEL_STEPS;
     addChild.addEventListener("click", () => updateMacroDraft((steps) => {
       const group = steps[path.index];
@@ -2521,14 +2539,16 @@ export function createBindingsFeature({
     const header = document.createElement("div");
     header.className = "binding-config-macro-properties-header";
     const title = document.createElement("span");
-    title.textContent = "Step Properties";
+    title.textContent = t("macro.stepProperties");
     const nav = document.createElement("div");
     nav.className = "binding-config-macro-properties-nav";
     const currentIndex = macroPathListIndex(binding, path);
     const position = document.createElement("span");
-    position.textContent = currentIndex >= 0 ? `Step ${currentIndex + 1} of ${paths.length}` : "No step";
-    const prev = createMacroIconButton("Previous step", '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 6-6 6 6 6"></path></svg>');
-    const next = createMacroIconButton("Next step", '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"></path></svg>');
+    position.textContent = currentIndex >= 0
+      ? t("macro.stepPosition", { current: currentIndex + 1, total: paths.length })
+      : t("macro.noStep");
+    const prev = createMacroIconButton(t("macro.previousStep"), '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 6-6 6 6 6"></path></svg>');
+    const next = createMacroIconButton(t("macro.nextStep"), '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"></path></svg>');
     prev.disabled = currentIndex <= 0;
     next.disabled = currentIndex < 0 || currentIndex >= paths.length - 1;
     prev.addEventListener("click", () => {
@@ -2551,7 +2571,7 @@ export function createBindingsFeature({
     if (!step) {
       const empty = document.createElement("div");
       empty.className = "binding-config-macro-empty";
-      empty.textContent = "Add a step to configure this macro.";
+      empty.textContent = t("macro.addStepToConfigure");
       body.appendChild(empty);
       panel.appendChild(body);
       return;
@@ -2582,7 +2602,7 @@ export function createBindingsFeature({
     const nameField = document.createElement("label");
     nameField.className = "binding-config-macro-name-field";
     const nameLabel = document.createElement("span");
-    nameLabel.textContent = "Macro Name";
+    nameLabel.textContent = t("macro.name");
     const nameInput = document.createElement("input");
     nameInput.type = "text";
     nameInput.maxLength = 80;
@@ -2599,15 +2619,15 @@ export function createBindingsFeature({
     addGroup.className = "binding-config-macro-add-group";
     const addLabel = document.createElement("span");
     addLabel.className = "binding-config-macro-add-label";
-    addLabel.textContent = "Add Step";
+    addLabel.textContent = t("macro.addStep");
     addGroup.appendChild(addLabel);
 
     const addActions = document.createElement("div");
     addActions.className = "binding-config-title-actions binding-config-macro-add-actions";
     [
-      ["Add Action", defaultMacroActionStep],
-      ["Add Wait", defaultMacroWaitStep],
-      ["Add Parallel", defaultMacroParallelStep],
+      [t("macro.addAction"), defaultMacroActionStep],
+      [t("macro.addWait"), defaultMacroWaitStep],
+      [t("macro.addParallel"), defaultMacroParallelStep],
     ].forEach(([label, factory]) => {
       const button = createBindingConfigButton("", label, "secondary");
       button.disabled = binding.macro_steps.length >= MACRO_MAX_TOP_LEVEL_STEPS;
@@ -2629,7 +2649,7 @@ export function createBindingsFeature({
     const stepsTitle = document.createElement("div");
     stepsTitle.className = "binding-config-macro-panel-title";
     const titleText = document.createElement("span");
-    titleText.textContent = "Macro Steps";
+    titleText.textContent = t("macro.steps");
     const count = document.createElement("span");
     count.className = "binding-config-macro-count";
     count.textContent = String(binding.macro_steps.length);
@@ -2656,7 +2676,7 @@ export function createBindingsFeature({
     if (binding.macro_steps.length === 0) {
       const empty = document.createElement("div");
       empty.className = "binding-config-macro-empty-state";
-      empty.textContent = "No steps yet. Add an action, wait, or parallel group.";
+      empty.textContent = t("macro.noStepsYet");
       list.appendChild(empty);
     }
     stepsPanel.appendChild(list);
@@ -4514,8 +4534,8 @@ export function createBindingsFeature({
             const editMacroButton = document.createElement("button");
             editMacroButton.type = "button";
             editMacroButton.className = "binding-macro-edit-button";
-            editMacroButton.textContent = "Edit Macro";
-            editMacroButton.title = "Edit Macro";
+            editMacroButton.textContent = t("macro.edit");
+            editMacroButton.title = t("macro.edit");
             editMacroButton.addEventListener("click", (event) => {
               event.preventDefault();
               event.stopPropagation();
