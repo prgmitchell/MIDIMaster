@@ -184,7 +184,10 @@ fn deserialize_macro_binding_preserves_macro_name() {
 
     assert_eq!(binding.macro_name, "Game Mix");
     let serialized = serde_json::to_value(binding).expect("binding should serialize");
-    assert_eq!(serialized.get("macro_name"), Some(&serde_json::json!("Game Mix")));
+    assert_eq!(
+        serialized.get("macro_name"),
+        Some(&serde_json::json!("Game Mix"))
+    );
 }
 
 #[test]
