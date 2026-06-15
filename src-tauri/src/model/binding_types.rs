@@ -180,7 +180,7 @@ impl Default for MacroActionStep {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum MacroStep {
-    Action(MacroActionStep),
+    Action(Box<MacroActionStep>),
     Wait { duration_ms: u64 },
     Parallel { steps: Vec<MacroActionStep> },
 }
@@ -188,7 +188,9 @@ pub enum MacroStep {
 impl MacroStep {
     pub fn normalized(&self) -> Option<Self> {
         match self {
-            MacroStep::Action(step) => normalize_macro_action_step(step).map(MacroStep::Action),
+            MacroStep::Action(step) => {
+                normalize_macro_action_step(step).map(|step| MacroStep::Action(Box::new(step)))
+            }
             MacroStep::Wait { duration_ms } => Some(MacroStep::Wait {
                 duration_ms: (*duration_ms).min(MACRO_MAX_WAIT_MS),
             }),
@@ -209,9 +211,8 @@ impl MacroStep {
 
     pub fn normalized_draft(&self) -> Option<Self> {
         match self {
-            MacroStep::Action(step) => {
-                normalize_macro_draft_action_step(step).map(MacroStep::Action)
-            }
+            MacroStep::Action(step) => normalize_macro_draft_action_step(step)
+                .map(|step| MacroStep::Action(Box::new(step))),
             MacroStep::Wait { duration_ms } => Some(MacroStep::Wait {
                 duration_ms: (*duration_ms).min(MACRO_MAX_WAIT_MS),
             }),

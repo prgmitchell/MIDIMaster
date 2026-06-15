@@ -250,7 +250,7 @@ fn normalize_macro_steps_filters_nested_macro_targets_and_limits_parallel_childr
 
 #[test]
 fn normalize_macro_steps_preserves_action_metadata() {
-    let normalized = normalize_macro_steps(&[MacroStep::Action(MacroActionStep {
+    let normalized = normalize_macro_steps(&[MacroStep::Action(Box::new(MacroActionStep {
         action: BindingAction::Volume,
         targets: vec![BindingTarget::Master],
         value: Some(0.42),
@@ -258,7 +258,7 @@ fn normalize_macro_steps_preserves_action_metadata() {
         action_label: Some("Set Value".to_string()),
         value_kind: Some("percent".to_string()),
         ..Default::default()
-    })]);
+    }))]);
 
     assert_eq!(normalized.len(), 1);
     let MacroStep::Action(step) = &normalized[0] else {
@@ -274,7 +274,7 @@ fn normalize_macro_steps_preserves_action_metadata() {
 fn ensure_targets_preserves_macro_draft_placeholders() {
     let mut binding = mapped_button_binding(BindingAction::Macro, vec![BindingTarget::Macro]);
     binding.macro_steps = vec![
-        MacroStep::Action(MacroActionStep::default()),
+        MacroStep::Action(Box::default()),
         MacroStep::Wait { duration_ms: 500 },
         MacroStep::Parallel {
             steps: vec![MacroActionStep::default(), MacroActionStep::default()],
@@ -284,10 +284,7 @@ fn ensure_targets_preserves_macro_draft_placeholders() {
     binding.ensure_targets();
 
     assert_eq!(binding.macro_steps.len(), 3);
-    assert_eq!(
-        binding.macro_steps[0],
-        MacroStep::Action(MacroActionStep::default())
-    );
+    assert_eq!(binding.macro_steps[0], MacroStep::Action(Box::default()));
     let MacroStep::Parallel { steps } = &binding.macro_steps[2] else {
         panic!("expected parallel macro draft step");
     };
@@ -303,12 +300,12 @@ fn mapped_button_light_requires_macro_steps() {
     let mut binding = mapped_button_binding(BindingAction::Macro, vec![BindingTarget::Macro]);
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(0.0));
 
-    binding.macro_steps = normalize_macro_steps(&[MacroStep::Action(MacroActionStep {
+    binding.macro_steps = normalize_macro_steps(&[MacroStep::Action(Box::new(MacroActionStep {
         action: BindingAction::ToggleMute,
         targets: vec![BindingTarget::Master],
         state: MacroActionState::Toggle,
         ..Default::default()
-    })]);
+    }))]);
 
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
 }
