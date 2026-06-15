@@ -2655,6 +2655,17 @@ body[data-theme] .learn-panel-content {
   background-clip: padding-box;
 }
 
+body[data-theme="dark"] .alert-panel-content:not(.alert-panel-content--privacy-consent) {
+  background:
+    radial-gradient(circle at 7% -8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 98% 108%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 86%, transparent),
+      color-mix(in srgb, var(--surface) 86%, transparent)
+    );
+}
+
 body[data-theme] #target-panel {
   --target-picker-border-soft: color-mix(in srgb, var(--control-border) 62%, transparent);
   --target-picker-panel-bg:
