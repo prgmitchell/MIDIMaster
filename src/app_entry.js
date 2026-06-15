@@ -1963,14 +1963,16 @@ async function maybePromptMidiDeviceInventoryConsent() {
   const choice = await showChoices({
     title: t("privacy.midiDeviceInventoryTitle"),
     message: t("privacy.midiDeviceInventoryMessage"),
-    overlayClass: "alert-overlay--privacy-consent",
-    panelClass: "alert-panel-content--privacy-consent",
+    panelClass: "alert-panel-content--midi-consent",
     options: [
       { id: "disabled", label: t("privacy.midiDeviceInventoryDecline"), variant: "secondary" },
       { id: "enabled", label: t("privacy.midiDeviceInventoryAccept"), variant: "primary" },
     ],
   });
-  const consent = choice === "enabled" ? "enabled" : "disabled";
+  if (choice !== "enabled" && choice !== "disabled") {
+    return;
+  }
+  const consent = choice;
   const normalized = await updateMidiDeviceInventoryConsent(consent).catch((error) => {
     diagnosticError("midi_device_inventory_consent_update_failed", error);
     return applyMidiDeviceInventorySettings({
