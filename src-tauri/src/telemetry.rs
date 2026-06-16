@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn payload_includes_only_midi_inventory_fields() {
         let payload = build_midi_device_inventory_payload(
-            "4.1.0".to_string(),
+            "4.2.0".to_string(),
             &[device(" midi:0\n", " Platform X+1 V2.13\t")],
             &[device("midi:1", "Platform X+1 V2.13")],
             &[route(
@@ -242,7 +242,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         let payload =
-            build_midi_device_inventory_payload("4.1.0".to_string(), &devices, &devices, &routes);
+            build_midi_device_inventory_payload("4.2.0".to_string(), &devices, &devices, &routes);
 
         assert_eq!(payload.input_devices.len(), MAX_DEVICE_COUNT);
         assert_eq!(payload.output_devices.len(), MAX_DEVICE_COUNT);
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn disabled_consent_skips_submission() {
         let payload = build_midi_device_inventory_payload(
-            "4.1.0".to_string(),
+            "4.2.0".to_string(),
             &[device("midi:0", "Controller")],
             &[],
             &[],
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn unchanged_payload_skips_submission() {
         let payload = build_midi_device_inventory_payload(
-            "4.1.0".to_string(),
+            "4.2.0".to_string(),
             &[device("midi:0", "Controller")],
             &[],
             &[],

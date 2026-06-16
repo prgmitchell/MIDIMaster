@@ -20,7 +20,7 @@ Schema version: `1`
 {
   "schemaVersion": 1,
   "noticeVersion": 1,
-  "appVersion": "4.1.0",
+  "appVersion": "4.2.0",
   "inputDeviceCount": 1,
   "outputDeviceCount": 1,
   "selectedRouteCount": 1,
