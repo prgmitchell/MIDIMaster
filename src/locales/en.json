@@ -408,7 +408,7 @@
   "targets.category.devices": "Devices",
   "targets.category.actions": "Actions",
   "targets.category.other": "Other",
-  "targets.description.master": "Global master output for all bindings.",
+  "targets.description.master": "Volume of your current system output device.",
   "targets.description.focus": "Currently focused application or audio session.",
   "targets.description.mediaControl": "Control playback actions from a button binding.",
   "targets.description.windowFocus": "Bring a running application window to the front from a button binding.",
