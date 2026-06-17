@@ -408,7 +408,7 @@
   "targets.category.devices": "Dispositivos",
   "targets.category.actions": "Acciones",
   "targets.category.other": "Otros",
-  "targets.description.master": "Producto maestro mundial para todas las uniones.",
+  "targets.description.master": "Volumen de tu dispositivo de salida del sistema actual.",
   "targets.description.focus": "Aplicación o sesión de audio.",
   "targets.description.mediaControl": "Controlar las acciones de reproducción desde un botón de unión.",
   "targets.description.windowFocus": "Traiga una ventana de aplicación en ejecución al frente desde un botón de unión.",

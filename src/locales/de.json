@@ -408,7 +408,7 @@
   "targets.category.devices": "Geräte",
   "targets.category.actions": "Maßnahmen",
   "targets.category.other": "Sonstige",
-  "targets.description.master": "Globale Master-Ausgabe für alle Bindungen.",
+  "targets.description.master": "Lautst?rke Ihres aktuellen Systemausgabeger?ts.",
   "targets.description.focus": "Derzeit konzentrierte Anwendung oder Audio-Session.",
   "targets.description.mediaControl": "Kontrollieren Sie Wiedergabeaktionen von einer Tastenbindung.",
   "targets.description.windowFocus": "Bringen Sie ein laufendes Anwendungsfenster von einer Knopfbindung nach vorne.",

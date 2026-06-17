@@ -408,7 +408,7 @@
   "targets.category.devices": "Dispositifs",
   "targets.category.actions": "Actions",
   "targets.category.other": "Autres",
-  "targets.description.master": "Produit maître global pour toutes les fixations.",
+  "targets.description.master": "Volume de votre p?riph?rique de sortie syst?me actuel.",
   "targets.description.focus": "Application ou session audio actuellement ciblée.",
   "targets.description.mediaControl": "Contrôler les actions de lecture à partir d'un bouton liant.",
   "targets.description.windowFocus": "Apportez une fenêtre d'application à l'avant à partir d'un bouton liant.",

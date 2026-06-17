@@ -408,7 +408,7 @@
   "targets.category.devices": "Apparaten",
   "targets.category.actions": "Acties",
   "targets.category.other": "Andere",
-  "targets.description.master": "Globale hoofduitvoer voor alle bindingen.",
+  "targets.description.master": "Volume van uw huidige systeemuitvoerapparaat.",
   "targets.description.focus": "Momenteel gerichte applicatie of audiosessie.",
   "targets.description.mediaControl": "Bedien de afspeelacties vanaf een knopbinding.",
   "targets.description.windowFocus": "Breng een draaiend toepassingsvenster naar voren vanaf een knopbinding.",

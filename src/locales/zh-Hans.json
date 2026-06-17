@@ -408,7 +408,7 @@
   "targets.category.devices": "设备",
   "targets.category.actions": "行动",
   "targets.category.other": "其他人员",
-  "targets.description.master": "所有绑定的全局主输出 .",
+  "targets.description.master": "????????????",
   "targets.description.focus": "当前有重点的应用程序或音频会话 .",
   "targets.description.mediaControl": "从按钮绑定控制播放动作 .",
   "targets.description.windowFocus": "从绑定按钮中将运行中的应用程序窗口带至前方 .",

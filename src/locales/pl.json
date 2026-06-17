@@ -408,7 +408,7 @@
   "targets.category.devices": "Urządzenia",
   "targets.category.actions": "Działania",
   "targets.category.other": "Inne",
-  "targets.description.master": "Globalne wyjście master dla wszystkich wiązań.",
+  "targets.description.master": "G?o?no?? bie??cego systemowego urz?dzenia wyj?ciowego.",
   "targets.description.focus": "Aktualnie skupiona aplikacja lub sesja audio.",
   "targets.description.mediaControl": "Kontrola odtwarzania z połączenia przycisku.",
   "targets.description.windowFocus": "Przynieść okno uruchomionej aplikacji do przodu z połączenia przycisku.",

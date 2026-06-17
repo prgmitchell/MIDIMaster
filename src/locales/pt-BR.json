@@ -408,7 +408,7 @@
   "targets.category.devices": "Dispositivos",
   "targets.category.actions": "Ações",
   "targets.category.other": "Outro",
-  "targets.description.master": "Saída principal global para todas as ligações.",
+  "targets.description.master": "Volume do dispositivo de sa?da do sistema atual.",
   "targets.description.focus": "Aplicativo atualmente focado ou sessão de áudio.",
   "targets.description.mediaControl": "Controle as ações de reprodução de uma ligação de botões.",
   "targets.description.windowFocus": "Traga uma janela de aplicação para a frente a partir de uma ligação de botões.",

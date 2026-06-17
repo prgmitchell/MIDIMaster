@@ -408,7 +408,7 @@
   "targets.category.devices": "제품정보",
   "targets.category.actions": "팟캐스트",
   "targets.category.other": "이름 *",
-  "targets.description.master": "모든 바인딩에 대한 글로벌 마스터 출력.",
+  "targets.description.master": "?? ??? ?? ??? ?????.",
   "targets.description.focus": "현재 집중된 응용 프로그램 또는 오디오 세션.",
   "targets.description.mediaControl": "버튼 바인딩에서 재생 작업을 제어합니다.",
   "targets.description.windowFocus": "버튼 바인딩에서 앞쪽으로 실행 응용 프로그램 창을 가져옵니다.",

@@ -408,7 +408,7 @@
   "targets.category.devices": "デバイス",
   "targets.category.actions": "アクション",
   "targets.category.other": "その他",
-  "targets.description.master": "すべての結合のための全体的なマスターの出力.",
+  "targets.description.master": "?????????????????",
   "targets.description.focus": "現在、アプリケーションや音声セッションを集中しています.",
   "targets.description.mediaControl": "ボタンバインディングから再生アクションを制御する.",
   "targets.description.windowFocus": "実行中のアプリケーションウィンドウをボタンバインディングからフロントへ.",

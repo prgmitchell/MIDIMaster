@@ -408,7 +408,7 @@
   "targets.category.devices": "Apparecchi",
   "targets.category.actions": "Azioni",
   "targets.category.other": "Altri",
-  "targets.description.master": "Uscita master globale per tutti gli attacchi.",
+  "targets.description.master": "Volume del dispositivo di uscita di sistema corrente.",
   "targets.description.focus": "Attualmente l'applicazione focalizzata o la sessione audio.",
   "targets.description.mediaControl": "Controllare le azioni di riproduzione da un binding del pulsante.",
   "targets.description.windowFocus": "Portare una finestra di applicazione in esecuzione sulla parte anteriore da un binding del pulsante.",
