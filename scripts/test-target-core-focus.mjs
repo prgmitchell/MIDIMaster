@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const targetCoreSource = await readFile(new URL("../src/core/target_core.js", import.meta.url), "utf8");
 const targetCoreModuleUrl = `data:text/javascript;base64,${Buffer.from(targetCoreSource).toString("base64")}`;
-const { createTargetCore } = await import(targetCoreModuleUrl);
+const { createTargetCore, SYSTEM_SOUNDS_ICON_DATA, iconDataForSession } = await import(targetCoreModuleUrl);
 
 const sessionRefreshSource = await readFile(new URL("../src/app/session_refresh.js", import.meta.url), "utf8");
 const sessionRefreshModuleUrl = `data:text/javascript;base64,${Buffer.from(sessionRefreshSource).toString("base64")}`;
@@ -106,7 +106,7 @@ function testPackageProductNameMatchesLegacyApplicationTarget() {
     application_key: "package:5319275A.WhatsAppDesktop_cv1g1gvanyjgm",
     process_name: "WhatsApp.Root.exe",
     volume: 0.42,
-    muted: true,
+    is_muted: true,
     icon_data: "whatsapp-icon",
   }];
   const core = createTargetCore({
@@ -128,6 +128,46 @@ function testPackageProductNameMatchesLegacyApplicationTarget() {
   assert.deepEqual(core.resolveOsdTarget(legacyTarget), {
     label: "WhatsApp",
     icon_data: "whatsapp-icon",
+  });
+}
+
+function testSystemSoundsApplicationTargetUsesReportedSession() {
+  const sessions = [{
+    id: "0:{system-sounds-session}",
+    display_name: "System Sounds",
+    application_key: "system sounds",
+    process_name: null,
+    process_path: null,
+    volume: 0.33,
+    is_muted: true,
+    icon_data: null,
+    is_master: false,
+  }];
+  const core = createTargetCore({
+    masterIconData: "master",
+    focusIconData: "focus",
+    mediaPlayPauseIconData: "media",
+    getSessions: () => sessions,
+    getPlaybackDevices: () => [],
+    getRecordingDevices: () => [],
+    getFocusedSession: () => null,
+    getPluginHost: () => null,
+    getIntegrationTargetState: () => null,
+  });
+  const systemSoundsTarget = {
+    Application: {
+      name: "system sounds",
+      display_name: "System Sounds",
+    },
+  };
+
+  assert.equal(core.getVolumeForTarget(systemSoundsTarget), 0.33);
+  assert.equal(core.resolveTargetVolume(systemSoundsTarget), 0.33);
+  assert.equal(core.getMuteForTarget(systemSoundsTarget), true);
+  assert.equal(iconDataForSession(sessions[0]), SYSTEM_SOUNDS_ICON_DATA);
+  assert.deepEqual(core.resolveOsdTarget(systemSoundsTarget), {
+    label: "System Sounds",
+    icon_data: SYSTEM_SOUNDS_ICON_DATA,
   });
 }
 
@@ -187,6 +227,7 @@ testNormalizeSessionKeyPrefersApplicationKey();
 testNormalizeSessionKeyAvoidsPidOnlyFallback();
 testNormalizeSessionKeyAvoidsWebView2Fallback();
 testPackageProductNameMatchesLegacyApplicationTarget();
+testSystemSoundsApplicationTargetUsesReportedSession();
 await testFocusRefreshUpdatesTargetDisplaysWithoutSessionListChanges();
 
 console.log("Target core focus tests passed");

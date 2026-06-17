@@ -1,3 +1,5 @@
+export const SYSTEM_SOUNDS_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='1.5' y='1.5' width='17' height='17' rx='4' fill='%2317263d'/><path d='M4.4 8.1v3.8h2.7l3.5 3V5.1L7.1 8.1H4.4z' fill='%23d8e7ff'/><path d='M13.1 7.1a4.1 4.1 0 0 1 0 5.8M14.9 5.4a6.6 6.6 0 0 1 0 9.2' stroke='%238fd5ff' stroke-width='1.35' stroke-linecap='round'/><circle cx='15.4' cy='4.5' r='1.2' fill='%2386d6a7'/></svg>";
+
 function stableStringify(value) {
   if (value == null) return "null";
   if (typeof value !== "object") return JSON.stringify(value);
@@ -90,6 +92,22 @@ function sessionMatchesAppName(session, appName) {
   return candidates.has(target);
 }
 
+function isSystemSoundsName(value) {
+  return String(value || "").trim().toLowerCase() === "system sounds";
+}
+
+export function iconDataForApplicationName(name) {
+  return isSystemSoundsName(name) ? SYSTEM_SOUNDS_ICON_DATA : null;
+}
+
+export function iconDataForSession(session) {
+  if (session?.icon_data) return session.icon_data;
+  if (isSystemSoundsName(normalizeSessionKey(session)) || isSystemSoundsName(session?.display_name)) {
+    return SYSTEM_SOUNDS_ICON_DATA;
+  }
+  return null;
+}
+
 function friendlyAppLabel(name) {
   const raw = String(name || "").trim();
   if (!raw) return "Application";
@@ -101,6 +119,10 @@ function withUnavailableSuffix(label) {
   const raw = String(label || "").trim();
   if (!raw) return "Unavailable";
   return /\(\s*Unavailable\s*\)\s*$/i.test(raw) ? raw : `${raw} (Unavailable)`;
+}
+
+function itemIsMuted(item) {
+  return Boolean(item?.is_muted ?? item?.muted ?? false);
 }
 
 export function createTargetCore({
@@ -193,7 +215,7 @@ export function createTargetCore({
       const label = session?.display_name || storedLabel || friendlyAppLabel(appName);
       return {
         label: session ? label : `${label} (Unavailable)`,
-        icon_data: session?.icon_data ?? storedIcon ?? null,
+        icon_data: iconDataForSession(session) ?? storedIcon ?? iconDataForApplicationName(appName),
       };
     }
 
@@ -206,7 +228,7 @@ export function createTargetCore({
       const session = sessions.find((item) => String(item.id) === String(sessionId));
       return {
         label: session?.display_name || "Application",
-        icon_data: session?.icon_data ?? null,
+        icon_data: iconDataForSession(session),
       };
     }
 
@@ -499,7 +521,7 @@ export function createTargetCore({
 
     if (target === "Master" || target?.Master != null) {
       const session = sessions.find((s) => s.is_master);
-      return session ? session.muted : false;
+      return itemIsMuted(session);
     }
 
     if (target === "Focus" || target?.Focus != null) {
@@ -514,14 +536,14 @@ export function createTargetCore({
     const appName = appContainer?.name ?? target.name;
     if (appName) {
       const session = sessions.find((item) => sessionMatchesAppName(item, appName));
-      return session ? session.muted : false;
+      return itemIsMuted(session);
     }
 
     const sessionContainer = target.Session || target.session;
     const sessionId = sessionContainer?.session_id ?? sessionContainer?.sessionId ?? target.session_id;
     if (sessionId) {
       const session = sessions.find((item) => item.id === sessionId);
-      return session ? session.muted : false;
+      return itemIsMuted(session);
     }
 
     const deviceContainer = target.Device || target.device;
@@ -529,7 +551,7 @@ export function createTargetCore({
     if (deviceId) {
       const device = playbackDevices.find((d) => d.id === deviceId)
         || recordingDevices.find((d) => d.id === deviceId);
-      return device ? device.muted : false;
+      return itemIsMuted(device);
     }
 
     const integration = target.Integration || target.integration;

@@ -1,4 +1,5 @@
 import { closeOpenDropdowns, renderLabelFromRawWithTags } from "../ui/dropdown_badges.js";
+import { iconDataForApplicationName, iconDataForSession } from "../../core/target_core.js";
 
 export function createTargetsFeature({
   invoke,
@@ -634,7 +635,10 @@ export function createTargetsFeature({
     const selectedAppName = selectedAppContainer?.name || selectedAppContainer?.appName;
     const selectedAppKey = selectedAppName ? String(selectedAppName).toLowerCase() : "";
     const selectedAppDisplayName = selectedAppContainer?.display_name || selectedAppContainer?.displayName || "";
-    const selectedAppIconData = selectedAppContainer?.icon_data || selectedAppContainer?.iconData || null;
+    const selectedAppIconData = selectedAppContainer?.icon_data
+      || selectedAppContainer?.iconData
+      || iconDataForApplicationName(selectedAppName)
+      || null;
     const sessionContainer = currentTarget?.Session || currentTarget?.session;
     const selectedSessionId = (sessionContainer && typeof sessionContainer === "object")
       ? (sessionContainer.session_id ?? sessionContainer.sessionId)
@@ -763,7 +767,7 @@ export function createTargetsFeature({
           value: key,
           label: session.display_name,
           display_name: session.display_name,
-          icon_data: session.icon_data,
+          icon_data: iconDataForSession(session),
           title_tags: [processTagForSession(session)].filter(Boolean),
           kind: "session",
         });
@@ -1160,7 +1164,10 @@ export function createTargetsFeature({
           value: String(app.name).toLowerCase(),
           label: displayOption?.label || app.display_name || app.name,
           display_name: app.display_name || displayOption?.label || app.name,
-          icon_data: displayOption?.icon_data || app.icon_data || null,
+          icon_data: displayOption?.icon_data
+            || app.icon_data
+            || iconDataForApplicationName(app.name)
+            || null,
           kind: "session",
         };
       }

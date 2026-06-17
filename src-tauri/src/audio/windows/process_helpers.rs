@@ -710,7 +710,7 @@ pub(super) fn should_skip_session(
         return true;
     }
 
-    let blocked = ["audiosrv", "audiodg", "system sounds", "midimaster"];
+    let blocked = ["audiosrv", "audiodg", "midimaster"];
 
     let mut labels = Vec::new();
     labels.push(canonical_label(friendly_name));
@@ -1220,6 +1220,28 @@ mod tests {
             "WhatsAppDesktop",
             &application_key,
             &identity
+        ));
+    }
+
+    #[test]
+    fn keeps_system_sounds_session_with_stable_key() {
+        let display_name = Some("System Sounds".to_string());
+        let application_key = stable_application_key(
+            &ProcessIdentity::default(),
+            None,
+            None,
+            display_name.as_deref(),
+        );
+
+        assert_eq!(application_key.as_deref(), Some("system sounds"));
+        assert!(!should_skip_session(
+            0,
+            &display_name,
+            &None,
+            &None,
+            "System Sounds",
+            &application_key,
+            &ProcessIdentity::default()
         ));
     }
 
