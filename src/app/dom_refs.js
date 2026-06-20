@@ -69,6 +69,17 @@ export function createDomRefs() {
   const bindingConfigAssignModeReplace = document.getElementById("binding-config-assign-mode-replace");
   const bindingConfigCurveCards = document.getElementById("binding-config-curve-cards");
   const bindingConfigCurveHelp = document.getElementById("binding-config-curve-help");
+  const bindingConfigCurvePresetRoot = document.getElementById("binding-config-curve-preset-root");
+  const bindingConfigCurvePresetButton = document.getElementById("binding-config-curve-preset-button");
+  const bindingConfigCurvePresetMenu = document.getElementById("binding-config-curve-preset-menu");
+  const bindingConfigCurvePresetSearch = document.getElementById("binding-config-curve-preset-search");
+  const bindingConfigCurvePresetList = document.getElementById("binding-config-curve-preset-list");
+  const bindingConfigCurvePresetSave = document.getElementById("binding-config-curve-preset-save");
+  const bindingConfigCurvePresetForm = document.getElementById("binding-config-curve-preset-form");
+  const bindingConfigCurvePresetFormTitle = document.getElementById("binding-config-curve-preset-form-title");
+  const bindingConfigCurvePresetName = document.getElementById("binding-config-curve-preset-name");
+  const bindingConfigCurvePresetFormSave = document.getElementById("binding-config-curve-preset-form-save");
+  const bindingConfigCurvePresetFormCancel = document.getElementById("binding-config-curve-preset-form-cancel");
   const bindingConfigCustomEditor = document.getElementById("binding-config-custom-editor");
   const bindingConfigCustomSurface = document.getElementById("binding-config-custom-surface");
   const bindingConfigCustomReset = document.getElementById("binding-config-custom-reset");
@@ -248,6 +259,17 @@ export function createDomRefs() {
     bindingConfigAssignModeReplace,
     bindingConfigCurveCards,
     bindingConfigCurveHelp,
+    bindingConfigCurvePresetRoot,
+    bindingConfigCurvePresetButton,
+    bindingConfigCurvePresetMenu,
+    bindingConfigCurvePresetSearch,
+    bindingConfigCurvePresetList,
+    bindingConfigCurvePresetSave,
+    bindingConfigCurvePresetForm,
+    bindingConfigCurvePresetFormTitle,
+    bindingConfigCurvePresetName,
+    bindingConfigCurvePresetFormSave,
+    bindingConfigCurvePresetFormCancel,
     bindingConfigCustomEditor,
     bindingConfigCustomSurface,
     bindingConfigCustomReset,

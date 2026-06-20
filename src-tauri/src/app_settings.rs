@@ -1,4 +1,4 @@
-use crate::model::{normalized_routes_with_legacy, MidiDeviceRoute};
+use crate::model::{normalized_routes_with_legacy, FaderCurvePoint, MidiDeviceRoute};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::PathBuf};
@@ -161,6 +161,24 @@ impl Default for AppAppearanceSettings {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct FaderCurvePreset {
+    pub id: String,
+    pub name: String,
+    pub points: Vec<FaderCurvePoint>,
+}
+
+impl Default for FaderCurvePreset {
+    fn default() -> Self {
+        Self {
+            id: "curve-preset".to_string(),
+            name: "Custom Curve".to_string(),
+            points: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppSettings {
@@ -178,6 +196,7 @@ pub struct AppSettings {
     pub auto_check_updates: bool,
     pub language: String,
     pub appearance: AppAppearanceSettings,
+    pub fader_curve_presets: Vec<FaderCurvePreset>,
     pub midi_device_inventory_consent: MidiDeviceInventoryConsent,
     pub midi_device_inventory_notice_version: u32,
     pub midi_device_inventory_last_sent_hash: Option<String>,
@@ -200,6 +219,7 @@ impl Default for AppSettings {
             auto_check_updates: true,
             language: "en".to_string(),
             appearance: AppAppearanceSettings::default(),
+            fader_curve_presets: Vec::new(),
             midi_device_inventory_consent: MidiDeviceInventoryConsent::Unknown,
             midi_device_inventory_notice_version: 0,
             midi_device_inventory_last_sent_hash: None,
@@ -269,9 +289,10 @@ impl AppSettingsStore {
 #[cfg(test)]
 mod tests {
     use super::{
-        AppAppearanceSettings, AppSettings, AppSettingsStore, AppearanceTheme,
+        AppAppearanceSettings, AppSettings, AppSettingsStore, AppearanceTheme, FaderCurvePreset,
         MidiDeviceInventoryConsent,
     };
+    use crate::model::FaderCurvePoint;
     use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -298,6 +319,7 @@ mod tests {
         assert_eq!(settings.appearance.font_size, 14.0);
         assert_eq!(settings.appearance.surface_contrast, 50.0);
         assert_eq!(settings.appearance.icon_glow, 50.0);
+        assert!(settings.fader_curve_presets.is_empty());
         assert_eq!(
             settings.midi_device_inventory_consent,
             MidiDeviceInventoryConsent::Unknown
@@ -396,5 +418,42 @@ mod tests {
             loaded.appearance.custom_themes[0].tokens.get("--accent"),
             Some(&"#24c8d6".to_string())
         );
+    }
+
+    #[test]
+    fn saved_fader_curve_presets_round_trip() {
+        let settings = AppSettings {
+            fader_curve_presets: vec![FaderCurvePreset {
+                id: "drums-ride".to_string(),
+                name: "Drums Ride".to_string(),
+                points: vec![
+                    FaderCurvePoint {
+                        x: 0.0,
+                        y: 0.0,
+                        curve: 0.0,
+                    },
+                    FaderCurvePoint {
+                        x: 0.5,
+                        y: 0.7,
+                        curve: 0.0,
+                    },
+                    FaderCurvePoint {
+                        x: 1.0,
+                        y: 1.0,
+                        curve: 0.0,
+                    },
+                ],
+            }],
+            ..AppSettings::default()
+        };
+
+        let json = serde_json::to_string(&settings).expect("serialize settings");
+        let loaded: AppSettings = serde_json::from_str(&json).expect("deserialize settings");
+
+        assert_eq!(loaded.fader_curve_presets.len(), 1);
+        assert_eq!(loaded.fader_curve_presets[0].id, "drums-ride");
+        assert_eq!(loaded.fader_curve_presets[0].name, "Drums Ride");
+        assert_eq!(loaded.fader_curve_presets[0].points[1].x, 0.5);
+        assert_eq!(loaded.fader_curve_presets[0].points[1].y, 0.7);
     }
 }

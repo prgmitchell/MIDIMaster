@@ -2,6 +2,7 @@ import { PLUGINS_ICON_DATA, createPluginsTabs } from "./features/plugins/tabs.js
 import { createSettingsFeature } from "./features/settings/settings.js";
 import { createProfilesFeature } from "./features/profiles/profiles.js";
 import { createBindingsFeature } from "./features/bindings/bindings.js";
+import { normalizeFaderCurvePresets } from "./features/bindings/fader_curve_presets.js";
 import { createTargetsFeature } from "./features/targets/targets.js";
 import { createOsdFeature } from "./features/osd/osd.js";
 import { createMidiFeature } from "./features/midi/midi.js";
@@ -180,6 +181,17 @@ const {
   bindingConfigAssignModeReplace,
   bindingConfigCurveCards,
   bindingConfigCurveHelp,
+  bindingConfigCurvePresetRoot,
+  bindingConfigCurvePresetButton,
+  bindingConfigCurvePresetMenu,
+  bindingConfigCurvePresetSearch,
+  bindingConfigCurvePresetList,
+  bindingConfigCurvePresetSave,
+  bindingConfigCurvePresetForm,
+  bindingConfigCurvePresetFormTitle,
+  bindingConfigCurvePresetName,
+  bindingConfigCurvePresetFormSave,
+  bindingConfigCurvePresetFormCancel,
   bindingConfigCustomEditor,
   bindingConfigCustomSurface,
   bindingConfigCustomReset,
@@ -460,6 +472,9 @@ async function hydrateClientPreferences() {
         settings.midi_device_inventory_notice_version
         ?? settings.midiDeviceInventoryNoticeVersion
         ?? 0,
+      ),
+      faderCurvePresets: normalizeFaderCurvePresets(
+        settings.fader_curve_presets ?? settings.faderCurvePresets,
       ),
     };
     applyAppearanceToDocument(savedAppearance, { matchMediaSource: window });
@@ -960,6 +975,7 @@ let appSettings = {
   autoCheckUpdates: true,
   language: "en",
   appearance: defaultAppearanceSettings(),
+  faderCurvePresets: [],
   midiDeviceInventoryConsent: "unknown",
   midiDeviceInventoryNoticeVersion: 0,
 };
@@ -972,6 +988,17 @@ function applyGlobalAppearance(nextAppearance) {
     appearance,
   };
   return applyAppearanceToDocument(appearance, { matchMediaSource: window });
+}
+
+async function saveFaderCurvePresets(nextPresets) {
+  const presets = normalizeFaderCurvePresets(nextPresets);
+  const saved = await invoke("update_fader_curve_presets", { presets });
+  const normalized = normalizeFaderCurvePresets(saved);
+  appSettings = {
+    ...appSettings,
+    faderCurvePresets: normalized,
+  };
+  return normalized;
 }
 
 function bindSystemAppearanceListener() {
@@ -1056,7 +1083,15 @@ settingsFeature = createSettingsFeature({
   getMonitorOptions: () => monitorOptions,
   setMonitorOptions: (next) => { monitorOptions = next; },
   getAppSettings: () => appSettings,
-  setAppSettings: (next) => { appSettings = next; },
+  setAppSettings: (next) => {
+    appSettings = {
+      ...appSettings,
+      ...(next || {}),
+      faderCurvePresets: normalizeFaderCurvePresets(
+        next?.faderCurvePresets ?? next?.fader_curve_presets ?? appSettings.faderCurvePresets,
+      ),
+    };
+  },
   applyAppearance: applyGlobalAppearance,
   onUpdateAvailableClick: showUpdateAvailableDialog,
   onMidiDeviceInventoryConsentChanged: () => {
@@ -1213,6 +1248,17 @@ bindingsFeature = createBindingsFeature({
     bindingConfigAssignModeReplace,
     bindingConfigCurveCards,
     bindingConfigCurveHelp,
+    bindingConfigCurvePresetRoot,
+    bindingConfigCurvePresetButton,
+    bindingConfigCurvePresetMenu,
+    bindingConfigCurvePresetSearch,
+    bindingConfigCurvePresetList,
+    bindingConfigCurvePresetSave,
+    bindingConfigCurvePresetForm,
+    bindingConfigCurvePresetFormTitle,
+    bindingConfigCurvePresetName,
+    bindingConfigCurvePresetFormSave,
+    bindingConfigCurvePresetFormCancel,
     bindingConfigCustomEditor,
     bindingConfigCustomSurface,
     bindingConfigCustomReset,
@@ -1266,6 +1312,8 @@ bindingsFeature = createBindingsFeature({
   showVolumeOsd,
   showMuteOsd,
   saveBindingsForProfile,
+  getFaderCurvePresets: () => appSettings.faderCurvePresets || [],
+  saveFaderCurvePresets,
   getPluginHost,
   getEditingBindingId: () => editingBindingId,
   setEditingBindingId: (next) => { editingBindingId = next; },

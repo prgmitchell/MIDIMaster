@@ -159,7 +159,9 @@ fn interpolate_custom_curve(points: &[crate::model::FaderCurvePoint], normalized
             return y1;
         }
         let t = ((input - x0) / (x1 - x0)).clamp(0.0, 1.0);
-        return (y0 + ((y1 - y0) * t)).clamp(0.0, 1.0);
+        let linear = y0 + ((y1 - y0) * t);
+        let curve_offset = start.curve.clamp(-1.0, 1.0) * 2.0 * (1.0 - t) * t;
+        return (linear + curve_offset).clamp(0.0, 1.0);
     }
 
     sorted
@@ -458,12 +460,45 @@ mod tests {
         let mut binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
         binding.fader_curve = crate::model::FaderCurve::Custom;
         binding.custom_curve = vec![
-            crate::model::FaderCurvePoint { x: 0.0, y: 0.0 },
-            crate::model::FaderCurvePoint { x: 0.5, y: 0.8 },
-            crate::model::FaderCurvePoint { x: 1.0, y: 1.0 },
+            crate::model::FaderCurvePoint {
+                x: 0.0,
+                y: 0.0,
+                curve: 0.0,
+            },
+            crate::model::FaderCurvePoint {
+                x: 0.5,
+                y: 0.8,
+                curve: 0.0,
+            },
+            crate::model::FaderCurvePoint {
+                x: 1.0,
+                y: 1.0,
+                curve: 0.0,
+            },
         ];
         let mut state = sample_state(0.0);
         let next = apply_midi_event(&binding, &sample_event(64), &mut state).expect("value");
         assert!((next - 0.8).abs() < 0.02);
+    }
+
+    #[test]
+    fn absolute_custom_curve_applies_segment_bend() {
+        let mut binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
+        binding.fader_curve = crate::model::FaderCurve::Custom;
+        binding.custom_curve = vec![
+            crate::model::FaderCurvePoint {
+                x: 0.0,
+                y: 0.0,
+                curve: 0.5,
+            },
+            crate::model::FaderCurvePoint {
+                x: 1.0,
+                y: 1.0,
+                curve: 0.0,
+            },
+        ];
+        let mut state = sample_state(0.0);
+        let next = apply_midi_event(&binding, &sample_event(64), &mut state).expect("value");
+        assert!(next > 0.7);
     }
 }

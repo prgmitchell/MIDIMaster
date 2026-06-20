@@ -935,8 +935,7 @@ body[data-theme] .binding-config-preview-value {
 body[data-theme] .binding-config-curve-help,
 body[data-theme] .binding-config-preview-status,
 body[data-theme] .binding-config-preview-learn-indicator,
-body[data-theme] .binding-config-preview-summary-label,
-body[data-theme] .binding-config-info-pill {
+body[data-theme] .binding-config-preview-summary-label {
   color: var(--text-secondary);
 }
 

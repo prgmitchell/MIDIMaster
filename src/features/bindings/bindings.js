@@ -45,6 +45,22 @@ import {
   resolveBindingVolumeValue,
   resolveTargetChangeVolumeValue,
 } from "./value_sync.js";
+import {
+  MAX_FADER_CURVE_PRESETS,
+  curvePointsForBinding,
+  curvePresetPointsEqual,
+  findMatchingFaderCurvePreset,
+  nextCurvePresetName,
+  normalizeCurvePresetName,
+  normalizeCurvePresetPoints,
+  normalizeFaderCurvePresets,
+} from "./fader_curve_presets.js";
+
+const CUSTOM_CURVE_VIEWBOX_SIZE = 120;
+const CUSTOM_CURVE_PADDING = 10;
+const CUSTOM_CURVE_PLOT_SIZE = CUSTOM_CURVE_VIEWBOX_SIZE - (CUSTOM_CURVE_PADDING * 2);
+const CUSTOM_CURVE_MIN_POINT_SPACING = 0.035;
+const CUSTOM_CURVE_EPSILON = 0.0001;
 
 export function createBindingsFeature({
   invoke,
@@ -65,6 +81,8 @@ export function createBindingsFeature({
   showVolumeOsd,
   showMuteOsd,
   saveBindingsForProfile,
+  getFaderCurvePresets,
+  saveFaderCurvePresets,
   getPluginHost,
   getEditingBindingId,
   setEditingBindingId,
@@ -132,6 +150,10 @@ export function createBindingsFeature({
   const getMuted = (typeof getMuteForTarget === "function") ? getMuteForTarget : (() => false);
   const getLiveMidiValue = (typeof getLiveMidiValueForControl === "function") ? getLiveMidiValueForControl : (() => null);
   const saveProfile = (typeof saveBindingsForProfile === "function") ? saveBindingsForProfile : (async () => { });
+  const getCurvePresets = (typeof getFaderCurvePresets === "function") ? getFaderCurvePresets : (() => []);
+  const saveCurvePresets = (typeof saveFaderCurvePresets === "function")
+    ? saveFaderCurvePresets
+    : (async (presets) => normalizeFaderCurvePresets(presets));
   const getHost = (typeof getPluginHost === "function") ? getPluginHost : (() => null);
   const iconForTarget = (typeof createTargetIcon === "function") ? createTargetIcon : (() => document.createElement("span"));
   const resolveTargetDisplay = (typeof resolveOsdTarget === "function") ? resolveOsdTarget : (() => null);
@@ -816,6 +838,11 @@ export function createBindingsFeature({
   const configAcceptedTransfers = new Map();
   let configPreviewTimer = null;
   let customCurvePointer = null;
+  let curvePresetMenuOpen = false;
+  let curvePresetSearchQuery = "";
+  let curvePresetFormMode = null;
+  let curvePresetFormPresetId = null;
+  let selectedCustomCurvePresetId = null;
   let macroDragState = null;
   let hotkeyLearnBindingId = null;
   let hotkeyLearnCleanup = null;
@@ -3262,6 +3289,302 @@ export function createBindingsFeature({
     }
   }
 
+  function currentCurvePresets() {
+    return normalizeFaderCurvePresets(getCurvePresets());
+  }
+
+  function activeCustomCurvePreset(binding = getConfigBinding()) {
+    const presets = currentCurvePresets();
+    const selected = presets.find((preset) => preset.id === selectedCustomCurvePresetId);
+    if (
+      selected
+      && normalizeFaderCurve(binding?.fader_curve) === "Custom"
+      && curvePresetPointsEqual(binding?.custom_curve, selected.points)
+    ) {
+      return selected;
+    }
+    return findMatchingFaderCurvePreset(binding, presets);
+  }
+
+  function setCurvePresetMenuOpen(open) {
+    curvePresetMenuOpen = Boolean(open);
+    if (d.bindingConfigCurvePresetMenu) {
+      d.bindingConfigCurvePresetMenu.classList.toggle("hidden", !curvePresetMenuOpen);
+    }
+    if (d.bindingConfigCurvePresetButton) {
+      d.bindingConfigCurvePresetButton.setAttribute("aria-expanded", String(curvePresetMenuOpen));
+    }
+    if (curvePresetMenuOpen) {
+      renderCurvePresetMenu();
+      requestAnimationFrame(() => d.bindingConfigCurvePresetSearch?.focus?.({ preventScroll: true }));
+    }
+  }
+
+  function closeCurvePresetMenu() {
+    setCurvePresetMenuOpen(false);
+  }
+
+  function closeCurvePresetForm() {
+    curvePresetFormMode = null;
+    curvePresetFormPresetId = null;
+    if (d.bindingConfigCurvePresetForm) {
+      d.bindingConfigCurvePresetForm.classList.add("hidden");
+    }
+  }
+
+  function openCurvePresetForm(mode, preset = null) {
+    curvePresetFormMode = mode === "rename" ? "rename" : "save";
+    curvePresetFormPresetId = preset?.id || null;
+    if (d.bindingConfigCurvePresetForm) {
+      d.bindingConfigCurvePresetForm.classList.remove("hidden");
+      d.bindingConfigCurvePresetForm.dataset.mode = curvePresetFormMode;
+    }
+    if (d.bindingConfigCurvePresetFormTitle) {
+      d.bindingConfigCurvePresetFormTitle.textContent = curvePresetFormMode === "rename"
+        ? t("bindings.curvePresetRenameTitle")
+        : t("bindings.curvePresetSaveTitle");
+    }
+    if (d.bindingConfigCurvePresetName) {
+      d.bindingConfigCurvePresetName.value = preset?.name || nextCurvePresetName(currentCurvePresets());
+      requestAnimationFrame(() => {
+        d.bindingConfigCurvePresetName?.focus?.({ preventScroll: true });
+        d.bindingConfigCurvePresetName?.select?.();
+      });
+    }
+    closeCurvePresetMenu();
+  }
+
+  function syncCurvePresetToolbar(binding) {
+    const presets = currentCurvePresets();
+    const activeCustom = activeCustomCurvePreset(binding);
+    selectedCustomCurvePresetId = activeCustom?.id || null;
+    if (d.bindingConfigCurvePresetButton) {
+      const label = activeCustom?.name || t("bindings.myCurves");
+      d.bindingConfigCurvePresetButton.textContent = label || t("bindings.presets");
+    }
+    if (d.bindingConfigCurvePresetSave) {
+      d.bindingConfigCurvePresetSave.disabled = false;
+    }
+    if (d.bindingConfigCurvePresetForm) {
+      d.bindingConfigCurvePresetForm.classList.toggle("hidden", !curvePresetFormMode);
+    }
+    renderCurvePresetMenu();
+  }
+
+  function appendCurvePresetGroup(container, title, items, renderItem, emptyText = "") {
+    if (!container || (!items.length && !emptyText)) return;
+    const group = document.createElement("div");
+    group.className = "binding-config-curve-preset-group";
+    const heading = document.createElement("div");
+    heading.className = "binding-config-curve-preset-heading";
+    heading.textContent = title;
+    group.appendChild(heading);
+    if (items.length) {
+      items.forEach((item) => group.appendChild(renderItem(item)));
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "binding-config-curve-preset-empty";
+      empty.textContent = emptyText;
+      group.appendChild(empty);
+    }
+    container.appendChild(group);
+  }
+
+  function renderCurvePresetMenu() {
+    if (!d.bindingConfigCurvePresetList) return;
+    const binding = getConfigBinding();
+    const presets = currentCurvePresets();
+    const query = curvePresetSearchQuery.trim().toLowerCase();
+    const activeCustom = activeCustomCurvePreset(binding);
+    d.bindingConfigCurvePresetList.innerHTML = "";
+    if (d.bindingConfigCurvePresetSearch && d.bindingConfigCurvePresetSearch.value !== curvePresetSearchQuery) {
+      d.bindingConfigCurvePresetSearch.value = curvePresetSearchQuery;
+    }
+
+    const customPresets = presets
+      .filter((preset) => !query || preset.name.toLowerCase().includes(query));
+
+    const renderCustom = (preset) => {
+      const row = document.createElement("div");
+      row.className = "binding-config-curve-preset-custom-row";
+      row.classList.toggle("is-selected", activeCustom?.id === preset.id);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "binding-config-curve-preset-option";
+      button.dataset.curvePresetKind = "custom";
+      button.dataset.curvePresetId = preset.id;
+      button.textContent = preset.name;
+      button.classList.toggle("is-selected", activeCustom?.id === preset.id);
+      button.addEventListener("click", () => {
+        applyCurvePresetToDraft(preset);
+      });
+      row.appendChild(button);
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "binding-config-curve-preset-action";
+      setActionIcon(editButton, "edit", t("bindings.renameCurvePreset"));
+      editButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openCurvePresetForm("rename", preset);
+      });
+      row.appendChild(editButton);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "binding-config-curve-preset-action binding-config-curve-preset-action--danger";
+      setActionIcon(deleteButton, "delete", t("bindings.deleteCurvePreset"));
+      deleteButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await deleteCurvePreset(preset);
+      });
+      row.appendChild(deleteButton);
+
+      return row;
+    };
+
+    appendCurvePresetGroup(
+      d.bindingConfigCurvePresetList,
+      t("bindings.myCurves"),
+      customPresets,
+      renderCustom,
+      query ? t("bindings.curvePresetNoSearchResults") : t("bindings.curvePresetEmpty"),
+    );
+  }
+
+  function applyCurvePresetToDraft(preset) {
+    const binding = getConfigBinding();
+    if (!binding || !preset) return;
+    binding.fader_curve = "Custom";
+    binding.custom_curve = normalizeCurvePresetPoints(preset.points);
+    selectedCustomCurvePresetId = preset.id;
+    closeCurvePresetForm();
+    closeCurvePresetMenu();
+    renderConfigModal();
+  }
+
+  async function submitCurvePresetForm() {
+    const binding = getConfigBinding();
+    if (!binding) return;
+    const name = normalizeCurvePresetName(d.bindingConfigCurvePresetName?.value || "");
+    if (!name) {
+      alertAction(t("bindings.curvePresetInvalidTitle"), t("bindings.curvePresetInvalidName"));
+      return;
+    }
+
+    const presets = currentCurvePresets();
+    if (curvePresetFormMode === "rename") {
+      const preset = presets.find((item) => item.id === curvePresetFormPresetId)
+        || activeCustomCurvePreset(binding);
+      if (!preset) return;
+      const duplicate = presets.find((item) => (
+        item.id !== preset.id && item.name.toLowerCase() === name.toLowerCase()
+      ));
+      if (duplicate) {
+        alertAction(t("bindings.curvePresetDuplicateTitle"), t("bindings.curvePresetDuplicateName"));
+        return;
+      }
+      const saved = await saveCurvePresets(presets.map((item) => (
+        item.id === preset.id ? { ...item, name } : item
+      )));
+      selectedCustomCurvePresetId = normalizeFaderCurvePresets(saved)
+        .find((item) => item.name.toLowerCase() === name.toLowerCase())?.id || preset.id;
+      closeCurvePresetForm();
+      renderConfigModal();
+      return;
+    }
+
+    const points = normalizeCurvePresetPoints(curvePointsForBinding(binding));
+    if (points.length < 2) {
+      alertAction(t("bindings.curvePresetInvalidTitle"), t("bindings.curvePresetInvalidCurve"));
+      return;
+    }
+    const existing = presets.find((item) => item.name.toLowerCase() === name.toLowerCase());
+    let nextPresets;
+    if (existing) {
+      const confirmed = await confirmAction({
+        title: t("bindings.curvePresetReplaceTitle"),
+        message: t("bindings.curvePresetReplaceMessage", { name }),
+        confirmLabel: t("common.save"),
+        cancelLabel: t("common.cancel"),
+        overlayClass: "target-panel--over-config",
+      });
+      if (!confirmed) return;
+      nextPresets = presets.map((item) => (
+        item.id === existing.id ? { ...item, name, points } : item
+      ));
+    } else {
+      if (presets.length >= MAX_FADER_CURVE_PRESETS) {
+        alertAction(
+          t("bindings.curvePresetLimitTitle"),
+          t("bindings.curvePresetLimitMessage", { count: MAX_FADER_CURVE_PRESETS }),
+        );
+        return;
+      }
+      nextPresets = [...presets, { id: "", name, points }];
+    }
+    const saved = normalizeFaderCurvePresets(await saveCurvePresets(nextPresets));
+    selectedCustomCurvePresetId = saved.find((item) => item.name.toLowerCase() === name.toLowerCase())?.id || null;
+    closeCurvePresetForm();
+    renderConfigModal();
+  }
+
+  async function deleteCurvePreset(preset) {
+    if (!preset) return;
+    const confirmed = await confirmAction({
+      title: t("bindings.curvePresetDeleteTitle"),
+      message: t("bindings.curvePresetDeleteMessage", { name: preset.name }),
+      confirmLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+      confirmVariant: "danger",
+      overlayClass: "target-panel--over-config",
+    });
+    if (!confirmed) return;
+    await saveCurvePresets(currentCurvePresets().filter((item) => item.id !== preset.id));
+    if (selectedCustomCurvePresetId === preset.id) {
+      selectedCustomCurvePresetId = null;
+    }
+    closeCurvePresetForm();
+    renderConfigModal();
+  }
+
+  function curveSvgX(value) {
+    return CUSTOM_CURVE_PADDING + (Math.min(1, Math.max(0, Number(value) || 0)) * CUSTOM_CURVE_PLOT_SIZE);
+  }
+
+  function curveSvgY(value) {
+    return CUSTOM_CURVE_VIEWBOX_SIZE
+      - CUSTOM_CURVE_PADDING
+      - (Math.min(1, Math.max(0, Number(value) || 0)) * CUSTOM_CURVE_PLOT_SIZE);
+  }
+
+  function clampSegmentCurve(start, end, curve) {
+    const midpointY = ((Number(start?.y) || 0) + (Number(end?.y) || 0)) / 2;
+    return Math.min(1 - midpointY, Math.max(-midpointY, Number(curve) || 0));
+  }
+
+  function curvePathData(points) {
+    const safePoints = normalizeCustomCurve(points);
+    if (!safePoints.length) return "";
+    const commands = [`M${curveSvgX(safePoints[0].x)} ${curveSvgY(safePoints[0].y)}`];
+    for (let index = 0; index < safePoints.length - 1; index += 1) {
+      const start = safePoints[index];
+      const end = safePoints[index + 1];
+      const curve = clampSegmentCurve(start, end, start.curve || 0);
+      if (Math.abs(curve) > CUSTOM_CURVE_EPSILON) {
+        const controlX = (start.x + end.x) / 2;
+        const controlY = ((start.y + end.y) / 2) + curve;
+        commands.push(`Q${curveSvgX(controlX)} ${curveSvgY(controlY)} ${curveSvgX(end.x)} ${curveSvgY(end.y)}`);
+      } else {
+        commands.push(`L${curveSvgX(end.x)} ${curveSvgY(end.y)}`);
+      }
+    }
+    return commands.join(" ");
+  }
+
   function buildCurveCardSvg(binding, curve) {
     const pathMap = {
       Linear: "M10 110 L110 10",
@@ -3272,15 +3595,9 @@ export function createBindingsFeature({
     };
     if (curve === "Custom") {
       const points = curveEditorPoints(binding);
-      const width = 120;
-      const height = 120;
-      const padding = 10;
-      const toX = (point) => padding + (point.x * (width - (padding * 2)));
-      const toY = (point) => height - padding - (point.y * (height - (padding * 2)));
-      const polyline = points.map((point) => `${toX(point)},${toY(point)}`).join(" ");
       return `
-        <svg class="binding-config-curve-editor-svg" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-          <polyline points="${polyline}" />
+        <svg class="binding-config-curve-editor-svg" viewBox="0 0 ${CUSTOM_CURVE_VIEWBOX_SIZE} ${CUSTOM_CURVE_VIEWBOX_SIZE}" aria-hidden="true" focusable="false">
+          <path class="binding-config-curve-editor-path" d="${curvePathData(points)}" />
         </svg>
       `;
     }
@@ -3293,6 +3610,8 @@ export function createBindingsFeature({
     if (binding.fader_curve === normalizeFaderCurve(curve)) {
       return;
     }
+    selectedCustomCurvePresetId = null;
+    closeCurvePresetForm();
     binding.fader_curve = normalizeFaderCurve(curve);
     binding.custom_curve = customCurvePoints(binding);
     renderConfigModal();
@@ -3324,8 +3643,8 @@ export function createBindingsFeature({
         if (svg && visual) {
           points.forEach((point, index) => {
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            const x = 10 + (point.x * 100);
-            const y = 110 - (point.y * 100);
+            const x = curveSvgX(point.x);
+            const y = curveSvgY(point.y);
             circle.setAttribute("cx", String(x));
             circle.setAttribute("cy", String(y));
             circle.setAttribute("r", "5.5");
@@ -3351,34 +3670,145 @@ export function createBindingsFeature({
     // Editing now happens directly inside the Custom curve card.
   }
 
-  function updateCustomCurveFromPointer(event) {
-    const binding = getConfigBinding();
-    if (!binding || !customCurvePointer?.surfaceEl) return;
-    const rect = customCurvePointer.surfaceEl.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const points = curveEditorPoints(binding);
-    const index = customCurvePointer.index;
-    const isEdge = index === 0 || index === points.length - 1;
-    const localX = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-    const localY = Math.min(1, Math.max(0, 1 - ((event.clientY - rect.top) / rect.height)));
-    const prevX = index > 0 ? points[index - 1].x + 0.04 : 0;
-    const nextX = index < points.length - 1 ? points[index + 1].x - 0.04 : 1;
-    points[index] = {
-      x: isEdge ? (index === 0 ? 0 : 1) : Math.min(nextX, Math.max(prevX, localX)),
-      y: localY,
+  function customCurveSurfaceFromEvent(event) {
+    if (!(event.target instanceof Element)) return null;
+    const surface = event.target.closest('[data-curve-editor-surface="custom"]');
+    const card = surface?.closest?.(".binding-config-curve-card");
+    return card?.dataset?.curve === "Custom" ? surface : null;
+  }
+
+  function localCustomCurvePoint(event, surfaceEl) {
+    const svg = surfaceEl?.querySelector?.("svg");
+    const rect = (svg || surfaceEl)?.getBoundingClientRect?.();
+    if (!rect?.width || !rect.height) return null;
+    const svgX = ((event.clientX - rect.left) / rect.width) * CUSTOM_CURVE_VIEWBOX_SIZE;
+    const svgY = ((event.clientY - rect.top) / rect.height) * CUSTOM_CURVE_VIEWBOX_SIZE;
+    return {
+      x: Math.min(1, Math.max(0, (svgX - CUSTOM_CURVE_PADDING) / CUSTOM_CURVE_PLOT_SIZE)),
+      y: Math.min(1, Math.max(0, (CUSTOM_CURVE_VIEWBOX_SIZE - CUSTOM_CURVE_PADDING - svgY) / CUSTOM_CURVE_PLOT_SIZE)),
     };
+  }
+
+  function segmentIndexForCurveX(points, x) {
+    if (!Array.isArray(points) || points.length < 2) return -1;
+    for (let index = 0; index < points.length - 1; index += 1) {
+      if (x <= points[index + 1].x) return index;
+    }
+    return points.length - 2;
+  }
+
+  function curveYAtSegmentPoint(start, end, t) {
+    const linear = start.y + ((end.y - start.y) * t);
+    return Math.min(1, Math.max(0, linear + ((Number(start.curve) || 0) * 2 * (1 - t) * t)));
+  }
+
+  function segmentCurveFromPointer(start, end, localPoint) {
+    const span = end.x - start.x;
+    if (Math.abs(span) < CUSTOM_CURVE_EPSILON) return start.curve || 0;
+    const t = Math.min(1, Math.max(0, (localPoint.x - start.x) / span));
+    const denominator = 2 * (1 - t) * t;
+    if (denominator < 0.08) return start.curve || 0;
+    const linear = start.y + ((end.y - start.y) * t);
+    return clampSegmentCurve(start, end, (localPoint.y - linear) / denominator);
+  }
+
+  function refreshCustomCurvePointerSurface() {
+    if (!customCurvePointer) return;
+    const nextSurface = d.bindingConfigCurveCards?.querySelector('.binding-config-curve-card[data-curve="Custom"] .binding-config-curve-card-visual');
+    if (nextSurface) {
+      customCurvePointer.surfaceEl = nextSurface;
+    }
+  }
+
+  function commitCustomCurvePoints(points, { keepPointer = false } = {}) {
+    const binding = getConfigBinding();
+    if (!binding) return;
     if (binding.fader_curve !== "Custom") {
       binding.fader_curve = "Custom";
     }
     binding.custom_curve = normalizeCustomCurve(points);
+    selectedCustomCurvePresetId = null;
     renderCurveCards();
-    if (customCurvePointer) {
-      const nextSurface = d.bindingConfigCurveCards?.querySelector('.binding-config-curve-card[data-curve="Custom"] .binding-config-curve-card-visual');
-      if (nextSurface) {
-        customCurvePointer.surfaceEl = nextSurface;
-      }
+    syncCurvePresetToolbar(binding);
+    if (keepPointer) {
+      refreshCustomCurvePointerSurface();
     }
     renderConfigPreview();
+  }
+
+  function addCustomCurvePoint(event) {
+    const binding = getConfigBinding();
+    const surfaceEl = customCurveSurfaceFromEvent(event);
+    if (!binding || !surfaceEl) return;
+    if (event.target instanceof Element && event.target.closest("circle.binding-config-curve-card-point")) return;
+    const localPoint = localCustomCurvePoint(event, surfaceEl);
+    if (!localPoint) return;
+    const points = curveEditorPoints(binding);
+    const segmentIndex = segmentIndexForCurveX(points, localPoint.x);
+    if (segmentIndex < 0) return;
+    const start = points[segmentIndex];
+    const end = points[segmentIndex + 1];
+    if ((end.x - start.x) < (CUSTOM_CURVE_MIN_POINT_SPACING * 2)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const span = end.x - start.x;
+    const t = Math.min(1, Math.max(0, (localPoint.x - start.x) / span));
+    const x = Math.min(end.x - CUSTOM_CURVE_MIN_POINT_SPACING, Math.max(start.x + CUSTOM_CURVE_MIN_POINT_SPACING, localPoint.x));
+    const y = localPoint.y == null ? curveYAtSegmentPoint(start, end, t) : localPoint.y;
+    const nextPoints = points.map((point) => ({ ...point }));
+    nextPoints[segmentIndex] = { ...nextPoints[segmentIndex], curve: 0 };
+    nextPoints.splice(segmentIndex + 1, 0, { x, y });
+    commitCustomCurvePoints(nextPoints);
+  }
+
+  function removeCustomCurvePoint(index, event = null) {
+    const binding = getConfigBinding();
+    if (!binding) return;
+    const points = curveEditorPoints(binding);
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (!Number.isInteger(index) || index <= 0 || index >= points.length - 1) return;
+    const nextPoints = points.map((point) => ({ ...point }));
+    nextPoints.splice(index, 1);
+    if (nextPoints[index - 1]) {
+      nextPoints[index - 1] = { ...nextPoints[index - 1], curve: 0 };
+    }
+    commitCustomCurvePoints(nextPoints);
+  }
+
+  function updateCustomCurveFromPointer(event) {
+    const binding = getConfigBinding();
+    if (!binding || !customCurvePointer?.surfaceEl) return;
+    const localPoint = localCustomCurvePoint(event, customCurvePointer.surfaceEl);
+    if (!localPoint) return;
+    const points = curveEditorPoints(binding);
+    const index = customCurvePointer.index;
+
+    if (customCurvePointer.mode === "segment") {
+      if (index < 0 || index >= points.length - 1) return;
+      const start = points[index];
+      const end = points[index + 1];
+      points[index] = {
+        ...start,
+        curve: segmentCurveFromPointer(start, end, localPoint),
+      };
+      commitCustomCurvePoints(points, { keepPointer: true });
+      return;
+    }
+
+    const isEdge = index === 0 || index === points.length - 1;
+    const prevX = index > 0 ? points[index - 1].x + CUSTOM_CURVE_MIN_POINT_SPACING : 0;
+    const nextX = index < points.length - 1 ? points[index + 1].x - CUSTOM_CURVE_MIN_POINT_SPACING : 1;
+    points[index] = {
+      ...points[index],
+      x: isEdge ? (index === 0 ? 0 : 1) : Math.min(nextX, Math.max(prevX, localPoint.x)),
+      y: localPoint.y,
+    };
+    if (isEdge) {
+      points[index].curve = 0;
+    }
+    commitCustomCurvePoints(points, { keepPointer: true });
   }
 
   async function closeConfigModal({ commit = false } = {}) {
@@ -3387,8 +3817,12 @@ export function createBindingsFeature({
     clearTransferPrompt();
     closeMuteModeMenu();
     closeAssignModeMenu();
+    closeCurvePresetMenu();
     stopConfigPreviewTimer();
     customCurvePointer = null;
+    curvePresetSearchQuery = "";
+    closeCurvePresetForm();
+    selectedCustomCurvePresetId = null;
     cancelMacroDrag();
     if (!commit) {
       await restoreConfigPreviewBindings();
@@ -3460,6 +3894,7 @@ export function createBindingsFeature({
         if (d.bindingConfigMacroSummary) d.bindingConfigMacroSummary.innerHTML = "";
       }
     } else {
+      syncCurvePresetToolbar(binding);
       renderCurveCards();
       renderCustomCurveEditor();
       renderMuteMappingLabel(binding);
@@ -4822,7 +5257,60 @@ export function createBindingsFeature({
         const binding = getConfigBinding();
         if (!binding) return;
         binding.custom_curve = presetCurvePoints(binding.fader_curve);
+        selectedCustomCurvePresetId = null;
+        closeCurvePresetForm();
         renderConfigModal();
+      });
+    }
+    if (d.bindingConfigCurvePresetButton) {
+      d.bindingConfigCurvePresetButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setCurvePresetMenuOpen(!curvePresetMenuOpen);
+      });
+    }
+    if (d.bindingConfigCurvePresetSearch) {
+      d.bindingConfigCurvePresetSearch.addEventListener("input", () => {
+        curvePresetSearchQuery = d.bindingConfigCurvePresetSearch.value || "";
+        renderCurvePresetMenu();
+      });
+      d.bindingConfigCurvePresetSearch.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+    }
+    if (d.bindingConfigCurvePresetSave) {
+      d.bindingConfigCurvePresetSave.addEventListener("click", () => {
+        const binding = getConfigBinding();
+        if (!binding) return;
+        openCurvePresetForm("save", activeCustomCurvePreset(binding));
+      });
+    }
+    if (d.bindingConfigCurvePresetFormSave) {
+      d.bindingConfigCurvePresetFormSave.addEventListener("click", async () => {
+        await submitCurvePresetForm();
+      });
+    }
+    if (d.bindingConfigCurvePresetFormCancel) {
+      d.bindingConfigCurvePresetFormCancel.addEventListener("click", () => {
+        closeCurvePresetForm();
+      });
+    }
+    if (d.bindingConfigCurvePresetForm) {
+      d.bindingConfigCurvePresetForm.addEventListener("click", (event) => {
+        if (event.target === d.bindingConfigCurvePresetForm) {
+          closeCurvePresetForm();
+        }
+      });
+    }
+    if (d.bindingConfigCurvePresetName) {
+      d.bindingConfigCurvePresetName.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          await submitCurvePresetForm();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          closeCurvePresetForm();
+        }
       });
     }
     if (d.bindingConfigMuteLearn) {
@@ -4954,6 +5442,45 @@ export function createBindingsFeature({
 
     if (d.bindingConfigCurveCards) {
       d.bindingConfigCurveCards.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        const target = event.target instanceof Element
+          ? event.target.closest("circle.binding-config-curve-card-point")
+          : null;
+        if (target) {
+          const card = target.closest(".binding-config-curve-card");
+          if (!card || card.dataset.curve !== "Custom") return;
+          const index = Number(target.dataset.pointIndex);
+          if (!Number.isFinite(index)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const surfaceEl = target.closest(".binding-config-curve-card-visual");
+          if (!surfaceEl) return;
+          customCurvePointer = { mode: "point", index, surfaceEl };
+          target.setPointerCapture?.(event.pointerId);
+          updateCustomCurveFromPointer(event);
+          return;
+        }
+
+        const surfaceEl = customCurveSurfaceFromEvent(event);
+        if (!surfaceEl || !event.altKey) return;
+        const binding = getConfigBinding();
+        const localPoint = binding ? localCustomCurvePoint(event, surfaceEl) : null;
+        if (!binding || !localPoint) return;
+        const points = curveEditorPoints(binding);
+        const index = segmentIndexForCurveX(points, localPoint.x);
+        if (index < 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        customCurvePointer = { mode: "segment", index, surfaceEl };
+        surfaceEl.setPointerCapture?.(event.pointerId);
+        updateCustomCurveFromPointer(event);
+      });
+
+      d.bindingConfigCurveCards.addEventListener("dblclick", (event) => {
+        addCustomCurvePoint(event);
+      });
+
+      d.bindingConfigCurveCards.addEventListener("contextmenu", (event) => {
         const target = event.target instanceof Element
           ? event.target.closest("circle.binding-config-curve-card-point")
           : null;
@@ -4962,13 +5489,7 @@ export function createBindingsFeature({
         if (!card || card.dataset.curve !== "Custom") return;
         const index = Number(target.dataset.pointIndex);
         if (!Number.isFinite(index)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const surfaceEl = target.closest(".binding-config-curve-card-visual");
-        if (!surfaceEl) return;
-        customCurvePointer = { index, surfaceEl };
-        target.setPointerCapture?.(event.pointerId);
-        updateCustomCurveFromPointer(event);
+        removeCustomCurvePoint(index, event);
       });
     }
 
@@ -4977,6 +5498,13 @@ export function createBindingsFeature({
       const muteRoot = d.bindingConfigMuteModeRoot;
       if (muteRoot && !muteRoot.contains(event.target)) {
         closeMuteModeMenu();
+      }
+      const curvePresetRoot = d.bindingConfigCurvePresetRoot;
+      if (d.alertOverlay?.contains?.(event.target)) {
+        return;
+      }
+      if (curvePresetRoot && !curvePresetRoot.contains(event.target)) {
+        closeCurvePresetMenu();
       }
       const root = d.bindingConfigAssignModeRoot;
       if (!root || root.contains(event.target)) return;

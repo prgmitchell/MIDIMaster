@@ -110,6 +110,8 @@ export function createAlertsController({
     confirmLabel = "Confirm",
     cancelLabel = "Cancel",
     confirmVariant = "primary",
+    overlayClass = "",
+    panelClass = "",
   } = {}) {
     if (!alertOverlay || !alertMessage) {
       return Promise.resolve(false);
@@ -118,7 +120,7 @@ export function createAlertsController({
     if (alertTitle) {
       alertTitle.textContent = title;
     }
-    setAlertClasses();
+    setAlertClasses({ overlayClass, panelClass });
     setActionsMode("confirm", { confirmLabel, cancelLabel, confirmVariant });
     alertMessage.textContent = message;
     alertOverlay.classList.remove("hidden");

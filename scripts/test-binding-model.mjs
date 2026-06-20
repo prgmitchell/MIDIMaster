@@ -59,6 +59,30 @@ function testNormalizeBindingPreservesExplicitRelativeFormat() {
   assert.equal(normalized.relative_format, "BinaryOffset");
 }
 
+function testCustomCurveNormalizationPreservesSegmentBend() {
+  const normalized = bindingModel.normalizeCustomCurvePoints([
+    { x: 1.2, y: 1.2, curve: 2 },
+    { x: 0.5, y: 0.25, curve: -0.35 },
+    { x: -0.2, y: -0.2, curve: 0.4 },
+  ]);
+
+  assert.deepEqual(normalized, [
+    { x: 0, y: 0, curve: 0.4 },
+    { x: 0.5, y: 0.25, curve: -0.35 },
+    { x: 1, y: 1 },
+  ]);
+}
+
+function testCustomCurveInterpolationAppliesSegmentBend() {
+  assert.equal(
+    bindingModel.applyCustomFaderCurve([
+      { x: 0, y: 0, curve: 0.5 },
+      { x: 1, y: 1 },
+    ], 0.5),
+    0.75,
+  );
+}
+
 function testExplicitRelativeFormatsDecodeWithoutAutoState() {
   const autoState = new Map();
   assert.equal(
@@ -401,6 +425,8 @@ function testNormalizeBindingDefaultsLegacyMacroName() {
 }
 
 testNormalizeBindingPreservesExplicitRelativeFormat();
+testCustomCurveNormalizationPreservesSegmentBend();
+testCustomCurveInterpolationAppliesSegmentBend();
 testExplicitRelativeFormatsDecodeWithoutAutoState();
 testAutoDetectionMatchesBackendMidpointRule();
 testAutoDetectionUsesSignMagnitudeWithoutMidpoint();

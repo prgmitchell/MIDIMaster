@@ -1,10 +1,11 @@
 use crate::{
     app_paths::app_data_root_dir,
     app_settings::{
-        AppAppearanceSettings, AppSettings, AppearanceTheme, MidiDeviceInventoryConsent,
+        AppAppearanceSettings, AppSettings, AppearanceTheme, FaderCurvePreset,
+        MidiDeviceInventoryConsent,
     },
     collect_monitor_descriptors,
-    model::{MidiDevicePreference, MidiDeviceRoute, OsdSettings},
+    model::{FaderCurvePoint, MidiDevicePreference, MidiDeviceRoute, OsdSettings},
     run_logger, AppState,
 };
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,7 @@ const BUILT_IN_APPEARANCE_IDS: &[&str] = &[
 ];
 const SUPPORTED_FONT_FAMILIES: &[&str] = &["bahnschrift", "aptos", "segoe", "inter", "mono"];
 const SUPPORTED_TEXT_RENDERING: &[&str] = &["auto", "legibility", "geometric", "speed"];
+const MAX_FADER_CURVE_PRESETS: usize = 50;
 const ALLOWED_APPEARANCE_TOKEN_KEYS: &[&str] = &[
     "--app-bg",
     "--sidebar-bg",
@@ -354,6 +356,33 @@ pub fn update_appearance_settings(
 }
 
 #[tauri::command]
+pub fn update_fader_curve_presets(
+    state: State<AppState>,
+    presets: Vec<FaderCurvePreset>,
+) -> Result<Vec<FaderCurvePreset>, String> {
+    let normalized = normalize_fader_curve_presets(presets);
+    run_logger::info(
+        "settings",
+        "update_fader_curve_presets",
+        &format!("preset_count={}", normalized.len()),
+    );
+
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    settings.fader_curve_presets = normalized.clone();
+    let updated = settings.clone();
+    drop(settings);
+
+    state
+        .app_settings_store
+        .save(&updated)
+        .map_err(|err| err.to_string())?;
+    Ok(normalized)
+}
+
+#[tauri::command]
 pub fn export_appearance_theme(theme: AppearanceTheme) -> Result<Option<String>, String> {
     let theme = normalize_appearance_theme(theme)?;
     let file_name = format!("{}.json", safe_file_stem(&theme.name));
@@ -437,6 +466,95 @@ fn normalize_language(language: Option<&str>) -> String {
     } else {
         "en".to_string()
     }
+}
+
+fn normalize_fader_curve_presets(presets: Vec<FaderCurvePreset>) -> Vec<FaderCurvePreset> {
+    let mut output: Vec<FaderCurvePreset> = Vec::new();
+    for preset in presets {
+        if output.len() >= MAX_FADER_CURVE_PRESETS {
+            break;
+        }
+        let Some(mut normalized) = normalize_fader_curve_preset(preset) else {
+            continue;
+        };
+        normalized.name = unique_curve_preset_name(&output, &normalized.name);
+        normalized.id = unique_curve_preset_id(&output, &normalized.id);
+        output.push(normalized);
+    }
+    output
+}
+
+fn normalize_fader_curve_preset(mut preset: FaderCurvePreset) -> Option<FaderCurvePreset> {
+    preset.name = normalize_curve_preset_name(&preset.name);
+    if preset.name.is_empty() {
+        return None;
+    }
+    preset.id = normalize_id(&preset.id, &normalize_id(&preset.name, "curve-preset"));
+    preset.points = normalize_curve_preset_points(preset.points);
+    if preset.points.len() < 2 {
+        return None;
+    }
+    Some(preset)
+}
+
+fn normalize_curve_preset_points(points: Vec<FaderCurvePoint>) -> Vec<FaderCurvePoint> {
+    let mut normalized: Vec<FaderCurvePoint> = points
+        .into_iter()
+        .map(|point| FaderCurvePoint {
+            x: point.x.clamp(0.0, 1.0),
+            y: point.y.clamp(0.0, 1.0),
+            curve: point.curve.clamp(-1.0, 1.0),
+        })
+        .collect();
+    normalized.sort_by(|left, right| left.x.total_cmp(&right.x));
+    if normalized.len() >= 2 {
+        normalized[0].x = 0.0;
+        if let Some(last) = normalized.last_mut() {
+            last.x = 1.0;
+            last.curve = 0.0;
+        }
+    }
+    normalized
+}
+
+fn normalize_curve_preset_name(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .chars()
+        .take(64)
+        .collect()
+}
+
+fn unique_curve_preset_name(existing: &[FaderCurvePreset], candidate: &str) -> String {
+    let base = normalize_curve_preset_name(candidate);
+    let mut name = base.clone();
+    let mut counter = 2;
+    while existing
+        .iter()
+        .any(|preset| preset.name.eq_ignore_ascii_case(&name))
+    {
+        let suffix = format!(" {}", counter);
+        let keep = 64usize.saturating_sub(suffix.chars().count()).max(1);
+        name = format!("{}{}", base.chars().take(keep).collect::<String>(), suffix);
+        counter += 1;
+    }
+    name
+}
+
+fn unique_curve_preset_id(existing: &[FaderCurvePreset], candidate: &str) -> String {
+    let base = normalize_id(candidate, "curve-preset");
+    let mut id = base.clone();
+    let mut counter = 2;
+    while existing.iter().any(|preset| preset.id == id) {
+        let suffix = format!("-{}", counter);
+        let keep = 64usize.saturating_sub(suffix.chars().count()).max(1);
+        id = format!("{}{}", base.chars().take(keep).collect::<String>(), suffix);
+        counter += 1;
+    }
+    id
 }
 
 fn normalize_appearance_settings(
@@ -1015,8 +1133,11 @@ pub fn pick_autohotkey_script_path() -> Result<Option<PickAutoHotkeyScriptResult
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_appearance_settings;
-    use crate::app_settings::{AppAppearanceSettings, AppearanceTheme};
+    use super::{normalize_appearance_settings, normalize_fader_curve_presets};
+    use crate::{
+        app_settings::{AppAppearanceSettings, AppearanceTheme, FaderCurvePreset},
+        model::FaderCurvePoint,
+    };
 
     #[test]
     fn appearance_surface_contrast_and_icon_glow_are_clamped() {
@@ -1037,5 +1158,103 @@ mod tests {
         assert_eq!(normalized.icon_glow, 0.0);
         assert_eq!(normalized.custom_themes[0].surface_contrast, 0.0);
         assert_eq!(normalized.custom_themes[0].icon_glow, 100.0);
+    }
+
+    #[test]
+    fn fader_curve_presets_are_normalized() {
+        let presets = normalize_fader_curve_presets(vec![
+            FaderCurvePreset {
+                id: "Drums Ride".to_string(),
+                name: "  Drums   Ride  ".to_string(),
+                points: vec![
+                    FaderCurvePoint {
+                        x: 1.2,
+                        y: -1.0,
+                        curve: 2.0,
+                    },
+                    FaderCurvePoint {
+                        x: 0.4,
+                        y: 0.8,
+                        curve: -0.4,
+                    },
+                    FaderCurvePoint {
+                        x: -0.2,
+                        y: 2.0,
+                        curve: 0.25,
+                    },
+                ],
+            },
+            FaderCurvePreset {
+                id: "Drums Ride".to_string(),
+                name: "Drums Ride".to_string(),
+                points: vec![
+                    FaderCurvePoint {
+                        x: 0.0,
+                        y: 0.0,
+                        curve: 0.0,
+                    },
+                    FaderCurvePoint {
+                        x: 1.0,
+                        y: 1.0,
+                        curve: 0.0,
+                    },
+                ],
+            },
+            FaderCurvePreset {
+                id: "ignored".to_string(),
+                name: "   ".to_string(),
+                points: vec![
+                    FaderCurvePoint {
+                        x: 0.0,
+                        y: 0.0,
+                        curve: 0.0,
+                    },
+                    FaderCurvePoint {
+                        x: 1.0,
+                        y: 1.0,
+                        curve: 0.0,
+                    },
+                ],
+            },
+        ]);
+
+        assert_eq!(presets.len(), 2);
+        assert_eq!(presets[0].id, "drums-ride");
+        assert_eq!(presets[0].name, "Drums Ride");
+        assert_eq!(presets[0].points[0].x, 0.0);
+        assert_eq!(presets[0].points[0].y, 1.0);
+        assert_eq!(presets[0].points[0].curve, 0.25);
+        assert_eq!(presets[0].points[1].curve, -0.4);
+        assert_eq!(presets[0].points[2].x, 1.0);
+        assert_eq!(presets[0].points[2].y, 0.0);
+        assert_eq!(presets[0].points[2].curve, 0.0);
+        assert_eq!(presets[1].id, "drums-ride-2");
+        assert_eq!(presets[1].name, "Drums Ride 2");
+    }
+
+    #[test]
+    fn fader_curve_presets_are_capped() {
+        let presets = normalize_fader_curve_presets(
+            (0..55)
+                .map(|index| FaderCurvePreset {
+                    id: format!("curve-{index}"),
+                    name: format!("Curve {index}"),
+                    points: vec![
+                        FaderCurvePoint {
+                            x: 0.0,
+                            y: 0.0,
+                            curve: 0.0,
+                        },
+                        FaderCurvePoint {
+                            x: 1.0,
+                            y: 1.0,
+                            curve: 0.0,
+                        },
+                    ],
+                })
+                .collect(),
+        );
+
+        assert_eq!(presets.len(), 50);
     }
 }

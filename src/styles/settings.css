@@ -2887,6 +2887,99 @@ body[data-theme] #binding-config-panel .binding-config-curve-card {
   border-color: var(--binding-config-border-soft);
 }
 
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-search,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-dialog input {
+  background-color: var(--binding-config-control-bg);
+  border-color: var(--binding-config-border-soft);
+  color: var(--text-primary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button[aria-expanded="true"] {
+  background-color: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button::after {
+  color: var(--text-secondary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button:hover::after,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button[aria-expanded="true"]::after {
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-menu,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-dialog-card {
+  background: var(--surface-raised);
+  border-color: var(--binding-config-border-soft);
+  box-shadow: var(--shadow-raised);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-option,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-action {
+  color: var(--text-primary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-option:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-option.is-selected {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--control-border));
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row.is-selected {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--control-border));
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row:hover .binding-config-curve-preset-option,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row.is-selected .binding-config-curve-preset-option,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row .binding-config-curve-preset-option:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row .binding-config-curve-preset-option.is-selected {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row:hover .binding-config-curve-preset-action,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row.is-selected .binding-config-curve-preset-action {
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-action:hover {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--control-border));
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-action--danger:hover {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--control-border));
+  color: var(--danger);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-toolbar-label,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-heading,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-empty,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-form-title {
+  color: var(--text-secondary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-button--danger {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--control-border));
+  color: var(--danger);
+}
+
+body[data-theme] #binding-config-panel .binding-config-button--danger:hover {
+  background: color-mix(in srgb, var(--danger-soft) 82%, var(--surface-raised) 18%);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 body[data-theme] #binding-config-panel .binding-config-label,
 body[data-theme] #binding-config-panel .binding-config-preview-summary-value,
 body[data-theme] #binding-config-panel .binding-config-preview-track,

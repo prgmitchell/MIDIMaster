@@ -349,6 +349,7 @@ fn main() {
             update_app_settings,
             update_midi_device_inventory_consent,
             update_appearance_settings,
+            update_fader_curve_presets,
             export_appearance_theme,
             import_appearance_theme,
             set_theme_preference,

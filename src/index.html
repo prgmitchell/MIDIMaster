@@ -741,9 +741,38 @@
             <section id="binding-config-curve-section" class="binding-config-section binding-config-section--curve">
               <div class="binding-config-title-row">
                 <span class="binding-config-title" data-i18n="bindings.curve">Curve</span>
-                <div class="binding-config-title-actions">
-                  <button id="binding-config-custom-reset" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.reset">Reset</button>
-                  <span class="binding-config-info-pill" title="Choose how raw MIDI movement maps to output volume." data-i18n-title="bindings.chooseCurveInfo">i</span>
+              </div>
+              <div class="binding-config-curve-toolbar">
+                <span class="binding-config-curve-toolbar-label" data-i18n="bindings.presets">Presets</span>
+                <div id="binding-config-curve-preset-root" class="binding-config-curve-preset-root">
+                  <button
+                    id="binding-config-curve-preset-button"
+                    type="button"
+                    class="binding-config-curve-preset-button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                  >Linear</button>
+                  <div id="binding-config-curve-preset-menu" class="binding-config-curve-preset-menu hidden">
+                    <label class="binding-config-curve-preset-search">
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="m21 21-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" />
+                      </svg>
+                      <input id="binding-config-curve-preset-search" type="search" placeholder="Search presets..." autocomplete="off" data-i18n-placeholder="bindings.curvePresetSearchPlaceholder" />
+                    </label>
+                    <div id="binding-config-curve-preset-list" class="binding-config-curve-preset-list" role="listbox" aria-label="Curve presets" data-i18n-aria-label="bindings.curvePresetOptions"></div>
+                  </div>
+                </div>
+                <button id="binding-config-curve-preset-save" type="button" class="binding-config-button binding-config-button--primary" data-i18n="bindings.saveCurrentCurve">Save Current</button>
+                <button id="binding-config-custom-reset" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.reset">Reset</button>
+              </div>
+              <div id="binding-config-curve-preset-form" class="binding-config-curve-preset-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="binding-config-curve-preset-form-title">
+                <div class="binding-config-curve-preset-dialog-card">
+                  <span id="binding-config-curve-preset-form-title" class="binding-config-curve-preset-form-title" data-i18n="bindings.curvePresetSaveTitle">Save Curve Preset</span>
+                  <input id="binding-config-curve-preset-name" type="text" maxlength="64" placeholder="Preset name" autocomplete="off" spellcheck="false" data-i18n-placeholder="bindings.curvePresetNamePlaceholder" />
+                  <div class="binding-config-curve-preset-dialog-actions">
+                    <button id="binding-config-curve-preset-form-cancel" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.cancel">Cancel</button>
+                    <button id="binding-config-curve-preset-form-save" type="button" class="binding-config-button binding-config-button--primary" data-i18n="common.save">Save</button>
+                  </div>
                 </div>
               </div>
               <div id="binding-config-curve-cards" class="binding-config-curve-cards" role="listbox" aria-label="Fader curve options" data-i18n-aria-label="bindings.curveOptions"></div>

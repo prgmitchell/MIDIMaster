@@ -371,6 +371,27 @@ fn deserialize_custom_curve_points_when_present() {
     assert_eq!(binding.custom_curve.len(), 3);
     assert_eq!(binding.custom_curve[1].x, 0.4);
     assert_eq!(binding.custom_curve[1].y, 0.7);
+    assert_eq!(binding.custom_curve[1].curve, 0.0);
+}
+
+#[test]
+fn deserialize_custom_curve_preserves_segment_bend() {
+    let mut json = binding_base_json();
+    json.as_object_mut()
+        .unwrap()
+        .insert("fader_curve".to_string(), serde_json::json!("Custom"));
+    json.as_object_mut().unwrap().insert(
+        "custom_curve".to_string(),
+        serde_json::json!([
+            { "x": 0.0, "y": 0.0, "curve": 0.35 },
+            { "x": 1.0, "y": 1.0 }
+        ]),
+    );
+
+    let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+    assert_eq!(binding.fader_curve, FaderCurve::Custom);
+    assert_eq!(binding.custom_curve[0].curve, 0.35);
+    assert_eq!(binding.custom_curve[1].curve, 0.0);
 }
 
 #[test]

@@ -120,7 +120,7 @@ export function normalizeCustomCurve(points) {
 
 export function customCurvePoints(binding) {
   const points = normalizeCustomCurve(binding?.custom_curve);
-  if (Array.isArray(points) && points.length >= 3) {
+  if (Array.isArray(points) && points.length >= 2) {
     return points;
   }
   return defaultCustomCurve();
@@ -150,7 +150,7 @@ export function curveHelpText(curve) {
     return "S-Curve response. Soft at the edges with a more assertive response through the center.";
   }
   if (current === "Custom") {
-    return "Custom response. Drag the control points to shape how MIDI movement maps to output.";
+    return "Custom response. Drag dots, double-click line to add, right-click dot to delete, Alt-drag line to curve.";
   }
   return "Linear response. Output value changes at the same rate as the fader movement.";
 }

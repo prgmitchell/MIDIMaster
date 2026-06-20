@@ -545,14 +545,20 @@ export function normalizeCustomCurvePoints(points) {
         .map((point) => ({
           x: Math.min(1, Math.max(0, Number(point?.x) || 0)),
           y: Math.min(1, Math.max(0, Number(point?.y) || 0)),
+          curve: Math.min(1, Math.max(-1, Number(point?.curve) || 0)),
         }))
         .sort((a, b) => a.x - b.x)
     : [];
   if (normalized.length >= 2) {
     normalized[0].x = 0;
     normalized[normalized.length - 1].x = 1;
+    normalized[normalized.length - 1].curve = 0;
   }
-  return normalized;
+  return normalized.map((point) => (
+    Math.abs(point.curve) < 0.0001
+      ? { x: point.x, y: point.y }
+      : point
+  ));
 }
 
 export function applyCustomFaderCurve(points, normalized) {
@@ -567,7 +573,9 @@ export function applyCustomFaderCurve(points, normalized) {
     const span = end.x - start.x;
     if (Math.abs(span) < 0.00001) return end.y;
     const t = Math.min(1, Math.max(0, (clamped - start.x) / span));
-    return start.y + ((end.y - start.y) * t);
+    const linear = start.y + ((end.y - start.y) * t);
+    const curveOffset = (Number(start.curve) || 0) * 2 * (1 - t) * t;
+    return Math.min(1, Math.max(0, linear + curveOffset));
   }
   return normalizedPoints[normalizedPoints.length - 1].y;
 }

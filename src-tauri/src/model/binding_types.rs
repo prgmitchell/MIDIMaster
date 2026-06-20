@@ -72,10 +72,23 @@ pub enum FaderCurve {
     Custom,
 }
 
+fn default_curve_segment() -> f32 {
+    0.0
+}
+
+fn is_default_curve_segment(value: &f32) -> bool {
+    value.abs() < f32::EPSILON
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FaderCurvePoint {
     pub x: f32,
     pub y: f32,
+    #[serde(
+        default = "default_curve_segment",
+        skip_serializing_if = "is_default_curve_segment"
+    )]
+    pub curve: f32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
