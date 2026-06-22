@@ -49,6 +49,7 @@ import {
   resolveBindingVolumeValue,
   resolveTargetChangeVolumeValue,
 } from "./value_sync.js";
+import { reorderVisibleBindings } from "./reorder.js";
 import {
   MAX_FADER_CURVE_PRESETS,
   curvePointsForBinding,
@@ -4338,6 +4339,7 @@ export function createBindingsFeature({
     d.bindingsContainer.innerHTML = "";
     const searchQuery = getSearchQuery();
     const typeFilter = getBindingTypeFilter();
+    const visibleBindingIds = [];
     let renderedCount = 0;
 
     if (!Array.isArray(bindings) || bindings.length === 0) {
@@ -4362,6 +4364,9 @@ export function createBindingsFeature({
         if (searchQuery && !bindingSearchText(binding, index).includes(searchQuery)) {
           return;
         }
+        const visibleIndex = visibleBindingIds.length;
+        const bindingId = String(binding.id || "");
+        visibleBindingIds.push(bindingId);
         renderedCount += 1;
         const item = document.createElement("div");
         item.className = "list-item binding-item";
@@ -4370,7 +4375,8 @@ export function createBindingsFeature({
         row.className = "binding-row";
 
         item.dataset.index = index;
-        item.dataset.bindingId = String(binding.id || "");
+        item.dataset.visibleIndex = String(visibleIndex);
+        item.dataset.bindingId = bindingId;
 
         const fallbackName = fallbackNameFor(binding, index);
         const isEditing = binding.id === getEditingId();
@@ -4477,7 +4483,11 @@ export function createBindingsFeature({
         rowNumber.addEventListener("pointerdown", (event) => {
           event.preventDefault();
           rowNumber.setPointerCapture(event.pointerId);
-          startBindingDrag(item, index, event);
+          startBindingDrag(item, {
+            bindingId,
+            visibleIndex,
+            visibleBindingIds: visibleBindingIds.slice(),
+          }, event);
         });
         rowNumber.addEventListener("pointerup", (event) => {
           rowNumber.releasePointerCapture(event.pointerId);
@@ -5120,7 +5130,7 @@ export function createBindingsFeature({
     flushQueuedBindingReveal();
   }
 
-  function startBindingDrag(item, index, event) {
+  function startBindingDrag(item, dragInfo, event) {
     const rect = item.getBoundingClientRect();
     const ghost = item.cloneNode(true);
     ghost.classList.add("binding-ghost");
@@ -5136,8 +5146,20 @@ export function createBindingsFeature({
 
     document.body.appendChild(ghost);
 
+    const bindingId = String(dragInfo?.bindingId || item.dataset?.bindingId || "");
+    const visibleIndex = Number.isInteger(dragInfo?.visibleIndex)
+      ? dragInfo.visibleIndex
+      : Number(item.dataset?.visibleIndex || 0);
+    const visibleBindingIds = Array.isArray(dragInfo?.visibleBindingIds)
+      ? dragInfo.visibleBindingIds.map((id) => String(id || ""))
+      : Array.from(d.bindingsContainer.querySelectorAll(".binding-item[data-binding-id]"))
+        .map((bindingItem) => String(bindingItem.dataset?.bindingId || ""))
+        .filter(Boolean);
+
     setDrag({
-      index,
+      bindingId,
+      visibleIndex,
+      visibleBindingIds,
       item,
       ghost,
       placeholder,
@@ -5185,14 +5207,18 @@ export function createBindingsFeature({
     }
   }
 
-  function placeholderIndex() {
+  function placeholderVisibleIndex(visibleBindingIds = []) {
+    const visibleIdSet = new Set(visibleBindingIds.map((id) => String(id || "")));
     const children = Array.from(d.bindingsContainer.children);
     let index = 0;
     for (const child of children) {
       if (child.classList.contains("binding-placeholder")) {
         return index;
       }
-      if (child.classList.contains("binding-item")) {
+      if (
+        child.classList.contains("binding-item")
+        && visibleIdSet.has(String(child.dataset?.bindingId || ""))
+      ) {
         index += 1;
       }
     }
@@ -5202,8 +5228,8 @@ export function createBindingsFeature({
   async function endBindingDrag() {
     const dragState = getDrag();
     if (!dragState) return;
-    const { index, item, ghost, placeholder, active } = dragState;
-    const newIndex = active ? placeholderIndex() : null;
+    const { bindingId, visibleIndex, visibleBindingIds, item, ghost, placeholder, active } = dragState;
+    const newIndex = active ? placeholderVisibleIndex(visibleBindingIds) : null;
     setDrag(null);
 
     item.style.display = "";
@@ -5214,14 +5240,19 @@ export function createBindingsFeature({
     }
     document.body.classList.remove("dragging-binding");
 
-    if (active && newIndex !== null && newIndex !== index) {
-      const insertIndex = (newIndex > index) ? (newIndex - 1) : newIndex;
-      const next = getB();
-      const [moved] = next.splice(index, 1);
-      next.splice(insertIndex, 0, moved);
-      setB(next);
-      renderBindings();
-      finishBindingUiMutation("reorder bindings");
+    if (active && newIndex !== null) {
+      const destinationVisibleIndex = (newIndex > visibleIndex) ? (newIndex - 1) : newIndex;
+      const result = reorderVisibleBindings(
+        getB(),
+        visibleBindingIds,
+        bindingId,
+        destinationVisibleIndex,
+      );
+      if (result.changed) {
+        setB(result.bindings);
+        renderBindings();
+        finishBindingUiMutation("reorder bindings");
+      }
     }
 
     flushPendingRerender();
