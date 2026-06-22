@@ -128,7 +128,9 @@
   "bindings.curveOptions": "Faderkurvenoptionen",
   "bindings.linearHelp": "Lineare Reaktion. Der Ausgangswert ändert sich mit der gleichen Geschwindigkeit wie die Faderbewegung.",
   "bindings.lightWhenMapped": "Leuchten, wenn zugeordnet",
-  "bindings.lightWhenMappedHelp": "Lässt die Controller-Leuchte eingeschaltet, wenn dieser Button einem Ziel zugeordnet ist.",
+  "bindings.lightWhenMappedHelp": "Hält die Controller-Leuchte eingeschaltet, wenn diese Taste ein zugewiesenes Ziel hat. Überschreibt das Leuchtverhalten von Umschaltern.",
+  "bindings.toggleMuteLight": "Tastenbeleuchtung",
+  "bindings.toggleMuteLightHelp": "Wähle, wann die Tastenbeleuchtung eingeschaltet wird.",
   "bindings.lightStateControlledHelp": "Diese Leuchte folgt dem tatsächlichen Zielstatus.",
   "bindings.lightUnavailableHelp": "Wählen Sie eine zustandslose Button-Aktion, um die Zuordnungsbeleuchtung zu verwenden.",
   "bindings.mute": "Mut",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey nicht konfiguriert",
   "dialogs.autoHotkeyNoAssociationMessage": "Windows hat keine App mit .ahk-Dateien verknüpft. Installieren Sie AutoHotkey oder wählen Sie eine Standard-App für .ahk-Dateien.",
   "dialogs.autoHotkeyLaunchFailedTitle": "Skriptstart fehlgeschlagen",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster konnte dieses AutoHotkey-Skript nicht ausführen: {message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster konnte dieses AutoHotkey-Skript nicht ausführen: {message}",
+  "bindings.buttonLightWhenMapped": "Wenn zugewiesen",
+  "bindings.buttonLightWhenOn": "Wenn ein",
+  "bindings.buttonLightWhenOff": "Wenn aus",
+  "bindings.buttonLightWhilePressed": "Während gedrückt"
 }

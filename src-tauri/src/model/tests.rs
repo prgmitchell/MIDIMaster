@@ -490,14 +490,14 @@ fn mapped_button_light_marks_toggle_mute_application_targets_as_mapped() {
         }],
     );
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
-    assert_eq!(binding.idle_button_light_feedback_value(), Some(1.0));
+    assert_eq!(binding.button_light_feedback_value(None, None), Some(1.0));
 }
 
 #[test]
 fn mapped_button_light_keeps_toggle_mute_unset_targets_dark() {
     let binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Unset]);
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(0.0));
-    assert_eq!(binding.idle_button_light_feedback_value(), Some(0.0));
+    assert_eq!(binding.button_light_feedback_value(None, None), Some(0.0));
 }
 
 #[test]
@@ -524,7 +524,7 @@ fn mapped_button_light_marks_stateful_integration_actions_as_mapped() {
         }],
     );
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
-    assert_eq!(binding.idle_button_light_feedback_value(), Some(1.0));
+    assert_eq!(binding.button_light_feedback_value(None, None), Some(1.0));
 }
 
 #[test]
@@ -538,7 +538,7 @@ fn mapped_button_light_marks_obs_toggle_actions_as_mapped() {
         }],
     );
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
-    assert_eq!(binding.idle_button_light_feedback_value(), Some(1.0));
+    assert_eq!(binding.button_light_feedback_value(None, None), Some(1.0));
 }
 
 #[test]
@@ -555,7 +555,7 @@ fn idle_button_light_clears_activity_mode_for_stateless_actions() {
     });
 
     assert_eq!(binding.mapped_button_light_feedback_value(), None);
-    assert_eq!(binding.idle_button_light_feedback_value(), Some(0.0));
+    assert_eq!(binding.button_light_feedback_value(None, None), Some(0.0));
 }
 
 #[test]
@@ -567,25 +567,145 @@ fn activity_button_light_tracks_button_press_for_stateless_actions() {
     binding.button_light_mode = ButtonLightMode::Activity;
 
     assert_eq!(
-        binding.activity_button_light_feedback_value(false),
+        binding.button_light_feedback_value(Some(false), None),
         Some(0.0)
     );
     assert_eq!(
-        binding.activity_button_light_feedback_value(true),
+        binding.button_light_feedback_value(Some(true), None),
         Some(1.0)
     );
 }
 
 #[test]
-fn activity_button_light_does_not_override_mapped_or_stateful_feedback() {
-    let mapped = mapped_button_binding(
-        BindingAction::MediaPlayPause,
-        vec![BindingTarget::MediaControl],
-    );
-    assert_eq!(mapped.activity_button_light_feedback_value(true), None);
+fn legacy_activity_button_light_follows_state_with_press_fallback() {
+    let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    binding.button_light_mode = ButtonLightMode::Activity;
 
-    let mut stateful =
-        mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
-    stateful.button_light_mode = ButtonLightMode::Activity;
-    assert_eq!(stateful.activity_button_light_feedback_value(true), None);
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(true)),
+        Some(1.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), Some(false)),
+        Some(0.0)
+    );
+
+    binding.action = BindingAction::OpenApplication;
+    binding.targets = vec![BindingTarget::OpenApplication];
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), None),
+        Some(1.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), None),
+        Some(0.0)
+    );
+}
+
+#[test]
+fn follow_state_button_light_follows_state_with_press_fallback() {
+    let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    binding.button_light_mode = ButtonLightMode::FollowState;
+
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(true)),
+        Some(1.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), Some(false)),
+        Some(0.0)
+    );
+
+    binding.action = BindingAction::MediaPlayPause;
+    binding.targets = vec![BindingTarget::MediaControl];
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), None),
+        Some(1.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), None),
+        Some(0.0)
+    );
+}
+
+#[test]
+fn invert_state_button_light_inverts_state_with_release_fallback() {
+    let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    binding.button_light_mode = ButtonLightMode::InvertState;
+
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(true)),
+        Some(0.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), Some(false)),
+        Some(1.0)
+    );
+
+    binding.action = BindingAction::MediaPlayPause;
+    binding.targets = vec![BindingTarget::MediaControl];
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), None),
+        Some(0.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), None),
+        Some(1.0)
+    );
+}
+
+#[test]
+fn pressed_button_light_ignores_state() {
+    let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    binding.button_light_mode = ButtonLightMode::Pressed;
+
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(true)),
+        Some(0.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), Some(false)),
+        Some(1.0)
+    );
+}
+
+#[test]
+fn mapped_button_light_overrides_toggle_mute_feedback() {
+    let binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(false)),
+        Some(1.0)
+    );
+    assert_eq!(
+        binding.button_light_feedback_value(Some(true), Some(true)),
+        Some(1.0)
+    );
+}
+
+#[test]
+fn mapped_button_light_overrides_toggle_effect_feedback() {
+    let binding = mapped_button_binding(BindingAction::ToggleEffect, vec![BindingTarget::Master]);
+
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(false)),
+        Some(1.0)
+    );
+}
+
+#[test]
+fn mapped_button_light_overrides_stateful_integration_feedback() {
+    let binding = mapped_button_binding(
+        BindingAction::Volume,
+        vec![BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "action".to_string(),
+            data: serde_json::json!({ "action_kind": "stateful", "action": "ToggleRecording" }),
+        }],
+    );
+
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(false)),
+        Some(1.0)
+    );
 }

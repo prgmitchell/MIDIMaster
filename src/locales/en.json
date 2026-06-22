@@ -128,7 +128,9 @@
   "bindings.curveOptions": "Fader curve options",
   "bindings.linearHelp": "Linear response. Output value changes at the same rate as the fader movement.",
   "bindings.lightWhenMapped": "Light when mapped",
-  "bindings.lightWhenMappedHelp": "Keep the controller light on when this button has a mapped target.",
+  "bindings.lightWhenMappedHelp": "Keep the controller light on when this button has a mapped target. Overrides toggle light behavior.",
+  "bindings.toggleMuteLight": "Button light",
+  "bindings.toggleMuteLightHelp": "Choose when the button light turns on.",
   "bindings.lightStateControlledHelp": "This button shows the target state.",
   "bindings.lightUnavailableHelp": "Choose a stateless button action to use mapped lighting.",
   "bindings.mute": "Mute",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey Not Configured",
   "dialogs.autoHotkeyNoAssociationMessage": "Windows doesn't have an app associated with .ahk files. Install AutoHotkey or choose a default app for .ahk files.",
   "dialogs.autoHotkeyLaunchFailedTitle": "Script Launch Failed",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster couldn't run this AutoHotkey script: {message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster couldn't run this AutoHotkey script: {message}",
+  "bindings.buttonLightWhenMapped": "When Mapped",
+  "bindings.buttonLightWhenOn": "When On",
+  "bindings.buttonLightWhenOff": "When Off",
+  "bindings.buttonLightWhilePressed": "While Pressed"
 }

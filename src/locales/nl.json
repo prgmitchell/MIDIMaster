@@ -128,7 +128,9 @@
   "bindings.curveOptions": "Fadercurve-opties",
   "bindings.linearHelp": "Lineaire reactie. De outputwaarde verandert met dezelfde snelheid als de faderbeweging.",
   "bindings.lightWhenMapped": "Licht bij toewijzing",
-  "bindings.lightWhenMappedHelp": "Houd het lampje op de controller aan wanneer deze knop een toegewezen doel heeft.",
+  "bindings.lightWhenMappedHelp": "Houdt de controllerverlichting aan wanneer deze knop een toegewezen doel heeft. Overschrijft het lichtgedrag van schakelaars.",
+  "bindings.toggleMuteLight": "Knopverlichting",
+  "bindings.toggleMuteLightHelp": "Kies wanneer de knopverlichting aangaat.",
   "bindings.lightStateControlledHelp": "Dit licht volgt de werkelijke doelstatus.",
   "bindings.lightUnavailableHelp": "Kies een statusloze knopactie om toegewezen verlichting te gebruiken.",
   "bindings.mute": "Dempen",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey niet geconfigureerd",
   "dialogs.autoHotkeyNoAssociationMessage": "Windows heeft geen app gekoppeld aan .ahk-bestanden. Installeer AutoHotkey of kies een standaardapp voor .ahk-bestanden.",
   "dialogs.autoHotkeyLaunchFailedTitle": "Script starten mislukt",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMAster kon dit AutoHotkey script niet uitvoeren: {message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMAster kon dit AutoHotkey script niet uitvoeren: {message}",
+  "bindings.buttonLightWhenMapped": "Bij toewijzing",
+  "bindings.buttonLightWhenOn": "Wanneer aan",
+  "bindings.buttonLightWhenOff": "Wanneer uit",
+  "bindings.buttonLightWhilePressed": "Tijdens indrukken"
 }

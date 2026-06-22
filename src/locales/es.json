@@ -128,7 +128,9 @@
   "bindings.curveOptions": "Opciones de curvas más rápidas",
   "bindings.linearHelp": "Respuesta lineal. El valor de salida cambia al mismo ritmo que el movimiento de la moda.",
   "bindings.lightWhenMapped": "Luz al estar asignado",
-  "bindings.lightWhenMappedHelp": "Mantiene encendida la luz del controlador cuando este botón tiene un destino asignado.",
+  "bindings.lightWhenMappedHelp": "Mantiene encendida la luz del controlador cuando este botón tiene un destino asignado. Anula el comportamiento de luz de los conmutadores.",
+  "bindings.toggleMuteLight": "Luz del botón",
+  "bindings.toggleMuteLightHelp": "Elige cuándo se enciende la luz del botón.",
   "bindings.lightStateControlledHelp": "Esta luz sigue el estado real del destino.",
   "bindings.lightUnavailableHelp": "Elija una acción de botón sin estado para usar la iluminación asignada.",
   "bindings.mute": "Mute",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey no configurado",
   "dialogs.autoHotkeyNoAssociationMessage": "Windows no tiene una aplicación asociada con archivos .ahk. Instala AutoHotkey o elige una aplicación predeterminada para archivos .ahk.",
   "dialogs.autoHotkeyLaunchFailedTitle": "Error al iniciar el script",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster no pudo ejecutar este script de AutoHotkey: {message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster no pudo ejecutar este script de AutoHotkey: {message}",
+  "bindings.buttonLightWhenMapped": "Cuando está asignado",
+  "bindings.buttonLightWhenOn": "Cuando está activado",
+  "bindings.buttonLightWhenOff": "Cuando está desactivado",
+  "bindings.buttonLightWhilePressed": "Mientras se pulsa"
 }

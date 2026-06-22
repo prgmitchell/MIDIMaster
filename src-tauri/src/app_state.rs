@@ -471,15 +471,14 @@ impl AppState {
 
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
-            let idle_feedback_value = binding.idle_button_light_feedback_value().map(|value| {
-                if binding.activity_button_light_feedback_value(true) == Some(1.0)
-                    && self.activity_button_light_input_active(&key)
-                {
-                    1.0
-                } else {
-                    value
-                }
-            });
+            let input_active = self.activity_button_light_input_active(&key);
+            let cached_state_active = if binding.uses_stateful_toggle_feedback() {
+                self.binding_action_value(&key).map(|value| value > 0.5)
+            } else {
+                None
+            };
+            let idle_feedback_value =
+                binding.button_light_feedback_value(Some(input_active), cached_state_active);
 
             let primary_target = binding.primary_target();
             if matches!(
@@ -651,7 +650,15 @@ impl AppState {
                     last_target_mute_state.insert(key.clone(), val > 0.5);
                 }
 
-                feedback.insert(key, idle_feedback_value.unwrap_or(val));
+                let state_active = if binding.action == model::BindingAction::ToggleMute {
+                    Some(val > 0.5)
+                } else {
+                    cached_state_active
+                };
+                let feedback_value = binding
+                    .button_light_feedback_value(Some(input_active), state_active)
+                    .unwrap_or(val);
+                feedback.insert(key, feedback_value);
             } else if let Some(value) = idle_feedback_value {
                 feedback.insert(key, value);
             }
@@ -673,15 +680,29 @@ impl AppState {
 
         if let Ok(mut feedback) = self.feedback_values.lock() {
             for binding in &profile.bindings {
-                if let Some(value) = binding.idle_button_light_feedback_value() {
-                    feedback.insert(BindingKey::from_binding(binding), value);
+                let key = BindingKey::from_binding(binding);
+                let state_active = if binding.uses_stateful_toggle_feedback() {
+                    self.binding_action_value(&key).map(|value| value > 0.5)
+                } else {
+                    None
+                };
+                if let Some(value) = binding.button_light_feedback_value(Some(false), state_active)
+                {
+                    feedback.insert(key, value);
                 }
             }
         }
 
         if let Ok(mut midi) = self.midi.lock() {
             for binding in &profile.bindings {
-                let Some(value) = binding.idle_button_light_feedback_value() else {
+                let key = BindingKey::from_binding(binding);
+                let state_active = if binding.uses_stateful_toggle_feedback() {
+                    self.binding_action_value(&key).map(|value| value > 0.5)
+                } else {
+                    None
+                };
+                let Some(value) = binding.button_light_feedback_value(Some(false), state_active)
+                else {
                     continue;
                 };
                 let _ = midi.send_binding_feedback(binding, value);

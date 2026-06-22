@@ -767,9 +767,13 @@ pub fn update_midi_feedback(
 
         if matches {
             let key = BindingKey::from_binding(binding);
+            let state_active = if binding.uses_stateful_toggle_feedback() {
+                Some(value > 0.5)
+            } else {
+                None
+            };
             let feedback_value = binding
-                .mapped_button_light_feedback_value()
-                .or_else(|| binding.idle_button_light_feedback_value())
+                .button_light_feedback_value(None, state_active)
                 .unwrap_or(value);
 
             let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
@@ -832,9 +836,18 @@ pub fn set_binding_feedback(
     let affected_targets = binding.normalized_targets();
     let effective_action = action.clone().unwrap_or_else(|| binding.action.clone());
     let action_matches_binding = action.is_none() || effective_action == binding.action;
+    let input_active = input_value.map(|value| value > 0.0);
+    let state_active = if binding.uses_stateful_toggle_feedback()
+        || matches!(
+            effective_action,
+            model::BindingAction::ToggleMute | model::BindingAction::ToggleEffect
+        ) {
+        Some(value > 0.5)
+    } else {
+        None
+    };
     let feedback_value = binding
-        .mapped_button_light_feedback_value()
-        .or_else(|| binding.idle_button_light_feedback_value())
+        .button_light_feedback_value(input_active, state_active)
         .unwrap_or(value);
     if binding.uses_stateful_toggle_feedback()
         || matches!(
@@ -912,11 +925,14 @@ pub fn set_binding_feedback(
                 let primary_key = FeedbackControlKey::from_binding(candidate);
                 state.set_binding_action_value(&primary_key.to_binding_key(), value);
                 if emitted_controls.insert(primary_key.clone()) {
+                    let candidate_value = candidate
+                        .button_light_feedback_value(None, Some(value > 0.5))
+                        .unwrap_or(value);
                     feedback::send_feedback_to_binding(
                         &state,
                         candidate,
                         FeedbackSendOptions {
-                            value,
+                            value: candidate_value,
                             silent,
                             force_hardware_feedback,
                             context: &format!("toggle_binding:{}", candidate.id),
@@ -942,8 +958,7 @@ pub fn set_binding_feedback(
             let primary_key = FeedbackControlKey::from_binding(candidate);
             if emitted_controls.insert(primary_key.clone()) {
                 let candidate_value = candidate
-                    .mapped_button_light_feedback_value()
-                    .or_else(|| candidate.idle_button_light_feedback_value())
+                    .button_light_feedback_value(input_active, None)
                     .unwrap_or(value);
                 feedback::send_feedback_to_binding(
                     &state,

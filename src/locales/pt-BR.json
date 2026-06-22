@@ -128,7 +128,9 @@
   "bindings.curveOptions": "Opções de curva mais rápidas",
   "bindings.linearHelp": "Resposta linear. O valor de saída muda na mesma taxa que o movimento do fader.",
   "bindings.lightWhenMapped": "Acender quando mapeado",
-  "bindings.lightWhenMappedHelp": "Mantém a luz do controlador acesa quando este botão tem um destino mapeado.",
+  "bindings.lightWhenMappedHelp": "Mantém a luz do controlador acesa quando este botão tem um destino mapeado. Substitui o comportamento de luz dos alternadores.",
+  "bindings.toggleMuteLight": "Luz do botão",
+  "bindings.toggleMuteLightHelp": "Escolha quando a luz do botão acende.",
   "bindings.lightStateControlledHelp": "Esta luz segue o estado real do destino.",
   "bindings.lightUnavailableHelp": "Escolha uma ação de botão sem estado para usar a luz de mapeamento.",
   "bindings.mute": "Mudo",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey não configurado",
   "dialogs.autoHotkeyNoAssociationMessage": "O Windows não tem um aplicativo associado a arquivos .ahk. Instale o AutoHotkey ou escolha um aplicativo padrão para arquivos .ahk.",
   "dialogs.autoHotkeyLaunchFailedTitle": "Falha ao iniciar o script",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster não conseguiu executar este script AutoHotkey: {message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster não conseguiu executar este script AutoHotkey: {message}",
+  "bindings.buttonLightWhenMapped": "Quando mapeado",
+  "bindings.buttonLightWhenOn": "Quando ligado",
+  "bindings.buttonLightWhenOff": "Quando desligado",
+  "bindings.buttonLightWhilePressed": "Enquanto pressionado"
 }

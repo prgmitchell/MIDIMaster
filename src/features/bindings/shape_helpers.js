@@ -177,6 +177,7 @@ export function ensureBindingShape(binding) {
   binding.custom_curve = customCurvePoints(binding);
   binding.mute_behavior = normalizeMuteBehavior(binding.mute_behavior);
   binding.button_light_mode = normalizeButtonLightMode(binding.button_light_mode);
+  delete binding.toggle_mute_light_mode;
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
   }

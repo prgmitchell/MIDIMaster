@@ -146,8 +146,8 @@ const {
   bindingConfigSave,
   bindingConfigName,
   bindingConfigButtonLightSection,
-  bindingConfigButtonLightToggle,
-  bindingConfigButtonLightHelp,
+  bindingConfigButtonLightSelectRow,
+  bindingConfigButtonLightSelect,
   bindingConfigButtonLearnSection,
   bindingConfigButtonLearnButton,
   bindingConfigButtonLearnIndicator,
@@ -1213,8 +1213,8 @@ bindingsFeature = createBindingsFeature({
     bindingConfigSave,
     bindingConfigName,
     bindingConfigButtonLightSection,
-    bindingConfigButtonLightToggle,
-    bindingConfigButtonLightHelp,
+    bindingConfigButtonLightSelectRow,
+    bindingConfigButtonLightSelect,
     bindingConfigButtonLearnSection,
     bindingConfigButtonLearnButton,
     bindingConfigButtonLearnIndicator,
@@ -1568,7 +1568,7 @@ function updateButtonVisualFromMidiEvent(binding, payload, inputValue) {
   }
 
   if ((Number(payload?.value) || 0) <= 0) {
-    syncButtonValueVisual(bindingId);
+    syncButtonValueVisual(bindingId, { inputValue });
     return true;
   }
 
@@ -1581,9 +1581,12 @@ function updateButtonVisualFromMidiEvent(binding, payload, inputValue) {
     bindingMuteValues[bindingId] = nextMuted;
     if (muteButton) {
       setInlineMuteButtonState(muteButton, nextMuted);
-    } else {
-      syncButtonValueVisual(bindingId, { muted: nextMuted, stateValue: nextMuted ? 1 : 0 });
     }
+    syncButtonValueVisual(bindingId, {
+      inputValue,
+      muted: nextMuted,
+      stateValue: nextMuted ? 1 : 0,
+    });
     return true;
   }
 
@@ -1592,7 +1595,7 @@ function updateButtonVisualFromMidiEvent(binding, payload, inputValue) {
     : false;
   const nextValue = currentlyOn ? 0.0 : 1.0;
   bindingLastValues[bindingId] = nextValue;
-  syncButtonValueVisual(bindingId, { stateValue: nextValue });
+  syncButtonValueVisual(bindingId, { inputValue, stateValue: nextValue });
   return true;
 }
 
@@ -1734,7 +1737,10 @@ function applyVolumeUpdatePayload(payload, context) {
       }
     } else if (typeof payload.volume === "number") {
       bindingLastValues[payload.binding_id] = payload.volume;
-      syncButtonValueVisual(payload.binding_id, { stateValue: payload.volume });
+      syncButtonValueVisual(payload.binding_id, {
+        stateValue: payload.volume,
+        ...(buttonInputValue != null ? { inputValue: buttonInputValue } : {}),
+      });
     }
   }
 
@@ -2577,10 +2583,12 @@ async function setupListeners() {
     }
 
     if (payload.binding_id != null && typeof payload.muted === "boolean") {
+      const buttonInputValue = typeof payload.input_value === "number" ? payload.input_value : null;
       bindingMuteValues[payload.binding_id] = payload.muted;
       syncButtonValueVisual(payload.binding_id, {
         muted: payload.muted,
         stateValue: payload.muted ? 1 : 0,
+        ...(buttonInputValue != null ? { inputValue: buttonInputValue } : {}),
       });
     }
 

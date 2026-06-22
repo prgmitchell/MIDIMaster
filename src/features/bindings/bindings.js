@@ -4,6 +4,10 @@ import {
   wireDropdownToggle,
 } from "../ui/dropdown_badges.js";
 import {
+  createSelectDropdownShell,
+  renderNativeSelectDropdown,
+} from "../ui/dropdown_select.js";
+import {
   applyCurveToNormalized,
   assignModeTooltip,
   buttonModeValue,
@@ -115,6 +119,7 @@ export function createBindingsFeature({
 
   const getB = (typeof getBindings === "function") ? getBindings : (() => []);
   const setB = (typeof setBindings === "function") ? setBindings : (() => { });
+  let buttonLightDropdown = null;
 
   const getPlayback = (typeof getPlaybackDevices === "function") ? getPlaybackDevices : (() => []);
   const getRecording = (typeof getRecordingDevices === "function") ? getRecordingDevices : (() => []);
@@ -410,6 +415,7 @@ export function createBindingsFeature({
     const storedValue = bindingId != null && bindingLastValues[bindingId] != null
       ? Number(bindingLastValues[bindingId])
       : null;
+    const liveInputValue = getLiveMidiValue(binding?.device_id, binding?.control);
     const mappedMuteValue = bindingId != null && bindingMuteValues[bindingId] != null
       ? Boolean(bindingMuteValues[bindingId])
       : null;
@@ -417,7 +423,7 @@ export function createBindingsFeature({
     return {
       inputValue: Object.prototype.hasOwnProperty.call(overrides, "inputValue")
         ? overrides.inputValue
-        : (behavior === "momentary" ? storedValue : null),
+        : (liveInputValue != null ? liveInputValue : (behavior === "momentary" ? storedValue : null)),
       stateValue: Object.prototype.hasOwnProperty.call(overrides, "stateValue")
         ? overrides.stateValue
         : (behavior === "stateful" && binding?.action !== "ToggleMute" ? storedValue : null),
@@ -429,6 +435,8 @@ export function createBindingsFeature({
   }
 
   function buttonVisualActive(binding, overrides = {}) {
+    const mappedLightValue = mappedButtonLightFeedbackValue(binding);
+    if (mappedLightValue != null) return mappedLightValue > 0.5;
     return resolveButtonVisualActive(binding, buttonVisualOptions(binding, overrides));
   }
 
@@ -561,9 +569,49 @@ export function createBindingsFeature({
   }
 
   function buttonLightLabel(binding) {
-    return normalizeButtonLightMode(binding?.button_light_mode) === "MappedWhenAssigned"
-      ? t("bindings.mapped")
-      : t("bindings.activity");
+    switch (normalizeButtonLightMode(binding?.button_light_mode)) {
+      case "MappedWhenAssigned":
+        return t("bindings.buttonLightWhenMapped");
+      case "InvertState":
+        return t("bindings.buttonLightWhenOff");
+      case "Pressed":
+        return t("bindings.buttonLightWhilePressed");
+      case "FollowState":
+      case "Activity":
+      default:
+        return t("bindings.buttonLightWhenOn");
+    }
+  }
+
+  function buttonLightOptionText(value) {
+    switch (normalizeButtonLightMode(value)) {
+      case "MappedWhenAssigned":
+        return t("bindings.buttonLightWhenMapped");
+      case "InvertState":
+        return t("bindings.buttonLightWhenOff");
+      case "Pressed":
+        return t("bindings.buttonLightWhilePressed");
+      case "FollowState":
+      case "Activity":
+      default:
+        return t("bindings.buttonLightWhenOn");
+    }
+  }
+
+  function buttonLightSelectValue(binding) {
+    const mode = normalizeButtonLightMode(binding?.button_light_mode);
+    return mode === "Activity" ? "FollowState" : mode;
+  }
+
+  function renderButtonLightDropdown() {
+    if (!buttonLightDropdown || !d.bindingConfigButtonLightSelect) return;
+    renderNativeSelectDropdown({
+      entry: buttonLightDropdown,
+      selectEl: d.bindingConfigButtonLightSelect,
+      fallbackText: t("bindings.buttonLightWhenMapped"),
+      formatOptionText: (option) => buttonLightOptionText(option.value),
+      truncateDisplayLabel: false,
+    });
   }
 
   function pulseMomentaryValue(button) {
@@ -3190,16 +3238,16 @@ export function createBindingsFeature({
       : Boolean(getMuted(target));
     const visualBehavior = buttonVisualBehavior(binding);
     const buttonActive = isButton
-      ? resolveButtonVisualActive(binding, {
-          inputValue: visualBehavior === "momentary"
-            ? (liveMidiValue != null ? liveMidiValue : storedBindingValue)
-            : null,
+      ? (mappedLightValue != null ? mappedLightValue > 0.5 : resolveButtonVisualActive(binding, {
+          inputValue: liveMidiValue != null
+            ? liveMidiValue
+            : (visualBehavior === "momentary" ? storedBindingValue : null),
           stateValue: visualBehavior === "stateful" && binding.action !== "ToggleMute"
             ? storedBindingValue
             : null,
           muted,
           fallbackMuted: muted,
-        })
+        }))
       : false;
     const previewValue = isButton
       ? (buttonActive ? 1 : 0)
@@ -3907,16 +3955,22 @@ export function createBindingsFeature({
   }
 
   function syncButtonLightUi(binding) {
-    const toggle = d.bindingConfigButtonLightToggle;
-    if (!toggle) return;
-    toggle.checked = normalizeButtonLightMode(binding?.button_light_mode) === "MappedWhenAssigned";
-    toggle.disabled = false;
-    const row = toggle.closest?.(".binding-config-toggle-row");
+    const select = d.bindingConfigButtonLightSelect;
+    if (!select) return;
+    select.value = buttonLightSelectValue(binding);
+    select.disabled = false;
+    select.title = t("bindings.toggleMuteLight");
+    const row = d.bindingConfigButtonLightSelectRow || select.closest?.(".binding-config-select-row");
     if (row) {
       row.classList.remove("is-disabled");
+      row.classList.remove("hidden");
     }
-    if (d.bindingConfigButtonLightHelp) {
-      d.bindingConfigButtonLightHelp.textContent = t("bindings.lightWhenMappedHelp");
+    if (buttonLightDropdown) {
+      buttonLightDropdown.button.disabled = false;
+      buttonLightDropdown.button.title = t("bindings.toggleMuteLight");
+      buttonLightDropdown.button.setAttribute("aria-disabled", "false");
+      buttonLightDropdown.root.classList.remove("is-disabled");
+      renderButtonLightDropdown();
     }
   }
 
@@ -5195,6 +5249,15 @@ export function createBindingsFeature({
       renderConfigModal();
     };
 
+    if (d.bindingConfigButtonLightSelect && !buttonLightDropdown) {
+      buttonLightDropdown = createSelectDropdownShell({
+        selectEl: d.bindingConfigButtonLightSelect,
+        rootClass: "binding-config-light-dropdown settings-select-dropdown",
+        title: t("bindings.toggleMuteLight"),
+      });
+      renderButtonLightDropdown();
+    }
+
     if (d.bindingConfigPanel) {
       d.bindingConfigPanel.addEventListener("click", (event) => {
         if (event.target === d.bindingConfigPanel) {
@@ -5226,13 +5289,11 @@ export function createBindingsFeature({
         renderConfigPreview();
       });
     }
-    if (d.bindingConfigButtonLightToggle) {
-      d.bindingConfigButtonLightToggle.addEventListener("change", () => {
+    if (d.bindingConfigButtonLightSelect) {
+      d.bindingConfigButtonLightSelect.addEventListener("change", () => {
         const binding = getConfigBinding();
         if (!binding) return;
-        binding.button_light_mode = d.bindingConfigButtonLightToggle.checked
-          ? "MappedWhenAssigned"
-          : "Activity";
+        binding.button_light_mode = normalizeButtonLightMode(d.bindingConfigButtonLightSelect.value);
         syncButtonLightUi(binding);
         renderConfigPreview();
       });

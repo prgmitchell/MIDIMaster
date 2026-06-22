@@ -128,7 +128,9 @@
   "bindings.curveOptions": "ファダーカーブオプション",
   "bindings.linearHelp": "線形応答。 フェーダーの動きと同じ速度で出力値が変化します.",
   "bindings.lightWhenMapped": "割り当て時にライト点灯",
-  "bindings.lightWhenMappedHelp": "このボタンに割り当て先があるとき、コントローラーのライトを点灯したままにします。",
+  "bindings.lightWhenMappedHelp": "このボタンにマッピング先がある場合、コントローラーライトを点灯したままにします。トグルのライト動作より優先されます。",
+  "bindings.toggleMuteLight": "ボタンライト",
+  "bindings.toggleMuteLightHelp": "ボタンライトを点灯するタイミングを選択します。",
   "bindings.lightStateControlledHelp": "このライトは対象の実際の状態に連動します。",
   "bindings.lightUnavailableHelp": "割り当てライトを使うには、状態を持たないボタンアクションを選択してください。",
   "bindings.mute": "ミュート",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkeyが設定されていません",
   "dialogs.autoHotkeyNoAssociationMessage": "Windowsでは .ahk ファイルに関連付けられたアプリがありません。AutoHotkeyをインストールするか、.ahk ファイルの既定のアプリを選択してください。",
   "dialogs.autoHotkeyLaunchFailedTitle": "スクリプトの起動に失敗しました",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMasterはこのAutoHotkeyスクリプトを実行できませんでした: {message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMasterはこのAutoHotkeyスクリプトを実行できませんでした: {message}",
+  "bindings.buttonLightWhenMapped": "マッピング時",
+  "bindings.buttonLightWhenOn": "オンのとき",
+  "bindings.buttonLightWhenOff": "オフのとき",
+  "bindings.buttonLightWhilePressed": "押している間"
 }

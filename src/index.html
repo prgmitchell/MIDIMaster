@@ -691,15 +691,17 @@
               <div class="binding-config-title-row">
                 <span class="binding-config-title" data-i18n="bindings.light">Light</span>
               </div>
-              <label class="binding-config-toggle-row" id="binding-config-button-light-row">
+              <label class="binding-config-select-row" id="binding-config-button-light-select-row">
                 <span class="binding-config-toggle-copy">
-                  <span class="binding-config-toggle-title" data-i18n="bindings.lightWhenMapped">Light when mapped</span>
-                  <span id="binding-config-button-light-help" class="binding-config-toggle-help" data-i18n="bindings.lightWhenMappedHelp">Keep the controller light on when this button has a mapped target.</span>
+                  <span class="binding-config-toggle-title" data-i18n="bindings.toggleMuteLight">Button light</span>
+                  <span class="binding-config-toggle-help" data-i18n="bindings.toggleMuteLightHelp">Choose when the button light turns on.</span>
                 </span>
-                <span class="settings-toggle binding-config-toggle">
-                  <input id="binding-config-button-light-toggle" type="checkbox" />
-                  <span class="plugins-toggle-ui" aria-hidden="true"></span>
-                </span>
+                <select id="binding-config-button-light-select" class="binding-config-light-select" aria-label="Button light" data-i18n-aria-label="bindings.toggleMuteLight">
+                  <option value="MappedWhenAssigned" data-i18n="bindings.buttonLightWhenMapped">When Mapped</option>
+                  <option value="FollowState" data-i18n="bindings.buttonLightWhenOn">When On</option>
+                  <option value="InvertState" data-i18n="bindings.buttonLightWhenOff">When Off</option>
+                  <option value="Pressed" data-i18n="bindings.buttonLightWhilePressed">While Pressed</option>
+                </select>
               </label>
             </section>
 

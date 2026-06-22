@@ -154,10 +154,47 @@ function testMomentaryButtonFollowsInputValue() {
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0 }), false);
 }
 
-function testMappedLightDoesNotControlButtonVisualState() {
+function testMappedLightControlsButtonVisualState() {
   const binding = buttonBinding({ button_light_mode: "MappedWhenAssigned" });
 
-  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0 }), true);
+}
+
+function testMappedLightRequiresCompleteTarget() {
+  const incomplete = buttonBinding({
+    action: "Hotkey",
+    target: "Hotkey",
+    targets: ["Hotkey"],
+    button_light_mode: "MappedWhenAssigned",
+  });
+  const complete = buttonBinding({
+    action: "Hotkey",
+    target: "Hotkey",
+    targets: ["Hotkey"],
+    button_light_mode: "MappedWhenAssigned",
+    hotkey: { keys: ["Ctrl", "M"], display: "Ctrl+M" },
+  });
+
+  assert.equal(bindingModel.resolveButtonVisualActive(incomplete, { inputValue: 1 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(complete, { inputValue: 0 }), true);
+}
+
+function testNormalizeButtonLightModeAcceptsUnifiedModes() {
+  assert.equal(bindingModel.normalizeButtonLightMode("MappedWhenAssigned"), "MappedWhenAssigned");
+  assert.equal(bindingModel.normalizeButtonLightMode("FollowState"), "FollowState");
+  assert.equal(bindingModel.normalizeButtonLightMode("InvertState"), "InvertState");
+  assert.equal(bindingModel.normalizeButtonLightMode("Pressed"), "Pressed");
+  assert.equal(bindingModel.normalizeButtonLightMode("Activity"), "Activity");
+  assert.equal(bindingModel.normalizeButtonLightMode("not-a-mode"), "Activity");
+}
+
+function testNormalizeBindingDropsInterimToggleMuteLightMode() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "ToggleMute",
+    toggle_mute_light_mode: "UnmutedLit",
+  }));
+
+  assert.equal(Object.hasOwn(normalized, "toggle_mute_light_mode"), false);
 }
 
 function testToggleMuteFollowsMutedState() {
@@ -169,6 +206,95 @@ function testToggleMuteFollowsMutedState() {
   assert.equal(bindingModel.buttonVisualBehavior(binding), "stateful");
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: true }), true);
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: false }), false);
+}
+
+function testToggleMuteInvertStateLightsWhileUnmuted() {
+  const binding = buttonBinding({
+    action: "ToggleMute",
+    target: { Application: { name: "firefox.exe" } },
+    button_light_mode: "InvertState",
+  });
+
+  assert.equal(bindingModel.buttonVisualBehavior(binding), "stateful");
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: true }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: false }), true);
+}
+
+function testMappedLightOverridesToggleMuteState() {
+  const binding = buttonBinding({
+    action: "ToggleMute",
+    target: { Application: { name: "firefox.exe" } },
+    button_light_mode: "MappedWhenAssigned",
+  });
+
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: true }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: false }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0, muted: false }), true);
+}
+
+function testFollowStateUsesStateWithPressFallback() {
+  const stateful = buttonBinding({
+    action: "Volume",
+    button_light_mode: "FollowState",
+    target: {
+      Integration: {
+        integration_id: "obs",
+        kind: "action",
+        data: { action: "ToggleRecording", action_kind: "stateful" },
+      },
+    },
+  });
+  const momentary = buttonBinding({ button_light_mode: "FollowState" });
+
+  assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 1, inputValue: 0 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 0, inputValue: 1 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(momentary, { inputValue: 1 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(momentary, { inputValue: 0 }), false);
+}
+
+function testInvertStateUsesInverseStateWithReleaseFallback() {
+  const stateful = buttonBinding({
+    action: "Volume",
+    button_light_mode: "InvertState",
+    target: {
+      Integration: {
+        integration_id: "obs",
+        kind: "action",
+        data: { action: "ToggleRecording", action_kind: "stateful" },
+      },
+    },
+  });
+  const momentary = buttonBinding({ button_light_mode: "InvertState" });
+
+  assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 1, inputValue: 0 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 0, inputValue: 1 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(momentary, { inputValue: 1 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(momentary, { inputValue: 0 }), true);
+}
+
+function testPressedModeIgnoresToggleState() {
+  const binding = buttonBinding({
+    action: "ToggleMute",
+    target: { Application: { name: "firefox.exe" } },
+    button_light_mode: "Pressed",
+  });
+
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: true, inputValue: 0 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: false, inputValue: 1 }), true);
+}
+
+function testLegacyActivityMatchesFollowState() {
+  const toggle = buttonBinding({
+    action: "ToggleMute",
+    target: { Application: { name: "firefox.exe" } },
+    button_light_mode: "Activity",
+  });
+  const momentary = buttonBinding({ button_light_mode: "Activity" });
+
+  assert.equal(bindingModel.resolveButtonVisualActive(toggle, { muted: true, inputValue: 0 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(toggle, { muted: false, inputValue: 1 }), false);
+  assert.equal(bindingModel.resolveButtonVisualActive(momentary, { inputValue: 1 }), true);
+  assert.equal(bindingModel.resolveButtonVisualActive(momentary, { inputValue: 0 }), false);
 }
 
 function testStatefulButtonKeepsHalfThreshold() {
@@ -435,8 +561,17 @@ testWaveLinkSetMainOutputIsMomentary();
 testProgramChangeAutoBindingIsButton();
 testProgramChangeButtonBindingIsButton();
 testMomentaryButtonFollowsInputValue();
-testMappedLightDoesNotControlButtonVisualState();
+testMappedLightControlsButtonVisualState();
+testMappedLightRequiresCompleteTarget();
+testNormalizeButtonLightModeAcceptsUnifiedModes();
+testNormalizeBindingDropsInterimToggleMuteLightMode();
 testToggleMuteFollowsMutedState();
+testToggleMuteInvertStateLightsWhileUnmuted();
+testMappedLightOverridesToggleMuteState();
+testFollowStateUsesStateWithPressFallback();
+testInvertStateUsesInverseStateWithReleaseFallback();
+testPressedModeIgnoresToggleState();
+testLegacyActivityMatchesFollowState();
 testStatefulButtonKeepsHalfThreshold();
 testUnsetToggleMuteButtonIsMomentary();
 testIntegrationVisualBehaviorKinds();

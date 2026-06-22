@@ -35,8 +35,7 @@ fn emit_macro_button_feedback(
 ) {
     let input_value = if input_active { 1.0 } else { 0.0 };
     let feedback_value = binding
-        .mapped_button_light_feedback_value()
-        .or_else(|| binding.activity_button_light_feedback_value(input_active))
+        .button_light_feedback_value(Some(input_active), None)
         .unwrap_or(input_value);
 
     if !input_active {
@@ -231,7 +230,7 @@ pub(super) fn update_activity_button_light_hold_feedback(
     }
 
     if binding
-        .activity_button_light_feedback_value(input_active)
+        .button_light_hold_feedback_value(input_active)
         .is_none()
         || !input_active
     {
@@ -592,7 +591,7 @@ pub(crate) fn apply_midi_event(
         }
 
         let feedback_value = binding
-            .mapped_button_light_feedback_value()
+            .button_light_feedback_value(Some(event.value > 0), Some(muted))
             .unwrap_or(if muted { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if muted { 1.0 } else { 0.0 });
 
@@ -727,7 +726,7 @@ pub(crate) fn apply_midi_event(
         }
 
         let feedback_value = binding
-            .mapped_button_light_feedback_value()
+            .button_light_feedback_value(Some(event.value > 0), Some(next_enabled))
             .unwrap_or(if next_enabled { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if next_enabled { 1.0 } else { 0.0 });
         if let Ok(mut feedback) = state.feedback_values.lock() {
@@ -741,6 +740,15 @@ pub(crate) fn apply_midi_event(
 
     if binding_actions::action_is_momentary_integration_action(&binding.action) {
         if event.value == 0 {
+            let feedback_value = binding
+                .button_light_feedback_value(Some(false), None)
+                .unwrap_or(0.0);
+            if let Ok(mut feedback) = state.feedback_values.lock() {
+                feedback.insert(key.clone(), feedback_value);
+            }
+            if let Ok(mut midi) = state.midi.lock() {
+                let _ = midi.send_binding_feedback(&binding, feedback_value);
+            }
             update_activity_button_light_hold_feedback(state, &binding, key.clone(), false);
             return Ok(());
         }
@@ -782,7 +790,7 @@ pub(crate) fn apply_midi_event(
         }
 
         let feedback_value = binding
-            .activity_button_light_feedback_value(true)
+            .button_light_feedback_value(Some(true), None)
             .unwrap_or(1.0);
         if let Ok(mut feedback) = state.feedback_values.lock() {
             feedback.insert(key.clone(), feedback_value);
@@ -952,8 +960,7 @@ pub(crate) fn apply_midi_event(
     }
 
     let primary_feedback_value = binding
-        .mapped_button_light_feedback_value()
-        .or_else(|| binding.activity_button_light_feedback_value(event.value > 0))
+        .button_light_feedback_value(Some(event.value > 0), None)
         .unwrap_or(volume);
 
     let input_active = event.value > 0;

@@ -83,8 +83,85 @@ function targetIsAssigned(target) {
   );
 }
 
+function targetIsCompleteForMappedLight(target) {
+  if (!targetIsAssigned(target)) return false;
+  if (
+    target === "Master"
+    || target === "Focus"
+    || target === "MediaControl"
+    || target === "CaptureControl"
+    || target === "Macro"
+  ) {
+    return true;
+  }
+  const session = target?.Session || target?.session;
+  if (session) return Boolean(String(session.session_id || "").trim());
+  const app = target?.Application || target?.application;
+  if (app) return Boolean(String(app.name || "").trim());
+  const device = target?.Device || target?.device;
+  if (device) return Boolean(String(device.device_id || "").trim());
+  const integration = integrationFromTarget(target);
+  if (integration) {
+    return Boolean(String(integration.integration_id || "").trim())
+      && Boolean(String(integration.kind || "").trim());
+  }
+  return false;
+}
+
 function isMacroTarget(target) {
   return target === "Macro";
+}
+
+function mappedButtonLightTargetComplete(binding) {
+  const targets = getBindingTargets(binding);
+  const action = String(binding?.action || "");
+  if (action === "OpenApplication") {
+    return targets.some((target) => target === "OpenApplication")
+      && Boolean(String(normalizeOpenApplicationMapping(binding?.open_application)?.path || "").trim());
+  }
+  if (action === "RunAutoHotkeyScript") {
+    return targets.some((target) => target === "AutoHotkeyScript")
+      && Boolean(String(normalizeAutoHotkeyScriptMapping(binding?.autohotkey_script)?.path || "").trim());
+  }
+  if (action === "Hotkey") {
+    return targets.some((target) => target === "Hotkey")
+      && Boolean(normalizeHotkeyMapping(binding?.hotkey)?.keys?.length);
+  }
+  if (action === "Macro") {
+    return targets.some(isMacroTarget)
+      && normalizeMacroSteps(binding?.macro_steps).length > 0;
+  }
+  if (
+    action === "MediaPlayPause"
+    || action === "MediaNextTrack"
+    || action === "MediaPrevTrack"
+    || action === "MediaStop"
+  ) {
+    return targets.some((target) => target === "MediaControl");
+  }
+  if (action === "FocusWindow") {
+    return targets.some((target) => {
+      const app = target?.Application || target?.application;
+      return Boolean(String(app?.name || "").trim());
+    });
+  }
+  if (
+    action === "FullScreenshot"
+    || action === "SnipScreenshot"
+    || action === "ToggleScreenRecording"
+  ) {
+    return targets.some((target) => target === "CaptureControl");
+  }
+  if (action === "SetDefaultDevice") {
+    return targets.some((target) => Boolean(String((target?.Device || target?.device)?.device_id || "").trim()));
+  }
+  return targets.some(targetIsCompleteForMappedLight);
+}
+
+function mappedButtonLightVisualActive(binding) {
+  const targets = getBindingTargets(binding);
+  if (!targets.some(targetIsAssigned)) return false;
+  return mappedButtonLightTargetComplete(binding);
 }
 
 function integrationVisualBehavior(integration) {
@@ -148,15 +225,27 @@ export function resolveButtonVisualActive(binding, options = {}) {
   const behavior = buttonVisualBehavior(binding);
   if (!behavior) return false;
 
-  if (behavior === "momentary") {
-    return activeFromInputValue(options.inputValue) === true;
+  const lightMode = normalizeButtonLightMode(binding?.button_light_mode);
+  if (lightMode === "MappedWhenAssigned") {
+    return mappedButtonLightVisualActive(binding);
   }
 
-  const stateActive = activeFromStateValue(options.stateValue);
-  if (stateActive != null) return stateActive;
-  if (typeof options.muted === "boolean") return options.muted;
-  if (typeof options.fallbackMuted === "boolean") return options.fallbackMuted;
-  return false;
+  const inputActive = activeFromInputValue(options.inputValue) === true;
+  const stateActive = behavior === "stateful" ? activeFromStateValue(options.stateValue) : null;
+  const muteState = typeof options.muted === "boolean"
+    ? options.muted
+    : (typeof options.fallbackMuted === "boolean" ? options.fallbackMuted : null);
+  const effectiveState = stateActive
+    ?? (behavior === "stateful" && String(binding?.action || "") === "ToggleMute" ? muteState : null);
+
+  if (lightMode === "Pressed") {
+    return inputActive;
+  }
+  if (lightMode === "InvertState") {
+    return effectiveState != null ? !effectiveState : !inputActive;
+  }
+
+  return effectiveState != null ? effectiveState : inputActive;
 }
 
 function normalizeHotkeyMapping(rawHotkey) {
@@ -349,6 +438,7 @@ export function normalizeBinding(binding) {
   }
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
   out.button_light_mode = normalizeButtonLightMode(out.button_light_mode);
+  delete out.toggle_mute_light_mode;
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
   if (!out.open_application || typeof out.open_application !== "object") {
     out.open_application = null;
@@ -390,7 +480,17 @@ export function normalizeRelativeFormat(raw) {
 }
 
 export function normalizeButtonLightMode(raw) {
-  return raw === "MappedWhenAssigned" ? "MappedWhenAssigned" : "Activity";
+  const value = String(raw || "Activity");
+  if (
+    value === "Activity"
+    || value === "MappedWhenAssigned"
+    || value === "FollowState"
+    || value === "InvertState"
+    || value === "Pressed"
+  ) {
+    return value;
+  }
+  return "Activity";
 }
 
 export function decodeRelativeTwosComplement(value) {

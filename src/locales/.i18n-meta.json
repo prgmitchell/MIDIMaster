@@ -372,7 +372,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -505,7 +505,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -880,7 +886,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -1013,7 +1019,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1388,7 +1400,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -1521,7 +1533,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1896,7 +1914,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -2029,7 +2047,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2404,7 +2428,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -2537,7 +2561,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2912,7 +2942,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -3045,7 +3075,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3420,7 +3456,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -3553,7 +3589,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -3928,7 +3970,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -4061,7 +4103,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4436,7 +4484,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -4569,7 +4617,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4944,7 +4998,7 @@
     "bindings.stateControlled": "9fb8f186fd9c7e6f8b436f4ca2b97aa41323da5b1c2322d5201f9180ebec0d63",
     "bindings.buttonConfiguration": "fa67c5a4ceea1c1372a05ca9285e9af56e18fbbd16c1117c3de8d9e2921a0f50",
     "bindings.lightWhenMapped": "865a7c39450b132d4724c773a1ac88129a40d1680ccac97274c90dabff9422ae",
-    "bindings.lightWhenMappedHelp": "6ed651916944a23d8f80e5fd0bb425a8d18bba950acb919eb09440c620286e0c",
+    "bindings.lightWhenMappedHelp": "8e2d5d879165c8f4ade11d47bb2ef7f0af58f9e6233801fd03d7087a233d0c36",
     "bindings.lightStateControlledHelp": "9ba9b65b53565bf58cd8099b28a64fcb0d057c75af3fbaba4a4aba6cd5247f82",
     "bindings.lightUnavailableHelp": "9f18fe0b15b6eaf3cf9c658936e8c9abd9c51b0e1000700b2b7f77c6a56db9ce",
     "bindings.waitingForNewButtonInput": "e1f518c076e28f7dbe9f6d2e2daa21ab6353425172eb35505ddd54c80bb1a738",
@@ -5077,7 +5131,13 @@
     "privacy.midiDeviceInventoryTitle": "d07e7a241c5bfd158832bff9132063a268a5d83552ec32331866788a27e82859",
     "privacy.midiDeviceInventoryMessage": "b31dae2330f8198df0775645456b59193a34ad15876876940ab70927d0feb61e",
     "privacy.midiDeviceInventoryDecline": "a0e63d7c7125d29af84d6919af5550529be77c327324940c98c4b2cb13a99c8c",
-    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee"
+    "privacy.midiDeviceInventoryAccept": "03d07b0db536f791ed37dfc4859fb988b6069d1ecea6a71c34f2525f81d14fee",
+    "bindings.toggleMuteLight": "9fa34b98b954e4a3c662b42b4945e094d8a7ff8615f0d5a7a82f1116e5007100",
+    "bindings.toggleMuteLightHelp": "828a120bdd21e3543cd3ec3e77767feed67cc7d3bbe8d104ba22174e8c243ba2",
+    "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
+    "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
+    "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

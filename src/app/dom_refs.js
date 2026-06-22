@@ -34,8 +34,8 @@ export function createDomRefs() {
   const bindingConfigSave = document.getElementById("binding-config-save");
   const bindingConfigName = document.getElementById("binding-config-name");
   const bindingConfigButtonLightSection = document.getElementById("binding-config-button-light-section");
-  const bindingConfigButtonLightToggle = document.getElementById("binding-config-button-light-toggle");
-  const bindingConfigButtonLightHelp = document.getElementById("binding-config-button-light-help");
+  const bindingConfigButtonLightSelectRow = document.getElementById("binding-config-button-light-select-row");
+  const bindingConfigButtonLightSelect = document.getElementById("binding-config-button-light-select");
   const bindingConfigButtonLearnSection = document.getElementById("binding-config-button-learn-section");
   const bindingConfigButtonLearnButton = document.getElementById("binding-config-button-learn-button");
   const bindingConfigButtonLearnIndicator = document.getElementById("binding-config-button-learn-indicator");
@@ -224,8 +224,8 @@ export function createDomRefs() {
     bindingConfigSave,
     bindingConfigName,
     bindingConfigButtonLightSection,
-    bindingConfigButtonLightToggle,
-    bindingConfigButtonLightHelp,
+    bindingConfigButtonLightSelectRow,
+    bindingConfigButtonLightSelect,
     bindingConfigButtonLearnSection,
     bindingConfigButtonLearnButton,
     bindingConfigButtonLearnIndicator,

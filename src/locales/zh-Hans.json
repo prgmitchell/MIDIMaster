@@ -128,7 +128,9 @@
   "bindings.curveOptions": "Fader 曲线选项",
   "bindings.linearHelp": "线性反应. 输出值变化的速度与淡化器运动相同.",
   "bindings.lightWhenMapped": "映射时点亮",
-  "bindings.lightWhenMappedHelp": "当此按钮已有映射目标时，保持控制器灯光点亮。",
+  "bindings.lightWhenMappedHelp": "当此按钮有映射目标时，保持控制器灯亮起。会覆盖切换灯行为。",
+  "bindings.toggleMuteLight": "按钮灯",
+  "bindings.toggleMuteLightHelp": "选择按钮灯何时亮起。",
   "bindings.lightStateControlledHelp": "此灯光跟随目标的实际状态。",
   "bindings.lightUnavailableHelp": "请选择无状态按钮操作以使用映射灯光。",
   "bindings.mute": "静音",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey 未配置",
   "dialogs.autoHotkeyNoAssociationMessage": "Windows 没有关联 .ahk 文件的应用。请安装 AutoHotkey，或为 .ahk 文件选择默认应用。",
   "dialogs.autoHotkeyLaunchFailedTitle": "脚本启动失败",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster 无法运行此 AutoHotkey 脚本：{message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster 无法运行此 AutoHotkey 脚本：{message}",
+  "bindings.buttonLightWhenMapped": "映射时",
+  "bindings.buttonLightWhenOn": "开启时",
+  "bindings.buttonLightWhenOff": "关闭时",
+  "bindings.buttonLightWhilePressed": "按下时"
 }

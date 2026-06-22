@@ -51,6 +51,9 @@ pub enum ButtonLightMode {
     #[default]
     Activity,
     MappedWhenAssigned,
+    FollowState,
+    InvertState,
+    Pressed,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -722,26 +725,11 @@ impl Binding {
         })
     }
 
-    pub fn activity_button_light_feedback_value(&self, input_active: bool) -> Option<f32> {
-        if !self.is_button_binding()
-            || matches!(self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
-            || self.uses_stateful_toggle_feedback()
-        {
-            return None;
-        }
-
-        let targets = self.normalized_targets();
-        if targets
-            .iter()
-            .any(|target| !matches!(target, BindingTarget::Unset))
-        {
-            return Some(if input_active { 1.0 } else { 0.0 });
-        }
-
-        None
-    }
-
-    pub fn idle_button_light_feedback_value(&self) -> Option<f32> {
+    pub fn button_light_feedback_value(
+        &self,
+        input_active: Option<bool>,
+        state_active: Option<bool>,
+    ) -> Option<f32> {
         if !self.is_button_binding() {
             return None;
         }
@@ -751,15 +739,36 @@ impl Binding {
         }
 
         let targets = self.normalized_targets();
-        if !self.uses_stateful_toggle_feedback()
-            && targets
-                .iter()
-                .any(|target| !matches!(target, BindingTarget::Unset))
+        if !targets
+            .iter()
+            .any(|target| !matches!(target, BindingTarget::Unset))
         {
-            return Some(0.0);
+            return None;
         }
 
-        None
+        let input_active = input_active.unwrap_or(false);
+        let active = match self.button_light_mode {
+            ButtonLightMode::MappedWhenAssigned => unreachable!("mapped mode resolved above"),
+            ButtonLightMode::Activity | ButtonLightMode::FollowState => {
+                state_active.unwrap_or(input_active)
+            }
+            ButtonLightMode::InvertState => match state_active {
+                Some(active) => !active,
+                None => !input_active,
+            },
+            ButtonLightMode::Pressed => input_active,
+        };
+
+        Some(if active { 1.0 } else { 0.0 })
+    }
+
+    pub fn button_light_hold_feedback_value(&self, input_active: bool) -> Option<f32> {
+        let value = self.button_light_feedback_value(Some(input_active), None)?;
+        if value > 0.5 {
+            Some(value)
+        } else {
+            None
+        }
     }
 
     pub fn has_complete_mapped_button_light_target(&self, targets: &[BindingTarget]) -> bool {

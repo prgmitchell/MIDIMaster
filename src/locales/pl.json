@@ -128,7 +128,9 @@
   "bindings.curveOptions": "Opcje krzywej Fader",
   "bindings.linearHelp": "Reakcja liniowa. Wartość wyjściowa zmienia się w tym samym tempie co ruch fadera.",
   "bindings.lightWhenMapped": "Podświetlenie po przypisaniu",
-  "bindings.lightWhenMappedHelp": "Utrzymuje podświetlenie kontrolera, gdy ten przycisk ma przypisany cel.",
+  "bindings.lightWhenMappedHelp": "Utrzymuje podświetlenie kontrolera włączone, gdy ten przycisk ma przypisany cel. Zastępuje zachowanie podświetlenia przełączników.",
+  "bindings.toggleMuteLight": "Podświetlenie przycisku",
+  "bindings.toggleMuteLightHelp": "Wybierz, kiedy podświetlenie przycisku ma się włączać.",
   "bindings.lightStateControlledHelp": "To podświetlenie podąża za rzeczywistym stanem celu.",
   "bindings.lightUnavailableHelp": "Wybierz bezstanową akcję przycisku, aby użyć podświetlenia przypisania.",
   "bindings.mute": "Mute",
@@ -529,5 +531,9 @@
   "dialogs.autoHotkeyNoAssociationTitle": "AutoHotkey nie jest skonfigurowany",
   "dialogs.autoHotkeyNoAssociationMessage": "System Windows nie ma aplikacji skojarzonej z plikami .ahk. Zainstaluj AutoHotkey albo wybierz domyślną aplikację dla plików .ahk.",
   "dialogs.autoHotkeyLaunchFailedTitle": "Nie udało się uruchomić skryptu",
-  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster nie mógł uruchomić tego skryptu AutoHotkey: {message}"
+  "dialogs.autoHotkeyLaunchFailedMessage": "MIDIMaster nie mógł uruchomić tego skryptu AutoHotkey: {message}",
+  "bindings.buttonLightWhenMapped": "Po przypisaniu",
+  "bindings.buttonLightWhenOn": "Gdy włączone",
+  "bindings.buttonLightWhenOff": "Gdy wyłączone",
+  "bindings.buttonLightWhilePressed": "Podczas naciskania"
 }
