@@ -43,6 +43,27 @@ fn key_name_to_vk(name: &str) -> Option<u16> {
         "PRINTSCREEN" => Some(0x2C),
         "SCROLLLOCK" => Some(0x91),
         "PAUSE" => Some(0x13),
+        "COMMA" | "," | "<" => Some(0xBC),
+        "PERIOD" | "DOT" | "." | ">" => Some(0xBE),
+        "SLASH" | "/" | "?" => Some(0xBF),
+        "SEMICOLON" | ";" | ":" => Some(0xBA),
+        "QUOTE" | "APOSTROPHE" | "'" | "\"" => Some(0xDE),
+        "BACKQUOTE" | "BACKTICK" | "GRAVE" | "`" | "~" => Some(0xC0),
+        "MINUS" | "DASH" | "-" | "_" => Some(0xBD),
+        "EQUAL" | "EQUALS" | "=" | "+" => Some(0xBB),
+        "BRACKETLEFT" | "LEFTBRACKET" | "[" | "{" => Some(0xDB),
+        "BRACKETRIGHT" | "RIGHTBRACKET" | "]" | "}" => Some(0xDD),
+        "BACKSLASH" | "\\" | "|" => Some(0xDC),
+        "!" => Some(b'1' as u16),
+        "@" => Some(b'2' as u16),
+        "#" => Some(b'3' as u16),
+        "$" => Some(b'4' as u16),
+        "%" => Some(b'5' as u16),
+        "^" => Some(b'6' as u16),
+        "&" => Some(b'7' as u16),
+        "*" => Some(b'8' as u16),
+        "(" => Some(b'9' as u16),
+        ")" => Some(b'0' as u16),
         _ => {
             if upper.len() == 1 {
                 let b = upper.as_bytes()[0];
@@ -514,6 +535,22 @@ mod tests {
 
         assert_eq!(vks, vec![0x11, b'P' as u16]);
         assert_eq!(unmapped, vec!["Launch Mail".to_string()]);
+    }
+
+    #[test]
+    fn normalizes_hotkey_oem_symbol_names() {
+        let (vks, unmapped) = normalize_hotkey_vks(&keys(&["Ctrl", "Shift", "Comma", "Period"]));
+
+        assert_eq!(vks, vec![0x11, 0x10, 0xBC, 0xBE]);
+        assert!(unmapped.is_empty());
+    }
+
+    #[test]
+    fn normalizes_hotkey_shifted_symbol_aliases_to_base_keys() {
+        let (vks, unmapped) = normalize_hotkey_vks(&keys(&["<", ">", "!", "+"]));
+
+        assert_eq!(vks, vec![0xBC, 0xBE, b'1' as u16, 0xBB]);
+        assert!(unmapped.is_empty());
     }
 
     #[test]

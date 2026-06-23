@@ -1,6 +1,7 @@
 import {
   applyCustomFaderCurve,
   applyFaderCurve,
+  buildHotkeyMappingFromEvent,
   buttonVisualBehavior as coreButtonVisualBehavior,
   effectiveButtonLightMode as coreEffectiveButtonLightMode,
   getBindingTargets,
@@ -19,6 +20,7 @@ import {
   normalizeMacroDraftSteps,
   normalizeMacroStep,
   normalizeMacroSteps,
+  normalizeHotkeyKeyFromEvent,
   normalizeRelativeFormat as normalizeCoreRelativeFormat,
   presetCurvePoints as corePresetCurvePoints,
   resolveButtonVisualActive as coreResolveButtonVisualActive,
@@ -29,12 +31,14 @@ export {
   MACRO_MAX_PARALLEL_STEPS,
   MACRO_MAX_TOP_LEVEL_STEPS,
   MACRO_MAX_WAIT_MS,
+  buildHotkeyMappingFromEvent,
   normalizeMacroActionState,
   normalizeMacroActionStep,
   normalizeMacroDraftStep,
   normalizeMacroDraftSteps,
   normalizeMacroStep,
   normalizeMacroSteps,
+  normalizeHotkeyKeyFromEvent,
 };
 
 export function normalizeControlKind(raw) {

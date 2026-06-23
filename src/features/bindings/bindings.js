@@ -10,6 +10,7 @@ import {
 import {
   applyCurveToNormalized,
   assignModeTooltip,
+  buildHotkeyMappingFromEvent,
   buttonModeValue,
   buttonVisualBehavior,
   cloneBindingDraft,
@@ -898,7 +899,6 @@ export function createBindingsFeature({
   let macroDragState = null;
   let hotkeyLearnBindingId = null;
   let hotkeyLearnCleanup = null;
-  const hotkeyModifiers = ["Ctrl", "Shift", "Alt", "Meta"];
   const nameDrafts = new Map();
   let pendingRerender = false;
   let suppressPendingFocusClearUntil = 0;
@@ -2769,46 +2769,6 @@ export function createBindingsFeature({
     shell.appendChild(body);
     section.appendChild(shell);
     scrollSelectedMacroStepIntoView();
-  }
-
-  function normalizeHotkeyKey(event) {
-    const key = String(event?.key || "").trim();
-    if (!key) return null;
-    const lower = key.toLowerCase();
-    if (lower === "control") return "Ctrl";
-    if (lower === "shift") return "Shift";
-    if (lower === "alt") return "Alt";
-    if (lower === "meta") return "Meta";
-    if (lower === " ") return "Space";
-    if (lower === "escape") return "Esc";
-    if (lower === "arrowup") return "Up";
-    if (lower === "arrowdown") return "Down";
-    if (lower === "arrowleft") return "Left";
-    if (lower === "arrowright") return "Right";
-    if (key.length === 1) return key.toUpperCase();
-    if (/^f\d{1,2}$/i.test(key)) return key.toUpperCase();
-    return key.length <= 16 ? key[0].toUpperCase() + key.slice(1) : null;
-  }
-
-  function isHotkeyModifier(key) {
-    return hotkeyModifiers.includes(key);
-  }
-
-  function buildHotkeyMappingFromEvent(event) {
-    const key = normalizeHotkeyKey(event);
-    if (!key || isHotkeyModifier(key)) return null;
-
-    const keys = [];
-    if (event.ctrlKey) keys.push("Ctrl");
-    if (event.shiftKey) keys.push("Shift");
-    if (event.altKey) keys.push("Alt");
-    if (event.metaKey) keys.push("Meta");
-    if (!keys.includes(key)) keys.push(key);
-
-    return {
-      keys,
-      display: keys.join("+"),
-    };
   }
 
   function stopHotkeyLearn(result = null) {

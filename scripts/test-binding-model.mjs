@@ -179,6 +179,56 @@ function testMappedLightRequiresCompleteTarget() {
   assert.equal(bindingModel.resolveButtonVisualActive(complete, { inputValue: 0 }), true);
 }
 
+function testHotkeyMappingUsesPhysicalKeysForShiftedSymbols() {
+  assert.deepEqual(
+    bindingModel.buildHotkeyMappingFromEvent({
+      key: "<",
+      code: "Comma",
+      ctrlKey: true,
+      shiftKey: true,
+      altKey: false,
+      metaKey: false,
+    }),
+    { keys: ["Ctrl", "Shift", "Comma"], display: "Ctrl+Shift+Comma" },
+  );
+  assert.deepEqual(
+    bindingModel.buildHotkeyMappingFromEvent({
+      key: ">",
+      code: "Period",
+      ctrlKey: true,
+      shiftKey: true,
+      altKey: false,
+      metaKey: false,
+    }),
+    { keys: ["Ctrl", "Shift", "Period"], display: "Ctrl+Shift+Period" },
+  );
+  assert.deepEqual(
+    bindingModel.buildHotkeyMappingFromEvent({
+      key: "!",
+      code: "Digit1",
+      ctrlKey: true,
+      shiftKey: true,
+      altKey: false,
+      metaKey: false,
+    }),
+    { keys: ["Ctrl", "Shift", "1"], display: "Ctrl+Shift+1" },
+  );
+}
+
+function testHotkeyMappingKeepsLetterShortcuts() {
+  assert.deepEqual(
+    bindingModel.buildHotkeyMappingFromEvent({
+      key: "A",
+      code: "KeyA",
+      ctrlKey: true,
+      shiftKey: true,
+      altKey: false,
+      metaKey: false,
+    }),
+    { keys: ["Ctrl", "Shift", "A"], display: "Ctrl+Shift+A" },
+  );
+}
+
 function testNormalizeButtonLightModeKeepsLegacyValuesOnly() {
   assert.equal(bindingModel.normalizeButtonLightMode("MappedWhenAssigned"), "MappedWhenAssigned");
   assert.equal(bindingModel.normalizeButtonLightMode("FollowState"), "Activity");
@@ -592,6 +642,8 @@ testProgramChangeButtonBindingIsButton();
 testMomentaryButtonFollowsInputValue();
 testMappedLightControlsButtonVisualState();
 testMappedLightRequiresCompleteTarget();
+testHotkeyMappingUsesPhysicalKeysForShiftedSymbols();
+testHotkeyMappingKeepsLetterShortcuts();
 testNormalizeButtonLightModeKeepsLegacyValuesOnly();
 testNormalizeBindingMovesUnsafeLightModesToBehavior();
 testNormalizeBindingPreservesDowngradeSafeBehavior();
