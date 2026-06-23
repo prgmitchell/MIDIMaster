@@ -16,6 +16,43 @@ const VOLUME_WRITE_EPSILON = 0.002;
 const RECONNECT_INITIAL_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;
 const RECONNECT_IDLE_DELAY_MS = 5000;
+
+function rememberLocalMuteIntent(intents, inputName, muted, now = Date.now()) {
+  if (!intents || !inputName) return;
+  intents.set(String(inputName), {
+    muted: Boolean(muted),
+    at: now,
+  });
+}
+
+function forgetLocalMuteIntent(intents, inputName) {
+  if (!intents || !inputName) return;
+  intents.delete(String(inputName));
+}
+
+function shouldIgnoreLocalMuteEcho(intents, inputName, muted, now = Date.now()) {
+  if (!intents || !inputName) return false;
+  const key = String(inputName);
+  const intent = intents.get(key);
+  if (!intent) return false;
+  if ((now - Number(intent.at || 0)) >= LOCAL_WRITE_QUIET_MS) {
+    intents.delete(key);
+    return false;
+  }
+  if (Boolean(intent.muted) !== Boolean(muted)) {
+    intents.delete(key);
+    return false;
+  }
+  return true;
+}
+
+export const obsTestUtils = {
+  LOCAL_WRITE_QUIET_MS,
+  rememberLocalMuteIntent,
+  forgetLocalMuteIntent,
+  shouldIgnoreLocalMuteEcho,
+};
+
 function isOsdWindow() {
   try {
     return new URLSearchParams(window.location.search).get("osd") === "1";
@@ -140,7 +177,8 @@ export async function activate(ctx) {
   let bindingsByInputMute = new Map();
   let bindingsBySourceVisibility = new Map(); // sceneName\0sourceName -> Set(bindingId)
   const statefulActionFeedback = new Map(); // bindingId -> last latched value fallback
-  const lastLocalWriteAt = new Map(); // inputName -> ms
+  const lastLocalWriteAt = new Map(); // inputName -> ms for volume writes
+  const localMuteIntentByInput = new Map(); // inputName -> { muted, at }
   const localVolumeIntentByBinding = new Map(); // bindingId -> { value, at }
   const pendingVolumeWrites = new Map(); // inputName -> volume
   const lastSentVolumeByInput = new Map(); // inputName -> volume
@@ -195,6 +233,7 @@ export async function activate(ctx) {
     knownMutes.clear();
     statefulActionFeedback.clear();
     lastLocalWriteAt.clear();
+    localMuteIntentByInput.clear();
     localVolumeIntentByBinding.clear();
     resetAudioInputDiscovery();
   }
@@ -825,9 +864,10 @@ export async function activate(ctx) {
           if (data.inputName != null && data.inputMuted != null) {
             const inputName = String(data.inputName);
             const muted = Boolean(data.inputMuted);
+            const ignoreLocalEcho = shouldIgnoreLocalMuteEcho(localMuteIntentByInput, inputName, muted);
             knownMutes.set(inputName, muted);
 
-            if (!shouldIgnoreEcho(inputName)) {
+            if (!ignoreLocalEcho) {
               const set = bindingsByInputMute.get(inputName);
               if (set) {
                 set.forEach((bid) => {
@@ -997,8 +1037,13 @@ export async function activate(ctx) {
         });
       } else if (action === "ToggleMute") {
         const muted = clamp01(value) > 0.5;
-        lastLocalWriteAt.set(String(inputName), Date.now());
-        await request("SetInputMute", { inputName, inputMuted: muted });
+        rememberLocalMuteIntent(localMuteIntentByInput, inputName, muted);
+        try {
+          await request("SetInputMute", { inputName, inputMuted: muted });
+        } catch (err) {
+          forgetLocalMuteIntent(localMuteIntentByInput, inputName);
+          throw err;
+        }
         knownMutes.set(String(inputName), muted);
         if (bindingId) await ctx.feedback.set(bindingId, muted ? 1.0 : 0.0, action);
       }
