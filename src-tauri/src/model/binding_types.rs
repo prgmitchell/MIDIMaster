@@ -1,5 +1,5 @@
 use super::midi_types::{MidiControl, MidiMessageType};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 pub const MACRO_MAX_TOP_LEVEL_STEPS: usize = 25;
 pub const MACRO_MAX_PARALLEL_STEPS: usize = 8;
@@ -46,11 +46,35 @@ pub enum MuteBehavior {
     SetFromValue,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq, Hash)]
 pub enum ButtonLightMode {
     #[default]
     Activity,
     MappedWhenAssigned,
+    FollowState,
+    InvertState,
+    Pressed,
+}
+
+impl Serialize for ButtonLightMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let value = match self {
+            ButtonLightMode::MappedWhenAssigned => "MappedWhenAssigned",
+            ButtonLightMode::Activity
+            | ButtonLightMode::FollowState
+            | ButtonLightMode::InvertState
+            | ButtonLightMode::Pressed => "Activity",
+        };
+        serializer.serialize_str(value)
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ButtonLightBehavior {
+    #[default]
     FollowState,
     InvertState,
     Pressed,
@@ -678,6 +702,8 @@ pub struct Binding {
     #[serde(default)]
     pub button_light_mode: ButtonLightMode,
     #[serde(default)]
+    pub button_light_behavior: ButtonLightBehavior,
+    #[serde(default)]
     pub mute_control: Option<AuxiliaryControl>,
     #[serde(default)]
     pub assign_control: Option<AuxiliaryControl>,
@@ -694,6 +720,38 @@ pub struct Binding {
 }
 
 impl Binding {
+    pub fn normalize_button_light_serialization(&mut self) -> bool {
+        let before_mode = self.button_light_mode.clone();
+        let before_behavior = self.button_light_behavior.clone();
+        match self.button_light_mode.clone() {
+            ButtonLightMode::Activity | ButtonLightMode::MappedWhenAssigned => {}
+            ButtonLightMode::FollowState => {
+                self.button_light_mode = ButtonLightMode::Activity;
+                self.button_light_behavior = ButtonLightBehavior::FollowState;
+            }
+            ButtonLightMode::InvertState => {
+                self.button_light_mode = ButtonLightMode::Activity;
+                self.button_light_behavior = ButtonLightBehavior::InvertState;
+            }
+            ButtonLightMode::Pressed => {
+                self.button_light_mode = ButtonLightMode::Activity;
+                self.button_light_behavior = ButtonLightBehavior::Pressed;
+            }
+        }
+        self.button_light_mode != before_mode || self.button_light_behavior != before_behavior
+    }
+
+    fn effective_button_light_behavior(&self) -> ButtonLightBehavior {
+        match &self.button_light_mode {
+            ButtonLightMode::FollowState => ButtonLightBehavior::FollowState,
+            ButtonLightMode::InvertState => ButtonLightBehavior::InvertState,
+            ButtonLightMode::Pressed => ButtonLightBehavior::Pressed,
+            ButtonLightMode::Activity | ButtonLightMode::MappedWhenAssigned => {
+                self.button_light_behavior.clone()
+            }
+        }
+    }
+
     pub fn is_button_binding(&self) -> bool {
         matches!(self.control_kind, BindingControlKind::Button)
             || (matches!(self.control_kind, BindingControlKind::Auto)
@@ -705,7 +763,7 @@ impl Binding {
 
     pub fn mapped_button_light_feedback_value(&self) -> Option<f32> {
         if !self.is_button_binding()
-            || !matches!(self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
+            || !matches!(&self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
         {
             return None;
         }
@@ -747,16 +805,13 @@ impl Binding {
         }
 
         let input_active = input_active.unwrap_or(false);
-        let active = match self.button_light_mode {
-            ButtonLightMode::MappedWhenAssigned => unreachable!("mapped mode resolved above"),
-            ButtonLightMode::Activity | ButtonLightMode::FollowState => {
-                state_active.unwrap_or(input_active)
-            }
-            ButtonLightMode::InvertState => match state_active {
+        let active = match self.effective_button_light_behavior() {
+            ButtonLightBehavior::FollowState => state_active.unwrap_or(input_active),
+            ButtonLightBehavior::InvertState => match state_active {
                 Some(active) => !active,
                 None => !input_active,
             },
-            ButtonLightMode::Pressed => input_active,
+            ButtonLightBehavior::Pressed => input_active,
         };
 
         Some(if active { 1.0 } else { 0.0 })

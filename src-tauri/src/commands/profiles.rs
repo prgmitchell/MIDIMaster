@@ -37,6 +37,7 @@ fn normalize_profile_bindings(profile: &mut Profile) -> bool {
         let before_targets = binding.targets.clone();
         let before_target = binding.target.clone();
         binding.ensure_targets();
+        changed |= binding.normalize_button_light_serialization();
         if binding.targets != before_targets || binding.target != before_target {
             changed = true;
         }
@@ -233,4 +234,55 @@ pub fn import_profile_from_file() -> Result<Option<Profile>, String> {
 
     normalize_profile_bindings(&mut profile);
     Ok(Some(profile))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_profile_bindings;
+    use crate::model::{Binding, ButtonLightBehavior, ButtonLightMode, Profile};
+
+    fn profile_with_button_light_mode(mode: &str) -> Profile {
+        let binding: Binding = serde_json::from_value(serde_json::json!({
+            "id": "b1",
+            "name": "Binding 1",
+            "device_id": "midi-dev",
+            "control": {
+                "channel": 0,
+                "controller": 22,
+                "msg_type": "Note"
+            },
+            "control_kind": "Button",
+            "targets": ["Master"],
+            "action": "ToggleMute",
+            "mode": "Absolute",
+            "deadzone": 0.0,
+            "debounce_ms": 0,
+            "button_light_mode": mode
+        }))
+        .expect("binding");
+
+        Profile {
+            name: "Default".to_string(),
+            bindings: vec![binding],
+            osd_settings: Default::default(),
+            plugin_settings: Default::default(),
+            midi_device_preference: Default::default(),
+            midi_device_preference_set: false,
+        }
+    }
+
+    #[test]
+    fn normalize_profile_bindings_repairs_unsafe_button_light_mode() {
+        let mut profile = profile_with_button_light_mode("InvertState");
+
+        assert!(normalize_profile_bindings(&mut profile));
+        assert_eq!(
+            profile.bindings[0].button_light_mode,
+            ButtonLightMode::Activity
+        );
+        assert_eq!(
+            profile.bindings[0].button_light_behavior,
+            ButtonLightBehavior::InvertState
+        );
+    }
 }

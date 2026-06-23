@@ -1861,8 +1861,8 @@ fn parse_midi_message(device_id: &str, message: &[u8]) -> Option<MidiEvent> {
 mod tests {
     use super::*;
     use crate::model::{
-        AssignMode, BindingControlKind, BindingTarget, ButtonLightMode, FaderCurve, MidiControl,
-        MuteBehavior, RelativeFormat,
+        AssignMode, BindingControlKind, BindingTarget, ButtonLightBehavior, ButtonLightMode,
+        FaderCurve, MidiControl, MuteBehavior, RelativeFormat,
     };
 
     fn direct_feedback(
@@ -1982,6 +1982,7 @@ mod tests {
             debounce_ms: 0,
             mute_behavior: MuteBehavior::ToggleOnPress,
             button_light_mode: ButtonLightMode::Activity,
+            button_light_behavior: ButtonLightBehavior::FollowState,
             mute_control: None,
             assign_control: None,
             assign_mode: AssignMode::Add,

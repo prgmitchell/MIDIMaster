@@ -234,6 +234,16 @@ pub struct Profile {
     pub midi_device_preference_set: bool,
 }
 
+impl Profile {
+    pub fn normalize_for_storage(&mut self) -> bool {
+        let mut changed = false;
+        for binding in &mut self.bindings {
+            changed |= binding.normalize_button_light_serialization();
+        }
+        changed
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileSummary {
     pub name: String,

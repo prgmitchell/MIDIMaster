@@ -2,12 +2,15 @@ import {
   applyCustomFaderCurve,
   applyFaderCurve,
   buttonVisualBehavior as coreButtonVisualBehavior,
+  effectiveButtonLightMode as coreEffectiveButtonLightMode,
   getBindingTargets,
   getPrimaryBindingTarget,
   MACRO_MAX_PARALLEL_STEPS,
   MACRO_MAX_TOP_LEVEL_STEPS,
   MACRO_MAX_WAIT_MS,
   normalizeButtonLightMode as normalizeCoreButtonLightMode,
+  normalizeButtonLightBehavior as normalizeCoreButtonLightBehavior,
+  normalizeButtonLightFields as normalizeCoreButtonLightFields,
   normalizeCustomCurvePoints,
   normalizeFaderCurve as normalizeCoreFaderCurve,
   normalizeMacroActionState,
@@ -52,6 +55,14 @@ export function normalizeMuteBehavior(raw) {
 
 export function normalizeButtonLightMode(raw) {
   return normalizeCoreButtonLightMode(raw);
+}
+
+export function normalizeButtonLightBehavior(raw) {
+  return normalizeCoreButtonLightBehavior(raw);
+}
+
+export function effectiveButtonLightMode(binding) {
+  return coreEffectiveButtonLightMode(binding);
 }
 
 export function buttonVisualBehavior(binding) {
@@ -176,7 +187,7 @@ export function ensureBindingShape(binding) {
   binding.fader_curve = normalizeFaderCurve(binding.fader_curve);
   binding.custom_curve = customCurvePoints(binding);
   binding.mute_behavior = normalizeMuteBehavior(binding.mute_behavior);
-  binding.button_light_mode = normalizeButtonLightMode(binding.button_light_mode);
+  normalizeCoreButtonLightFields(binding);
   delete binding.toggle_mute_light_mode;
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);

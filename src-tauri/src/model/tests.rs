@@ -118,6 +118,7 @@ fn serialize_binding_uses_targets_not_target() {
         debounce_ms: 0,
         mute_behavior: MuteBehavior::ToggleOnPress,
         button_light_mode: ButtonLightMode::Activity,
+        button_light_behavior: ButtonLightBehavior::FollowState,
         mute_control: None,
         assign_control: None,
         assign_mode: AssignMode::Add,
@@ -409,6 +410,85 @@ fn deserialize_binding_defaults_button_light_mode_to_activity() {
 }
 
 #[test]
+fn deserialize_binding_defaults_button_light_behavior_to_follow_state() {
+    let binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+    assert_eq!(
+        binding.button_light_behavior,
+        ButtonLightBehavior::FollowState
+    );
+}
+
+#[test]
+fn normalize_button_light_serialization_repairs_unsafe_mode() {
+    let mut json = binding_base_json();
+    json.as_object_mut().unwrap().insert(
+        "button_light_mode".to_string(),
+        serde_json::json!("Pressed"),
+    );
+
+    let mut binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+    assert_eq!(binding.button_light_mode, ButtonLightMode::Pressed);
+    assert_eq!(
+        binding.button_light_behavior,
+        ButtonLightBehavior::FollowState
+    );
+
+    assert!(binding.normalize_button_light_serialization());
+    assert_eq!(binding.button_light_mode, ButtonLightMode::Activity);
+    assert_eq!(binding.button_light_behavior, ButtonLightBehavior::Pressed);
+
+    let json = serde_json::to_value(binding).expect("binding should serialize");
+    assert_eq!(json["button_light_mode"], serde_json::json!("Activity"));
+    assert_eq!(json["button_light_behavior"], serde_json::json!("Pressed"));
+}
+
+#[test]
+fn serialize_button_light_behavior_keeps_legacy_mode_downgrade_safe() {
+    let mut binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+    binding.button_light_mode = ButtonLightMode::Activity;
+    binding.button_light_behavior = ButtonLightBehavior::InvertState;
+
+    let json = serde_json::to_value(binding).expect("binding should serialize");
+    assert_eq!(json["button_light_mode"], serde_json::json!("Activity"));
+    assert_eq!(
+        json["button_light_behavior"],
+        serde_json::json!("InvertState")
+    );
+
+    let mut binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+    binding.button_light_mode = ButtonLightMode::Activity;
+    binding.button_light_behavior = ButtonLightBehavior::Pressed;
+
+    let json = serde_json::to_value(binding).expect("binding should serialize");
+    assert_eq!(json["button_light_mode"], serde_json::json!("Activity"));
+    assert_eq!(json["button_light_behavior"], serde_json::json!("Pressed"));
+}
+
+#[test]
+fn mapped_button_light_serializes_legacy_mode_and_overrides_behavior() {
+    let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    binding.button_light_behavior = ButtonLightBehavior::InvertState;
+
+    assert_eq!(
+        binding.button_light_feedback_value(Some(false), Some(false)),
+        Some(1.0)
+    );
+
+    let json = serde_json::to_value(binding).expect("binding should serialize");
+    assert_eq!(
+        json["button_light_mode"],
+        serde_json::json!("MappedWhenAssigned")
+    );
+    assert_eq!(
+        json["button_light_behavior"],
+        serde_json::json!("InvertState")
+    );
+}
+
+#[test]
 fn deserialize_aux_control_defaults_mute_behavior_to_toggle_on_press() {
     let aux: AuxiliaryControl = serde_json::from_value(serde_json::json!({
         "device_id": "midi-dev",
@@ -605,7 +685,8 @@ fn legacy_activity_button_light_follows_state_with_press_fallback() {
 #[test]
 fn follow_state_button_light_follows_state_with_press_fallback() {
     let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
-    binding.button_light_mode = ButtonLightMode::FollowState;
+    binding.button_light_mode = ButtonLightMode::Activity;
+    binding.button_light_behavior = ButtonLightBehavior::FollowState;
 
     assert_eq!(
         binding.button_light_feedback_value(Some(false), Some(true)),
@@ -631,7 +712,8 @@ fn follow_state_button_light_follows_state_with_press_fallback() {
 #[test]
 fn invert_state_button_light_inverts_state_with_release_fallback() {
     let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
-    binding.button_light_mode = ButtonLightMode::InvertState;
+    binding.button_light_mode = ButtonLightMode::Activity;
+    binding.button_light_behavior = ButtonLightBehavior::InvertState;
 
     assert_eq!(
         binding.button_light_feedback_value(Some(false), Some(true)),
@@ -657,7 +739,8 @@ fn invert_state_button_light_inverts_state_with_release_fallback() {
 #[test]
 fn pressed_button_light_ignores_state() {
     let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
-    binding.button_light_mode = ButtonLightMode::Pressed;
+    binding.button_light_mode = ButtonLightMode::Activity;
+    binding.button_light_behavior = ButtonLightBehavior::Pressed;
 
     assert_eq!(
         binding.button_light_feedback_value(Some(false), Some(true)),

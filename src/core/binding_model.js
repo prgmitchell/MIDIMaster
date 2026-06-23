@@ -225,7 +225,7 @@ export function resolveButtonVisualActive(binding, options = {}) {
   const behavior = buttonVisualBehavior(binding);
   if (!behavior) return false;
 
-  const lightMode = normalizeButtonLightMode(binding?.button_light_mode);
+  const lightMode = effectiveButtonLightMode(binding);
   if (lightMode === "MappedWhenAssigned") {
     return mappedButtonLightVisualActive(binding);
   }
@@ -437,7 +437,7 @@ export function normalizeBinding(binding) {
     };
   }
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
-  out.button_light_mode = normalizeButtonLightMode(out.button_light_mode);
+  normalizeButtonLightFields(out);
   delete out.toggle_mute_light_mode;
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
   if (!out.open_application || typeof out.open_application !== "object") {
@@ -480,17 +480,40 @@ export function normalizeRelativeFormat(raw) {
 }
 
 export function normalizeButtonLightMode(raw) {
-  const value = String(raw || "Activity");
-  if (
-    value === "Activity"
-    || value === "MappedWhenAssigned"
-    || value === "FollowState"
-    || value === "InvertState"
-    || value === "Pressed"
-  ) {
+  return raw === "MappedWhenAssigned" ? "MappedWhenAssigned" : "Activity";
+}
+
+export function normalizeButtonLightBehavior(raw) {
+  const value = String(raw || "FollowState");
+  if (value === "FollowState" || value === "InvertState" || value === "Pressed") {
     return value;
   }
-  return "Activity";
+  return "FollowState";
+}
+
+export function effectiveButtonLightMode(binding) {
+  const rawMode = String(binding?.button_light_mode || "Activity");
+  if (rawMode === "MappedWhenAssigned") return "MappedWhenAssigned";
+  if (rawMode === "FollowState" || rawMode === "InvertState" || rawMode === "Pressed") {
+    return rawMode;
+  }
+  return normalizeButtonLightBehavior(binding?.button_light_behavior);
+}
+
+export function normalizeButtonLightFields(binding) {
+  if (!binding || typeof binding !== "object") return binding;
+  const rawMode = String(binding.button_light_mode || "Activity");
+  if (rawMode === "MappedWhenAssigned") {
+    binding.button_light_mode = "MappedWhenAssigned";
+    binding.button_light_behavior = normalizeButtonLightBehavior(binding.button_light_behavior);
+  } else if (rawMode === "FollowState" || rawMode === "InvertState" || rawMode === "Pressed") {
+    binding.button_light_mode = "Activity";
+    binding.button_light_behavior = rawMode;
+  } else {
+    binding.button_light_mode = "Activity";
+    binding.button_light_behavior = normalizeButtonLightBehavior(binding.button_light_behavior);
+  }
+  return binding;
 }
 
 export function decodeRelativeTwosComplement(value) {

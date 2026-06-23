@@ -89,7 +89,11 @@ impl ProfileStore {
             fs::create_dir_all(parent)
                 .with_context(|| format!("Failed creating {}", parent.display()))?;
         }
-        let data = serde_json::to_string_pretty(profiles)?;
+        let mut profiles = profiles.to_vec();
+        for profile in &mut profiles {
+            profile.normalize_for_storage();
+        }
+        let data = serde_json::to_string_pretty(&profiles)?;
         self.write_atomically(data.as_bytes())?;
         Ok(())
     }
@@ -199,6 +203,33 @@ mod tests {
         }
     }
 
+    fn unsafe_light_profiles_json() -> serde_json::Value {
+        serde_json::json!([
+            {
+                "name": "unsafe",
+                "bindings": [
+                    {
+                        "id": "b1",
+                        "name": "Binding 1",
+                        "device_id": "midi-dev",
+                        "control": {
+                            "channel": 0,
+                            "controller": 22,
+                            "msg_type": "Note"
+                        },
+                        "control_kind": "Button",
+                        "targets": ["Master"],
+                        "action": "ToggleMute",
+                        "mode": "Absolute",
+                        "deadzone": 0.0,
+                        "debounce_ms": 0,
+                        "button_light_mode": "Pressed"
+                    }
+                ]
+            }
+        ])
+    }
+
     #[test]
     fn save_profile_keeps_backup_of_previous_profiles() {
         let dir = test_dir("backup");
@@ -277,6 +308,32 @@ mod tests {
             .expect("profile");
         assert_eq!(loaded.name, "Default");
         assert!(!dir.join("profiles.json.bak").exists());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn save_profile_repairs_unsafe_button_light_modes_for_downgrade() {
+        let dir = test_dir("repair-light-mode");
+        std::fs::create_dir_all(&dir).expect("create dir");
+        std::fs::write(
+            dir.join("profiles.json"),
+            serde_json::to_vec_pretty(&unsafe_light_profiles_json()).expect("profile json"),
+        )
+        .expect("write unsafe profile");
+        let store = ProfileStore::new(dir.clone());
+
+        store.save_profile(profile("next")).expect("save next");
+
+        let saved = std::fs::read_to_string(dir.join("profiles.json")).expect("profiles");
+        let profiles: serde_json::Value = serde_json::from_str(&saved).expect("parse profiles");
+        let binding = &profiles[0]["bindings"][0];
+        assert_eq!(binding["button_light_mode"], serde_json::json!("Activity"));
+        assert_eq!(
+            binding["button_light_behavior"],
+            serde_json::json!("Pressed")
+        );
+        assert_eq!(profiles[1]["name"], serde_json::json!("next"));
 
         let _ = std::fs::remove_dir_all(dir);
     }

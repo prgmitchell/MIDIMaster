@@ -179,13 +179,38 @@ function testMappedLightRequiresCompleteTarget() {
   assert.equal(bindingModel.resolveButtonVisualActive(complete, { inputValue: 0 }), true);
 }
 
-function testNormalizeButtonLightModeAcceptsUnifiedModes() {
+function testNormalizeButtonLightModeKeepsLegacyValuesOnly() {
   assert.equal(bindingModel.normalizeButtonLightMode("MappedWhenAssigned"), "MappedWhenAssigned");
-  assert.equal(bindingModel.normalizeButtonLightMode("FollowState"), "FollowState");
-  assert.equal(bindingModel.normalizeButtonLightMode("InvertState"), "InvertState");
-  assert.equal(bindingModel.normalizeButtonLightMode("Pressed"), "Pressed");
+  assert.equal(bindingModel.normalizeButtonLightMode("FollowState"), "Activity");
+  assert.equal(bindingModel.normalizeButtonLightMode("InvertState"), "Activity");
+  assert.equal(bindingModel.normalizeButtonLightMode("Pressed"), "Activity");
   assert.equal(bindingModel.normalizeButtonLightMode("Activity"), "Activity");
   assert.equal(bindingModel.normalizeButtonLightMode("not-a-mode"), "Activity");
+  assert.equal(bindingModel.normalizeButtonLightBehavior("FollowState"), "FollowState");
+  assert.equal(bindingModel.normalizeButtonLightBehavior("InvertState"), "InvertState");
+  assert.equal(bindingModel.normalizeButtonLightBehavior("Pressed"), "Pressed");
+  assert.equal(bindingModel.normalizeButtonLightBehavior("not-a-mode"), "FollowState");
+}
+
+function testNormalizeBindingMovesUnsafeLightModesToBehavior() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    button_light_mode: "Pressed",
+  }));
+
+  assert.equal(normalized.button_light_mode, "Activity");
+  assert.equal(normalized.button_light_behavior, "Pressed");
+  assert.equal(bindingModel.effectiveButtonLightMode(normalized), "Pressed");
+}
+
+function testNormalizeBindingPreservesDowngradeSafeBehavior() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    button_light_mode: "Activity",
+    button_light_behavior: "InvertState",
+  }));
+
+  assert.equal(normalized.button_light_mode, "Activity");
+  assert.equal(normalized.button_light_behavior, "InvertState");
+  assert.equal(bindingModel.effectiveButtonLightMode(normalized), "InvertState");
 }
 
 function testNormalizeBindingDropsInterimToggleMuteLightMode() {
@@ -212,7 +237,8 @@ function testToggleMuteInvertStateLightsWhileUnmuted() {
   const binding = buttonBinding({
     action: "ToggleMute",
     target: { Application: { name: "firefox.exe" } },
-    button_light_mode: "InvertState",
+    button_light_mode: "Activity",
+    button_light_behavior: "InvertState",
   });
 
   assert.equal(bindingModel.buttonVisualBehavior(binding), "stateful");
@@ -235,7 +261,8 @@ function testMappedLightOverridesToggleMuteState() {
 function testFollowStateUsesStateWithPressFallback() {
   const stateful = buttonBinding({
     action: "Volume",
-    button_light_mode: "FollowState",
+    button_light_mode: "Activity",
+    button_light_behavior: "FollowState",
     target: {
       Integration: {
         integration_id: "obs",
@@ -244,7 +271,7 @@ function testFollowStateUsesStateWithPressFallback() {
       },
     },
   });
-  const momentary = buttonBinding({ button_light_mode: "FollowState" });
+  const momentary = buttonBinding({ button_light_mode: "Activity", button_light_behavior: "FollowState" });
 
   assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 1, inputValue: 0 }), true);
   assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 0, inputValue: 1 }), false);
@@ -255,7 +282,8 @@ function testFollowStateUsesStateWithPressFallback() {
 function testInvertStateUsesInverseStateWithReleaseFallback() {
   const stateful = buttonBinding({
     action: "Volume",
-    button_light_mode: "InvertState",
+    button_light_mode: "Activity",
+    button_light_behavior: "InvertState",
     target: {
       Integration: {
         integration_id: "obs",
@@ -264,7 +292,7 @@ function testInvertStateUsesInverseStateWithReleaseFallback() {
       },
     },
   });
-  const momentary = buttonBinding({ button_light_mode: "InvertState" });
+  const momentary = buttonBinding({ button_light_mode: "Activity", button_light_behavior: "InvertState" });
 
   assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 1, inputValue: 0 }), false);
   assert.equal(bindingModel.resolveButtonVisualActive(stateful, { stateValue: 0, inputValue: 1 }), true);
@@ -276,7 +304,8 @@ function testPressedModeIgnoresToggleState() {
   const binding = buttonBinding({
     action: "ToggleMute",
     target: { Application: { name: "firefox.exe" } },
-    button_light_mode: "Pressed",
+    button_light_mode: "Activity",
+    button_light_behavior: "Pressed",
   });
 
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { muted: true, inputValue: 0 }), false);
@@ -563,7 +592,9 @@ testProgramChangeButtonBindingIsButton();
 testMomentaryButtonFollowsInputValue();
 testMappedLightControlsButtonVisualState();
 testMappedLightRequiresCompleteTarget();
-testNormalizeButtonLightModeAcceptsUnifiedModes();
+testNormalizeButtonLightModeKeepsLegacyValuesOnly();
+testNormalizeBindingMovesUnsafeLightModesToBehavior();
+testNormalizeBindingPreservesDowngradeSafeBehavior();
 testNormalizeBindingDropsInterimToggleMuteLightMode();
 testToggleMuteFollowsMutedState();
 testToggleMuteInvertStateLightsWhileUnmuted();

@@ -17,6 +17,7 @@ import {
   curveEditorPoints,
   curveHelpText,
   customCurvePoints,
+  effectiveButtonLightMode,
   effectiveIsButton,
   ensureAuxShape,
   ensureBindingShape,
@@ -32,7 +33,7 @@ import {
   modeTooltip,
   muteBehaviorLabel,
   muteBehaviorTooltip,
-  normalizeButtonLightMode,
+  normalizeButtonLightBehavior,
   normalizeControlKind,
   normalizeCustomCurve,
   normalizeFaderCurve,
@@ -558,7 +559,7 @@ export function createBindingsFeature({
   function mappedButtonLightFeedbackValue(binding) {
     if (
       !effectiveIsButton(binding)
-      || normalizeButtonLightMode(binding?.button_light_mode) !== "MappedWhenAssigned"
+      || effectiveButtonLightMode(binding) !== "MappedWhenAssigned"
     ) {
       return null;
     }
@@ -570,7 +571,7 @@ export function createBindingsFeature({
   }
 
   function buttonLightLabel(binding) {
-    switch (normalizeButtonLightMode(binding?.button_light_mode)) {
+    switch (effectiveButtonLightMode(binding)) {
       case "MappedWhenAssigned":
         return t("bindings.buttonLightWhenMapped");
       case "InvertState":
@@ -585,7 +586,10 @@ export function createBindingsFeature({
   }
 
   function buttonLightOptionText(value) {
-    switch (normalizeButtonLightMode(value)) {
+    const mode = value === "MappedWhenAssigned"
+      ? "MappedWhenAssigned"
+      : normalizeButtonLightBehavior(value);
+    switch (mode) {
       case "MappedWhenAssigned":
         return t("bindings.buttonLightWhenMapped");
       case "InvertState":
@@ -600,8 +604,7 @@ export function createBindingsFeature({
   }
 
   function buttonLightSelectValue(binding) {
-    const mode = normalizeButtonLightMode(binding?.button_light_mode);
-    return mode === "Activity" ? "FollowState" : mode;
+    return effectiveButtonLightMode(binding);
   }
 
   function renderButtonLightDropdown() {
@@ -5324,7 +5327,14 @@ export function createBindingsFeature({
       d.bindingConfigButtonLightSelect.addEventListener("change", () => {
         const binding = getConfigBinding();
         if (!binding) return;
-        binding.button_light_mode = normalizeButtonLightMode(d.bindingConfigButtonLightSelect.value);
+        const nextMode = d.bindingConfigButtonLightSelect.value;
+        if (nextMode === "MappedWhenAssigned") {
+          binding.button_light_mode = "MappedWhenAssigned";
+          binding.button_light_behavior = normalizeButtonLightBehavior(binding.button_light_behavior);
+        } else {
+          binding.button_light_mode = "Activity";
+          binding.button_light_behavior = normalizeButtonLightBehavior(nextMode);
+        }
         syncButtonLightUi(binding);
         renderConfigPreview();
       });
