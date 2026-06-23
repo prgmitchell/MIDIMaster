@@ -229,6 +229,31 @@ function testHotkeyMappingKeepsLetterShortcuts() {
   );
 }
 
+function testHotkeyMappingUsesPhysicalNumpadKeys() {
+  assert.deepEqual(
+    bindingModel.buildHotkeyMappingFromEvent({
+      key: "ArrowLeft",
+      code: "Numpad4",
+      ctrlKey: false,
+      shiftKey: true,
+      altKey: false,
+      metaKey: false,
+    }),
+    { keys: ["Shift", "Numpad4"], display: "Shift+Numpad4" },
+  );
+  assert.deepEqual(
+    bindingModel.buildHotkeyMappingFromEvent({
+      key: ".",
+      code: "NumpadDecimal",
+      ctrlKey: true,
+      shiftKey: false,
+      altKey: false,
+      metaKey: false,
+    }),
+    { keys: ["Ctrl", "NumpadDecimal"], display: "Ctrl+NumpadDecimal" },
+  );
+}
+
 function testNormalizeButtonLightModeKeepsLegacyValuesOnly() {
   assert.equal(bindingModel.normalizeButtonLightMode("MappedWhenAssigned"), "MappedWhenAssigned");
   assert.equal(bindingModel.normalizeButtonLightMode("FollowState"), "Activity");
@@ -644,6 +669,7 @@ testMappedLightControlsButtonVisualState();
 testMappedLightRequiresCompleteTarget();
 testHotkeyMappingUsesPhysicalKeysForShiftedSymbols();
 testHotkeyMappingKeepsLetterShortcuts();
+testHotkeyMappingUsesPhysicalNumpadKeys();
 testNormalizeButtonLightModeKeepsLegacyValuesOnly();
 testNormalizeBindingMovesUnsafeLightModesToBehavior();
 testNormalizeBindingPreservesDowngradeSafeBehavior();

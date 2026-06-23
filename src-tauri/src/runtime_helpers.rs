@@ -54,6 +54,22 @@ fn key_name_to_vk(name: &str) -> Option<u16> {
         "BRACKETLEFT" | "LEFTBRACKET" | "[" | "{" => Some(0xDB),
         "BRACKETRIGHT" | "RIGHTBRACKET" | "]" | "}" => Some(0xDD),
         "BACKSLASH" | "\\" | "|" => Some(0xDC),
+        "NUMPAD0" => Some(0x60),
+        "NUMPAD1" => Some(0x61),
+        "NUMPAD2" => Some(0x62),
+        "NUMPAD3" => Some(0x63),
+        "NUMPAD4" => Some(0x64),
+        "NUMPAD5" => Some(0x65),
+        "NUMPAD6" => Some(0x66),
+        "NUMPAD7" => Some(0x67),
+        "NUMPAD8" => Some(0x68),
+        "NUMPAD9" => Some(0x69),
+        "NUMPADMULTIPLY" => Some(0x6A),
+        "NUMPADADD" => Some(0x6B),
+        "NUMPADSUBTRACT" => Some(0x6D),
+        "NUMPADDECIMAL" => Some(0x6E),
+        "NUMPADDIVIDE" => Some(0x6F),
+        "NUMPADENTER" => Some(0x0D),
         "!" => Some(b'1' as u16),
         "@" => Some(b'2' as u16),
         "#" => Some(b'3' as u16),
@@ -550,6 +566,15 @@ mod tests {
         let (vks, unmapped) = normalize_hotkey_vks(&keys(&["<", ">", "!", "+"]));
 
         assert_eq!(vks, vec![0xBC, 0xBE, b'1' as u16, 0xBB]);
+        assert!(unmapped.is_empty());
+    }
+
+    #[test]
+    fn normalizes_hotkey_numpad_names() {
+        let (vks, unmapped) =
+            normalize_hotkey_vks(&keys(&["Shift", "Numpad4", "NumpadDecimal", "NumpadAdd"]));
+
+        assert_eq!(vks, vec![0x10, 0x64, 0x6E, 0x6B]);
         assert!(unmapped.is_empty());
     }
 

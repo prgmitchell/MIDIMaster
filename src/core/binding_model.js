@@ -262,6 +262,12 @@ const HOTKEY_CODE_KEYS = new Map(Object.entries({
   BracketLeft: "BracketLeft",
   BracketRight: "BracketRight",
   Backslash: "Backslash",
+  NumpadDecimal: "NumpadDecimal",
+  NumpadAdd: "NumpadAdd",
+  NumpadSubtract: "NumpadSubtract",
+  NumpadMultiply: "NumpadMultiply",
+  NumpadDivide: "NumpadDivide",
+  NumpadEnter: "NumpadEnter",
 }));
 const HOTKEY_KEY_ALIASES = new Map(Object.entries({
   " ": "Space",
@@ -306,6 +312,8 @@ function normalizeHotkeyCode(code) {
   if (letterMatch) return letterMatch[1];
   const digitMatch = /^Digit([0-9])$/.exec(value);
   if (digitMatch) return digitMatch[1];
+  const numpadDigitMatch = /^Numpad([0-9])$/.exec(value);
+  if (numpadDigitMatch) return `Numpad${numpadDigitMatch[1]}`;
   return HOTKEY_CODE_KEYS.get(value) || null;
 }
 
