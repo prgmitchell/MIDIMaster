@@ -48,6 +48,109 @@ function pickFirstString(obj, keys) {
   return "";
 }
 
+const MAIN_OUTPUT_CYCLE_LABEL = "Cycle Main Output";
+
+function outputDeviceName(device) {
+  return String(
+    device?.name
+    || device?.displayName
+    || device?.display_name
+    || device?.output_device_name
+    || outputDeviceId(device)
+    || "Output Device",
+  );
+}
+
+function outputDeviceId(deviceOrData) {
+  return pickFirstString(deviceOrData, [
+    "output_device_id",
+    "outputDeviceId",
+    "device_id",
+    "deviceId",
+    "id",
+  ]);
+}
+
+function outputId(deviceOrData) {
+  const direct = pickFirstString(deviceOrData, ["output_id", "outputId"]);
+  if (direct) return direct;
+  const firstOutputId = deviceOrData?.outputs?.[0]?.id;
+  if (firstOutputId != null && String(firstOutputId).trim()) return String(firstOutputId).trim();
+  return outputDeviceId(deviceOrData);
+}
+
+function normalizeOutputDevice(device) {
+  const deviceId = outputDeviceId(device);
+  if (!deviceId) return null;
+  const nextOutputId = outputId(device) || deviceId;
+  if (!nextOutputId) return null;
+  return {
+    output_device_id: deviceId,
+    output_id: nextOutputId,
+    output_device_name: outputDeviceName(device),
+    device_type: String(device?.deviceType || device?.device_type || device?.type || ""),
+  };
+}
+
+function validOutputDevices(outputDevices) {
+  if (!Array.isArray(outputDevices)) return [];
+  return outputDevices.map(normalizeOutputDevice).filter(Boolean);
+}
+
+function outputDeviceMatchesMainOutput(deviceOrData, mainOutput) {
+  const deviceId = outputDeviceId(deviceOrData);
+  const deviceOutputId = outputId(deviceOrData);
+  const mainDeviceId = outputDeviceId(mainOutput);
+  const mainOutputId = outputId(mainOutput);
+  return Boolean(
+    (deviceId && mainDeviceId && deviceId === mainDeviceId)
+    || (deviceOutputId && mainOutputId && deviceOutputId === mainOutputId)
+    || (deviceId && mainOutputId && deviceId === mainOutputId)
+  );
+}
+
+function nextMainOutputDevice(outputDevicesState) {
+  const devices = validOutputDevices(outputDevicesState?.outputDevices);
+  if (devices.length < 2) return null;
+  const currentIndex = devices.findIndex((device) => (
+    outputDeviceMatchesMainOutput(device, outputDevicesState?.mainOutput)
+  ));
+  return devices[currentIndex >= 0 ? ((currentIndex + 1) % devices.length) : 0] || null;
+}
+
+function createMainOutputCycleOption(outputDevices, iconDataUrl = null) {
+  if (validOutputDevices(outputDevices).length < 2) return null;
+  return {
+    label: MAIN_OUTPUT_CYCLE_LABEL,
+    icon_data: iconDataUrl || null,
+    buttonActions: [
+      { label: MAIN_OUTPUT_CYCLE_LABEL, value: "SetMainOutputDevice", behavior: "momentary" },
+    ],
+    target: {
+      Integration: {
+        integration_id: "wavelink",
+        kind: "main_output_cycle",
+        data: {
+          label: MAIN_OUTPUT_CYCLE_LABEL,
+          action_label: MAIN_OUTPUT_CYCLE_LABEL,
+          action_kind: "momentary",
+        },
+      },
+    },
+  };
+}
+
+export const wavelinkTestUtils = {
+  outputDeviceName,
+  outputDeviceId,
+  outputId,
+  normalizeOutputDevice,
+  validOutputDevices,
+  outputDeviceMatchesMainOutput,
+  nextMainOutputDevice,
+  createMainOutputCycleOption,
+};
+
 // Connection UI refs (mounted by the plugin).
 const ui = {
   statusText: null,
@@ -615,41 +718,8 @@ export async function activate(ctx) {
     return null;
   }
 
-  function outputDeviceName(device) {
-    return String(device?.name || device?.displayName || device?.id || "Output Device");
-  }
-
-  function outputDeviceId(deviceOrData) {
-    return String(
-      deviceOrData?.output_device_id
-      || deviceOrData?.outputDeviceId
-      || deviceOrData?.id
-      || "",
-    );
-  }
-
-  function outputId(deviceOrData) {
-    return String(
-      deviceOrData?.output_id
-      || deviceOrData?.outputId
-      || deviceOrData?.outputs?.[0]?.id
-      || outputDeviceId(deviceOrData)
-      || "",
-    );
-  }
-
-  function mainOutputDeviceId() {
-    return String(
-      outputDevicesState?.mainOutput?.outputDeviceId
-      || outputDevicesState?.mainOutput?.outputId
-      || outputDevicesState?.mainOutput?.id
-      || "",
-    );
-  }
-
   function targetIsMainOutputDevice(data) {
-    const id = outputDeviceId(data);
-    return Boolean(id) && id === mainOutputDeviceId();
+    return outputDeviceMatchesMainOutput(data, outputDevicesState?.mainOutput);
   }
 
   async function setChannelEffectEnabled(data, enabled) {
@@ -692,6 +762,12 @@ export async function activate(ctx) {
     }
     const message = response?.error?.message || (response?.timeout ? "timed out" : "unknown error");
     throw new Error(`Wave Link rejected main output change: ${String(message)}`);
+  }
+
+  async function cycleMainOutputDevice() {
+    const nextDevice = nextMainOutputDevice(outputDevicesState);
+    if (!nextDevice) return false;
+    return setMainOutputDevice(nextDevice);
   }
 
   async function syncAllFeedback() {
@@ -785,6 +861,8 @@ export async function activate(ctx) {
           }
         } else if (action === "SetMainOutputDevice" && t.kind === "main_output_device") {
           await ctx.feedback.set(b.id, targetIsMainOutputDevice(data) ? 1.0 : 0.0, action, { silent: true });
+        } else if (action === "SetMainOutputDevice" && t.kind === "main_output_cycle") {
+          await ctx.feedback.set(b.id, 0.0, action, { silent: true });
         }
       } catch {
         // ignore
@@ -822,10 +900,10 @@ export async function activate(ctx) {
     if (!wsId || disposed) {
       throw new Error("Wave Link not connected");
     }
-    // Keep state query ids stable (1/2/3), but use unique ids for rapid write
+    // Keep state query ids stable (1/2/3/4), but use unique ids for rapid write
     // traffic so Wave Link bridge responses cannot collide under high frequency.
     let requestId = id;
-    if (id !== 1 && id !== 2 && id !== 3) {
+    if (id !== 1 && id !== 2 && id !== 3 && id !== 4) {
       rpcSequence += 1;
       if (rpcSequence > 2_000_000_000) rpcSequence = 10;
       requestId = rpcSequence;
@@ -1303,6 +1381,10 @@ export async function activate(ctx) {
         if (deviceName && !label) {
           label = `Main Output: ${deviceName}`;
         }
+      } else if (t.kind === "main_output_cycle") {
+        if (!label) {
+          label = MAIN_OUTPUT_CYCLE_LABEL;
+        }
       }
 
       // Back-compat: reconstruct label if older targets didn't store it.
@@ -1322,6 +1404,8 @@ export async function activate(ctx) {
         } else if (t.kind === "main_output_device") {
           const deviceName = data.output_device_name || data.name || data.output_device_id;
           label = deviceName ? `Main Output: ${deviceName}` : "Wave Link Main Output";
+        } else if (t.kind === "main_output_cycle") {
+          label = MAIN_OUTPUT_CYCLE_LABEL;
         } else {
           const endpoint = normalizeEndpoint(target);
           const fromCache = describeFromCache(endpoint);
@@ -1453,9 +1537,12 @@ export async function activate(ctx) {
       const outputDeviceOptions = () => {
         const opts = [];
         if (!isButton || !Array.isArray(outputDevicesState.outputDevices)) return opts;
-        for (const device of outputDevicesState.outputDevices) {
+        const cycleOption = createMainOutputCycleOption(outputDevicesState.outputDevices, iconDataUrl);
+        if (cycleOption) {
+          opts.push(cycleOption);
+        }
+        for (const device of validOutputDevices(outputDevicesState.outputDevices)) {
           const id = outputDeviceId(device);
-          if (!id) continue;
           const name = outputDeviceName(device);
           const nextOutputId = outputId(device) || id;
           opts.push({
@@ -1562,7 +1649,9 @@ export async function activate(ctx) {
       if (action === "SetMainOutputDevice") {
         if (!wsId) return;
         try {
-          const applied = await setMainOutputDevice(targetData);
+          const applied = target?.kind === "main_output_cycle"
+            ? await cycleMainOutputDevice()
+            : await setMainOutputDevice(targetData);
           if (applied && bindingId && isPrimaryTarget) {
             await ctx.feedback.set(bindingId, 1.0, action);
           }
