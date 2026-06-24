@@ -1093,6 +1093,7 @@ settingsFeature = createSettingsFeature({
     };
   },
   applyAppearance: applyGlobalAppearance,
+  showAlert: (title, message = "") => showAlert(title, message),
   onUpdateAvailableClick: showUpdateAvailableDialog,
   onMidiDeviceInventoryConsentChanged: () => {
     queueMidiDeviceInventorySubmit("consent_changed");

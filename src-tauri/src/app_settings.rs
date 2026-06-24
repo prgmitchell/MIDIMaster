@@ -51,6 +51,8 @@ fn default_text_rendering() -> String {
     "auto".to_string()
 }
 
+pub const CURRENT_STARTUP_REGISTRATION_VERSION: u32 = 2;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MidiDeviceInventoryConsent {
@@ -183,6 +185,8 @@ impl Default for FaderCurvePreset {
 #[serde(default)]
 pub struct AppSettings {
     pub start_with_windows: bool,
+    #[serde(default)]
+    pub startup_registration_version: u32,
     pub start_in_tray: bool,
     pub minimize_to_tray: bool,
     pub exit_to_tray: bool,
@@ -206,6 +210,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             start_with_windows: false,
+            startup_registration_version: CURRENT_STARTUP_REGISTRATION_VERSION,
             start_in_tray: false,
             minimize_to_tray: false,
             exit_to_tray: false,
@@ -302,6 +307,14 @@ mod tests {
     }
 
     #[test]
+    fn default_startup_registration_version_is_current() {
+        assert_eq!(
+            AppSettings::default().startup_registration_version,
+            super::CURRENT_STARTUP_REGISTRATION_VERSION
+        );
+    }
+
+    #[test]
     fn missing_language_deserializes_to_english() {
         let json = r#"{
             "start_with_windows": true,
@@ -314,6 +327,7 @@ mod tests {
         let settings: AppSettings = serde_json::from_str(json).expect("settings deserialize");
         assert_eq!(settings.language, "en");
         assert!(settings.start_with_windows);
+        assert_eq!(settings.startup_registration_version, 0);
         assert!(settings.minimize_to_tray);
         assert_eq!(settings.appearance.active_theme_id, "system");
         assert_eq!(settings.appearance.font_size, 14.0);

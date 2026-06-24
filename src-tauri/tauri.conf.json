@@ -26,7 +26,12 @@
   },
   "bundle": {
     "createUpdaterArtifacts": true,
-    "icon": ["icons/MIDIMaster.png", "icons/icon.ico"]
+    "icon": ["icons/MIDIMaster.png", "icons/icon.ico"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    }
   },
   "plugins": {
     "updater": {

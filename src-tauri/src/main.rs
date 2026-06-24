@@ -28,7 +28,7 @@ mod windows_display;
 mod ws_bridge;
 
 use app_paths::app_data_root_dir;
-use app_settings::AppSettingsStore;
+use app_settings::{AppSettings, AppSettingsStore, CURRENT_STARTUP_REGISTRATION_VERSION};
 pub(crate) use app_state::AppState;
 use audio::AudioBackend;
 use commands::*;
@@ -79,6 +79,56 @@ fn shutdown_lights(state: &AppState) {
     run_logger::info("app", "shutdown_lights_done", "");
 }
 
+fn migrate_startup_registration_if_needed(
+    app_settings_store: &AppSettingsStore,
+    app_settings: &mut AppSettings,
+) {
+    if app_settings.startup_registration_version >= CURRENT_STARTUP_REGISTRATION_VERSION {
+        return;
+    }
+
+    let migration_result = if app_settings.start_with_windows {
+        windows_autostart::set_windows_autostart(true)
+    } else {
+        windows_autostart::clear_windows_autostart_artifacts()
+    };
+
+    match migration_result {
+        Ok(()) => {
+            app_settings.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
+            if let Err(err) = app_settings_store.save(app_settings) {
+                run_logger::warn(
+                    "app",
+                    "startup_registration_migration_save_failed",
+                    &err.to_string(),
+                );
+            } else {
+                run_logger::info(
+                    "app",
+                    "startup_registration_migrated",
+                    &format!("start_with_windows={}", app_settings.start_with_windows),
+                );
+            }
+        }
+        Err(err) if windows_autostart::startup_requires_installed_app(&err) => {
+            let _ = windows_autostart::clear_windows_autostart_artifacts();
+            app_settings.start_with_windows = false;
+            app_settings.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
+            if let Err(save_err) = app_settings_store.save(app_settings) {
+                run_logger::warn(
+                    "app",
+                    "startup_registration_migration_save_failed",
+                    &save_err.to_string(),
+                );
+            }
+            run_logger::warn("app", "startup_registration_disabled_uninstalled", &err);
+        }
+        Err(err) => {
+            run_logger::warn("app", "startup_registration_migration_failed", &err);
+        }
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -113,7 +163,8 @@ fn main() {
             builtin_plugins::ensure_builtin_plugins(app.handle());
             let profile_store = ProfileStore::new(config_dir.clone());
             let app_settings_store = AppSettingsStore::new(config_dir);
-            let app_settings = app_settings_store.load().unwrap_or_default();
+            let mut app_settings = app_settings_store.load().unwrap_or_default();
+            migrate_startup_registration_if_needed(&app_settings_store, &mut app_settings);
             run_logger::info(
                 "app",
                 "settings_loaded",

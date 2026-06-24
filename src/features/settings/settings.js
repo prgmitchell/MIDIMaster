@@ -37,6 +37,7 @@ export function createSettingsFeature({
   getAppSettings,
   setAppSettings,
   applyAppearance,
+  showAlert,
   onUpdateAvailableClick,
   onMidiDeviceInventoryConsentChanged,
 }) {
@@ -50,6 +51,7 @@ export function createSettingsFeature({
       i18n.applyTranslations(d.settingsPanel || document);
     }
   };
+  const showSettingsAlert = typeof showAlert === "function" ? showAlert : null;
   let monitorDropdownEl = null;
   let monitorMenuEl = null;
   let monitorDisplayEl = null;
@@ -1557,7 +1559,29 @@ export function createSettingsFeature({
     renderUpdateUi();
   }
 
-  function persistAppSettings() {
+  function normalizeBackendAppSettings(settings) {
+    return {
+      startWithWindows: Boolean(settings.start_with_windows ?? settings.startWithWindows),
+      startInTray: Boolean(settings.start_in_tray ?? settings.startInTray),
+      minimizeToTray: Boolean(settings.minimize_to_tray ?? settings.minimizeToTray),
+      exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
+      autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
+      language: normalizeLanguage(settings.language ?? settings.languageCode ?? "en"),
+      midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(
+        settings.midi_device_inventory_consent ?? settings.midiDeviceInventoryConsent,
+      ),
+      midiDeviceInventoryNoticeVersion: Number(
+        settings.midi_device_inventory_notice_version
+        ?? settings.midiDeviceInventoryNoticeVersion
+        ?? 0,
+      ),
+      appearance: settings.appearance && typeof settings.appearance === "object"
+        ? normalizeAppearanceSettings(settings.appearance)
+        : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme),
+    };
+  }
+
+  function persistAppSettings({ previousSettings = null } = {}) {
     const s = (typeof getAppSettings === "function") ? (getAppSettings() || {}) : {};
     return invoke("update_app_settings", {
       startWithWindows: Boolean(s.startWithWindows),
@@ -1566,8 +1590,19 @@ export function createSettingsFeature({
       exitToTray: Boolean(s.exitToTray),
       autoCheckUpdates: s.autoCheckUpdates !== false,
       language: normalizeLanguage(s.language),
+    }).then((updated) => {
+      if (updated && typeof updated === "object") {
+        syncAppSettingsUI(normalizeBackendAppSettings(updated));
+      }
     }).catch((error) => {
       console.error("Failed to update app settings", error);
+      if (previousSettings && typeof previousSettings === "object") {
+        syncAppSettingsUI(previousSettings);
+      }
+      showSettingsAlert?.(
+        t("dialogs.actionFailedTitle"),
+        String(error || t("dialogs.actionFailedMessage")),
+      );
     });
   }
 
@@ -1590,25 +1625,7 @@ export function createSettingsFeature({
     try {
       const settings = await invoke("get_app_settings");
       if (settings) {
-        const next = {
-          startWithWindows: Boolean(settings.start_with_windows ?? settings.startWithWindows),
-          startInTray: Boolean(settings.start_in_tray ?? settings.startInTray),
-          minimizeToTray: Boolean(settings.minimize_to_tray ?? settings.minimizeToTray),
-          exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
-          autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
-          language: normalizeLanguage(settings.language ?? settings.languageCode ?? "en"),
-          midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(
-            settings.midi_device_inventory_consent ?? settings.midiDeviceInventoryConsent,
-          ),
-          midiDeviceInventoryNoticeVersion: Number(
-            settings.midi_device_inventory_notice_version
-            ?? settings.midiDeviceInventoryNoticeVersion
-            ?? 0,
-          ),
-          appearance: settings.appearance && typeof settings.appearance === "object"
-            ? normalizeAppearanceSettings(settings.appearance)
-            : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme),
-        };
+        const next = normalizeBackendAppSettings(settings);
         if (typeof setAppSettings === "function") {
           setAppSettings(next);
         }
@@ -1930,26 +1947,30 @@ export function createSettingsFeature({
 
     if (d.startWithWindowsSelect) {
       d.startWithWindowsSelect.addEventListener("change", () => {
+        const previous = (typeof getAppSettings === "function") ? { ...(getAppSettings() || {}) } : null;
         syncAppSettingsUI({ startWithWindows: d.startWithWindowsSelect.checked });
-        persistAppSettings();
+        persistAppSettings({ previousSettings: previous });
       });
     }
     if (d.startInTraySelect) {
       d.startInTraySelect.addEventListener("change", () => {
+        const previous = (typeof getAppSettings === "function") ? { ...(getAppSettings() || {}) } : null;
         syncAppSettingsUI({ startInTray: d.startInTraySelect.checked });
-        persistAppSettings();
+        persistAppSettings({ previousSettings: previous });
       });
     }
     if (d.minimizeToTraySelect) {
       d.minimizeToTraySelect.addEventListener("change", () => {
+        const previous = (typeof getAppSettings === "function") ? { ...(getAppSettings() || {}) } : null;
         syncAppSettingsUI({ minimizeToTray: d.minimizeToTraySelect.checked });
-        persistAppSettings();
+        persistAppSettings({ previousSettings: previous });
       });
     }
     if (d.exitToTraySelect) {
       d.exitToTraySelect.addEventListener("change", () => {
+        const previous = (typeof getAppSettings === "function") ? { ...(getAppSettings() || {}) } : null;
         syncAppSettingsUI({ exitToTray: d.exitToTraySelect.checked });
-        persistAppSettings();
+        persistAppSettings({ previousSettings: previous });
       });
     }
     if (d.languageSelect) {
@@ -1966,8 +1987,9 @@ export function createSettingsFeature({
     }
     if (d.autoCheckUpdatesButton) {
       d.autoCheckUpdatesButton.addEventListener("change", () => {
+        const previous = (typeof getAppSettings === "function") ? { ...(getAppSettings() || {}) } : null;
         syncAppSettingsUI({ autoCheckUpdates: d.autoCheckUpdatesButton.checked });
-        persistAppSettings();
+        persistAppSettings({ previousSettings: previous });
         renderUpdateUi();
         ensureAutoUpdateCheck();
       });

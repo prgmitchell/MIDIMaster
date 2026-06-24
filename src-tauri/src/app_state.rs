@@ -9,7 +9,6 @@ use crate::model::{self, LearnedControl, MidiEvent, OsdSettings, Profile};
 use crate::profile_store::ProfileStore;
 use crate::run_logger;
 use crate::runtime_helpers::LearnCandidate;
-use crate::windows_autostart::set_windows_autostart;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -218,11 +217,8 @@ impl AppState {
     ) {
         crate::osd_window::emit_osd_update(app, state, payload, silent);
     }
-    pub(crate) fn apply_app_settings(_app: &AppHandle, settings: &AppSettings) {
-        #[cfg(target_os = "windows")]
-        {
-            let _ = set_windows_autostart(settings.start_with_windows);
-        }
+    pub(crate) fn apply_app_settings(_app: &AppHandle, _settings: &AppSettings) {
+        // Reserved for applying non-persistent app settings at runtime.
     }
 
     pub(crate) fn binding_matches_aux(

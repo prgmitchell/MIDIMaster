@@ -2,7 +2,7 @@ use crate::{
     app_paths::app_data_root_dir,
     app_settings::{
         AppAppearanceSettings, AppSettings, AppearanceTheme, FaderCurvePreset,
-        MidiDeviceInventoryConsent,
+        MidiDeviceInventoryConsent, CURRENT_STARTUP_REGISTRATION_VERSION,
     },
     collect_monitor_descriptors,
     model::{FaderCurvePoint, MidiDevicePreference, MidiDeviceRoute, OsdSettings},
@@ -254,7 +254,7 @@ pub fn update_app_settings(
     exit_to_tray: bool,
     auto_check_updates: bool,
     language: Option<String>,
-) -> Result<(), String> {
+) -> Result<AppSettings, String> {
     let normalized_language = normalize_language(language.as_deref());
     run_logger::info(
         "settings",
@@ -273,7 +273,14 @@ pub fn update_app_settings(
         .app_settings
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
+    let start_with_windows_changed = settings.start_with_windows != start_with_windows;
+    if start_with_windows_changed {
+        crate::windows_autostart::set_windows_autostart(start_with_windows)?;
+    }
     settings.start_with_windows = start_with_windows;
+    if start_with_windows_changed {
+        settings.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
+    }
     settings.start_in_tray = start_in_tray;
     settings.minimize_to_tray = minimize_to_tray;
     settings.exit_to_tray = exit_to_tray;
@@ -287,7 +294,7 @@ pub fn update_app_settings(
         .save(&updated)
         .map_err(|err| err.to_string())?;
     crate::AppState::apply_app_settings(&app, &updated);
-    Ok(())
+    Ok(updated)
 }
 
 #[tauri::command]
@@ -1007,6 +1014,7 @@ pub fn reset_app_data(app: AppHandle, state: State<AppState>) -> Result<(), Stri
     }
 
     if let Ok(mut settings) = state.app_settings.lock() {
+        let _ = crate::windows_autostart::set_windows_autostart(false);
         *settings = AppSettings::default();
         crate::AppState::apply_app_settings(&app, &settings);
     }
