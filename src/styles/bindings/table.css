@@ -285,10 +285,6 @@
   flex: 1 1 auto;
   width: 100%;
   min-width: 112px;
-  max-width: 204px;
-}
-
-.binding-value-cell--button .binding-button-value--stateful {
   max-width: none;
 }
 
@@ -1343,10 +1339,6 @@ body[data-theme] .binding-value-cell--button .binding-momentary-value {
   flex: 1 1 auto;
   width: 100%;
   min-width: 112px;
-  max-width: 204px;
-}
-
-body[data-theme] .binding-value-cell--button .binding-button-value--stateful {
   max-width: none;
 }
 
