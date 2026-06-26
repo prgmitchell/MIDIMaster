@@ -1553,13 +1553,23 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 
 .appearance-preset-preview-row {
   min-width: 0;
-  display: block;
+  flex: 0 1 clamp(194px, 25vh, 300px);
+  min-height: clamp(188px, 23vh, 276px);
+  display: flex;
+  align-items: stretch;
 }
 
 .appearance-preset-column,
 .appearance-subcard {
   min-width: 0;
   overflow: hidden;
+}
+
+.appearance-preset-column {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .appearance-preset-column,
@@ -1586,13 +1596,15 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 
 .appearance-presets {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-auto-flow: column;
   grid-auto-columns: minmax(124px, 1fr);
-  grid-template-rows: clamp(128px, 16vh, 150px);
-  gap: 12px;
-  padding: 10px 18px 12px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(12px, 1.15vh, 16px);
+  padding: clamp(10px, 1vh, 14px) 18px clamp(12px, 1.2vh, 16px);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -1607,10 +1619,10 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
   width: 100%;
   min-width: 0;
   height: 100%;
-  padding: 12px;
+  padding: clamp(12px, 1.15vh, 16px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: clamp(10px, 1vh, 14px);
   border-radius: var(--radius-card, 5px);
   border: 1px solid var(--control-border);
   background: color-mix(in srgb, var(--control-bg) 84%, transparent);
@@ -1651,14 +1663,14 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 
 .appearance-preset-mini {
   position: relative;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
+  flex: 1 1 80px;
   width: 100%;
-  min-height: 80px;
-  gap: 5px;
-  padding: 12px;
+  min-height: 0;
+  justify-content: center;
+  gap: clamp(5px, 0.65vh, 8px);
+  padding: clamp(12px, 1.1vh, 16px);
   border-radius: var(--radius-card, 5px);
   border: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
   background:
@@ -1667,7 +1679,7 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 }
 
 .appearance-preset-line {
-  height: 5px;
+  height: clamp(5px, 0.55vh, 7px);
   border-radius: 999px;
   background: color-mix(in srgb, var(--text-muted) 26%, transparent);
 }
@@ -1675,7 +1687,7 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
 .appearance-preset-line--1,
 .appearance-preset-line--4 {
   width: 22%;
-  height: 8px;
+  height: clamp(8px, 0.82vh, 10px);
   border-radius: 2px;
 }
 
