@@ -1,5 +1,6 @@
 use crate::model::OsdSettings;
 use crate::monitors::resolve_monitor_for_osd;
+use crate::run_logger;
 use crate::AppState;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
@@ -7,6 +8,23 @@ use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager};
 
 pub(crate) fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
     apply_osd_settings_if_needed(app, settings, true);
+}
+
+pub(crate) fn osd_settings_update_payload(settings: &OsdSettings) -> serde_json::Value {
+    serde_json::json!({
+        "enabled": settings.enabled,
+        "monitor_index": settings.monitor_index,
+        "monitor_name": settings.monitor_name.clone(),
+        "monitor_id": settings.monitor_id.clone(),
+        "anchor": settings.anchor.clone(),
+        "style": settings.style.clone(),
+        "opacity": settings.opacity,
+        "scale": settings.scale,
+    })
+}
+
+pub(crate) fn emit_osd_settings_update(app: &AppHandle, settings: &OsdSettings) {
+    let _ = app.emit("osd_settings_update", osd_settings_update_payload(settings));
 }
 
 #[derive(Default)]
@@ -131,6 +149,32 @@ fn apply_osd_settings_if_needed(app: &AppHandle, settings: &OsdSettings, force: 
         y = y.clamp(min_y, max_y);
         let _ = osd_window.set_size(LogicalSize::new(width, height));
         let _ = osd_window.set_position(LogicalPosition::new(x, y));
+        run_logger::info(
+            "osd",
+            "placement_applied",
+            &format!(
+                "anchor={} saved_monitor_index={} saved_monitor_name={} saved_monitor_id={} selected_monitor={} monitor_pos={}x{} monitor_size={}x{} monitor_scale_factor={:.3} logical_origin={:.1}x{:.1} logical_size={:.1}x{:.1} window_pos={:.1}x{:.1} window_size={:.1}x{:.1} osd_scale={:.3}",
+                settings.anchor,
+                settings.monitor_index,
+                settings.monitor_name.as_deref().unwrap_or(""),
+                settings.monitor_id.as_deref().unwrap_or(""),
+                monitor_name,
+                position.x,
+                position.y,
+                size.width,
+                size.height,
+                scale_factor,
+                origin_x,
+                origin_y,
+                logical_width,
+                logical_height,
+                x,
+                y,
+                width,
+                height,
+                scale
+            ),
+        );
         if let Ok(mut cache) = osd_window_cache().lock() {
             cache.placement_signature = Some(signature);
         }
@@ -213,3 +257,39 @@ fn force_topmost(window: &tauri::WebviewWindow) {
 
 #[cfg(not(target_os = "windows"))]
 fn force_topmost(_window: &tauri::WebviewWindow) {}
+
+#[cfg(test)]
+mod tests {
+    use super::osd_settings_update_payload;
+    use crate::model::OsdSettings;
+
+    #[test]
+    fn osd_settings_update_payload_preserves_monitor_and_anchor_fields() {
+        let settings = OsdSettings {
+            enabled: true,
+            monitor_index: 2,
+            monitor_name: Some("Secondary Display".to_string()),
+            monitor_id: Some("DISPLAY\\ABC123".to_string()),
+            anchor: "bottom-left".to_string(),
+            style: "glass".to_string(),
+            opacity: 0.82,
+            scale: 1.25,
+        };
+
+        let payload = osd_settings_update_payload(&settings);
+
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "enabled": true,
+                "monitor_index": 2,
+                "monitor_name": "Secondary Display",
+                "monitor_id": "DISPLAY\\ABC123",
+                "anchor": "bottom-left",
+                "style": "glass",
+                "opacity": 0.82,
+                "scale": 1.25,
+            })
+        );
+    }
+}

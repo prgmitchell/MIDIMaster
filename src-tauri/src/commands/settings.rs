@@ -10,7 +10,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, process::Command};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 
 const SUPPORTED_LANGUAGE_CODES: &[&str] = &[
     "en", "fr", "es", "de", "it", "pt-BR", "nl", "pl", "ja", "ko", "zh-Hans",
@@ -192,19 +192,7 @@ pub fn update_osd_settings(
     }
 
     crate::AppState::apply_osd_settings(&app, &updated);
-    let _ = app.emit(
-        "osd_settings_update",
-        serde_json::json!({
-            "enabled": updated.enabled,
-            "monitor_index": updated.monitor_index,
-            "monitor_name": updated.monitor_name,
-            "monitor_id": updated.monitor_id,
-            "anchor": updated.anchor,
-            "style": updated.style,
-            "opacity": updated.opacity,
-            "scale": updated.scale,
-        }),
-    );
+    crate::osd_window::emit_osd_settings_update(&app, &updated);
     Ok(())
 }
 

@@ -98,7 +98,10 @@ fn set_active_profile_state(
 
     if let Ok(mut settings) = state.osd_settings.lock() {
         *settings = profile.osd_settings.clone();
-        crate::AppState::apply_osd_settings(app, &settings);
+        let updated_osd_settings = settings.clone();
+        drop(settings);
+        crate::AppState::apply_osd_settings(app, &updated_osd_settings);
+        crate::osd_window::emit_osd_settings_update(app, &updated_osd_settings);
     }
 
     state.sync_feedback_values(profile);
