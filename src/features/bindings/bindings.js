@@ -2961,7 +2961,7 @@ export function createBindingsFeature({
     }
     if (indicatorLearn) {
       const active = configLearnField === "indicator_control";
-      const label = active ? t("bindings.listening") : "Learn indicator output";
+      const label = active ? t("bindings.listening") : t("bindings.learnIndicatorOutput");
       indicatorLearn.classList.toggle("is-learning", active);
       indicatorLearn.title = label;
       indicatorLearn.setAttribute("aria-label", label);

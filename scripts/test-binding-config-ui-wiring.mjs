@@ -6,6 +6,7 @@ const files = {
   domRefs: await readFile(new URL("../src/app/dom_refs.js", import.meta.url), "utf8"),
   appEntry: await readFile(new URL("../src/app_entry.js", import.meta.url), "utf8"),
   bindings: await readFile(new URL("../src/features/bindings/bindings.js", import.meta.url), "utf8"),
+  css: await readFile(new URL("../src/styles/bindings/config-panel.css", import.meta.url), "utf8"),
 };
 
 const indicatorControls = [
@@ -37,6 +38,13 @@ assert.match(files.bindings, /async function startPrimaryLearn\(\)[\s\S]*?setLea
 assert.doesNotMatch(files.bindings, /setPrimaryLearnButtonState|button\.replaceChildren\(spinner, label\)|binding-config-button-spinner/, "primary learn should not mutate the button with inline waiting markup");
 assert.doesNotMatch(files.bindings, /bindingConfigButtonLearnIndicator\.classList\.toggle\("hidden", !learningPrimary\)/, "button learn should not reveal a separate status row");
 assert.match(files.bindings, /bindingConfigButtonLearnIndicator\.classList\.add\("hidden"\)/, "button learn status row should stay hidden");
+assert.doesNotMatch(files.bindings, /bindingConfigPreviewLearnIndicator\.classList\.toggle\("hidden", !learningPrimary\)/, "fader learn should not reveal a separate status row");
+assert.match(files.css, /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-preview-learn-indicator\s*\{\s*display: none;/, "fader learn status row should stay hidden");
+assert.match(files.css, /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-layout\s*\{[\s\S]*?grid-template-areas:[\s\S]*?"assign learn";[\s\S]*?align-items: stretch;/, "fader assign and learn cards should share the bottom grid row");
+assert.match(files.css, /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-main-column\s*\{\s*display: contents;/, "fader config should not draw a center divider");
+assert.match(files.css, /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-preview-column\s*\{\s*display: contents;/, "fader preview column should not add a nested wrapper");
+assert.match(files.css, /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-preview-shell\s*\{[\s\S]*?display: contents;/, "fader learn should be a sibling card, not nested in a framed card");
+assert.match(files.css, /\.binding-config-preview-shell\s*\{[\s\S]*?grid-template-rows: auto auto;[\s\S]*?flex: 0 1 auto;[\s\S]*?background: transparent;/, "fader right wrapper should be unframed and content-sized");
 
 const mainMidiIndex = files.html.indexOf('id="binding-config-preview-main-midi"');
 const midiValueIndex = files.html.indexOf('id="binding-config-preview-midi-value"');

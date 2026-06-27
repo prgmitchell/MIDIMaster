@@ -2892,6 +2892,16 @@ body[data-theme] #binding-config-panel .binding-config-preview-meta {
   border-color: var(--binding-config-border-soft);
 }
 
+body[data-theme] #binding-config-panel.binding-config-panel--fader .binding-config-preview-shell {
+  background: transparent;
+  border-color: transparent;
+}
+
+body[data-theme] #binding-config-panel.binding-config-panel--fader .binding-config-preview-card {
+  background: var(--binding-config-card-bg);
+  border-color: var(--binding-config-border-soft);
+}
+
 body[data-theme] #binding-config-panel .binding-config-preview-stage,
 body[data-theme] #binding-config-panel .binding-config-preview-learn-shell,
 body[data-theme] #binding-config-panel .binding-config-curve-card {

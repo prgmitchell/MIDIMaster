@@ -1560,17 +1560,31 @@
 
 .binding-config-preview-shell {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 12px;
   min-height: 0;
-  flex: 1;
+  flex: 0 1 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .binding-config-preview-card {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.82fr);
+  grid-template-rows: auto auto;
   gap: 14px;
   align-items: stretch;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(120, 144, 184, 0.18);
+  background: linear-gradient(180deg, rgba(16, 25, 39, 0.72), rgba(13, 20, 31, 0.88));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.binding-config-preview-card > .binding-config-title-row {
+  grid-column: 1 / -1;
 }
 
 .binding-config-preview-stage {
@@ -1579,7 +1593,7 @@
   gap: 12px;
   padding: 10px;
   min-height: 344px;
-  height: 100%;
+  height: auto;
   border-radius: 16px;
   border: 1px solid rgba(120, 144, 184, 0.18);
   background: linear-gradient(180deg, rgba(14, 22, 34, 0.88), rgba(12, 18, 28, 0.94));
@@ -1610,12 +1624,12 @@
 
 .binding-config-preview-learn-shell {
   display: grid;
-  align-content: stretch;
-  grid-template-rows: auto 1fr;
+  align-content: start;
+  grid-template-rows: auto auto;
   gap: 10px;
   padding: 12px;
   min-height: 0;
-  height: 100%;
+  height: auto;
   border-radius: 14px;
   border: 1px solid rgba(120, 144, 184, 0.18);
   background: linear-gradient(180deg, rgba(15, 23, 34, 0.72), rgba(12, 19, 29, 0.86));
@@ -1798,7 +1812,7 @@
   grid-template-rows: auto auto 1fr;
   gap: 16px;
   padding: 8px 0;
-  height: 100%;
+  height: auto;
 }
 
 .binding-config-preview-value-block {
@@ -1872,6 +1886,78 @@
   font-weight: 600;
 }
 
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-content {
+  height: auto;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-body {
+  flex: 0 1 auto;
+  overflow: auto;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-layout {
+  display: grid;
+  flex: 0 1 auto;
+  grid-template-columns: minmax(0, 1.35fr) minmax(270px, 0.85fr);
+  grid-template-areas:
+    "name live"
+    "curve live"
+    "mute live"
+    "assign learn";
+  gap: 12px;
+  align-items: stretch;
+  padding: 10px;
+  overflow: visible;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-main-column {
+  display: contents;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-column {
+  display: contents;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-shell {
+  display: contents;
+  width: 100%;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--name {
+  grid-area: name;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--curve {
+  grid-area: curve;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--mute {
+  grid-area: mute;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--assign {
+  grid-area: assign;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-card {
+  grid-area: live;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-shell {
+  grid-area: learn;
+  align-content: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-row {
+  align-content: center;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-indicator {
+  display: none;
+}
+
 .binding-config-panel--button .binding-config-content {
   width: min(940px, 96vw);
 }
@@ -1914,7 +2000,7 @@
   box-shadow: none;
 }
 
-.binding-config-panel--button .binding-config-preview-shell > .binding-config-title-row {
+.binding-config-panel--button .binding-config-preview-card > .binding-config-title-row {
   display: none;
 }
 
@@ -1925,6 +2011,10 @@
   gap: 12px;
   height: 100%;
   min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .binding-config-panel--button .binding-config-preview-stage {
@@ -2563,6 +2653,17 @@ body[data-theme] .binding-config-midi-control {
 
   .binding-config-preview-card {
     grid-template-columns: 1fr;
+  }
+
+  .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "name"
+      "curve"
+      "mute"
+      "assign"
+      "live"
+      "learn";
   }
 }
 
