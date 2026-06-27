@@ -654,6 +654,43 @@ function testNormalizeBindingDefaultsLegacyMacroName() {
   assert.equal(normalized.macro_name, "");
 }
 
+function testNormalizeBindingPreservesNoteIndicatorControl() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    indicator_control: {
+      device_id: "midi:0",
+      channel: 3.7,
+      controller: 24.9,
+      msg_type: "Note",
+      control_kind: "Button",
+    },
+  }));
+
+  assert.deepEqual(normalized.indicator_control, {
+    device_id: "midi:0",
+    channel: 3,
+    controller: 24,
+    msg_type: "Note",
+    control_kind: "Button",
+    mode: "Absolute",
+    deadzone: 0,
+    debounce_ms: 0,
+    mute_behavior: "ToggleOnPress",
+  });
+}
+
+function testNormalizeBindingDropsUnsupportedIndicatorControl() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    indicator_control: {
+      device_id: "midi:0",
+      channel: 0,
+      controller: 9,
+      msg_type: "ProgramChange",
+    },
+  }));
+
+  assert.equal(normalized.indicator_control, null);
+}
+
 testNormalizeBindingPreservesExplicitRelativeFormat();
 testCustomCurveNormalizationPreservesSegmentBend();
 testCustomCurveInterpolationAppliesSegmentBend();
@@ -693,5 +730,7 @@ testIntegrationTargetKeyIgnoresActionSelectionMetadata();
 testNormalizeBindingPreservesMacroDraftShape();
 testNormalizeBindingPreservesMacroName();
 testNormalizeBindingDefaultsLegacyMacroName();
+testNormalizeBindingPreservesNoteIndicatorControl();
+testNormalizeBindingDropsUnsupportedIndicatorControl();
 
 console.log("Binding model tests passed");

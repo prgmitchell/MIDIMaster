@@ -63,6 +63,33 @@ function normalizeControlKind(raw) {
   return value === "Button" || value === "Continuous" ? value : "Auto";
 }
 
+function normalizeMidiMapping(raw, { indicator = false } = {}) {
+  if (!raw || typeof raw !== "object") return null;
+  const deviceId = String(raw.device_id || "").trim();
+  if (!deviceId) return null;
+  const msgType = String(raw.msg_type || "ControlChange");
+  if (indicator && msgType !== "ControlChange" && msgType !== "Note") {
+    return null;
+  }
+  const safeMsgType = msgType === "Note" || msgType === "PitchBend" || msgType === "ProgramChange"
+    ? msgType
+    : "ControlChange";
+  const channel = Math.min(15, Math.max(0, Math.trunc(Number(raw.channel) || 0)));
+  const controller = Math.min(127, Math.max(0, Math.trunc(Number(raw.controller) || 0)));
+  return {
+    ...raw,
+    device_id: deviceId,
+    channel,
+    controller,
+    msg_type: indicator ? (safeMsgType === "Note" ? "Note" : "ControlChange") : safeMsgType,
+    control_kind: normalizeControlKind(raw.control_kind),
+    mode: raw.mode === "Relative" ? "Relative" : "Absolute",
+    deadzone: Number.isFinite(Number(raw.deadzone)) ? Number(raw.deadzone) : 0,
+    debounce_ms: Number.isFinite(Number(raw.debounce_ms)) ? Number(raw.debounce_ms) : 0,
+    mute_behavior: raw.mute_behavior === "SetFromValue" ? "SetFromValue" : "ToggleOnPress",
+  };
+}
+
 function bindingLooksLikeButton(binding) {
   const controlKind = normalizeControlKind(binding?.control_kind);
   if (controlKind === "Button") return true;
@@ -544,11 +571,9 @@ export function normalizeBinding(binding) {
   }
   out.mute_behavior = out.mute_behavior === "SetFromValue" ? "SetFromValue" : "ToggleOnPress";
   if (out.mute_control && typeof out.mute_control === "object") {
-    out.mute_control = {
-      ...out.mute_control,
-      mute_behavior: out.mute_control.mute_behavior === "SetFromValue" ? "SetFromValue" : "ToggleOnPress",
-    };
+    out.mute_control = normalizeMidiMapping(out.mute_control);
   }
+  out.indicator_control = normalizeMidiMapping(out.indicator_control, { indicator: true });
   if (out.assign_mode !== "Replace") out.assign_mode = "Add";
   normalizeButtonLightFields(out);
   delete out.toggle_mute_light_mode;

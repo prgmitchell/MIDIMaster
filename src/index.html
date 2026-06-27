@@ -703,17 +703,40 @@
                   <option value="Pressed" data-i18n="bindings.buttonLightWhilePressed">While Pressed</option>
                 </select>
               </label>
-            </section>
-
-            <section id="binding-config-button-learn-section" class="binding-config-section binding-config-section--button-learn hidden">
-              <div class="binding-config-title-row">
-                <span class="binding-config-title" data-i18n="common.learn">Learn</span>
-              </div>
-              <div class="binding-config-preview-learn-row">
-                <button id="binding-config-button-learn-button" type="button" class="binding-config-button binding-config-button--primary" data-i18n="bindings.learnButton">Learn Button</button>
-                <div id="binding-config-button-learn-indicator" class="binding-config-preview-learn-indicator hidden" aria-live="polite">
-                  <div class="learn-panel-spinner" aria-hidden="true"></div>
-                  <span id="binding-config-button-learn-status" data-i18n="bindings.waitingMidiInput">Waiting for MIDI input...</span>
+              <div id="binding-config-indicator-custom" class="binding-config-indicator-custom">
+                <div class="binding-config-indicator-heading">
+                  <span class="binding-config-toggle-title" data-i18n="bindings.indicatorOutput">Indicator output</span>
+                  <span class="binding-config-toggle-help" data-i18n="bindings.indicatorOutputHelp">MIDI address that receives LED feedback.</span>
+                </div>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorType">Type</span>
+                  <select id="binding-config-indicator-msg-type" class="binding-config-light-select" aria-label="Indicator message type" data-i18n-aria-label="bindings.indicatorMessageType">
+                    <option value="Note">Note</option>
+                    <option value="ControlChange">CC</option>
+                  </select>
+                </label>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorChannel">Channel</span>
+                  <input id="binding-config-indicator-channel" type="number" min="1" max="16" step="1" inputmode="numeric" aria-label="Indicator channel" data-i18n-aria-label="bindings.indicatorChannelLabel" />
+                </label>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorControl">Control</span>
+                  <input id="binding-config-indicator-controller" type="number" min="0" max="127" step="1" inputmode="numeric" aria-label="Indicator control" data-i18n-aria-label="bindings.indicatorControlLabel" />
+                </label>
+                <div class="binding-config-indicator-actions">
+                  <button id="binding-config-indicator-learn" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Learn indicator output" title="Learn indicator output" data-i18n-aria-label="bindings.learnIndicatorOutput" data-i18n-title="bindings.learnIndicatorOutput">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="7"></circle>
+                      <circle cx="12" cy="12" r="2.5"></circle>
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                    </svg>
+                  </button>
+                  <button id="binding-config-indicator-clear" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Reset indicator output" title="Reset indicator output" data-i18n-aria-label="bindings.resetIndicatorOutput" data-i18n-title="bindings.resetIndicatorOutput">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M4 7v5h5"></path>
+                      <path d="M5.5 12A7 7 0 1 0 8 6.7L4 10.5"></path>
+                    </svg>
+                  </button>
                 </div>
               </div>
             </section>
@@ -887,11 +910,29 @@
                     <div id="binding-config-preview-value" class="binding-config-preview-value">0%</div>
                     <div id="binding-config-preview-status" class="binding-config-preview-status" data-i18n="bindings.waitingForLiveInput">Waiting for live input</div>
                   </div>
-                  <div class="binding-config-preview-summary">
+                  <div class="binding-config-preview-summary binding-config-preview-summary--midi">
                     <div class="binding-config-preview-summary-row">
                       <span class="binding-config-preview-summary-label" data-i18n="bindings.mainMidi">Main MIDI</span>
                       <span id="binding-config-preview-main-midi" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
                     </div>
+                    <div class="binding-config-preview-summary-row">
+                      <span class="binding-config-preview-summary-label" data-i18n="common.value">Value</span>
+                      <span id="binding-config-preview-midi-value" class="binding-config-preview-summary-value">0 / 127</span>
+                    </div>
+                  </div>
+                  <section id="binding-config-button-learn-section" class="binding-config-section binding-config-section--button-learn hidden">
+                    <div class="binding-config-title-row">
+                      <span class="binding-config-title" data-i18n="common.learn">Learn</span>
+                    </div>
+                    <div class="binding-config-preview-learn-row">
+                      <button id="binding-config-button-learn-button" type="button" class="binding-config-button binding-config-button--primary" data-i18n="bindings.learnButton">Learn Button</button>
+                      <div id="binding-config-button-learn-indicator" class="binding-config-preview-learn-indicator hidden" aria-live="polite">
+                        <div class="learn-panel-spinner" aria-hidden="true"></div>
+                        <span id="binding-config-button-learn-status" data-i18n="bindings.waitingMidiInput">Waiting for MIDI input...</span>
+                      </div>
+                    </div>
+                  </section>
+                  <div class="binding-config-preview-summary binding-config-preview-summary--status">
                     <div id="binding-config-preview-mute-row" class="binding-config-preview-summary-row">
                       <span class="binding-config-preview-summary-label" data-i18n="bindings.mute">Mute</span>
                       <span id="binding-config-preview-mute" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
@@ -903,14 +944,6 @@
                     <div id="binding-config-preview-curve-row" class="binding-config-preview-summary-row">
                       <span class="binding-config-preview-summary-label" data-i18n="bindings.curve">Curve</span>
                       <span id="binding-config-preview-curve" class="binding-config-preview-summary-value" data-i18n="bindings.linear">Linear</span>
-                    </div>
-                    <div id="binding-config-preview-light-row" class="binding-config-preview-summary-row hidden">
-                      <span class="binding-config-preview-summary-label" data-i18n="bindings.light">Light</span>
-                      <span id="binding-config-preview-light" class="binding-config-preview-summary-value" data-i18n="bindings.activity">Activity</span>
-                    </div>
-                    <div class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label" data-i18n="common.value">Value</span>
-                      <span id="binding-config-preview-midi-value" class="binding-config-preview-summary-value">0 / 127</span>
                     </div>
                   </div>
                 </div>

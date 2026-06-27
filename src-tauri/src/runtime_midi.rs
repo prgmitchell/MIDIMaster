@@ -3,6 +3,7 @@ use crate::bindings::{
     apply_midi_event as apply_binding_midi_event, find_binding_with_options, BindingKey,
     BindingState,
 };
+use crate::feedback::{self, FeedbackControlKey, FeedbackSendOptions};
 use crate::model::{self, MidiEvent};
 use crate::run_logger;
 use crate::AppState;
@@ -26,6 +27,24 @@ fn binding_is_button(binding: &model::Binding) -> bool {
             ))
 }
 
+fn send_immediate_button_light_feedback(
+    state: &AppState,
+    binding: &model::Binding,
+    value: f32,
+    context: &'static str,
+) {
+    feedback::send_button_light_feedback_to_binding(
+        state,
+        binding,
+        FeedbackSendOptions {
+            value,
+            silent: false,
+            force_hardware_feedback: true,
+            context,
+        },
+    );
+}
+
 fn emit_macro_button_feedback(
     state: &AppState,
     app: &AppHandle,
@@ -43,12 +62,7 @@ fn emit_macro_button_feedback(
     }
 
     state.set_binding_action_value(key, feedback_value);
-    if let Ok(mut feedback) = state.feedback_values.lock() {
-        feedback.insert(key.clone(), feedback_value);
-    }
-    if let Ok(mut midi) = state.midi.lock() {
-        let _ = midi.send_binding_feedback(binding, feedback_value);
-    }
+    send_immediate_button_light_feedback(state, binding, feedback_value, "macro_button");
 
     if input_active {
         update_activity_button_light_hold_feedback(state, binding, key.clone(), true);
@@ -105,10 +119,8 @@ struct ActivityButtonLightHoldContext {
     midi: std::sync::Arc<std::sync::Mutex<crate::midi::MidiManager>>,
     key: BindingKey,
     generation: u64,
-    device_id: String,
-    channel: u8,
-    controller: u8,
-    msg_type: model::MidiMessageType,
+    output_key: BindingKey,
+    binding: model::Binding,
 }
 
 fn start_activity_button_light_generation(
@@ -164,16 +176,17 @@ fn send_activity_button_light_hold_feedback(
     feedback_values: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, f32>>>,
     midi: &std::sync::Arc<std::sync::Mutex<crate::midi::MidiManager>>,
     key: &BindingKey,
-    device_id: &str,
-    channel: u8,
-    controller: u8,
-    msg_type: model::MidiMessageType,
+    output_key: &BindingKey,
+    binding: &model::Binding,
 ) {
     if let Ok(mut feedback) = feedback_values.lock() {
         feedback.insert(key.clone(), 1.0);
+        if output_key != key {
+            feedback.insert(output_key.clone(), 1.0);
+        }
     }
     if let Ok(mut midi) = midi.lock() {
-        let _ = midi.send_feedback(device_id, channel, controller, 1.0, msg_type);
+        let _ = midi.send_binding_light_feedback(binding, 1.0);
     }
 }
 
@@ -205,10 +218,8 @@ fn send_activity_button_light_hold_feedback_if_current(
         &context.feedback_values,
         &context.midi,
         &context.key,
-        &context.device_id,
-        context.channel,
-        context.controller,
-        context.msg_type.clone(),
+        &context.output_key,
+        &context.binding,
     );
     true
 }
@@ -222,7 +233,8 @@ pub(super) fn update_activity_button_light_hold_feedback(
     if matches!(
         binding.control.msg_type,
         model::MidiMessageType::ProgramChange
-    ) {
+    ) && binding.indicator_feedback_control().is_none()
+    {
         if let Ok(mut generations) = state.activity_button_light_generations.lock() {
             cancel_activity_button_light_generation(&mut generations, &key);
         }
@@ -245,6 +257,10 @@ pub(super) fn update_activity_button_light_hold_feedback(
         Err(_) => return,
     };
 
+    let output_control = binding
+        .indicator_feedback_control()
+        .map(FeedbackControlKey::from_aux)
+        .unwrap_or_else(|| FeedbackControlKey::from_binding(binding));
     let hold_context = ActivityButtonLightHoldContext {
         generations: state.activity_button_light_generations.clone(),
         binding_state: state.binding_state.clone(),
@@ -252,10 +268,8 @@ pub(super) fn update_activity_button_light_hold_feedback(
         midi: state.midi.clone(),
         key,
         generation,
-        device_id: binding.device_id.clone(),
-        channel: binding.control.channel,
-        controller: binding.control.controller,
-        msg_type: binding.control.msg_type.clone(),
+        output_key: output_control.to_binding_key(),
+        binding: binding.clone(),
     };
 
     tauri::async_runtime::spawn(async move {
@@ -370,12 +384,7 @@ pub(crate) fn apply_midi_event(
     {
         let feedback_value = if event.value > 0 { 1.0 } else { 0.0 };
         state.set_binding_action_value(&key, feedback_value);
-        if let Ok(mut feedback) = state.feedback_values.lock() {
-            feedback.insert(key.clone(), feedback_value);
-        }
-        if let Ok(mut midi) = state.midi.lock() {
-            let _ = midi.send_binding_feedback(&binding, feedback_value);
-        }
+        send_immediate_button_light_feedback(state, &binding, feedback_value, "unassigned_button");
         run_logger::debug(
             "bindings",
             "unassigned_button_activity_feedback",
@@ -434,7 +443,7 @@ pub(crate) fn apply_midi_event(
             // Clone Arcs for async task
             let feedback_arc = state.feedback_values.clone();
             let midi_arc = state.midi.clone();
-            let binding_for_feedback = binding.clone();
+            let binding_clone = binding.clone();
 
             tauri::async_runtime::spawn(async move {
                 // Sleep for 20ms to allow the hardware to process the "Note Off" completely
@@ -443,7 +452,7 @@ pub(crate) fn apply_midi_event(
                 if let Ok(feedback) = feedback_arc.lock() {
                     let current_val = feedback.get(&key_clone).cloned().unwrap_or(0.0);
                     if let Ok(mut midi) = midi_arc.lock() {
-                        let _ = midi.send_binding_feedback(&binding_for_feedback, current_val);
+                        let _ = midi.send_binding_light_feedback(&binding_clone, current_val);
                     }
                 }
             });
@@ -594,15 +603,7 @@ pub(crate) fn apply_midi_event(
             .button_light_feedback_value(Some(event.value > 0), Some(muted))
             .unwrap_or(if muted { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if muted { 1.0 } else { 0.0 });
-
-        if let Ok(mut feedback) = state.feedback_values.lock() {
-            feedback.insert(key.clone(), feedback_value);
-        }
-
-        if let Ok(mut midi) = state.midi.lock() {
-            // println!("MIDI Event Matched Binding: {:?} -> {:?}", binding.name, binding.target);
-            let _ = midi.send_binding_feedback(&binding, feedback_value);
-        }
+        send_immediate_button_light_feedback(state, &binding, feedback_value, "toggle_mute");
 
         let settings_enabled = state
             .osd_settings
@@ -644,13 +645,13 @@ pub(crate) fn apply_midi_event(
             let key_clone = key.clone();
             let feedback_arc = state.feedback_values.clone();
             let midi_arc = state.midi.clone();
-            let binding_for_feedback = binding.clone();
+            let binding_clone = binding.clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(Duration::from_millis(20)).await;
                 if let Ok(feedback) = feedback_arc.lock() {
                     let current_val = feedback.get(&key_clone).cloned().unwrap_or(0.0);
                     if let Ok(mut midi) = midi_arc.lock() {
-                        let _ = midi.send_binding_feedback(&binding_for_feedback, current_val);
+                        let _ = midi.send_binding_light_feedback(&binding_clone, current_val);
                     }
                 }
             });
@@ -729,12 +730,12 @@ pub(crate) fn apply_midi_event(
             .button_light_feedback_value(Some(event.value > 0), Some(next_enabled))
             .unwrap_or(if next_enabled { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if next_enabled { 1.0 } else { 0.0 });
-        if let Ok(mut feedback) = state.feedback_values.lock() {
-            feedback.insert(key.clone(), feedback_value);
-        }
-        if let Ok(mut midi) = state.midi.lock() {
-            let _ = midi.send_binding_feedback(&binding, feedback_value);
-        }
+        send_immediate_button_light_feedback(
+            state,
+            &binding,
+            feedback_value,
+            "stateful_integration_toggle",
+        );
         return Ok(());
     }
 
@@ -743,12 +744,12 @@ pub(crate) fn apply_midi_event(
             let feedback_value = binding
                 .button_light_feedback_value(Some(false), None)
                 .unwrap_or(0.0);
-            if let Ok(mut feedback) = state.feedback_values.lock() {
-                feedback.insert(key.clone(), feedback_value);
-            }
-            if let Ok(mut midi) = state.midi.lock() {
-                let _ = midi.send_binding_feedback(&binding, feedback_value);
-            }
+            send_immediate_button_light_feedback(
+                state,
+                &binding,
+                feedback_value,
+                "momentary_integration_release",
+            );
             update_activity_button_light_hold_feedback(state, &binding, key.clone(), false);
             return Ok(());
         }
@@ -792,12 +793,12 @@ pub(crate) fn apply_midi_event(
         let feedback_value = binding
             .button_light_feedback_value(Some(true), None)
             .unwrap_or(1.0);
-        if let Ok(mut feedback) = state.feedback_values.lock() {
-            feedback.insert(key.clone(), feedback_value);
-        }
-        if let Ok(mut midi) = state.midi.lock() {
-            let _ = midi.send_binding_feedback(&binding, feedback_value);
-        }
+        send_immediate_button_light_feedback(
+            state,
+            &binding,
+            feedback_value,
+            "momentary_integration_press",
+        );
         update_activity_button_light_hold_feedback(state, &binding, key.clone(), true);
         return Ok(());
     }
@@ -959,16 +960,16 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
 
-    let primary_feedback_value = binding
-        .button_light_feedback_value(Some(event.value > 0), None)
-        .unwrap_or(volume);
+    let button_light_feedback_value =
+        binding.button_light_feedback_value(Some(event.value > 0), None);
+    let primary_feedback_value = button_light_feedback_value.unwrap_or(volume);
 
     let input_active = event.value > 0;
     if !integration_button_feedback_owned && !input_active {
         update_activity_button_light_hold_feedback(state, &binding, key.clone(), false);
     }
 
-    if !integration_button_feedback_owned {
+    if !integration_button_feedback_owned && button_light_feedback_value.is_none() {
         if let Ok(mut feedback) = state.feedback_values.lock() {
             feedback.insert(key.clone(), primary_feedback_value);
         }
@@ -979,7 +980,21 @@ pub(crate) fn apply_midi_event(
     }
 
     if !integration_button_feedback_owned {
-        if let Ok(mut midi) = state.midi.lock() {
+        if button_light_feedback_value.is_some() {
+            send_immediate_button_light_feedback(
+                state,
+                &binding,
+                primary_feedback_value,
+                "button_volume",
+            );
+        } else if binding_is_button(&binding) {
+            send_immediate_button_light_feedback(
+                state,
+                &binding,
+                primary_feedback_value,
+                "button_volume_default",
+            );
+        } else if let Ok(mut midi) = state.midi.lock() {
             let _ = midi.send_binding_feedback(&binding, primary_feedback_value);
         }
         if input_active {

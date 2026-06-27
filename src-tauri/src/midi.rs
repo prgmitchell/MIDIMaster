@@ -1,5 +1,6 @@
 use crate::model::{
-    Binding, BindingAction, DeviceInfo, MidiDeviceRoute, MidiEvent, MidiMessageType, MidiMode,
+    AuxiliaryControl, Binding, BindingAction, DeviceInfo, MidiDeviceRoute, MidiEvent,
+    MidiMessageType, MidiMode,
 };
 use crate::run_logger;
 use anyhow::{anyhow, Result};
@@ -88,6 +89,65 @@ pub struct MidiConnectionHealth {
 pub struct MidiManager {
     input_routes: HashMap<String, MidiInputRoute>,
     output_routes: HashMap<String, MidiOutputRoute>,
+}
+
+struct BindingLightFeedbackSend {
+    device_id: String,
+    channel: u8,
+    controller: u8,
+    value: f32,
+    msg_type: MidiMessageType,
+    use_binding_protocol: bool,
+}
+
+fn primary_light_feedback_send(
+    binding: &Binding,
+    value: f32,
+    use_binding_protocol: bool,
+) -> BindingLightFeedbackSend {
+    BindingLightFeedbackSend {
+        device_id: binding.device_id.clone(),
+        channel: binding.control.channel,
+        controller: binding.control.controller,
+        value,
+        msg_type: binding.control.msg_type.clone(),
+        use_binding_protocol,
+    }
+}
+
+fn indicator_light_feedback_send(
+    indicator: &AuxiliaryControl,
+    value: f32,
+) -> BindingLightFeedbackSend {
+    BindingLightFeedbackSend {
+        device_id: indicator.device_id.clone(),
+        channel: indicator.channel,
+        controller: indicator.controller,
+        value,
+        msg_type: indicator.msg_type.clone(),
+        use_binding_protocol: false,
+    }
+}
+
+fn light_feedback_send_matches_primary(send: &BindingLightFeedbackSend, binding: &Binding) -> bool {
+    send.device_id == binding.device_id
+        && send.channel == binding.control.channel
+        && send.controller == binding.control.controller
+        && send.msg_type == binding.control.msg_type
+}
+
+fn binding_light_feedback_sends(binding: &Binding, value: f32) -> Vec<BindingLightFeedbackSend> {
+    let Some(indicator) = binding.indicator_feedback_control() else {
+        return vec![primary_light_feedback_send(binding, value, true)];
+    };
+
+    let indicator_send = indicator_light_feedback_send(indicator, value);
+    let should_suppress_primary = !light_feedback_send_matches_primary(&indicator_send, binding);
+    let mut sends = vec![indicator_send];
+    if should_suppress_primary {
+        sends.push(primary_light_feedback_send(binding, 0.0, false));
+    }
+    sends
 }
 
 struct MidiInputRoute {
@@ -846,6 +906,30 @@ impl MidiManager {
             binding.control.msg_type.clone(),
             Some(binding),
         )
+    }
+
+    pub fn send_binding_light_feedback(&mut self, binding: &Binding, value: f32) -> Result<()> {
+        let mut result = Ok(());
+        for send in binding_light_feedback_sends(binding, value) {
+            let binding_context = if send.use_binding_protocol {
+                Some(binding)
+            } else {
+                None
+            };
+            if let Err(err) = self.send_feedback_inner(
+                &send.device_id,
+                send.channel,
+                send.controller,
+                send.value,
+                send.msg_type,
+                binding_context,
+            ) {
+                if result.is_ok() {
+                    result = Err(err);
+                }
+            }
+        }
+        result
     }
 
     pub fn send_feedback(
@@ -1861,8 +1945,8 @@ fn parse_midi_message(device_id: &str, message: &[u8]) -> Option<MidiEvent> {
 mod tests {
     use super::*;
     use crate::model::{
-        AssignMode, BindingControlKind, BindingTarget, ButtonLightBehavior, ButtonLightMode,
-        FaderCurve, MidiControl, MuteBehavior, RelativeFormat,
+        AssignMode, AuxiliaryControl, BindingControlKind, BindingTarget, ButtonLightBehavior,
+        ButtonLightMode, FaderCurve, MidiControl, MuteBehavior, RelativeFormat,
     };
 
     fn direct_feedback(
@@ -1983,6 +2067,7 @@ mod tests {
             mute_behavior: MuteBehavior::ToggleOnPress,
             button_light_mode: ButtonLightMode::Activity,
             button_light_behavior: ButtonLightBehavior::FollowState,
+            indicator_control: None,
             mute_control: None,
             assign_control: None,
             assign_mode: AssignMode::Add,
@@ -2270,6 +2355,92 @@ mod tests {
             direct_feedback(2, 15, 1.0, MidiMessageType::Note),
             expected_direct_feedback(vec![0x92, 15, 127], 2, 15, MidiMessageType::Note, 1.0, 127)
         );
+    }
+
+    #[test]
+    fn program_change_button_can_emit_note_indicator_feedback() {
+        let mut binding = xtouch_mini_mc_volume_binding(16);
+        binding.control_kind = BindingControlKind::Button;
+        binding.control.msg_type = MidiMessageType::ProgramChange;
+        binding.indicator_control = Some(AuxiliaryControl {
+            device_id: "midi:0".to_string(),
+            channel: 4,
+            controller: 25,
+            msg_type: MidiMessageType::Note,
+            control_kind: BindingControlKind::Button,
+            mode: MidiMode::Absolute,
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: MuteBehavior::ToggleOnPress,
+        });
+
+        let indicator = binding
+            .indicator_feedback_control()
+            .expect("custom indicator should be used");
+        let feedback = build_feedback_message(
+            indicator.channel,
+            indicator.controller,
+            1.0,
+            &indicator.msg_type,
+            None,
+            "Generic MIDI Output",
+        );
+
+        assert_eq!(feedback.protocol, "direct");
+        assert_eq!(feedback.physical_bytes, vec![0x94, 25, 127]);
+    }
+
+    #[test]
+    fn custom_indicator_light_feedback_includes_primary_off_send() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.control_kind = BindingControlKind::Button;
+        binding.control.msg_type = MidiMessageType::Note;
+        binding.mode = MidiMode::Absolute;
+        binding.indicator_control = Some(AuxiliaryControl {
+            device_id: "midi:0".to_string(),
+            channel: 0,
+            controller: 22,
+            msg_type: MidiMessageType::Note,
+            control_kind: BindingControlKind::Button,
+            mode: MidiMode::Absolute,
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: MuteBehavior::ToggleOnPress,
+        });
+
+        let sends = binding_light_feedback_sends(&binding, 1.0);
+
+        assert_eq!(sends.len(), 2);
+        assert_eq!(sends[0].device_id, "midi:0");
+        assert_eq!(sends[0].channel, 0);
+        assert_eq!(sends[0].controller, 22);
+        assert_eq!(sends[0].msg_type, MidiMessageType::Note);
+        assert_eq!(sends[0].value, 1.0);
+        assert!(!sends[0].use_binding_protocol);
+        assert_eq!(sends[1].device_id, "midi:0");
+        assert_eq!(sends[1].channel, 0);
+        assert_eq!(sends[1].controller, 21);
+        assert_eq!(sends[1].msg_type, MidiMessageType::Note);
+        assert_eq!(sends[1].value, 0.0);
+        assert!(!sends[1].use_binding_protocol);
+    }
+
+    #[test]
+    fn default_button_light_feedback_uses_primary_send_only() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.control_kind = BindingControlKind::Button;
+        binding.control.msg_type = MidiMessageType::Note;
+        binding.mode = MidiMode::Absolute;
+
+        let sends = binding_light_feedback_sends(&binding, 1.0);
+
+        assert_eq!(sends.len(), 1);
+        assert_eq!(sends[0].device_id, "midi:0");
+        assert_eq!(sends[0].channel, 0);
+        assert_eq!(sends[0].controller, 21);
+        assert_eq!(sends[0].msg_type, MidiMessageType::Note);
+        assert_eq!(sends[0].value, 1.0);
+        assert!(sends[0].use_binding_protocol);
     }
 
     #[test]

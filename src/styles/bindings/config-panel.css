@@ -139,6 +139,27 @@
   opacity: 0.45;
 }
 
+.binding-config-icon-button {
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.binding-config-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
 .binding-config-macro-list {
   display: grid;
   gap: 10px;
@@ -948,6 +969,85 @@
   cursor: default;
 }
 
+.binding-config-indicator-custom {
+  display: grid;
+  grid-template-columns: minmax(108px, 1fr) minmax(72px, 0.72fr) minmax(82px, 0.82fr) 40px 40px;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+  padding: 2px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.binding-config-indicator-custom.hidden {
+  display: none;
+}
+
+.binding-config-indicator-custom.is-visible,
+.binding-config-section--button-light.is-indicator-custom .binding-config-indicator-custom {
+  display: grid;
+}
+
+.binding-config-indicator-heading {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.binding-config-indicator-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: #93a5c4;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.binding-config-indicator-field input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 144, 184, 0.22);
+  background: rgba(6, 11, 18, 0.72);
+  color: #ecf4ff;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.binding-config-indicator-actions {
+  display: contents;
+}
+
+.binding-config-indicator-field .binding-config-light-dropdown {
+  width: 100%;
+  min-width: 0;
+}
+
+.binding-config-indicator-field .binding-config-light-dropdown .target-button {
+  min-width: 0;
+}
+
+.binding-config-indicator-actions .binding-config-button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+}
+
+@media (max-width: 720px) {
+  .binding-config-indicator-custom {
+    grid-template-columns: minmax(104px, 1fr) minmax(68px, 0.7fr) minmax(78px, 0.8fr) 40px 40px;
+  }
+
+  .binding-config-indicator-actions {
+    display: contents;
+  }
+}
+
 .binding-config-light-dropdown {
   width: min(180px, 42vw);
   min-width: 150px;
@@ -1695,7 +1795,7 @@
 .binding-config-preview-meta {
   display: grid;
   align-content: start;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   gap: 16px;
   padding: 8px 0;
   height: 100%;
@@ -1785,25 +1885,28 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   padding: 14px 20px 16px;
+  align-items: stretch;
 }
 
 .binding-config-panel--button .binding-config-main-column {
   align-content: start;
   border-right: none;
   gap: 12px;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto;
   padding: 0;
 }
 
 .binding-config-panel--button .binding-config-preview-column {
-  align-items: flex-start;
+  align-items: stretch;
   padding: 0;
 }
 
 .binding-config-panel--button .binding-config-preview-shell {
   width: 100%;
-  flex: none;
-  grid-template-rows: auto;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   padding: 0;
   border: 0;
@@ -1818,7 +1921,10 @@
 .binding-config-panel--button .binding-config-preview-card {
   display: grid;
   grid-template-columns: 1fr;
+  grid-template-rows: var(--button-config-top-section-height) minmax(0, 1fr);
   gap: 12px;
+  height: 100%;
+  min-height: 0;
 }
 
 .binding-config-panel--button .binding-config-preview-stage {
@@ -1883,14 +1989,16 @@
 }
 
 .binding-config-panel--button .binding-config-preview-meta {
-  height: auto;
-  grid-template-rows: auto;
-  gap: 0;
-  padding: 14px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(120, 144, 184, 0.18);
-  background: linear-gradient(180deg, rgba(16, 25, 39, 0.72), rgba(13, 20, 31, 0.88));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  height: 100%;
+  min-height: 0;
+  align-content: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .binding-config-panel--button .binding-config-preview-value-block {
@@ -1908,14 +2016,37 @@
 }
 
 .binding-config-panel--button .binding-config-preview-summary {
-  gap: 10px;
+  gap: 8px;
+}
+
+.binding-config-panel--button .binding-config-preview-summary--midi,
+.binding-config-panel--button .binding-config-preview-summary--status {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 144, 184, 0.18);
+  background: linear-gradient(180deg, rgba(16, 25, 39, 0.72), rgba(13, 20, 31, 0.88));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.binding-config-panel--button .binding-config-preview-summary--status {
+  display: none;
 }
 
 .binding-config-panel--button .binding-config-preview-summary-value {
-  min-height: 40px;
-  padding: 6px 10px;
+  min-height: 36px;
+  padding: 5px 10px;
   border-radius: 9px;
-  font-size: 14px;
+  font-size: 13px;
+}
+
+.binding-config-panel--button .binding-config-preview-summary-row:first-child .binding-config-preview-summary-value {
+  min-height: 34px;
+  padding-block: 4px;
+}
+
+.binding-config-panel--button .binding-config-preview-summary--midi .binding-config-preview-summary-value {
+  min-height: 34px;
+  padding-block: 4px;
 }
 
 .binding-config-panel--button .binding-config-preview-learn-shell {
@@ -1954,16 +2085,62 @@
   background: transparent;
 }
 
+.binding-config-panel--button .binding-config-section--button-light {
+  gap: 15px;
+  padding-block: 16px;
+}
+
 .binding-config-panel--button .binding-config-select-row {
   min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
 }
 
+.binding-config-panel--button .binding-config-select-row .binding-config-light-select,
+.binding-config-panel--button .binding-config-select-row .binding-config-light-dropdown {
+  width: 100%;
+  min-width: 0;
+}
+
+.binding-config-panel--button .binding-config-indicator-custom {
+  grid-template-columns: minmax(104px, 1fr) 86px 96px 40px 40px;
+  gap: 10px 8px;
+  padding: 4px 0 0;
+}
+
+.binding-config-panel--button .binding-config-indicator-field {
+  gap: 4px;
+  font-size: 11px;
+}
+
+.binding-config-panel--button .binding-config-indicator-field input,
+.binding-config-panel--button .binding-config-indicator-field .target-button,
+.binding-config-panel--button .binding-config-indicator-field .binding-config-light-select {
+  height: 40px;
+  min-height: 40px;
+}
+
+.binding-config-panel--button .binding-config-indicator-actions .binding-config-button {
+  height: 40px;
+}
+
 .binding-config-panel--button .binding-config-section--button-learn {
-  align-content: start;
+  align-content: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  padding: 14px 12px 16px;
+}
+
+.binding-config-panel--button .binding-config-section--button-learn .binding-config-preview-learn-row {
+  align-content: center;
 }
 
 .binding-config-panel--button .binding-config-toggle-title {
@@ -1977,7 +2154,7 @@
 }
 
 .binding-config-panel--button .binding-config-preview-learn-row .binding-config-button {
-  height: 42px;
+  height: 38px;
   border-radius: 10px;
   font-size: 14px;
 }
@@ -2035,9 +2212,16 @@
 
 body[data-theme] .binding-config-panel--button .binding-config-section,
 body[data-theme] .binding-config-panel--button .binding-config-preview-stage,
-body[data-theme] .binding-config-panel--button .binding-config-preview-meta {
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary--midi,
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary--status {
   border-color: var(--control-border);
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, var(--surface-raised)) 0%, var(--surface) 100%);
+}
+
+body[data-theme] #binding-config-panel.binding-config-panel--button .binding-config-preview-meta {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 body[data-theme] .binding-config-panel--button .binding-config-toggle-row {

@@ -1,4 +1,5 @@
 use crate::bindings::BindingKey;
+use crate::feedback;
 use crate::midi_event_queue::log_queue_stats;
 use crate::model::{BindingTarget, Profile, SessionInfo};
 use crate::run_logger;
@@ -234,7 +235,7 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                         last_focused_session = feedback_snapshot.focused_session.clone();
                         let _ = app_handle.emit("focused_session_update", &last_focused_session);
                     }
-                    let feedback = state
+                    let feedback_snapshot = state
                         .feedback_values
                         .lock()
                         .map(|values| values.clone())
@@ -243,14 +244,24 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                     if let Ok(mut midi) = state.midi.lock() {
                         for binding in &profile.bindings {
                             let key = BindingKey::from_binding(binding);
-                            if let Some(volume) = feedback.get(&key).cloned() {
+                            if let Some(volume) = feedback_snapshot.get(&key).cloned() {
+                                let output_key = if binding.is_button_binding() {
+                                    feedback::button_light_feedback_control_key(binding)
+                                        .to_binding_key()
+                                } else {
+                                    key.clone()
+                                };
                                 if should_send_feedback(
                                     &mut last_sent_feedback,
-                                    key,
+                                    output_key,
                                     volume,
                                     force_feedback_resend,
                                 ) {
-                                    let _ = midi.send_binding_feedback(binding, volume);
+                                    if binding.is_button_binding() {
+                                        let _ = midi.send_binding_light_feedback(binding, volume);
+                                    } else {
+                                        let _ = midi.send_binding_feedback(binding, volume);
+                                    }
                                 }
                             }
                         }

@@ -704,6 +704,8 @@ pub struct Binding {
     #[serde(default)]
     pub button_light_behavior: ButtonLightBehavior,
     #[serde(default)]
+    pub indicator_control: Option<AuxiliaryControl>,
+    #[serde(default)]
     pub mute_control: Option<AuxiliaryControl>,
     #[serde(default)]
     pub assign_control: Option<AuxiliaryControl>,
@@ -781,6 +783,18 @@ impl Binding {
         } else {
             0.0
         })
+    }
+
+    pub fn indicator_feedback_control(&self) -> Option<&AuxiliaryControl> {
+        if !self.is_button_binding() {
+            return None;
+        }
+
+        let control = self.indicator_control.as_ref()?;
+        match control.msg_type {
+            MidiMessageType::ControlChange | MidiMessageType::Note => Some(control),
+            MidiMessageType::PitchBend | MidiMessageType::ProgramChange => None,
+        }
     }
 
     pub fn button_light_feedback_value(

@@ -36,6 +36,12 @@ export function createDomRefs() {
   const bindingConfigButtonLightSection = document.getElementById("binding-config-button-light-section");
   const bindingConfigButtonLightSelectRow = document.getElementById("binding-config-button-light-select-row");
   const bindingConfigButtonLightSelect = document.getElementById("binding-config-button-light-select");
+  const bindingConfigIndicatorCustom = document.getElementById("binding-config-indicator-custom");
+  const bindingConfigIndicatorMsgType = document.getElementById("binding-config-indicator-msg-type");
+  const bindingConfigIndicatorChannel = document.getElementById("binding-config-indicator-channel");
+  const bindingConfigIndicatorController = document.getElementById("binding-config-indicator-controller");
+  const bindingConfigIndicatorLearn = document.getElementById("binding-config-indicator-learn");
+  const bindingConfigIndicatorClear = document.getElementById("binding-config-indicator-clear");
   const bindingConfigButtonLearnSection = document.getElementById("binding-config-button-learn-section");
   const bindingConfigButtonLearnButton = document.getElementById("binding-config-button-learn-button");
   const bindingConfigButtonLearnIndicator = document.getElementById("binding-config-button-learn-indicator");
@@ -105,8 +111,6 @@ export function createDomRefs() {
   const bindingConfigPreviewAssign = document.getElementById("binding-config-preview-assign");
   const bindingConfigPreviewCurveRow = document.getElementById("binding-config-preview-curve-row");
   const bindingConfigPreviewCurve = document.getElementById("binding-config-preview-curve");
-  const bindingConfigPreviewLightRow = document.getElementById("binding-config-preview-light-row");
-  const bindingConfigPreviewLight = document.getElementById("binding-config-preview-light");
   const bindingConfigPreviewMidiValue = document.getElementById("binding-config-preview-midi-value");
   
   // Defensive cleanup for older builds that injected extra back buttons.
@@ -226,6 +230,12 @@ export function createDomRefs() {
     bindingConfigButtonLightSection,
     bindingConfigButtonLightSelectRow,
     bindingConfigButtonLightSelect,
+    bindingConfigIndicatorCustom,
+    bindingConfigIndicatorMsgType,
+    bindingConfigIndicatorChannel,
+    bindingConfigIndicatorController,
+    bindingConfigIndicatorLearn,
+    bindingConfigIndicatorClear,
     bindingConfigButtonLearnSection,
     bindingConfigButtonLearnButton,
     bindingConfigButtonLearnIndicator,
@@ -295,8 +305,6 @@ export function createDomRefs() {
     bindingConfigPreviewAssign,
     bindingConfigPreviewCurveRow,
     bindingConfigPreviewCurve,
-    bindingConfigPreviewLightRow,
-    bindingConfigPreviewLight,
     bindingConfigPreviewMidiValue,
     learnPanel,
     learnPanelTitle,

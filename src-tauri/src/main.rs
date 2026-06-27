@@ -71,7 +71,7 @@ fn shutdown_lights(state: &AppState) {
             );
             if let Ok(mut midi) = state.midi.lock() {
                 for binding in &profile.bindings {
-                    let _ = midi.send_binding_feedback(binding, 0.0);
+                    let _ = midi.send_binding_light_feedback(binding, 0.0);
                 }
             }
         }
@@ -661,6 +661,7 @@ mod tests {
             mute_behavior: model::MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            indicator_control: None,
             mute_control: None,
             assign_control: None,
             assign_mode: model::AssignMode::Add,
@@ -695,6 +696,7 @@ mod tests {
             mute_behavior: model::MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            indicator_control: None,
             mute_control: None,
             assign_control: None,
             assign_mode: model::AssignMode::Add,

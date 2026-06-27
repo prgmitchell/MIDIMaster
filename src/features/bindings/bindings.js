@@ -123,6 +123,7 @@ export function createBindingsFeature({
   const getB = (typeof getBindings === "function") ? getBindings : (() => []);
   const setB = (typeof setBindings === "function") ? setBindings : (() => { });
   let buttonLightDropdown = null;
+  let indicatorMsgTypeDropdown = null;
 
   const getPlayback = (typeof getPlaybackDevices === "function") ? getPlaybackDevices : (() => []);
   const getRecording = (typeof getRecordingDevices === "function") ? getRecordingDevices : (() => []);
@@ -617,6 +618,100 @@ export function createBindingsFeature({
       formatOptionText: (option) => buttonLightOptionText(option.value),
       truncateDisplayLabel: false,
     });
+  }
+
+  function renderIndicatorDropdowns() {
+    if (indicatorMsgTypeDropdown && d.bindingConfigIndicatorMsgType) {
+      renderNativeSelectDropdown({
+        entry: indicatorMsgTypeDropdown,
+        selectEl: d.bindingConfigIndicatorMsgType,
+        fallbackText: "Note",
+        formatOptionText: (option) => option.textContent || option.value,
+        onOptionSelected: () => updateIndicatorFromFields(),
+        truncateDisplayLabel: false,
+      });
+    }
+  }
+
+  function clampMidiNumber(value, min, max, fallback) {
+    const number = Math.trunc(Number(value));
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(max, Math.max(min, number));
+  }
+
+  function normalizeIndicatorControl(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const deviceId = String(raw.device_id || "").trim();
+    if (!deviceId) return null;
+    const msgType = raw.msg_type === "Note" ? "Note" : "ControlChange";
+    return {
+      device_id: deviceId,
+      channel: clampMidiNumber(raw.channel, 0, 15, 0),
+      controller: clampMidiNumber(raw.controller, 0, 127, 0),
+      msg_type: msgType,
+      control_kind: normalizeControlKind(raw.control_kind),
+      mode: "Absolute",
+      deadzone: 0,
+      debounce_ms: 0,
+      mute_behavior: "ToggleOnPress",
+    };
+  }
+
+  function defaultIndicatorControl(binding) {
+    const primaryMsgType = binding?.control?.msg_type === "ControlChange" ? "ControlChange" : "Note";
+    return normalizeIndicatorControl({
+      device_id: binding?.device_id,
+      channel: binding?.control?.channel ?? 0,
+      controller: binding?.control?.controller ?? 0,
+      msg_type: primaryMsgType,
+      control_kind: "Button",
+    });
+  }
+
+  function ensureIndicatorControl(binding) {
+    if (!binding || typeof binding !== "object") return null;
+    const normalized = normalizeIndicatorControl(binding.indicator_control);
+    if (normalized) {
+      binding.indicator_control = normalized;
+      return normalized;
+    }
+    const fallback = defaultIndicatorControl(binding);
+    binding.indicator_control = fallback;
+    return fallback;
+  }
+
+  function syncIndicatorUi(binding, options = {}) {
+    let custom = normalizeIndicatorControl(binding?.indicator_control);
+    if (binding && custom) binding.indicator_control = custom;
+    if (options.forceCustom && binding && !custom) {
+      custom = ensureIndicatorControl(binding);
+    }
+    if (d.bindingConfigIndicatorCustom) {
+      d.bindingConfigIndicatorCustom.classList.remove("hidden");
+      d.bindingConfigIndicatorCustom.classList.add("is-visible");
+      d.bindingConfigIndicatorCustom.setAttribute("aria-hidden", "false");
+    }
+    d.bindingConfigButtonLightSection?.classList.add("is-indicator-custom");
+    const control = custom || defaultIndicatorControl(binding);
+    if (d.bindingConfigIndicatorMsgType) d.bindingConfigIndicatorMsgType.value = control?.msg_type || "Note";
+    if (d.bindingConfigIndicatorChannel) d.bindingConfigIndicatorChannel.value = String((control?.channel ?? 0) + 1);
+    if (d.bindingConfigIndicatorController) d.bindingConfigIndicatorController.value = String(control?.controller ?? 0);
+    renderIndicatorDropdowns();
+  }
+
+  function updateIndicatorFromFields() {
+    const binding = getConfigBinding();
+    if (!binding) return;
+    const current = ensureIndicatorControl(binding);
+    if (!current) return;
+    binding.indicator_control = normalizeIndicatorControl({
+      ...current,
+      msg_type: d.bindingConfigIndicatorMsgType?.value === "ControlChange" ? "ControlChange" : "Note",
+      channel: clampMidiNumber((Number(d.bindingConfigIndicatorChannel?.value) || 1) - 1, 0, 15, 0),
+      controller: clampMidiNumber(d.bindingConfigIndicatorController?.value, 0, 127, current.controller),
+    });
+    syncIndicatorUi(binding, { forceCustom: true });
+    renderConfigPreview();
   }
 
   function pulseMomentaryValue(button) {
@@ -2841,8 +2936,10 @@ export function createBindingsFeature({
   function updateAuxLearnUi() {
     const muteLearn = d.bindingConfigMuteLearn;
     const assignLearn = d.bindingConfigAssignLearn;
+    const indicatorLearn = d.bindingConfigIndicatorLearn;
     const muteClear = d.bindingConfigMuteClear;
     const assignClear = d.bindingConfigAssignClear;
+    const indicatorClear = d.bindingConfigIndicatorClear;
     const previewLearnButton = d.bindingConfigPreviewLearnButton;
     const buttonLearnButton = d.bindingConfigButtonLearnButton;
     const transferLocked = Boolean(transferPrompt);
@@ -2862,18 +2959,31 @@ export function createBindingsFeature({
       assignLearn.textContent = t("common.learn");
       assignLearn.disabled = transferLocked || Boolean(configLearnField && !active);
     }
+    if (indicatorLearn) {
+      const active = configLearnField === "indicator_control";
+      const label = active ? t("bindings.listening") : "Learn indicator output";
+      indicatorLearn.classList.toggle("is-learning", active);
+      indicatorLearn.title = label;
+      indicatorLearn.setAttribute("aria-label", label);
+      indicatorLearn.disabled = transferLocked || Boolean(configLearnField && !active);
+    }
 
     const lockClear = transferLocked || Boolean(configLearnField);
     if (muteClear) muteClear.disabled = lockClear;
     if (assignClear) assignClear.disabled = lockClear;
+    if (indicatorClear) indicatorClear.disabled = lockClear;
+    if (d.bindingConfigIndicatorMsgType) d.bindingConfigIndicatorMsgType.disabled = lockClear;
+    if (d.bindingConfigIndicatorChannel) d.bindingConfigIndicatorChannel.disabled = lockClear;
+    if (d.bindingConfigIndicatorController) d.bindingConfigIndicatorController.disabled = lockClear;
     if (d.bindingConfigMuteModeButton) d.bindingConfigMuteModeButton.disabled = lockClear;
     if (d.bindingConfigAssignModeButton) d.bindingConfigAssignModeButton.disabled = lockClear;
     for (const learnButton of [previewLearnButton, buttonLearnButton]) {
       if (!learnButton) continue;
-      learnButton.classList.toggle("is-learning", learningPrimary);
-      learnButton.textContent = learningPrimary
-        ? t("bindings.listening")
-        : (isButton ? t("bindings.learnButton") : t("bindings.learnFader"));
+      const label = isButton ? t("bindings.learnButton") : t("bindings.learnFader");
+      learnButton.classList.remove("is-learning");
+      learnButton.textContent = label;
+      learnButton.title = label;
+      learnButton.setAttribute("aria-label", label);
       learnButton.disabled = transferLocked || Boolean(configLearnField && !learningPrimary);
     }
   }
@@ -3252,7 +3362,6 @@ export function createBindingsFeature({
     if (d.bindingConfigPreviewMuteRow) d.bindingConfigPreviewMuteRow.classList.toggle("hidden", isButton);
     if (d.bindingConfigPreviewAssignRow) d.bindingConfigPreviewAssignRow.classList.toggle("hidden", isButton);
     if (d.bindingConfigPreviewCurveRow) d.bindingConfigPreviewCurveRow.classList.toggle("hidden", isButton);
-    if (d.bindingConfigPreviewLightRow) d.bindingConfigPreviewLightRow.classList.toggle("hidden", !isButton);
     renderMidiMappingSummary(
       d.bindingConfigPreviewMute,
       binding.mute_control?.device_id,
@@ -3266,7 +3375,6 @@ export function createBindingsFeature({
       formatMidiControlLabel(binding.assign_control),
     );
     if (d.bindingConfigPreviewCurve) d.bindingConfigPreviewCurve.textContent = curveDisplayName(binding.fader_curve);
-    if (d.bindingConfigPreviewLight) d.bindingConfigPreviewLight.textContent = buttonLightLabel(binding);
     if (d.bindingConfigPreviewMidiValue) {
       d.bindingConfigPreviewMidiValue.textContent = formatPreviewMidiValue(binding, previewValue, liveMidiValue);
     }
@@ -3286,15 +3394,15 @@ export function createBindingsFeature({
       }
     }
     if (d.bindingConfigPreviewLearnIndicator) {
-      d.bindingConfigPreviewLearnIndicator.classList.toggle("hidden", !learningPrimary);
-      d.bindingConfigPreviewLearnIndicator.classList.toggle("is-learning", learningPrimary);
+      d.bindingConfigPreviewLearnIndicator.classList.add("hidden");
+      d.bindingConfigPreviewLearnIndicator.classList.remove("is-learning");
     }
     if (d.bindingConfigPreviewLearnStatus) {
       d.bindingConfigPreviewLearnStatus.textContent = t("bindings.waitingMidiInput");
     }
     if (d.bindingConfigButtonLearnIndicator) {
-      d.bindingConfigButtonLearnIndicator.classList.toggle("hidden", !learningPrimary);
-      d.bindingConfigButtonLearnIndicator.classList.toggle("is-learning", learningPrimary);
+      d.bindingConfigButtonLearnIndicator.classList.add("hidden");
+      d.bindingConfigButtonLearnIndicator.classList.remove("is-learning");
     }
     if (d.bindingConfigButtonLearnStatus) {
       d.bindingConfigButtonLearnStatus.textContent = t("bindings.waitingMidiInput");
@@ -3936,6 +4044,7 @@ export function createBindingsFeature({
       buttonLightDropdown.root.classList.remove("is-disabled");
       renderButtonLightDropdown();
     }
+    syncIndicatorUi(binding);
   }
 
   function closeMuteModeMenu() {
@@ -4036,6 +4145,9 @@ export function createBindingsFeature({
       if (controlsEqual(binding.assign_control, mapping)) {
         return { binding, field: "assign_control" };
       }
+      if (controlsEqual(binding.indicator_control, mapping)) {
+        return { binding, field: "indicator_control" };
+      }
     }
     return null;
   }
@@ -4080,7 +4192,7 @@ export function createBindingsFeature({
       const ownerName = conflict.binding.name || "Binding";
       const ownerSlot = conflict.field === "control"
         ? "Primary"
-        : (conflict.field === "mute_control" ? "Mute" : "Assign");
+        : (conflict.field === "mute_control" ? "Mute" : (conflict.field === "assign_control" ? "Assign" : "Indicator"));
       const message = conflict.field === "control"
         ? `This control is the primary mapping on "${ownerName}". Transferring it here will delete that binding. Continue?`
         : `This control is already mapped as ${ownerSlot} on "${ownerName}". Transfer it here?`;
@@ -4124,6 +4236,7 @@ export function createBindingsFeature({
     configLearnField = "control";
     renderConfigPreview();
     updateAuxLearnUi();
+    setLearnPanelWaiting();
     await invoke("start_midi_learn");
     if (configLearnTimer) clearInterval(configLearnTimer);
     configLearnTimer = setInterval(async () => {
@@ -4136,7 +4249,7 @@ export function createBindingsFeature({
         const mapping = normalizeAuxControl(learned);
         await applyAuxMapping("control", mapping);
       } catch {
-        stopAuxLearn({ closePanel: false });
+        stopAuxLearn();
         renderConfigModal();
       }
     }, 200);
@@ -4159,7 +4272,13 @@ export function createBindingsFeature({
         const targetField = configLearnField;
         stopAuxLearn({ closePanel: false });
         if (!targetField) return;
-        const mapping = normalizeAuxControl(learned);
+        const mapping = targetField === "indicator_control"
+          ? normalizeIndicatorControl(learned)
+          : normalizeAuxControl(learned);
+        if (!mapping) {
+          renderConfigModal();
+          return;
+        }
         await applyAuxMapping(targetField, mapping);
       } catch {
         stopAuxLearn();
@@ -5251,6 +5370,14 @@ export function createBindingsFeature({
       });
       renderButtonLightDropdown();
     }
+    if (d.bindingConfigIndicatorMsgType && !indicatorMsgTypeDropdown) {
+      indicatorMsgTypeDropdown = createSelectDropdownShell({
+        selectEl: d.bindingConfigIndicatorMsgType,
+        rootClass: "binding-config-light-dropdown settings-select-dropdown",
+        title: "Indicator message type",
+      });
+    }
+    renderIndicatorDropdowns();
 
     if (d.bindingConfigPanel) {
       d.bindingConfigPanel.addEventListener("click", (event) => {
@@ -5299,6 +5426,9 @@ export function createBindingsFeature({
         renderConfigPreview();
       });
     }
+    d.bindingConfigIndicatorMsgType?.addEventListener("change", updateIndicatorFromFields);
+    d.bindingConfigIndicatorChannel?.addEventListener("input", updateIndicatorFromFields);
+    d.bindingConfigIndicatorController?.addEventListener("input", updateIndicatorFromFields);
     if (d.bindingConfigPreviewLearnButton) {
       d.bindingConfigPreviewLearnButton.addEventListener("click", async () => {
         await startPrimaryLearn();
@@ -5385,6 +5515,11 @@ export function createBindingsFeature({
         await startAuxLearn("assign_control");
       });
     }
+    if (d.bindingConfigIndicatorLearn) {
+      d.bindingConfigIndicatorLearn.addEventListener("click", async () => {
+        await startAuxLearn("indicator_control");
+      });
+    }
     if (d.bindingConfigMuteClear) {
       d.bindingConfigMuteClear.addEventListener("click", () => {
         if (transferPrompt) return;
@@ -5416,6 +5551,17 @@ export function createBindingsFeature({
         binding.assign_control = null;
         configAcceptedTransfers.delete("assign_control");
         renderConfigModal();
+      });
+    }
+    if (d.bindingConfigIndicatorClear) {
+      d.bindingConfigIndicatorClear.addEventListener("click", () => {
+        if (transferPrompt) return;
+        const binding = getConfigBinding();
+        if (!binding) return;
+        binding.indicator_control = null;
+        configAcceptedTransfers.delete("indicator_control");
+        syncIndicatorUi(binding);
+        renderConfigPreview();
       });
     }
     const onMuteModeOptionClick = async (event) => {

@@ -3,6 +3,7 @@ use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo}
 use crate::audio::AudioBackend;
 use crate::bindings::{BindingKey, BindingState};
 use crate::device_target::{parse_device_target, DeviceTargetKind};
+use crate::feedback;
 use crate::midi::MidiManager;
 use crate::midi_event_queue::MidiEventQueue;
 use crate::model::{self, LearnedControl, MidiEvent, OsdSettings, Profile};
@@ -674,7 +675,7 @@ impl AppState {
     pub(crate) fn send_idle_button_light_feedback_values(&self, profile: &Profile) {
         self.cancel_activity_button_light_holds();
 
-        if let Ok(mut feedback) = self.feedback_values.lock() {
+        if let Ok(mut feedback_values) = self.feedback_values.lock() {
             for binding in &profile.bindings {
                 let key = BindingKey::from_binding(binding);
                 let state_active = if binding.uses_stateful_toggle_feedback() {
@@ -684,7 +685,12 @@ impl AppState {
                 };
                 if let Some(value) = binding.button_light_feedback_value(Some(false), state_active)
                 {
-                    feedback.insert(key, value);
+                    feedback_values.insert(key.clone(), value);
+                    let output_key =
+                        feedback::button_light_feedback_control_key(binding).to_binding_key();
+                    if output_key != key {
+                        feedback_values.insert(output_key, value);
+                    }
                 }
             }
         }
@@ -701,7 +707,7 @@ impl AppState {
                 else {
                     continue;
                 };
-                let _ = midi.send_binding_feedback(binding, value);
+                let _ = midi.send_binding_light_feedback(binding, value);
             }
         }
     }

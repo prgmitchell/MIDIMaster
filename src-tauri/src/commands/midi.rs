@@ -197,6 +197,13 @@ fn migrate_control_device_id(
                 binding_migrated = true;
             }
         }
+        if let Some(indicator_control) = binding.indicator_control.as_mut() {
+            if indicator_control.device_id == previous_input_id {
+                indicator_control.device_id = next_input_id.to_string();
+                migrated_count += 1;
+                binding_migrated = true;
+            }
+        }
         if binding_migrated {
             record_binding_migration(migrations, &binding.id, previous_input_id, next_input_id);
         }
@@ -338,6 +345,9 @@ fn binding_midi_device_ids(profile: &Profile) -> HashSet<String> {
         if let Some(assign_control) = binding.assign_control.as_ref() {
             insert_midi_device_id(&mut device_ids, &assign_control.device_id);
         }
+        if let Some(indicator_control) = binding.indicator_control.as_ref() {
+            insert_midi_device_id(&mut device_ids, &indicator_control.device_id);
+        }
     }
     device_ids
 }
@@ -422,6 +432,12 @@ fn migrate_pitch_bend_bindings_saved_to_route_outputs(
         if let Some(assign_control) = binding.assign_control.as_mut() {
             if assign_control.device_id == output_id {
                 assign_control.device_id = input_id.to_string();
+                migrated_count += 1;
+            }
+        }
+        if let Some(indicator_control) = binding.indicator_control.as_mut() {
+            if indicator_control.device_id == output_id {
+                indicator_control.device_id = input_id.to_string();
                 migrated_count += 1;
             }
         }
@@ -754,6 +770,7 @@ mod tests {
             mute_behavior: MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            indicator_control: None,
             mute_control: mute_device_id.map(|id| aux_control(id, 18)),
             assign_control: assign_device_id.map(|id| aux_control(id, 19)),
             assign_mode: AssignMode::Add,
@@ -845,6 +862,29 @@ mod tests {
                 .expect("mute control")
                 .device_id,
             "midi:0"
+        );
+    }
+
+    #[test]
+    fn migrate_route_inputs_updates_indicator_control_device_id() {
+        let mut binding = binding("midi:0", None, None);
+        binding.indicator_control = Some(aux_control("midi:0", 20));
+        let mut profile = profile_with(binding);
+        profile.midi_device_preference.routes = vec![route("midi:0", "midi:10", "Deck A")];
+
+        let (migrated_count, migrations) =
+            migrate_profile_route_inputs(&mut profile, &[route("midi:2", "midi:12", "Deck A")]);
+
+        assert_eq!(migrated_count, 2);
+        assert_eq!(migrations.len(), 1);
+        assert_eq!(profile.bindings[0].device_id, "midi:2");
+        assert_eq!(
+            profile.bindings[0]
+                .indicator_control
+                .as_ref()
+                .expect("indicator control")
+                .device_id,
+            "midi:2"
         );
     }
 

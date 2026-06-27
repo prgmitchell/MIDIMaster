@@ -119,6 +119,7 @@ fn serialize_binding_uses_targets_not_target() {
         mute_behavior: MuteBehavior::ToggleOnPress,
         button_light_mode: ButtonLightMode::Activity,
         button_light_behavior: ButtonLightBehavior::FollowState,
+        indicator_control: None,
         mute_control: None,
         assign_control: None,
         assign_mode: AssignMode::Add,
@@ -131,6 +132,75 @@ fn serialize_binding_uses_targets_not_target() {
     let json = serde_json::to_value(binding).expect("binding should serialize");
     assert!(json.get("targets").is_some());
     assert!(json.get("target").is_none());
+}
+
+#[test]
+fn deserialize_binding_indicator_control_defaults_to_none() {
+    let binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+
+    assert!(binding.indicator_control.is_none());
+}
+
+#[test]
+fn deserialize_binding_indicator_control_round_trips_note_mapping() {
+    let mut json = binding_base_json();
+    json.as_object_mut().unwrap().insert(
+        "indicator_control".to_string(),
+        serde_json::json!({
+            "device_id": "midi-dev",
+            "channel": 2,
+            "controller": 40,
+            "msg_type": "Note",
+            "control_kind": "Button"
+        }),
+    );
+
+    let binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+    let indicator = binding
+        .indicator_control
+        .as_ref()
+        .expect("indicator control should deserialize");
+
+    assert_eq!(indicator.device_id, "midi-dev");
+    assert_eq!(indicator.channel, 2);
+    assert_eq!(indicator.controller, 40);
+    assert_eq!(indicator.msg_type, MidiMessageType::Note);
+}
+
+#[test]
+fn indicator_feedback_control_only_allows_button_note_or_cc_output() {
+    let mut binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+    binding.control_kind = BindingControlKind::Button;
+    binding.control.msg_type = MidiMessageType::ProgramChange;
+    binding.indicator_control = Some(AuxiliaryControl {
+        device_id: "midi-dev".to_string(),
+        channel: 1,
+        controller: 41,
+        msg_type: MidiMessageType::ControlChange,
+        control_kind: BindingControlKind::Button,
+        mode: MidiMode::Absolute,
+        deadzone: 0.0,
+        debounce_ms: 0,
+        mute_behavior: MuteBehavior::ToggleOnPress,
+    });
+    assert!(binding.indicator_feedback_control().is_some());
+
+    binding
+        .indicator_control
+        .as_mut()
+        .expect("indicator control")
+        .msg_type = MidiMessageType::ProgramChange;
+    assert!(binding.indicator_feedback_control().is_none());
+
+    binding.control_kind = BindingControlKind::Continuous;
+    binding
+        .indicator_control
+        .as_mut()
+        .expect("indicator control")
+        .msg_type = MidiMessageType::Note;
+    assert!(binding.indicator_feedback_control().is_none());
 }
 
 #[test]

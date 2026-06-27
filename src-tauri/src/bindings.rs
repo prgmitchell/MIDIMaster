@@ -292,6 +292,7 @@ mod tests {
             mute_behavior: crate::model::MuteBehavior::ToggleOnPress,
             button_light_mode: crate::model::ButtonLightMode::Activity,
             button_light_behavior: crate::model::ButtonLightBehavior::FollowState,
+            indicator_control: None,
             mute_control: None,
             assign_control: None,
             assign_mode: crate::model::AssignMode::Add,

@@ -196,6 +196,24 @@ export function ensureBindingShape(binding) {
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
   }
+  if (binding.indicator_control && typeof binding.indicator_control === "object") {
+    const msgType = binding.indicator_control.msg_type === "Note" ? "Note" : "ControlChange";
+    binding.indicator_control = {
+      ...binding.indicator_control,
+      device_id: String(binding.indicator_control.device_id || "").trim(),
+      channel: Math.min(15, Math.max(0, Math.trunc(Number(binding.indicator_control.channel) || 0))),
+      controller: Math.min(127, Math.max(0, Math.trunc(Number(binding.indicator_control.controller) || 0))),
+      msg_type: msgType,
+      control_kind: normalizeControlKind(binding.indicator_control.control_kind),
+      mode: binding.indicator_control.mode === "Relative" ? "Relative" : "Absolute",
+      deadzone: Number.isFinite(Number(binding.indicator_control.deadzone)) ? Number(binding.indicator_control.deadzone) : 0,
+      debounce_ms: Number.isFinite(Number(binding.indicator_control.debounce_ms)) ? Number(binding.indicator_control.debounce_ms) : 0,
+      mute_behavior: normalizeMuteBehavior(binding.indicator_control.mute_behavior),
+    };
+    if (!binding.indicator_control.device_id) binding.indicator_control = null;
+  } else {
+    binding.indicator_control = null;
+  }
   if (getBindingTargets(binding).some(isMacroTarget)) {
     binding.action = "Macro";
   }
@@ -246,6 +264,7 @@ export function ensureAuxShape(binding) {
   if (!binding) return;
   if (!("mute_control" in binding)) binding.mute_control = null;
   if (!("assign_control" in binding)) binding.assign_control = null;
+  if (!("indicator_control" in binding)) binding.indicator_control = null;
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
   }

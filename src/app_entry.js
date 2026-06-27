@@ -148,6 +148,12 @@ const {
   bindingConfigButtonLightSection,
   bindingConfigButtonLightSelectRow,
   bindingConfigButtonLightSelect,
+  bindingConfigIndicatorCustom,
+  bindingConfigIndicatorMsgType,
+  bindingConfigIndicatorChannel,
+  bindingConfigIndicatorController,
+  bindingConfigIndicatorLearn,
+  bindingConfigIndicatorClear,
   bindingConfigButtonLearnSection,
   bindingConfigButtonLearnButton,
   bindingConfigButtonLearnIndicator,
@@ -217,8 +223,6 @@ const {
   bindingConfigPreviewAssign,
   bindingConfigPreviewCurveRow,
   bindingConfigPreviewCurve,
-  bindingConfigPreviewLightRow,
-  bindingConfigPreviewLight,
   bindingConfigPreviewMidiValue,
   learnPanel,
   learnPanelTitle,
@@ -1216,6 +1220,12 @@ bindingsFeature = createBindingsFeature({
     bindingConfigButtonLightSection,
     bindingConfigButtonLightSelectRow,
     bindingConfigButtonLightSelect,
+    bindingConfigIndicatorCustom,
+    bindingConfigIndicatorMsgType,
+    bindingConfigIndicatorChannel,
+    bindingConfigIndicatorController,
+    bindingConfigIndicatorLearn,
+    bindingConfigIndicatorClear,
     bindingConfigButtonLearnSection,
     bindingConfigButtonLearnButton,
     bindingConfigButtonLearnIndicator,
@@ -1285,8 +1295,6 @@ bindingsFeature = createBindingsFeature({
     bindingConfigPreviewAssign,
     bindingConfigPreviewCurveRow,
     bindingConfigPreviewCurve,
-    bindingConfigPreviewLightRow,
-    bindingConfigPreviewLight,
     bindingConfigPreviewMidiValue,
     learnPanel,
     learnPanelTitle,
@@ -1372,9 +1380,11 @@ midiFeature = createMidiFeature({
         return;
       }
 
-      if (conflict && (conflict.field === "mute_control" || conflict.field === "assign_control")) {
+      if (conflict && (conflict.field === "mute_control" || conflict.field === "assign_control" || conflict.field === "indicator_control")) {
         const owner = conflict.binding?.name || t("bindings.unnamedBinding");
-        const ownerSlot = conflict.field === "mute_control" ? t("bindings.mute") : t("common.assign");
+        const ownerSlot = conflict.field === "mute_control"
+          ? t("bindings.mute")
+          : (conflict.field === "assign_control" ? t("common.assign") : "Indicator");
         const confirmed = await promptCreateLearnTransfer(
           t("bindings.transferFromAuxMessage", { slot: ownerSlot, name: owner }),
         );
@@ -2156,6 +2166,9 @@ function findCreateBindingConflict(learnedMapping) {
     if (controlsMatch(binding.assign_control, learnedMapping)) {
       return { binding, field: "assign_control" };
     }
+    if (controlsMatch(binding.indicator_control, learnedMapping)) {
+      return { binding, field: "indicator_control" };
+    }
   }
   return null;
 }
@@ -2225,6 +2238,7 @@ function createBindingFromLearn(payload) {
     deadzone: 0,
     debounce_ms: 0,
     mute_behavior: "ToggleOnPress",
+    indicator_control: null,
     mute_control: null,
     assign_control: null,
     assign_mode: "Add",
@@ -2364,6 +2378,7 @@ async function setupListeners() {
               : migration.deviceId,
             mute_control: migrateAuxControl(nextBinding?.mute_control, migration),
             assign_control: migrateAuxControl(nextBinding?.assign_control, migration),
+            indicator_control: migrateAuxControl(nextBinding?.indicator_control, migration),
           };
         });
         return nextBinding;
@@ -2387,6 +2402,7 @@ async function setupListeners() {
       device_id: deviceId,
       mute_control: migrateAuxControl(binding?.mute_control),
       assign_control: migrateAuxControl(binding?.assign_control),
+      indicator_control: migrateAuxControl(binding?.indicator_control),
     }));
     requestBindingsRerender("bindings_migrated");
   });

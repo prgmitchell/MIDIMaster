@@ -511,7 +511,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -1025,7 +1035,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1539,7 +1559,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2053,7 +2083,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2567,7 +2607,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3081,7 +3131,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3595,7 +3655,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4109,7 +4179,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4623,7 +4703,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5137,7 +5227,17 @@
     "bindings.buttonLightWhenMapped": "bcf8576d3452b40a7e1772147bf0540ff3defe8a3b205aa3f42e83a75996491f",
     "bindings.buttonLightWhenOn": "001477ada8b444ada4560dbcc1119c55f06096615a088ef5237321a201c916d6",
     "bindings.buttonLightWhenOff": "d956416febe4eb6be44551b997cee65ecd9081e6c36b88e8d93b24f952b9ba57",
-    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866"
+    "bindings.buttonLightWhilePressed": "eac034ec0ca6ab93d02836968c721bbfdbe8a0b0a9fd0a14a904a219ddcca866",
+    "bindings.indicatorOutput": "2e9d3bd44f23856726670bb0209d7df56e8eb85dffee30485daf4f8233ddfd03",
+    "bindings.indicatorOutputHelp": "b96fb96a4f357d49961ca5f1fb6e232c7a53e08111215ded97fb2da96840a70e",
+    "bindings.indicatorType": "baaddf70fb5d432b8bd948ef91d6f910124a6d138edae4d5f000c4610ddc8eae",
+    "bindings.indicatorMessageType": "228f92ec80bb3100730cfe71206c6f2884c8ab5ef9af2d750f3db258b218a78d",
+    "bindings.indicatorChannel": "ce4683e7013a18cdf3d224bfcb4e9594ea8f559e946a837c633defe7d3c32172",
+    "bindings.indicatorChannelLabel": "b8aedf60da474aa889138df94990e1ce1d72a352f7502a4183bd8d5c6b2f3369",
+    "bindings.indicatorControl": "32d7e82082479b8cb546187ff0af11e4915e4d17bc28e02dca7425288b79badd",
+    "bindings.indicatorControlLabel": "fec84c857671450c612807d22051d14f4c15e157354aea89166e13b40e4f45ba",
+    "bindings.learnIndicatorOutput": "05295c617766a6570e55e39c6f10beb3566fe4539b58527c8636a2c5371879ce",
+    "bindings.resetIndicatorOutput": "b37a137b9a0fff58bd72047a2628db89ea5a630545e886169dd596b68065039d"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

@@ -1,6 +1,7 @@
 use super::update_activity_button_light_hold_feedback;
 use crate::binding_actions;
 use crate::bindings::BindingKey;
+use crate::feedback::{self, FeedbackSendOptions};
 use crate::model::{self, Binding, BindingTarget, MidiEvent};
 use crate::run_logger;
 use crate::runtime_helpers::{focus_window_by_process_name, send_hotkey, send_media_key};
@@ -25,12 +26,16 @@ fn emit_button_feedback(
     if !input_active {
         update_activity_button_light_hold_feedback(state, binding, key.clone(), false);
     }
-    if let Ok(mut feedback) = state.feedback_values.lock() {
-        feedback.insert(key.clone(), feedback_value);
-    }
-    if let Ok(mut midi) = state.midi.lock() {
-        let _ = midi.send_binding_feedback(binding, feedback_value);
-    }
+    feedback::send_button_light_feedback_to_binding(
+        state,
+        binding,
+        FeedbackSendOptions {
+            value: feedback_value,
+            silent: false,
+            force_hardware_feedback: true,
+            context: "special_action_button",
+        },
+    );
     if input_active {
         update_activity_button_light_hold_feedback(state, binding, key, true);
     }
