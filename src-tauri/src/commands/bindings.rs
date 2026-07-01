@@ -69,53 +69,56 @@ fn send_resolved_binding_feedback(
 }
 
 fn resolved_binding_feedback_control_key(binding: &Binding) -> FeedbackControlKey {
-    if binding.is_button_binding() {
-        feedback::button_light_feedback_control_key(binding)
-    } else {
-        FeedbackControlKey::from_binding(binding)
-    }
+    feedback::binding_feedback_control_key(binding)
 }
 
-fn active_button_light_outputs(bindings: &[Binding]) -> HashSet<FeedbackControlKey> {
+fn binding_has_clearable_feedback_output(binding: &Binding) -> bool {
+    if binding
+        .button_light_feedback_value(Some(false), None)
+        .is_some()
+    {
+        return true;
+    }
+
+    !binding.is_button_binding() && binding.custom_feedback_output_control().is_some()
+}
+
+fn active_feedback_outputs(bindings: &[Binding]) -> HashSet<FeedbackControlKey> {
     bindings
         .iter()
-        .filter(|binding| {
-            binding
-                .button_light_feedback_value(Some(false), None)
-                .is_some()
-        })
-        .map(feedback::button_light_feedback_control_key)
+        .filter(|binding| binding_has_clearable_feedback_output(binding))
+        .map(resolved_binding_feedback_control_key)
         .collect()
 }
 
-fn stale_button_light_bindings_for_removed_outputs(
+fn stale_feedback_bindings_for_removed_outputs(
     removed_bindings: &[Binding],
     active_output_keys: &HashSet<FeedbackControlKey>,
 ) -> Vec<Binding> {
     removed_bindings
         .iter()
+        .filter(|binding| binding_has_clearable_feedback_output(binding))
         .filter(|binding| {
-            binding
-                .button_light_feedback_value(Some(false), None)
-                .is_some()
-        })
-        .filter(|binding| {
-            let old_output = feedback::button_light_feedback_control_key(binding);
+            let old_output = resolved_binding_feedback_control_key(binding);
             !active_output_keys.contains(&old_output)
         })
         .cloned()
         .collect()
 }
 
-fn clear_button_light_feedback_output(state: &AppState, binding: &Binding) {
+fn clear_binding_feedback_output(state: &AppState, binding: &Binding) {
     let logical_key = BindingKey::from_binding(binding);
-    let output_key = feedback::button_light_feedback_control_key(binding).to_binding_key();
+    let output_key = resolved_binding_feedback_control_key(binding).to_binding_key();
     if let Ok(mut feedback_values) = state.feedback_values.lock() {
         feedback_values.remove(&logical_key);
         feedback_values.remove(&output_key);
     }
     if let Ok(mut midi) = state.midi.lock() {
-        let _ = midi.send_binding_light_feedback(binding, 0.0);
+        if binding.is_button_binding() {
+            let _ = midi.send_binding_light_feedback(binding, 0.0);
+        } else {
+            let _ = midi.send_binding_feedback(binding, 0.0);
+        }
     }
 }
 
@@ -733,7 +736,7 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
         return Err("Binding cannot have more than 8 targets".to_string());
     }
 
-    let stale_button_light_bindings;
+    let stale_feedback_bindings;
     let profile_to_save = {
         let mut profile_guard = state
             .active_profile
@@ -757,9 +760,9 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
             !remove
         });
         profile.bindings.push(binding);
-        let active_outputs = active_button_light_outputs(&profile.bindings);
-        stale_button_light_bindings =
-            stale_button_light_bindings_for_removed_outputs(&removed_bindings, &active_outputs);
+        let active_outputs = active_feedback_outputs(&profile.bindings);
+        stale_feedback_bindings =
+            stale_feedback_bindings_for_removed_outputs(&removed_bindings, &active_outputs);
         state.sync_feedback_values(profile);
         state.send_idle_button_light_feedback_values(profile);
         run_logger::info(
@@ -773,8 +776,8 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
         );
         profile.clone()
     };
-    for binding in stale_button_light_bindings {
-        clear_button_light_feedback_output(&state, &binding);
+    for binding in stale_feedback_bindings {
+        clear_binding_feedback_output(&state, &binding);
     }
     state
         .profile_store
@@ -812,8 +815,10 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
 
     // 2. Clear internal state
     let key = BindingKey::from_binding(&binding);
+    let output_key = resolved_binding_feedback_control_key(&binding).to_binding_key();
     if let Ok(mut feedback) = state.feedback_values.lock() {
         feedback.remove(&key);
+        feedback.remove(&output_key);
     }
     if let Ok(mut values) = state.binding_action_values.lock() {
         values.remove(&key);
@@ -827,7 +832,11 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
 
     // 4. Send 0.0 value to the binding's feedback destination
     if let Ok(mut midi) = state.midi.lock() {
-        let _ = midi.send_binding_light_feedback(&binding, 0.0);
+        if binding.is_button_binding() {
+            let _ = midi.send_binding_light_feedback(&binding, 0.0);
+        } else {
+            let _ = midi.send_binding_feedback(&binding, 0.0);
+        }
     }
 
     Ok(())
@@ -841,84 +850,88 @@ pub fn update_midi_feedback(
     binding_id: Option<String>,
     action: Option<model::BindingAction>,
 ) -> Result<(), String> {
-    let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
-    let profile = match profile_guard.as_ref() {
-        Some(p) => p,
-        None => return Ok(()),
-    };
-
-    for binding in &profile.bindings {
-        let binding_targets = binding.normalized_targets();
-        let matches = if let Some(ref id) = binding_id {
-            binding.id == *id
-        } else if let Some(ref act) = action {
-            if binding.action != *act {
-                false
-            } else {
-                binding_targets.contains(&target)
-            }
-        } else {
-            binding_targets.contains(&target)
+    let matched_bindings: Vec<Binding> = {
+        let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
+        let profile = match profile_guard.as_ref() {
+            Some(p) => p,
+            None => return Ok(()),
         };
 
-        if matches {
-            let key = BindingKey::from_binding(binding);
-            let state_active = if binding.uses_stateful_toggle_feedback() {
-                Some(value > 0.5)
-            } else {
-                None
-            };
-            let button_light_value = binding.button_light_feedback_value(None, state_active);
-            let feedback_value = button_light_value.unwrap_or(value);
+        profile
+            .bindings
+            .iter()
+            .filter(|binding| {
+                let binding_targets = binding.normalized_targets();
+                if let Some(ref id) = binding_id {
+                    binding.id == *id
+                } else if let Some(ref act) = action {
+                    if binding.action != *act {
+                        false
+                    } else {
+                        binding_targets.contains(&target)
+                    }
+                } else {
+                    binding_targets.contains(&target)
+                }
+            })
+            .cloned()
+            .collect()
+    };
 
-            let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
-            if feedback::binding_user_active(&state, &key, is_note) {
-                run_logger::debug(
-                    "bindings_cmd",
-                    "feedback_skipped_user_active",
-                    &format!("binding_id={} is_note={}", binding.id, is_note),
-                );
-                continue;
-            }
+    for binding in matched_bindings {
+        let key = BindingKey::from_binding(&binding);
+        let state_active = if binding.uses_stateful_toggle_feedback() {
+            Some(value > 0.5)
+        } else {
+            None
+        };
+        let button_light_value = binding.button_light_feedback_value(None, state_active);
+        let feedback_value = button_light_value.unwrap_or(value);
 
-            if binding.is_button_binding() {
-                feedback::send_button_light_feedback_to_binding(
-                    &state,
-                    binding,
-                    FeedbackSendOptions {
-                        value: feedback_value,
-                        silent: false,
-                        force_hardware_feedback: false,
-                        context: &format!("target_feedback:{}", binding.id),
-                    },
-                );
-                run_logger::debug(
-                    "bindings_cmd",
-                    "button_light_feedback_sent",
-                    &format!("binding_id={} value={}", binding.id, feedback_value),
-                );
-                continue;
-            }
-
-            if !feedback::update_feedback_cache_if_changed(&state, &key, feedback_value) {
-                run_logger::debug(
-                    "bindings_cmd",
-                    "feedback_skipped_unchanged",
-                    &format!("binding_id={} value={}", binding.id, feedback_value),
-                );
-                continue;
-            }
-
-            // Send the actual MIDI feedback
-            if let Ok(mut midi) = state.midi.lock() {
-                let _ = midi.send_binding_feedback(binding, feedback_value);
-            }
+        let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
+        if feedback::binding_user_active(&state, &key, is_note) {
             run_logger::debug(
                 "bindings_cmd",
-                "feedback_sent",
+                "feedback_skipped_user_active",
+                &format!("binding_id={} is_note={}", binding.id, is_note),
+            );
+            continue;
+        }
+
+        if binding.is_button_binding() {
+            feedback::send_button_light_feedback_to_binding(
+                &state,
+                &binding,
+                FeedbackSendOptions {
+                    value: feedback_value,
+                    silent: false,
+                    force_hardware_feedback: false,
+                    context: &format!("target_feedback:{}", binding.id),
+                },
+            );
+            run_logger::debug(
+                "bindings_cmd",
+                "button_light_feedback_sent",
                 &format!("binding_id={} value={}", binding.id, feedback_value),
             );
+            continue;
         }
+
+        feedback::send_feedback_to_binding(
+            &state,
+            &binding,
+            FeedbackSendOptions {
+                value: feedback_value,
+                silent: false,
+                force_hardware_feedback: false,
+                context: &format!("target_feedback:{}", binding.id),
+            },
+        );
+        run_logger::debug(
+            "bindings_cmd",
+            "feedback_sent",
+            &format!("binding_id={} value={}", binding.id, feedback_value),
+        );
     }
 
     Ok(())
@@ -936,13 +949,15 @@ pub fn set_binding_feedback(
     input_value: Option<f32>,
     force_hardware_feedback: Option<bool>,
 ) -> Result<(), String> {
-    let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
-    let profile = match profile_guard.as_ref() {
-        Some(p) => p,
-        None => return Ok(()),
+    let profile_bindings = {
+        let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
+        match profile_guard.as_ref() {
+            Some(p) => p.bindings.clone(),
+            None => return Ok(()),
+        }
     };
 
-    let binding = match profile.bindings.iter().find(|b| b.id == binding_id) {
+    let binding = match profile_bindings.iter().find(|b| b.id == binding_id) {
         Some(b) => b.clone(),
         None => return Ok(()),
     };
@@ -1008,7 +1023,7 @@ pub fn set_binding_feedback(
             emitted_controls.insert(emitted_key);
         }
 
-        for candidate in &profile.bindings {
+        for candidate in &profile_bindings {
             let candidate_targets = candidate.normalized_targets();
             let is_affected = candidate_targets
                 .iter()
@@ -1059,7 +1074,7 @@ pub fn set_binding_feedback(
             let emitted_key = resolved_binding_feedback_control_key(&binding);
             emitted_controls.insert(emitted_key);
         }
-        for candidate in &profile.bindings {
+        for candidate in &profile_bindings {
             if !matches!(candidate.action, model::BindingAction::Volume) {
                 continue;
             }
@@ -1317,23 +1332,23 @@ mod tests {
     }
 
     #[test]
-    fn stale_button_light_outputs_include_replaced_indicator_destination() {
+    fn stale_feedback_outputs_include_replaced_indicator_destination() {
         let mut previous = integration_button_binding("stateful");
         previous.control.controller = 21;
 
         let mut next = previous.clone();
         next.indicator_control = Some(indicator_control(22));
 
-        let active_outputs = active_button_light_outputs(&[next]);
+        let active_outputs = active_feedback_outputs(&[next]);
         let stale =
-            stale_button_light_bindings_for_removed_outputs(&[previous.clone()], &active_outputs);
+            stale_feedback_bindings_for_removed_outputs(&[previous.clone()], &active_outputs);
 
         assert_eq!(stale.len(), 1);
         assert_eq!(stale[0].id, previous.id);
     }
 
     #[test]
-    fn stale_button_light_outputs_keep_destinations_used_by_other_bindings() {
+    fn stale_feedback_outputs_keep_destinations_used_by_other_bindings() {
         let mut previous = integration_button_binding("stateful");
         previous.control.controller = 21;
 
@@ -1345,8 +1360,8 @@ mod tests {
         other.control.controller = 30;
         other.indicator_control = Some(indicator_control(21));
 
-        let active_outputs = active_button_light_outputs(&[next, other]);
-        let stale = stale_button_light_bindings_for_removed_outputs(&[previous], &active_outputs);
+        let active_outputs = active_feedback_outputs(&[next, other]);
+        let stale = stale_feedback_bindings_for_removed_outputs(&[previous], &active_outputs);
 
         assert!(stale.is_empty());
     }
@@ -1365,7 +1380,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_feedback_control_key_keeps_primary_for_continuous_bindings() {
+    fn resolved_feedback_control_key_uses_indicator_for_continuous_bindings() {
         let mut binding = integration_button_binding("stateful");
         binding.control_kind = model::BindingControlKind::Continuous;
         binding.control.controller = 21;
@@ -1374,8 +1389,26 @@ mod tests {
         let key = resolved_binding_feedback_control_key(&binding);
 
         assert_eq!(key.device_id, "midi-dev");
-        assert_eq!(key.controller, 21);
+        assert_eq!(key.controller, 22);
         assert_eq!(key.msg_type, model::MidiMessageType::Note);
+    }
+
+    #[test]
+    fn stale_feedback_outputs_include_replaced_continuous_indicator_destination() {
+        let mut previous = integration_button_binding("stateful");
+        previous.control_kind = model::BindingControlKind::Continuous;
+        previous.control.controller = 21;
+        previous.indicator_control = Some(indicator_control(22));
+
+        let mut next = previous.clone();
+        next.indicator_control = Some(indicator_control(23));
+
+        let active_outputs = active_feedback_outputs(&[next]);
+        let stale =
+            stale_feedback_bindings_for_removed_outputs(&[previous.clone()], &active_outputs);
+
+        assert_eq!(stale.len(), 1);
+        assert_eq!(stale[0].id, previous.id);
     }
 
     #[test]

@@ -71,7 +71,11 @@ fn shutdown_lights(state: &AppState) {
             );
             if let Ok(mut midi) = state.midi.lock() {
                 for binding in &profile.bindings {
-                    let _ = midi.send_binding_light_feedback(binding, 0.0);
+                    if binding.is_button_binding() {
+                        let _ = midi.send_binding_light_feedback(binding, 0.0);
+                    } else {
+                        let _ = midi.send_binding_feedback(binding, 0.0);
+                    }
                 }
             }
         }

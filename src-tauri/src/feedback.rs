@@ -89,6 +89,17 @@ pub fn button_light_feedback_control_key(binding: &Binding) -> FeedbackControlKe
         .unwrap_or_else(|| FeedbackControlKey::from_binding(binding))
 }
 
+pub fn binding_feedback_control_key(binding: &Binding) -> FeedbackControlKey {
+    if binding.is_button_binding() {
+        return button_light_feedback_control_key(binding);
+    }
+
+    binding
+        .custom_feedback_output_control()
+        .map(FeedbackControlKey::from_aux)
+        .unwrap_or_else(|| FeedbackControlKey::from_binding(binding))
+}
+
 fn primary_button_light_suppression_control(
     binding: &Binding,
     output_key: &BindingKey,
@@ -213,29 +224,34 @@ pub fn send_feedback_to_binding(
     binding: &Binding,
     options: FeedbackSendOptions<'_>,
 ) {
-    let control = FeedbackControlKey::from_binding(binding);
-    let key = control.to_binding_key();
-    let is_note = matches!(control.msg_type, model::MidiMessageType::Note);
-    let user_active = binding_user_active(state, &key, is_note);
+    let logical_key = BindingKey::from_binding(binding);
+    let output_control = binding_feedback_control_key(binding);
+    let output_key = output_control.to_binding_key();
+    let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
+    let user_active = binding_user_active(state, &logical_key, is_note);
 
     if user_active && options.silent && !options.force_hardware_feedback {
         run_logger::debug(
             "feedback",
             "silent_ignored_user_active",
-            &format!("context={} key={:?}", options.context, key),
+            &format!("context={} key={:?}", options.context, logical_key),
         );
         return;
     }
 
-    if !update_feedback_cache_if_changed(state, &key, options.value)
+    if output_key != logical_key {
+        set_feedback_cache_value(state, &logical_key, options.value);
+    }
+
+    if !update_feedback_cache_if_changed(state, &output_key, options.value)
         && !options.force_hardware_feedback
     {
         run_logger::debug(
             "feedback",
             "skipped_unchanged",
             &format!(
-                "context={} key={:?} value={}",
-                options.context, key, options.value
+                "context={} logical_key={:?} output_key={:?} value={}",
+                options.context, logical_key, output_key, options.value
             ),
         );
         return;

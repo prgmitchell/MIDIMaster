@@ -150,6 +150,16 @@ fn binding_light_feedback_sends(binding: &Binding, value: f32) -> Vec<BindingLig
     sends
 }
 
+fn binding_feedback_send(binding: &Binding, value: f32) -> BindingLightFeedbackSend {
+    if !binding.is_button_binding() {
+        if let Some(output) = binding.custom_feedback_output_control() {
+            return indicator_light_feedback_send(output, value);
+        }
+    }
+
+    primary_light_feedback_send(binding, value, true)
+}
+
 struct MidiInputRoute {
     input_connection: Option<MidiInputConnection<()>>,
     input_device_id: String,
@@ -898,13 +908,19 @@ impl MidiManager {
     }
 
     pub fn send_binding_feedback(&mut self, binding: &Binding, value: f32) -> Result<()> {
+        let send = binding_feedback_send(binding, value);
+        let binding_context = if send.use_binding_protocol {
+            Some(binding)
+        } else {
+            None
+        };
         self.send_feedback_inner(
-            &binding.device_id,
-            binding.control.channel,
-            binding.control.controller,
-            value,
-            binding.control.msg_type.clone(),
-            Some(binding),
+            &send.device_id,
+            send.channel,
+            send.controller,
+            send.value,
+            send.msg_type,
+            binding_context,
         )
     }
 
@@ -2441,6 +2457,59 @@ mod tests {
         assert_eq!(sends[0].msg_type, MidiMessageType::Note);
         assert_eq!(sends[0].value, 1.0);
         assert!(sends[0].use_binding_protocol);
+    }
+
+    #[test]
+    fn custom_fader_feedback_uses_pitch_bend_indicator_send_without_primary_suppression() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.control_kind = BindingControlKind::Continuous;
+        binding.control.msg_type = MidiMessageType::PitchBend;
+        binding.indicator_control = Some(AuxiliaryControl {
+            device_id: "midi:0".to_string(),
+            channel: 4,
+            controller: 0,
+            msg_type: MidiMessageType::PitchBend,
+            control_kind: BindingControlKind::Continuous,
+            mode: MidiMode::Absolute,
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: MuteBehavior::ToggleOnPress,
+        });
+
+        let send = binding_feedback_send(&binding, 0.5);
+        let feedback = build_feedback_message(
+            send.channel,
+            send.controller,
+            send.value,
+            &send.msg_type,
+            None,
+            "Generic MIDI Output",
+        );
+
+        assert_eq!(send.device_id, "midi:0");
+        assert_eq!(send.channel, 4);
+        assert_eq!(send.controller, 0);
+        assert_eq!(send.msg_type, MidiMessageType::PitchBend);
+        assert_eq!(send.value, 0.5);
+        assert!(!send.use_binding_protocol);
+        assert_eq!(feedback.protocol, "direct");
+        assert_eq!(feedback.physical_bytes, vec![0xE4, 0, 64]);
+    }
+
+    #[test]
+    fn default_fader_feedback_uses_primary_binding_protocol() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.control_kind = BindingControlKind::Continuous;
+        binding.control.msg_type = MidiMessageType::PitchBend;
+
+        let send = binding_feedback_send(&binding, 0.5);
+
+        assert_eq!(send.device_id, "midi:0");
+        assert_eq!(send.channel, binding.control.channel);
+        assert_eq!(send.controller, binding.control.controller);
+        assert_eq!(send.msg_type, MidiMessageType::PitchBend);
+        assert_eq!(send.value, 0.5);
+        assert!(send.use_binding_protocol);
     }
 
     #[test]

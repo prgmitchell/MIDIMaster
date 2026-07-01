@@ -678,6 +678,58 @@ function testNormalizeBindingPreservesNoteIndicatorControl() {
   });
 }
 
+function testNormalizeBindingPreservesFaderFeedbackOutputControl() {
+  const normalized = bindingModel.normalizeBinding(relativeBinding({
+    control_kind: "Continuous",
+    control: { msg_type: "ControlChange", channel: 0, controller: 7 },
+    indicator_control: {
+      device_id: "midi:1",
+      channel: 15.9,
+      controller: 127.9,
+      msg_type: "ControlChange",
+      control_kind: "Continuous",
+    },
+  }));
+
+  assert.deepEqual(normalized.indicator_control, {
+    device_id: "midi:1",
+    channel: 15,
+    controller: 127,
+    msg_type: "ControlChange",
+    control_kind: "Continuous",
+    mode: "Absolute",
+    deadzone: 0,
+    debounce_ms: 0,
+    mute_behavior: "ToggleOnPress",
+  });
+}
+
+function testNormalizeBindingPreservesPitchBendFaderFeedbackOutputControl() {
+  const normalized = bindingModel.normalizeBinding(relativeBinding({
+    control_kind: "Continuous",
+    control: { msg_type: "PitchBend", channel: 4, controller: 224 },
+    indicator_control: {
+      device_id: "midi:2",
+      channel: 6.9,
+      controller: 224,
+      msg_type: "PitchBend",
+      control_kind: "Continuous",
+    },
+  }));
+
+  assert.deepEqual(normalized.indicator_control, {
+    device_id: "midi:2",
+    channel: 6,
+    controller: 0,
+    msg_type: "PitchBend",
+    control_kind: "Continuous",
+    mode: "Absolute",
+    deadzone: 0,
+    debounce_ms: 0,
+    mute_behavior: "ToggleOnPress",
+  });
+}
+
 function testNormalizeBindingDropsUnsupportedIndicatorControl() {
   const normalized = bindingModel.normalizeBinding(buttonBinding({
     indicator_control: {
@@ -685,6 +737,20 @@ function testNormalizeBindingDropsUnsupportedIndicatorControl() {
       channel: 0,
       controller: 9,
       msg_type: "ProgramChange",
+    },
+  }));
+
+  assert.equal(normalized.indicator_control, null);
+}
+
+function testNormalizeBindingDropsPitchBendButtonIndicatorControl() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    indicator_control: {
+      device_id: "midi:0",
+      channel: 0,
+      controller: 0,
+      msg_type: "PitchBend",
+      control_kind: "Button",
     },
   }));
 
@@ -731,6 +797,9 @@ testNormalizeBindingPreservesMacroDraftShape();
 testNormalizeBindingPreservesMacroName();
 testNormalizeBindingDefaultsLegacyMacroName();
 testNormalizeBindingPreservesNoteIndicatorControl();
+testNormalizeBindingPreservesFaderFeedbackOutputControl();
+testNormalizeBindingPreservesPitchBendFaderFeedbackOutputControl();
 testNormalizeBindingDropsUnsupportedIndicatorControl();
+testNormalizeBindingDropsPitchBendButtonIndicatorControl();
 
 console.log("Binding model tests passed");

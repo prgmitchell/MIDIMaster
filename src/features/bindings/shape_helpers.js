@@ -197,14 +197,20 @@ export function ensureBindingShape(binding) {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
   }
   if (binding.indicator_control && typeof binding.indicator_control === "object") {
-    const msgType = binding.indicator_control.msg_type === "Note" ? "Note" : "ControlChange";
+    const isFeedbackOutput = !effectiveIsButton(binding);
+    const rawMsgType = binding.indicator_control.msg_type;
+    const msgType = rawMsgType === "Note"
+      ? "Note"
+      : (isFeedbackOutput && rawMsgType === "PitchBend" ? "PitchBend" : "ControlChange");
     binding.indicator_control = {
       ...binding.indicator_control,
       device_id: String(binding.indicator_control.device_id || "").trim(),
       channel: Math.min(15, Math.max(0, Math.trunc(Number(binding.indicator_control.channel) || 0))),
-      controller: Math.min(127, Math.max(0, Math.trunc(Number(binding.indicator_control.controller) || 0))),
+      controller: msgType === "PitchBend"
+        ? 0
+        : Math.min(127, Math.max(0, Math.trunc(Number(binding.indicator_control.controller) || 0))),
       msg_type: msgType,
-      control_kind: normalizeControlKind(binding.indicator_control.control_kind),
+      control_kind: isFeedbackOutput ? "Continuous" : normalizeControlKind(binding.indicator_control.control_kind),
       mode: binding.indicator_control.mode === "Relative" ? "Relative" : "Absolute",
       deadzone: Number.isFinite(Number(binding.indicator_control.deadzone)) ? Number(binding.indicator_control.deadzone) : 0,
       debounce_ms: Number.isFinite(Number(binding.indicator_control.debounce_ms)) ? Number(binding.indicator_control.debounce_ms) : 0,

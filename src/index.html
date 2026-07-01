@@ -804,6 +804,46 @@
               <p id="binding-config-curve-help" class="binding-config-curve-help" data-i18n="bindings.linearHelp">Linear response. Output value changes at the same rate as the fader movement.</p>
             </section>
 
+            <section id="binding-config-feedback-output-section" class="binding-config-section binding-config-section--feedback-output hidden">
+              <div id="binding-config-feedback-output-custom" class="binding-config-indicator-custom binding-config-feedback-output-custom">
+                <div class="binding-config-indicator-heading">
+                  <span class="binding-config-toggle-title" data-i18n="bindings.feedbackOutput">Feedback output</span>
+                  <span class="binding-config-toggle-help" data-i18n="bindings.feedbackOutputHelp">Note, CC, or Pitch Bend address that receives fader feedback.</span>
+                </div>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorType">Type</span>
+                  <select id="binding-config-feedback-msg-type" class="binding-config-light-select" aria-label="Feedback message type" data-i18n-aria-label="bindings.feedbackMessageType">
+                    <option value="Note">Note</option>
+                    <option value="ControlChange">CC</option>
+                    <option value="PitchBend" data-i18n="bindings.pitchBend">Pitch Bend</option>
+                  </select>
+                </label>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorChannel">Channel</span>
+                  <input id="binding-config-feedback-channel" type="number" min="1" max="16" step="1" inputmode="numeric" aria-label="Feedback channel" data-i18n-aria-label="bindings.feedbackChannelLabel" />
+                </label>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorControl">Control</span>
+                  <input id="binding-config-feedback-controller" type="number" min="0" max="127" step="1" inputmode="numeric" aria-label="Feedback control" data-i18n-aria-label="bindings.feedbackControlLabel" />
+                </label>
+                <div class="binding-config-indicator-actions">
+                  <button id="binding-config-feedback-learn" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Learn feedback output" title="Learn feedback output" data-i18n-aria-label="bindings.learnFeedbackOutput" data-i18n-title="bindings.learnFeedbackOutput">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="7"></circle>
+                      <circle cx="12" cy="12" r="2.5"></circle>
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                    </svg>
+                  </button>
+                  <button id="binding-config-feedback-clear" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Reset feedback output" title="Reset feedback output" data-i18n-aria-label="bindings.resetFeedbackOutput" data-i18n-title="bindings.resetFeedbackOutput">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M4 7v5h5"></path>
+                      <path d="M5.5 12A7 7 0 1 0 8 6.7L4 10.5"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </section>
+
             <section id="binding-config-mute-section" class="binding-config-section binding-config-section--mute">
               <span class="binding-config-title binding-config-title-with-action">
                 <span data-i18n="bindings.mute">Mute</span>
@@ -832,8 +872,18 @@
               </span>
               <div class="binding-config-actions">
                 <span id="binding-config-mute-label" class="binding-config-label" data-i18n="bindings.notMapped">Not mapped</span>
-                <button id="binding-config-mute-learn" type="button" class="binding-config-button binding-config-button--primary" data-i18n="common.learn">Learn</button>
-                <button id="binding-config-mute-clear" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.clear">Clear</button>
+                <button id="binding-config-mute-learn" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Learn" title="Learn" data-i18n-aria-label="common.learn" data-i18n-title="common.learn">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="7"></circle>
+                    <circle cx="12" cy="12" r="2.5"></circle>
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                  </svg>
+                </button>
+                <button id="binding-config-mute-clear" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Clear" title="Clear" data-i18n-aria-label="common.clear" data-i18n-title="common.clear">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6 6l12 12M18 6 6 18"></path>
+                  </svg>
+                </button>
               </div>
             </section>
 
@@ -865,8 +915,18 @@
               </span>
               <div class="binding-config-actions">
                 <span id="binding-config-assign-label" class="binding-config-label" data-i18n="bindings.notMapped">Not mapped</span>
-                <button id="binding-config-assign-learn" type="button" class="binding-config-button binding-config-button--primary" data-i18n="common.learn">Learn</button>
-                <button id="binding-config-assign-clear" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.clear">Clear</button>
+                <button id="binding-config-assign-learn" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Learn" title="Learn" data-i18n-aria-label="common.learn" data-i18n-title="common.learn">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="7"></circle>
+                    <circle cx="12" cy="12" r="2.5"></circle>
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                  </svg>
+                </button>
+                <button id="binding-config-assign-clear" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Clear" title="Clear" data-i18n-aria-label="common.clear" data-i18n-title="common.clear">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6 6l12 12M18 6 6 18"></path>
+                  </svg>
+                </button>
               </div>
             </section>
           </div>

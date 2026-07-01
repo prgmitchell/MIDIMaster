@@ -490,7 +490,12 @@ impl AppState {
                     | model::BindingAction::SetDefaultDevice
             ) {
                 if let Some(value) = idle_feedback_value {
-                    feedback.insert(key, value);
+                    let output_key =
+                        feedback::binding_feedback_control_key(binding).to_binding_key();
+                    feedback.insert(key.clone(), value);
+                    if output_key != key {
+                        feedback.insert(output_key, value);
+                    }
                 }
                 continue;
             }
@@ -655,9 +660,17 @@ impl AppState {
                 let feedback_value = binding
                     .button_light_feedback_value(Some(input_active), state_active)
                     .unwrap_or(val);
-                feedback.insert(key, feedback_value);
+                let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
+                feedback.insert(key.clone(), feedback_value);
+                if output_key != key {
+                    feedback.insert(output_key, feedback_value);
+                }
             } else if let Some(value) = idle_feedback_value {
-                feedback.insert(key, value);
+                let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
+                feedback.insert(key.clone(), value);
+                if output_key != key {
+                    feedback.insert(output_key, value);
+                }
             }
         }
 

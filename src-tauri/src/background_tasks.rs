@@ -245,12 +245,8 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                         for binding in &profile.bindings {
                             let key = BindingKey::from_binding(binding);
                             if let Some(volume) = feedback_snapshot.get(&key).cloned() {
-                                let output_key = if binding.is_button_binding() {
-                                    feedback::button_light_feedback_control_key(binding)
-                                        .to_binding_key()
-                                } else {
-                                    key.clone()
-                                };
+                                let output_key = feedback::binding_feedback_control_key(binding)
+                                    .to_binding_key();
                                 if should_send_feedback(
                                     &mut last_sent_feedback,
                                     output_key,

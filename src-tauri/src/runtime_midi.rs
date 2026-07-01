@@ -970,8 +970,12 @@ pub(crate) fn apply_midi_event(
     }
 
     if !integration_button_feedback_owned && button_light_feedback_value.is_none() {
+        let output_key = feedback::binding_feedback_control_key(&binding).to_binding_key();
         if let Ok(mut feedback) = state.feedback_values.lock() {
             feedback.insert(key.clone(), primary_feedback_value);
+            if output_key != key {
+                feedback.insert(output_key, primary_feedback_value);
+            }
         }
     }
 

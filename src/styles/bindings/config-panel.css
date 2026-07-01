@@ -1887,25 +1887,29 @@
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-content {
-  height: auto;
+  height: min(780px, calc(100vh - 20px));
+  max-height: calc(100vh - 20px);
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-body {
-  flex: 0 1 auto;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-layout {
   display: grid;
   flex: 0 1 auto;
-  grid-template-columns: minmax(0, 1.35fr) minmax(270px, 0.85fr);
+  grid-template-columns: minmax(0, 0.675fr) minmax(0, 0.675fr) minmax(270px, 0.85fr);
   grid-template-areas:
-    "name live"
-    "curve live"
-    "mute live"
-    "assign learn";
+    "name name live"
+    "curve curve live"
+    "feedback feedback live"
+    "mute assign learn";
   gap: 12px;
   align-items: stretch;
+  align-content: start;
   padding: 10px;
   overflow: visible;
 }
@@ -1923,12 +1927,36 @@
   width: 100%;
 }
 
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-actions {
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--mute .binding-config-icon-button,
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--assign .binding-config-icon-button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-self: end;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--mute,
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--assign,
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-shell {
+  gap: 8px;
+  padding: 8px 10px;
+}
+
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--name {
   grid-area: name;
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--curve {
   grid-area: curve;
+}
+
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--feedback-output {
+  grid-area: feedback;
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--mute {
@@ -1941,6 +1969,10 @@
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-card {
   grid-area: live;
+  align-self: stretch;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 498px;
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-shell {
@@ -2660,6 +2692,7 @@ body[data-theme] .binding-config-midi-control {
     grid-template-areas:
       "name"
       "curve"
+      "feedback"
       "mute"
       "assign"
       "live"

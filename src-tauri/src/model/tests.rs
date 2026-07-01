@@ -169,7 +169,47 @@ fn deserialize_binding_indicator_control_round_trips_note_mapping() {
 }
 
 #[test]
-fn indicator_feedback_control_only_allows_button_note_or_cc_output() {
+fn serialize_continuous_indicator_control() {
+    let mut binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("binding should deserialize");
+    binding.control_kind = BindingControlKind::Continuous;
+    binding.indicator_control = Some(AuxiliaryControl {
+        device_id: "midi-dev".to_string(),
+        channel: 3,
+        controller: 0,
+        msg_type: MidiMessageType::PitchBend,
+        control_kind: BindingControlKind::Continuous,
+        mode: MidiMode::Absolute,
+        deadzone: 0.0,
+        debounce_ms: 0,
+        mute_behavior: MuteBehavior::ToggleOnPress,
+    });
+
+    let json = serde_json::to_value(&binding).expect("binding should serialize");
+    let indicator = json
+        .get("indicator_control")
+        .expect("indicator control should serialize");
+
+    assert_eq!(
+        indicator.get("device_id").and_then(|value| value.as_str()),
+        Some("midi-dev")
+    );
+    assert_eq!(
+        indicator.get("channel").and_then(|value| value.as_u64()),
+        Some(3)
+    );
+    assert_eq!(
+        indicator.get("controller").and_then(|value| value.as_u64()),
+        Some(0)
+    );
+    assert_eq!(
+        indicator.get("msg_type").and_then(|value| value.as_str()),
+        Some("PitchBend")
+    );
+}
+
+#[test]
+fn custom_feedback_output_allows_note_cc_or_continuous_pitch_bend_output() {
     let mut binding: Binding =
         serde_json::from_value(binding_base_json()).expect("binding should deserialize");
     binding.control_kind = BindingControlKind::Button;
@@ -185,13 +225,23 @@ fn indicator_feedback_control_only_allows_button_note_or_cc_output() {
         debounce_ms: 0,
         mute_behavior: MuteBehavior::ToggleOnPress,
     });
+    assert!(binding.custom_feedback_output_control().is_some());
     assert!(binding.indicator_feedback_control().is_some());
 
     binding
         .indicator_control
         .as_mut()
         .expect("indicator control")
+        .msg_type = MidiMessageType::PitchBend;
+    assert!(binding.custom_feedback_output_control().is_none());
+    assert!(binding.indicator_feedback_control().is_none());
+
+    binding
+        .indicator_control
+        .as_mut()
+        .expect("indicator control")
         .msg_type = MidiMessageType::ProgramChange;
+    assert!(binding.custom_feedback_output_control().is_none());
     assert!(binding.indicator_feedback_control().is_none());
 
     binding.control_kind = BindingControlKind::Continuous;
@@ -200,6 +250,15 @@ fn indicator_feedback_control_only_allows_button_note_or_cc_output() {
         .as_mut()
         .expect("indicator control")
         .msg_type = MidiMessageType::Note;
+    assert!(binding.custom_feedback_output_control().is_some());
+    assert!(binding.indicator_feedback_control().is_none());
+
+    binding
+        .indicator_control
+        .as_mut()
+        .expect("indicator control")
+        .msg_type = MidiMessageType::PitchBend;
+    assert!(binding.custom_feedback_output_control().is_some());
     assert!(binding.indicator_feedback_control().is_none());
 }
 

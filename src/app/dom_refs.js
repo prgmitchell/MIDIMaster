@@ -55,6 +55,13 @@ export function createDomRefs() {
   const bindingConfigMacroAddWait = document.getElementById("binding-config-macro-add-wait");
   const bindingConfigMacroAddParallel = document.getElementById("binding-config-macro-add-parallel");
   const bindingConfigCurveSection = document.getElementById("binding-config-curve-section");
+  const bindingConfigFeedbackOutputSection = document.getElementById("binding-config-feedback-output-section");
+  const bindingConfigFeedbackOutputCustom = document.getElementById("binding-config-feedback-output-custom");
+  const bindingConfigFeedbackMsgType = document.getElementById("binding-config-feedback-msg-type");
+  const bindingConfigFeedbackChannel = document.getElementById("binding-config-feedback-channel");
+  const bindingConfigFeedbackController = document.getElementById("binding-config-feedback-controller");
+  const bindingConfigFeedbackLearn = document.getElementById("binding-config-feedback-learn");
+  const bindingConfigFeedbackClear = document.getElementById("binding-config-feedback-clear");
   const bindingConfigMuteSection = document.getElementById("binding-config-mute-section");
   const bindingConfigAssignSection = document.getElementById("binding-config-assign-section");
   const bindingConfigMuteLabel = document.getElementById("binding-config-mute-label");
@@ -249,6 +256,13 @@ export function createDomRefs() {
     bindingConfigMacroAddWait,
     bindingConfigMacroAddParallel,
     bindingConfigCurveSection,
+    bindingConfigFeedbackOutputSection,
+    bindingConfigFeedbackOutputCustom,
+    bindingConfigFeedbackMsgType,
+    bindingConfigFeedbackChannel,
+    bindingConfigFeedbackController,
+    bindingConfigFeedbackLearn,
+    bindingConfigFeedbackClear,
     bindingConfigMuteSection,
     bindingConfigAssignSection,
     bindingConfigMuteLabel,

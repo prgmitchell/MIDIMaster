@@ -785,6 +785,15 @@ impl Binding {
         })
     }
 
+    pub fn custom_feedback_output_control(&self) -> Option<&AuxiliaryControl> {
+        let control = self.indicator_control.as_ref()?;
+        match control.msg_type {
+            MidiMessageType::ControlChange | MidiMessageType::Note => Some(control),
+            MidiMessageType::PitchBend if !self.is_button_binding() => Some(control),
+            MidiMessageType::PitchBend | MidiMessageType::ProgramChange => None,
+        }
+    }
+
     pub fn indicator_feedback_control(&self) -> Option<&AuxiliaryControl> {
         if !self.is_button_binding() {
             return None;
