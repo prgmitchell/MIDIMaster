@@ -46,11 +46,68 @@ function shouldIgnoreLocalMuteEcho(intents, inputName, muted, now = Date.now()) 
   return true;
 }
 
+function sourceFilterKey(sourceName, filterName) {
+  return `${String(sourceName || "")}\u0000${String(filterName || "")}`;
+}
+
+function normalizeSourceFilters(filters) {
+  if (!Array.isArray(filters)) return [];
+  return filters
+    .map((filter) => {
+      const filterName = String(filter?.filterName || "").trim();
+      if (!filterName) return null;
+      return {
+        filterName,
+        filterKind: String(filter?.filterKind || "").trim(),
+        filterEnabled: Boolean(filter?.filterEnabled),
+      };
+    })
+    .filter(Boolean);
+}
+
+function makeSourceFilterToggleTarget(sourceName, filterName) {
+  return {
+    Integration: {
+      integration_id: "obs",
+      kind: "source_filter",
+      data: {
+        source_name: String(sourceName),
+        filter_name: String(filterName),
+        action_kind: "stateful",
+      },
+    },
+  };
+}
+
+function makeSourceFilterTargetOption(sourceName, filterName, iconDataUrl = null) {
+  return {
+    label: `${String(sourceName)} - ${String(filterName)}`,
+    icon_data: iconDataUrl || null,
+    kind: "integration-target",
+    category: "integrations",
+    target: makeSourceFilterToggleTarget(sourceName, filterName),
+    description: "OBS source filter.",
+  };
+}
+
+function makeSourceFilterButtonAction(sourceName, filterName, iconDataUrl = null) {
+  return {
+    label: `Toggle ${String(filterName)}`,
+    value: "ToggleEffect",
+    behavior: "stateful",
+    targetOption: makeSourceFilterTargetOption(sourceName, filterName, iconDataUrl),
+  };
+}
+
 export const obsTestUtils = {
   LOCAL_WRITE_QUIET_MS,
   rememberLocalMuteIntent,
   forgetLocalMuteIntent,
   shouldIgnoreLocalMuteEcho,
+  sourceFilterKey,
+  normalizeSourceFilters,
+  makeSourceFilterToggleTarget,
+  makeSourceFilterButtonAction,
 };
 
 function isOsdWindow() {
@@ -176,6 +233,7 @@ export async function activate(ctx) {
   let bindingsByInputVolume = new Map(); // inputName -> Set(bindingId)
   let bindingsByInputMute = new Map();
   let bindingsBySourceVisibility = new Map(); // sceneName\0sourceName -> Set(bindingId)
+  let bindingsBySourceFilter = new Map(); // sourceName\0filterName -> Map(bindingId, action)
   const statefulActionFeedback = new Map(); // bindingId -> last latched value fallback
   const lastLocalWriteAt = new Map(); // inputName -> ms for volume writes
   const localMuteIntentByInput = new Map(); // inputName -> { muted, at }
@@ -293,6 +351,7 @@ export async function activate(ctx) {
     bindingsByInputVolume = new Map();
     bindingsByInputMute = new Map();
     bindingsBySourceVisibility = new Map();
+    bindingsBySourceFilter = new Map();
 
     for (const b of bindings) {
       const t = b?.target?.Integration || b?.target?.integration;
@@ -318,6 +377,14 @@ export async function activate(ctx) {
         const key = sourceVisibilityKey(sceneName, sourceName);
         if (!bindingsBySourceVisibility.has(key)) bindingsBySourceVisibility.set(key, new Set());
         bindingsBySourceVisibility.get(key).add(b.id);
+      }
+      if (t.kind === "source_filter" && (action === "ToggleMute" || action === "ToggleEffect")) {
+        const sourceName = t.data?.source_name;
+        const filterName = t.data?.filter_name;
+        if (!sourceName || !filterName) continue;
+        const key = sourceFilterKey(sourceName, filterName);
+        if (!bindingsBySourceFilter.has(key)) bindingsBySourceFilter.set(key, new Map());
+        bindingsBySourceFilter.get(key).set(b.id, action);
       }
     }
   }
@@ -600,6 +667,13 @@ export async function activate(ctx) {
     for (const sceneName of scenesWithVisibilityBindings) {
       await syncSourceVisibilityForScene(sceneName, { silent });
     }
+
+    const sourcesWithFilterBindings = new Set(
+      Array.from(bindingsBySourceFilter.keys()).map((key) => key.split("\u0000")[0]).filter(Boolean),
+    );
+    for (const sourceName of sourcesWithFilterBindings) {
+      await syncSourceFiltersForSource(sourceName, { silent });
+    }
   }
 
   async function syncSourceVisibilityForScene(sceneName, opts = null) {
@@ -620,6 +694,35 @@ export async function activate(ctx) {
       }
     } catch {
       // ignore
+    }
+  }
+
+  async function syncSourceFiltersForSource(sourceName, opts = null) {
+    if (!connected || !sourceName) return;
+    const silent = opts && typeof opts === "object" ? Boolean(opts.silent) : true;
+    try {
+      const list = await request("GetSourceFilterList", { sourceName });
+      const filters = normalizeSourceFilters(list?.filters);
+      for (const filter of filters) {
+        const set = bindingsBySourceFilter.get(sourceFilterKey(sourceName, filter.filterName));
+        if (!set) continue;
+        for (const [bid, action] of set.entries()) {
+          await ctx.feedback.set(bid, filter.filterEnabled ? 1.0 : 0.0, action, { silent });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function loadSourceFilterButtonActions(sourceName) {
+    if (!sourceName) return [];
+    try {
+      const filterList = await request("GetSourceFilterList", { sourceName: String(sourceName) });
+      return normalizeSourceFilters(filterList?.filters)
+        .map((filter) => makeSourceFilterButtonAction(String(sourceName), filter.filterName, iconDataUrl || null));
+    } catch {
+      return [];
     }
   }
 
@@ -883,6 +986,17 @@ export async function activate(ctx) {
         if (type === "SceneItemEnableStateChanged" && data.sceneName != null) {
           syncSourceVisibilityForScene(String(data.sceneName), { silent: true }).catch(() => {});
         }
+        if (type === "SourceFilterEnableStateChanged" && data.sourceName != null && data.filterName != null) {
+          const sourceName = String(data.sourceName);
+          const filterName = String(data.filterName);
+          const set = bindingsBySourceFilter.get(sourceFilterKey(sourceName, filterName));
+          if (set) {
+            const enabled = Boolean(data.filterEnabled);
+            set.forEach((action, bid) => {
+              ctx.feedback.set(bid, enabled ? 1.0 : 0.0, action, { silent: true }).catch(() => {});
+            });
+          }
+        }
         if (
           type === "InputCreated"
           || type === "InputRemoved"
@@ -894,6 +1008,14 @@ export async function activate(ctx) {
           || type === "SceneItemRemoved"
         ) {
           scheduleListRefresh(type);
+        }
+        if (
+          type === "SourceFilterCreated"
+          || type === "SourceFilterRemoved"
+          || type === "SourceFilterNameChanged"
+          || type === "SourceFilterListReindexed"
+        ) {
+          notifyTargetOptionsChanged();
         }
         return;
       }
@@ -1132,6 +1254,21 @@ export async function activate(ctx) {
       return;
     }
 
+    if (kind === "source_filter") {
+      const sourceName = data.source_name;
+      const filterName = data.filter_name;
+      if (!sourceName || !filterName) return;
+
+      const enabled = clamp01(value) > 0.5;
+      await request("SetSourceFilterEnabled", {
+        sourceName,
+        filterName,
+        filterEnabled: enabled,
+      });
+      if (bindingId) await ctx.feedback.set(bindingId, enabled ? 1.0 : 0.0, action);
+      return;
+    }
+
     if (kind === "media") {
       const eventKind = buttonEvent(payload);
       if (eventKind === "release") {
@@ -1165,6 +1302,11 @@ export async function activate(ctx) {
       if (!label) {
         if (t?.kind === "input") label = String(data.input_name || "OBS Input");
         else if (t?.kind === "source") label = String(data.source_name || "Source");
+        else if (t?.kind === "source_filter") {
+          const sourceName = String(data.source_name || "Source");
+          const filterName = String(data.filter_name || "Filter");
+          label = `${sourceName} - ${filterName}`;
+        }
         else if (t?.kind === "scene") label = String(data.scene_name || "OBS Scene");
         else if (t?.kind === "action") label = titleCaseAction(data.action || "Action");
         else label = "OBS Studio";
@@ -1231,11 +1373,15 @@ export async function activate(ctx) {
           for (const item of items) {
             const sourceName = item?.sourceName;
             if (!sourceName) continue;
+            const buttonActions = [
+              statefulAction("Toggle Visibility", "ToggleMute"),
+              ...await loadSourceFilterButtonActions(sourceName),
+            ];
             opts.push({
               label: String(sourceName),
               icon_data: iconDataUrl || null,
               target: makeSourceToggleTarget(sceneName, sourceName),
-              buttonActions: [statefulAction("Toggle Visibility", "ToggleMute")],
+              buttonActions,
             });
           }
         } catch {
@@ -1284,7 +1430,7 @@ export async function activate(ctx) {
         });
       }
 
-      opts.push({ kind: "divider", label: "Audio Sources (Mute)" });
+      opts.push({ kind: "divider", label: "Sources" });
 
       // Inputs
       for (const input of inputList) {
@@ -1294,7 +1440,10 @@ export async function activate(ctx) {
           label: String(name),
           icon_data: iconDataUrl || null,
           target: { Integration: { integration_id: "obs", kind: "input", data: { input_name: String(name) } } },
-          buttonActions: [statefulAction("Toggle Mute", "ToggleMute")],
+          buttonActions: [
+            statefulAction("Toggle Mute", "ToggleMute"),
+            ...await loadSourceFilterButtonActions(name),
+          ],
         });
       }
 
