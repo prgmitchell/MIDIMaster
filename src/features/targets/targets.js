@@ -44,6 +44,7 @@ export function createTargetsFeature({
   const CAPTURE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='3' y='5.2' width='14' height='10.3' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M7 5.2l1-1.7h4l1 1.7' stroke='%2398a6cc' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/><circle cx='10' cy='10.5' r='2.5' stroke='%238fd5ff' stroke-width='1.3'/></svg>";
   const SNIP_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 5h10v10H5z' stroke='%2398a6cc' stroke-width='1.2' stroke-dasharray='2 2'/><path d='M7 13l6-6M7 7l6 6' stroke='%238fd5ff' stroke-width='1.3' stroke-linecap='round'/></svg>";
   const RECORD_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='3' y='5' width='14' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><circle cx='10' cy='10' r='2.6' fill='%23f26d6d'/></svg>";
+  const PROFILE_SWITCH_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><circle cx='7' cy='7' r='2.5' stroke='%23c7d2f3' stroke-width='1.2'/><path d='M2.8 14.8c.6-2.5 2-3.8 4.2-3.8 1.4 0 2.5.5 3.3 1.5' stroke='%23c7d2f3' stroke-width='1.2' stroke-linecap='round'/><path d='M11.5 6.2h5.2m0 0-2-2m2 2-2 2M16.7 12.8h-5.2m0 0 2-2m-2 2 2 2' stroke='%238fd5ff' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
 
   function normalizeOpenApplication(raw) {
     if (!raw || typeof raw !== "object") return null;
@@ -227,7 +228,7 @@ export function createTargetsFeature({
     if (option.category) return option.category;
     if (option.integrationId || option.integration_id) return "integrations";
     if (option.kind === "master" || option.kind === "focus") return "builtIn";
-    if (option.kind === "media-control" || option.kind === "capture-control" || option.kind === "macro-target" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
+    if (option.kind === "media-control" || option.kind === "capture-control" || option.kind === "macro-target" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "profile-switch-root" || option.kind === "profile-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
     if (option.kind === "integration-root" || option.kind === "integration-target" || option.kind === "integration-nav") return "integrations";
     if (option.kind === "session") return "applications";
     if (option.kind === "device") {
@@ -251,6 +252,8 @@ export function createTargetsFeature({
     if (option?.kind === "hotkey-target") return t("targets.description.hotkey");
     if (option?.kind === "open-application-target") return t("targets.description.openApplication");
     if (option?.kind === "autohotkey-script-target") return t("targets.description.autoHotkeyScript");
+    if (option?.kind === "profile-switch-root") return t("targets.description.switchProfile");
+    if (option?.kind === "profile-target") return t("targets.description.profileTarget");
     if (option?.kind === "action-root" && option?.value === "window-focus") return t("targets.description.windowFocus");
     if (option?.kind === "action-root" && option?.value === "capture") return t("targets.description.captureControls");
     if (option?.kind === "capture-action") return t("targets.description.captureAction");
@@ -650,6 +653,7 @@ export function createTargetsFeature({
       })()
       : null;
     const selectedDeviceId = currentTarget?.Device?.device_id || currentTarget?.device?.device_id;
+    const selectedProfileName = currentTarget?.Profile?.name || currentTarget?.profile?.name;
 
     const isUnset = currentTarget == null || currentTarget === "" || currentTarget === "Unset";
     let selectedKind = "placeholder";
@@ -657,6 +661,7 @@ export function createTargetsFeature({
       if (integration) selectedKind = "integration-target";
       else if (currentTarget?.Session || currentTarget?.session || currentTarget?.Application || currentTarget?.application) selectedKind = "session";
       else if (currentTarget?.Device || currentTarget?.device) selectedKind = "device";
+      else if (currentTarget?.Profile || currentTarget?.profile) selectedKind = "profile-target";
       else if (currentTarget === "Master" || currentTarget?.Master != null) selectedKind = "master";
       else if (currentTarget === "Focus" || currentTarget?.Focus != null) selectedKind = "focus";
       else if (currentTarget === "MediaControl") selectedKind = "media-control";
@@ -671,6 +676,7 @@ export function createTargetsFeature({
     if (selectedKind === "integration-target") selectedValue = targetKey(integration);
     else if (selectedKind === "session") selectedValue = selectedAppKey || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
+    else if (selectedKind === "profile-target") selectedValue = selectedProfileName || "";
     else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "macro-target" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
@@ -731,6 +737,12 @@ export function createTargetsFeature({
         label: t("targets.autoHotkeyScript"),
         icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA,
         kind: "autohotkey-script-target",
+      });
+      options.push({
+        value: "profile-switch-root",
+        label: t("targets.switchProfile"),
+        icon_data: PROFILE_SWITCH_ICON_DATA,
+        kind: "profile-switch-root",
       });
     }
 
@@ -899,7 +911,8 @@ export function createTargetsFeature({
       : null;
 
     const filterPickerOptions = (list) => (Array.isArray(list) ? list : [])
-      .filter((option) => !(excludeMacroTarget && option?.kind === "macro-target"));
+      .filter((option) => !(excludeMacroTarget && option?.kind === "macro-target"))
+      .filter((option) => !(targetOnly && option?.kind === "profile-switch-root"));
 
     const button = document.createElement("button");
     button.type = "button";
@@ -935,6 +948,8 @@ export function createTargetsFeature({
       if (target === "Hotkey") return "hotkey-target";
       if (target === "OpenApplication") return "open-application-target";
       if (target === "AutoHotkeyScript") return "autohotkey-script-target";
+      const profile = target?.Profile || target?.profile;
+      if (profile?.name) return `profile:${profile.name}`;
       const integration = target?.Integration || target?.integration;
       if (integration) {
         return `integration:${targetKey(integration)}`;
@@ -1054,6 +1069,7 @@ export function createTargetsFeature({
       if (action === "Macro") return "Macro";
       if (action === "Hotkey") return t("targets.hotkey");
       if (action === "RunAutoHotkeyScript") return t("targets.autoHotkeyScript");
+      if (action === "SwitchProfile") return t("targets.switchProfile");
       if (action === "ToggleMute") return t("targets.action.toggleMute");
       if (action === "SetDefaultDevice") return t("targets.action.setDefault");
       if (action === "OpenApplication") return t("targets.openApplication");
@@ -1090,6 +1106,13 @@ export function createTargetsFeature({
         return {
           label: scriptLabel,
           icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA,
+        };
+      }
+      const profile = target?.Profile || target?.profile;
+      if (profile?.name) {
+        return {
+          label: t("targets.profileNamed", { name: profile.name }),
+          icon_data: PROFILE_SWITCH_ICON_DATA,
         };
       }
       if (target === "CaptureControl") {
@@ -1137,6 +1160,10 @@ export function createTargetsFeature({
       }
       if (target === "AutoHotkeyScript") {
         return { value: "autohotkey-script-target", label: t("targets.autoHotkeyScript"), icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA, kind: "autohotkey-script-target" };
+      }
+      const profile = target?.Profile || target?.profile;
+      if (profile?.name) {
+        return { value: profile.name, label: t("targets.profileNamed", { name: profile.name }), icon_data: PROFILE_SWITCH_ICON_DATA, kind: "profile-target", target };
       }
       const integration = target?.Integration || target?.integration;
       if (integration) {
@@ -1535,6 +1562,9 @@ export function createTargetsFeature({
       if (targetOption.kind === "autohotkey-script-target") {
         return [{ label: t("targets.autoHotkeyScript"), value: "RunAutoHotkeyScript", kind: "action", icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA, role: "command" }];
       }
+      if (targetOption.kind === "profile-target") {
+        return [{ label: t("targets.switchProfile"), value: "SwitchProfile", kind: "action", icon_data: PROFILE_SWITCH_ICON_DATA, role: "command" }];
+      }
       if (targetOption.kind === "capture-control") {
         return captureActionOptions();
       }
@@ -1701,7 +1731,13 @@ export function createTargetsFeature({
       if (mapped === "AutoHotkeyScript") {
         selectedAction = "RunAutoHotkeyScript";
       }
+      if (mapped?.Profile || mapped?.profile) {
+        selectedAction = "SwitchProfile";
+      }
       const key = targetIdentity(mapped);
+      const mappedIsProfile = Boolean(mapped?.Profile || mapped?.profile);
+      const replacesProfileTarget = !mappedIsProfile
+        && selectedTargets.some((target) => Boolean(target?.Profile || target?.profile));
       selectedTargetOption = (targetSourceOption && typeof targetSourceOption === "object" && targetSourceOption.kind !== "placeholder")
         ? targetSourceOption
         : null;
@@ -1716,7 +1752,7 @@ export function createTargetsFeature({
       const updatesExistingAction = exists >= 0 && nextActionValue;
       const updatesExistingFileTarget = exists >= 0
         && (option?.kind === "open-application-target" || option?.kind === "autohotkey-script-target");
-      if (mapped === "Macro") {
+      if (mapped === "Macro" || mappedIsProfile || replacesProfileTarget) {
         selectedTargets = [mapped];
       } else if (updatesExistingAction || updatesExistingFileTarget) {
         selectedTargets[exists] = mapped;
@@ -2038,6 +2074,45 @@ export function createTargetsFeature({
         );
       };
 
+      const showProfileSubmenu = async () => {
+        let profiles = [];
+        try {
+          profiles = callInvoke ? await callInvoke("list_profiles") : [];
+        } catch {
+          profiles = [];
+        }
+        const profileOptions = (Array.isArray(profiles) ? profiles : [])
+          .map((profile) => String(profile?.name || "").trim())
+          .filter(Boolean)
+          .map((name) => ({
+            value: name,
+            label: name,
+            kind: "profile-target",
+            icon_data: PROFILE_SWITCH_ICON_DATA,
+            target: { Profile: { name } },
+          }));
+        openTargetPanel(
+          profileOptions.length > 0 ? profileOptions : [{
+            value: "",
+            label: t("targets.noProfilesAvailable"),
+            kind: "placeholder",
+            icon_data: PROFILE_SWITCH_ICON_DATA,
+          }],
+          String((selectedTargets[0]?.Profile || selectedTargets[0]?.profile)?.name || ""),
+          "profile-target",
+          (option) => {
+            if (option.kind === "placeholder") return false;
+            selectOption(option, {
+              value: "SwitchProfile",
+              label: t("targets.switchProfile"),
+            });
+            return true;
+          },
+          t("targets.selectProfile"),
+          { onBack: openRootTargetPanel },
+        );
+      };
+
       const openRootTargetPanel = () => {
         openTargetPanel(
           options,
@@ -2065,6 +2140,11 @@ export function createTargetsFeature({
                 return true;
               }
               showCaptureSubmenu();
+              return false;
+            }
+
+            if (targetOption.kind === "profile-switch-root") {
+              showProfileSubmenu().catch(() => { });
               return false;
             }
 

@@ -48,6 +48,44 @@ fn emit_button_feedback(
     let _ = app.emit("volume_update", payload);
 }
 
+fn clear_profile_switch_button_feedback(
+    state: &AppState,
+    app: &AppHandle,
+    binding: &Binding,
+    event: &MidiEvent,
+    targets: &[BindingTarget],
+) {
+    let key = BindingKey::from_event(event);
+    update_activity_button_light_hold_feedback(state, binding, key.clone(), false);
+    if let Ok(mut states) = state.binding_state.lock() {
+        if let Some(binding_state) = states.get_mut(&key) {
+            binding_state.last_value = 0.0;
+            binding_state.last_update = std::time::Instant::now();
+        }
+    }
+    state.set_binding_action_value(&key, 0.0);
+    feedback::send_button_light_feedback_to_binding(
+        state,
+        binding,
+        FeedbackSendOptions {
+            value: 0.0,
+            silent: false,
+            force_hardware_feedback: true,
+            context: "profile_switch_button",
+        },
+    );
+    let _ = app.emit(
+        "volume_update",
+        serde_json::json!({
+            "target": targets.first().unwrap_or(&BindingTarget::Unset),
+            "volume": 0.0,
+            "binding_id": binding.id,
+            "source": "profile_switch_feedback",
+            "silent": true,
+        }),
+    );
+}
+
 fn emit_localized_action_error(
     app: &AppHandle,
     reason: &str,
@@ -87,6 +125,14 @@ pub(super) fn handle_special_action(
     targets: &[BindingTarget],
     event: &MidiEvent,
 ) -> Result<bool, String> {
+    if binding.action == model::BindingAction::SwitchProfile {
+        clear_profile_switch_button_feedback(state, app, binding, event, targets);
+        if event.value > 0 {
+            binding_actions::request_profile_switch(app, binding, "bindings");
+        }
+        return Ok(true);
+    }
+
     // Handle media key actions (fire-and-forget, no state tracking)
     if matches!(
         binding.action,

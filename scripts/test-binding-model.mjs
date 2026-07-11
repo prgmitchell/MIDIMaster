@@ -179,6 +179,24 @@ function testMappedLightRequiresCompleteTarget() {
   assert.equal(bindingModel.resolveButtonVisualActive(complete, { inputValue: 0 }), true);
 }
 
+function testProfileSwitchTargetIsCompleteAndMomentary() {
+  const binding = buttonBinding({
+    action: "SwitchProfile",
+    target: { Profile: { name: "Streaming" } },
+    targets: [{ Profile: { name: "Streaming" } }],
+    button_light_mode: "MappedWhenAssigned",
+  });
+
+  assert.equal(bindingModel.buttonVisualBehavior(binding), "momentary");
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0 }), true);
+  assert.deepEqual(targetCore.resolveOsdTarget(binding.target), {
+    label: "Profile: Streaming",
+    icon_data: null,
+  });
+  assert.equal(targetCore.resolveTargetKey(binding.target), "profile:Streaming");
+  assert.equal(targetCore.resolveTargetVolume(binding.target), null);
+}
+
 function testHotkeyMappingUsesPhysicalKeysForShiftedSymbols() {
   assert.deepEqual(
     bindingModel.buildHotkeyMappingFromEvent({
@@ -770,6 +788,7 @@ testProgramChangeButtonBindingIsButton();
 testMomentaryButtonFollowsInputValue();
 testMappedLightControlsButtonVisualState();
 testMappedLightRequiresCompleteTarget();
+testProfileSwitchTargetIsCompleteAndMomentary();
 testHotkeyMappingUsesPhysicalKeysForShiftedSymbols();
 testHotkeyMappingKeepsLetterShortcuts();
 testHotkeyMappingUsesPhysicalNumpadKeys();

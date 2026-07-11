@@ -89,6 +89,7 @@ const OSD_SESSION_REFRESH_MIN_MS = 5000;
 const OSD_IDLE_SESSION_REFRESH_MS = 15000;
 let lastOsdDataRefreshAt = 0;
 let osdDataRefreshInFlight = null;
+let profileSwitchInFlight = false;
 
 // Keep the app feeling native by disabling the default browser context menu.
 document.addEventListener("contextmenu", (event) => {
@@ -2308,6 +2309,34 @@ document.addEventListener("pointercancel", () => {
 
 
 async function setupListeners() {
+  await listen("profile_switch_requested", async (event) => {
+    if (isOsdWindow || profileSwitchInFlight) return;
+    let payload = event.payload;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        payload = null;
+      }
+    }
+    const name = String(payload?.name || "").trim();
+    if (!name || name === activeProfileName) return;
+
+    profileSwitchInFlight = true;
+    try {
+      await profilesFeature?.loadProfileByName?.(name);
+      await profilesFeature?.refreshProfiles?.(name);
+    } catch (error) {
+      diagnosticError("binding_profile_switch_failed", error);
+      showAlert(
+        t("dialogs.profileSwitchUnavailableTitle"),
+        t("dialogs.profileSwitchFailedMessage", { name }),
+      );
+    } finally {
+      profileSwitchInFlight = false;
+    }
+  });
+
   await listen("osd_settings_update", (event) => {
     let payload = event.payload;
     if (typeof payload === "string") {

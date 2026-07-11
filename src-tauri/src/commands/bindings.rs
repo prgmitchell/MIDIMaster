@@ -398,6 +398,7 @@ fn action_can_run_from_command(action: &model::BindingAction) -> bool {
             | model::BindingAction::MediaNextTrack
             | model::BindingAction::MediaPrevTrack
             | model::BindingAction::MediaStop
+            | model::BindingAction::SwitchProfile
             | model::BindingAction::Macro
     )
 }
@@ -1217,6 +1218,9 @@ pub async fn apply_binding_action(
         value,
         "bindings_cmd",
     ) {
+        if matches!(effective_action, model::BindingAction::SwitchProfile) {
+            return Ok(());
+        }
         return set_binding_feedback(
             app,
             state,

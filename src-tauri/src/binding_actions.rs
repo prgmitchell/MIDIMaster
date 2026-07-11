@@ -275,7 +275,50 @@ fn is_press_only_button_action(action: &model::BindingAction) -> bool {
             | model::BindingAction::SnipScreenshot
             | model::BindingAction::ToggleScreenRecording
             | model::BindingAction::RunAutoHotkeyScript
+            | model::BindingAction::SwitchProfile
     )
+}
+
+pub fn request_profile_switch(app: &AppHandle, binding: &Binding, log_target: &str) {
+    let profile_name = binding.normalized_targets().into_iter().find_map(|target| {
+        if let BindingTarget::Profile { name } = target {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+        None
+    });
+
+    let Some(profile_name) = profile_name else {
+        run_logger::warn(
+            log_target,
+            "profile_switch_missing_target",
+            &format!("binding_id={}", binding.id),
+        );
+        emit_localized_action_error(
+            app,
+            "profile_switch_missing_target",
+            &binding.id,
+            "dialogs.profileSwitchUnavailableTitle",
+            "dialogs.profileSwitchMissingTargetMessage",
+            serde_json::json!({}),
+        );
+        return;
+    };
+
+    run_logger::info(
+        log_target,
+        "profile_switch_requested",
+        &format!("binding_id={} profile={}", binding.id, profile_name),
+    );
+    let _ = app.emit(
+        "profile_switch_requested",
+        serde_json::json!({
+            "binding_id": binding.id,
+            "name": profile_name,
+        }),
+    );
 }
 
 pub fn run_autohotkey_script_action(app: &AppHandle, binding: &Binding, log_target: &str) {
@@ -554,6 +597,10 @@ pub fn apply_special_button_action(
         }
         model::BindingAction::RunAutoHotkeyScript => {
             run_autohotkey_script_action(app, binding, log_target);
+            true
+        }
+        model::BindingAction::SwitchProfile => {
+            request_profile_switch(app, binding, log_target);
             true
         }
         _ => false,

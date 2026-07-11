@@ -137,6 +137,7 @@ pub enum BindingAction {
     MediaStop,
     Hotkey,
     RunAutoHotkeyScript,
+    SwitchProfile,
     Macro,
 }
 
@@ -399,6 +400,9 @@ pub enum BindingTarget {
     Hotkey,
     OpenApplication,
     AutoHotkeyScript,
+    Profile {
+        name: String,
+    },
     Macro,
     #[default]
     Unset,
@@ -427,6 +431,7 @@ impl PartialEq for BindingTarget {
             (BindingTarget::Device { device_id: a }, BindingTarget::Device { device_id: b }) => {
                 a == b
             }
+            (BindingTarget::Profile { name: a }, BindingTarget::Profile { name: b }) => a == b,
             (
                 BindingTarget::Integration {
                     integration_id: a_id,
@@ -547,6 +552,14 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
                 .ok_or_else(|| "Device.device_id missing".to_string())?
                 .to_string();
             Ok(BindingTarget::Device { device_id })
+        }
+        "Profile" => {
+            let name = val
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "Profile.name missing".to_string())?
+                .to_string();
+            Ok(BindingTarget::Profile { name })
         }
         "Unset" => Ok(BindingTarget::Unset),
         "MediaControl" => Ok(BindingTarget::MediaControl),
@@ -910,6 +923,9 @@ impl Binding {
                     BindingTarget::Device { device_id } if !device_id.trim().is_empty()
                 )
             }),
+            BindingAction::SwitchProfile => targets.iter().any(|target| {
+                matches!(target, BindingTarget::Profile { name } if !name.trim().is_empty())
+            }),
             BindingAction::SetMainOutputDevice => targets
                 .iter()
                 .any(Self::target_is_complete_for_mapped_light),
@@ -970,6 +986,7 @@ impl Binding {
             BindingTarget::Session { session_id } => !session_id.trim().is_empty(),
             BindingTarget::Application { name, .. } => !name.trim().is_empty(),
             BindingTarget::Device { device_id } => !device_id.trim().is_empty(),
+            BindingTarget::Profile { name } => !name.trim().is_empty(),
             BindingTarget::Integration {
                 integration_id,
                 kind,

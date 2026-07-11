@@ -189,6 +189,11 @@ export function createTargetCore({
       }
     }
     const targetType = target.type || target.kind || target.target;
+    const profile = target.Profile || target.profile || (targetType === "Profile" ? target : null);
+    const profileName = typeof profile === "string" ? profile : profile?.name;
+    if (profileName) {
+      return { label: `Profile: ${profileName}`, icon_data: null };
+    }
     if (targetType === "Master" || target?.Master != null) {
       return { label: "Master", icon_data: masterIconData };
     }
@@ -297,6 +302,8 @@ export function createTargetCore({
     if (target === "Hotkey") return "::hotkey::";
     if (target === "OpenApplication") return "::open-application::";
     if (target === "AutoHotkeyScript") return "::autohotkey-script::";
+    const profile = target.Profile || target.profile;
+    if (profile?.name) return `profile:${profile.name}`;
 
     const integration = getIntegrationTarget(target);
     if (integration && integration.integration_id) {
@@ -393,7 +400,7 @@ export function createTargetCore({
     if (target === "Focus" || target?.Focus != null) {
       return currentFocusSession?.volume ?? null;
     }
-    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication") {
+    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
       return null;
     }
 
@@ -463,7 +470,7 @@ export function createTargetCore({
       return currentFocusSession?.volume ?? null;
     }
 
-    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication") {
+    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
       return null;
     }
 
@@ -528,7 +535,7 @@ export function createTargetCore({
       return Boolean(currentFocusSession?.is_muted ?? currentFocusSession?.muted ?? false);
     }
 
-    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication") {
+    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
       return false;
     }
 

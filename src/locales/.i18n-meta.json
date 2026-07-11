@@ -558,7 +558,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -1119,7 +1128,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1680,7 +1698,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2241,7 +2268,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2802,7 +2838,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3363,7 +3408,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3924,7 +3978,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4485,7 +4548,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5046,7 +5118,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5607,7 +5688,16 @@
     "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
     "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
     "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
-    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86",
+    "targets.switchProfile": "41f8b2daa57fb1e7ba3ede0494cbd62beaf300087795b82efbc516257b7b34e0",
+    "targets.selectProfile": "a1103f928cc721a44f7c8cdbc11bab66f8a7e44d66485112edccc40525787cfb",
+    "targets.profileNamed": "5c9e972fb7acf9ea211d4b2ac535f0d39e1ec7cb2c65a71d5b6115646319ce98",
+    "targets.noProfilesAvailable": "816acc95cadc0bc67a6a71b29902c23a307091298454a6db40783ec005737e9b",
+    "targets.description.switchProfile": "60da6d3ef3a2b688c53df1a38a393b48d73a1cfb5eebeab280a3cc4cd235a074",
+    "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
+    "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
+    "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

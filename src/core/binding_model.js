@@ -127,6 +127,8 @@ function targetIsCompleteForMappedLight(target) {
   ) {
     return true;
   }
+  const profile = target?.Profile || target?.profile;
+  if (profile) return Boolean(String(profile.name || "").trim());
   const session = target?.Session || target?.session;
   if (session) return Boolean(String(session.session_id || "").trim());
   const app = target?.Application || target?.application;
@@ -187,6 +189,9 @@ function mappedButtonLightTargetComplete(binding) {
   }
   if (action === "SetDefaultDevice") {
     return targets.some((target) => Boolean(String((target?.Device || target?.device)?.device_id || "").trim()));
+  }
+  if (action === "SwitchProfile") {
+    return targets.some((target) => Boolean(String((target?.Profile || target?.profile)?.name || "").trim()));
   }
   return targets.some(targetIsCompleteForMappedLight);
 }

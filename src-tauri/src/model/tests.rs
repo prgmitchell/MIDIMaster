@@ -58,6 +58,40 @@ fn deserialize_targets_shape_unchanged() {
 }
 
 #[test]
+fn profile_switch_binding_round_trips_target_and_action() {
+    let mut json = binding_base_json();
+    let object = json.as_object_mut().unwrap();
+    object.insert("control_kind".to_string(), serde_json::json!("Button"));
+    object.insert("action".to_string(), serde_json::json!("SwitchProfile"));
+    object.insert(
+        "targets".to_string(),
+        serde_json::json!([{ "Profile": { "name": "Streaming" } }]),
+    );
+
+    let mut binding: Binding = serde_json::from_value(json).expect("binding should deserialize");
+    binding.ensure_targets();
+
+    assert_eq!(binding.action, BindingAction::SwitchProfile);
+    assert_eq!(
+        binding.targets,
+        vec![BindingTarget::Profile {
+            name: "Streaming".to_string(),
+        }]
+    );
+    assert!(binding.has_complete_mapped_button_light_target(&binding.targets));
+
+    let serialized = serde_json::to_value(binding).expect("binding should serialize");
+    assert_eq!(
+        serialized.get("targets"),
+        Some(&serde_json::json!([{ "Profile": { "name": "Streaming" } }]))
+    );
+    assert_eq!(
+        serialized.get("action").and_then(|value| value.as_str()),
+        Some("SwitchProfile")
+    );
+}
+
+#[test]
 fn deserialize_application_target_metadata() {
     let mut json = binding_base_json();
     json.as_object_mut().unwrap().insert(

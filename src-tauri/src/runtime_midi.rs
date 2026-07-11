@@ -582,6 +582,7 @@ pub(crate) fn apply_midi_event(
                 | model::BindingTarget::Hotkey
                 | model::BindingTarget::OpenApplication
                 | model::BindingTarget::AutoHotkeyScript
+                | model::BindingTarget::Profile { .. }
                 | model::BindingTarget::Macro => {}
             }
         }
@@ -924,6 +925,7 @@ pub(crate) fn apply_midi_event(
             | model::BindingTarget::Hotkey
             | model::BindingTarget::OpenApplication
             | model::BindingTarget::AutoHotkeyScript
+            | model::BindingTarget::Profile { .. }
             | model::BindingTarget::Macro => {}
         }
     }

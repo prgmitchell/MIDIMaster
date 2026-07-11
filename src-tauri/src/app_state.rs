@@ -143,6 +143,7 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
             | model::BindingTarget::Hotkey
             | model::BindingTarget::OpenApplication
             | model::BindingTarget::AutoHotkeyScript
+            | model::BindingTarget::Profile { .. }
             | model::BindingTarget::Macro
             | model::BindingTarget::Integration { .. } => {}
         }
@@ -487,6 +488,7 @@ impl AppState {
                     | model::BindingAction::Hotkey
                     | model::BindingAction::OpenApplication
                     | model::BindingAction::RunAutoHotkeyScript
+                    | model::BindingAction::SwitchProfile
                     | model::BindingAction::SetDefaultDevice
             ) {
                 if let Some(value) = idle_feedback_value {
@@ -550,6 +552,7 @@ impl AppState {
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::AutoHotkeyScript => None,
+                    model::BindingTarget::Profile { .. } => None,
                     model::BindingTarget::Macro => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
@@ -616,6 +619,7 @@ impl AppState {
                     model::BindingTarget::Hotkey => None,
                     model::BindingTarget::OpenApplication => None,
                     model::BindingTarget::AutoHotkeyScript => None,
+                    model::BindingTarget::Profile { .. } => None,
                     model::BindingTarget::Macro => None,
                     model::BindingTarget::Integration { .. } => None,
                 }

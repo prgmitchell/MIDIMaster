@@ -80,6 +80,7 @@ Buttons typically support:
 - `Hotkey`
 - `Open Application`
 - `AutoHotkey Script` (runs a selected `.ahk` file through Windows' configured AutoHotkey association)
+- `Switch Profile` (loads a selected saved profile, including its bindings, MIDI routes, plugin settings, and OSD settings)
 
 Integrations may interpret actions differently depending on the plugin.
 
@@ -91,7 +92,7 @@ Integrations may interpret actions differently depending on the plugin.
 - `Focus`: the currently focused session
 - `Applications`: discovered audio sessions
 - `Playback Devices` / `Recording Devices`
-- `Utilities`: media controls, hotkeys, window focus, capture controls, application launch, and AutoHotkey scripts
+- `Utilities`: media controls, hotkeys, window focus, capture controls, application launch, AutoHotkey scripts, and profile switching
 
 If an application or device disappears, MIDIMaster will show an unavailable entry (greyed).
 
