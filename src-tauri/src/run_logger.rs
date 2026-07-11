@@ -91,7 +91,7 @@ pub fn init(app_data_dir: &Path) -> Result<(), String> {
     fs::create_dir_all(&logs_dir).map_err(|e| format!("Failed creating logs dir: {e}"))?;
 
     let run_id = make_run_id();
-    let file_name = format!("run-{}-{}.log", unix_ts_millis(), &run_id);
+    let file_name = format!("run-{}-{}.log", unix_ts_millis(), run_id);
     let file_path = logs_dir.join(file_name);
 
     let file = OpenOptions::new()
