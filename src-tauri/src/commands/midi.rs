@@ -16,6 +16,21 @@ struct BindingDeviceMigration {
     device_id: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MidiRouteApplyFailure {
+    route: MidiDeviceRoute,
+    reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MidiRouteApplyResult {
+    connected_routes: Vec<MidiDeviceRoute>,
+    failed_routes: Vec<MidiRouteApplyFailure>,
+    complete: bool,
+}
+
 fn emit_midi_connection_status(
     app: &AppHandle,
     input_device_id: &str,
@@ -505,7 +520,7 @@ pub fn start_midi_device(
     state: State<AppState>,
     input_device_id: String,
     output_device_id: String,
-) -> Result<(), String> {
+) -> Result<MidiRouteApplyResult, String> {
     run_logger::info(
         "midi_cmd",
         "start_requested",
@@ -530,7 +545,7 @@ pub fn start_midi_device_routes(
     state: State<AppState>,
     routes: Vec<MidiDeviceRoute>,
     force: Option<bool>,
-) -> Result<(), String> {
+) -> Result<MidiRouteApplyResult, String> {
     let force_reconnect = force.unwrap_or(false);
     let enabled_routes = routes
         .iter()
@@ -539,33 +554,9 @@ pub fn start_midi_device_routes(
         .collect::<Vec<_>>();
     emit_midi_routes_connection_status(&app, &enabled_routes, "reconnecting", "start_requested");
 
-    // Keep persisted bindings aligned before connecting new inputs so
-    // multi-route matching never sees stale single-route device ids.
-    let mut migrated_count = 0usize;
-    let mut profile_for_sync = None;
-    {
-        let mut profile_guard = state
-            .active_profile
-            .lock()
-            .map_err(|_| "Lock poisoned".to_string())?;
-
-        if let Some(profile) = profile_guard.as_mut() {
-            let migrations;
-            (migrated_count, migrations) = migrate_profile_route_inputs(profile, &enabled_routes);
-
-            if migrated_count > 0 {
-                state
-                    .profile_store
-                    .save_profile(profile.clone())
-                    .map_err(|err| err.to_string())?;
-                profile_for_sync = Some((profile.clone(), migrations));
-            }
-        }
-    }
-
     let app_handle = app.clone();
-    {
-        if let Err(err) = state
+    let apply_error = {
+        state
             .midi
             .lock()
             .map_err(|_| "Lock poisoned".to_string())?
@@ -574,15 +565,78 @@ pub fn start_midi_device_routes(
                 midi_event_callback(app_handle),
                 force_reconnect,
             )
-            .map_err(|err| err.to_string())
-        {
-            run_logger::error(
-                "midi_cmd",
-                "start_routes_failed",
-                &format!("route_count={} error={}", enabled_routes.len(), err),
-            );
-            emit_midi_routes_connection_status(&app, &enabled_routes, "failed", "start_failed");
-            return Err(err);
+            .err()
+            .map(|err| err.to_string())
+    };
+
+    let connected_routes = state
+        .midi
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?
+        .active_route_details();
+    let failed_routes = enabled_routes
+        .iter()
+        .filter(|requested| {
+            !connected_routes.iter().any(|connected| {
+                connected.input_id() == requested.input_id()
+                    && connected.output_id() == requested.output_id()
+            })
+        })
+        .cloned()
+        .map(|route| MidiRouteApplyFailure {
+            route,
+            reason: apply_error
+                .clone()
+                .unwrap_or_else(|| "MIDI route did not connect".to_string()),
+        })
+        .collect::<Vec<_>>();
+    let complete = apply_error.is_none() && failed_routes.is_empty();
+    let requested_connected_routes = connected_routes
+        .iter()
+        .filter(|connected| {
+            enabled_routes.iter().any(|requested| {
+                connected.input_id() == requested.input_id()
+                    && connected.output_id() == requested.output_id()
+            })
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if let Some(err) = apply_error.as_deref() {
+        run_logger::error(
+            "midi_cmd",
+            "start_routes_failed",
+            &format!(
+                "requested_route_count={} connected_route_count={} failed_route_count={} error={}",
+                enabled_routes.len(),
+                connected_routes.len(),
+                failed_routes.len(),
+                err
+            ),
+        );
+    }
+
+    // Persist route-id and binding migrations only for routes that actually connected.
+    let mut migrated_count = 0usize;
+    let mut profile_for_sync = None;
+    if !requested_connected_routes.is_empty() {
+        let mut profile_guard = state
+            .active_profile
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?;
+
+        if let Some(profile) = profile_guard.as_mut() {
+            let migrations;
+            (migrated_count, migrations) =
+                migrate_profile_route_inputs(profile, &requested_connected_routes);
+
+            if migrated_count > 0 {
+                state
+                    .profile_store
+                    .save_profile(profile.clone())
+                    .map_err(|err| err.to_string())?;
+                profile_for_sync = Some((profile.clone(), migrations));
+            }
         }
     }
 
@@ -619,16 +673,37 @@ pub fn start_midi_device_routes(
 
     run_logger::info(
         "midi_cmd",
-        "start_routes_succeeded",
+        if complete {
+            "start_routes_succeeded"
+        } else {
+            "start_routes_partial"
+        },
         &format!(
-            "route_count={} bindings_migrated={}",
-            enabled_routes.len(),
+            "requested_route_count={} connected_route_count={} failed_route_count={} bindings_migrated={}",
+            enabled_routes.len(), connected_routes.len(), failed_routes.len(),
             migrated_count
         ),
     );
-    emit_midi_routes_connection_status(&app, &enabled_routes, "connected", "start_succeeded");
+    emit_midi_routes_connection_status(
+        &app,
+        &connected_routes,
+        if connected_routes.is_empty() {
+            "failed"
+        } else {
+            "connected"
+        },
+        if complete {
+            "start_succeeded"
+        } else {
+            "start_partial"
+        },
+    );
 
-    Ok(())
+    Ok(MidiRouteApplyResult {
+        connected_routes,
+        failed_routes,
+        complete,
+    })
 }
 
 #[tauri::command]
@@ -1059,5 +1134,24 @@ mod tests {
                 device_id: "midi:1".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn route_apply_result_serializes_authoritative_status() {
+        let connected = route("midi:2", "midi:3", "Platform X+");
+        let failed = route("midi:4", "midi:5", "MIDI Mix");
+        let value = serde_json::to_value(MidiRouteApplyResult {
+            connected_routes: vec![connected],
+            failed_routes: vec![MidiRouteApplyFailure {
+                route: failed,
+                reason: "device unavailable".to_string(),
+            }],
+            complete: false,
+        })
+        .expect("serialize route apply result");
+
+        assert_eq!(value["complete"], false);
+        assert_eq!(value["connectedRoutes"][0]["input_device_id"], "midi:2");
+        assert_eq!(value["failedRoutes"][0]["reason"], "device unavailable");
     }
 }

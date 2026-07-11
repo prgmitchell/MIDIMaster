@@ -60,6 +60,78 @@ export function normalizeMidiRoutes(source) {
   return routes;
 }
 
+export function orderMidiRoutesByPreference(routes, preferredRoutes) {
+  const remaining = normalizeMidiRoutes({ routes }).map((route) => ({ ...route }));
+  const preferred = normalizeMidiRoutes({ routes: preferredRoutes });
+  const ordered = [];
+
+  preferred.forEach((preference) => {
+    const preferredName = stripUnavailableSuffix(preference.inputDeviceName || "");
+    let matchIndex = remaining.findIndex((route) => {
+      if (route.inputDeviceId !== preference.inputDeviceId) return false;
+      const routeName = stripUnavailableSuffix(route.inputDeviceName || "");
+      return !(preferredName && routeName && preferredName !== routeName);
+    });
+
+    if (matchIndex < 0 && preferredName) {
+      const nameMatches = remaining
+        .map((route, index) => ({
+          index,
+          name: stripUnavailableSuffix(route.inputDeviceName || ""),
+        }))
+        .filter((candidate) => candidate.name === preferredName);
+      if (nameMatches.length === 1) matchIndex = nameMatches[0].index;
+    }
+
+    if (matchIndex >= 0) {
+      ordered.push(remaining.splice(matchIndex, 1)[0]);
+    }
+  });
+
+  return [...ordered, ...remaining];
+}
+
+export function createMidiRouteDraftController() {
+  let draftRoutes = null;
+  let dirty = false;
+
+  return {
+    begin(routes) {
+      draftRoutes = normalizeMidiRoutes({ routes }).map((route) => ({ ...route }));
+      dirty = false;
+    },
+    replace(routes) {
+      draftRoutes = normalizeMidiRoutes({ routes }).map((route) => ({ ...route }));
+      dirty = true;
+    },
+    discard() {
+      draftRoutes = null;
+      dirty = false;
+    },
+    current(fallbackRoutes = []) {
+      return normalizeMidiRoutes({
+        routes: Array.isArray(draftRoutes) ? draftRoutes : fallbackRoutes,
+      });
+    },
+    draft() {
+      return Array.isArray(draftRoutes)
+        ? draftRoutes.map((route) => ({ ...route }))
+        : null;
+    },
+    isDirty() {
+      return dirty;
+    },
+    async commit(apply) {
+      if (!dirty || !Array.isArray(draftRoutes) || typeof apply !== "function") return null;
+      const routes = draftRoutes.map((route) => ({ ...route }));
+      const result = await apply(routes);
+      draftRoutes = null;
+      dirty = false;
+      return result;
+    },
+  };
+}
+
 function sameInputRouteIdentity(left, right) {
   const leftInputId = String(left?.inputDeviceId || left?.input_device_id || "").trim();
   const rightInputId = String(right?.inputDeviceId || right?.input_device_id || "").trim();
@@ -95,21 +167,28 @@ export function findDeviceMatch(devices, deviceId, deviceName) {
 // MIDI IDs can be index-based and may shift after unplug/replug.
 // Prefer an exact id+name match when both are known; otherwise use name fallback
 // and DO NOT fall back to id-only when a saved name is present (can bind to wrong device).
-export function findPreferredDevice(devices, deviceId, deviceName) {
+export function preferredDeviceMatch(devices, deviceId, deviceName) {
   const list = Array.isArray(devices) ? devices : [];
   const hasId = Boolean(deviceId);
   const hasName = Boolean(deviceName);
   const byId = hasId ? list.find((device) => device.id === deviceId) : null;
-  const byName = hasName ? list.find((device) => device.name === deviceName) : null;
+  const nameMatches = hasName ? list.filter((device) => device.name === deviceName) : [];
+  const byUniqueName = nameMatches.length === 1 ? nameMatches[0] : null;
 
   if (hasId && hasName) {
     const exact = list.find((device) => device.id === deviceId && device.name === deviceName);
-    if (exact) return exact;
-    if (byName) return byName;
-    return null;
+    if (exact) return { match: exact, status: "exact" };
+    if (byUniqueName) return { match: byUniqueName, status: "name" };
+    return { match: null, status: nameMatches.length > 1 ? "ambiguous" : "unavailable" };
   }
 
-  return byId || byName || null;
+  if (byId) return { match: byId, status: "id" };
+  if (byUniqueName) return { match: byUniqueName, status: "name" };
+  return { match: null, status: nameMatches.length > 1 ? "ambiguous" : "unavailable" };
+}
+
+export function findPreferredDevice(devices, deviceId, deviceName) {
+  return preferredDeviceMatch(devices, deviceId, deviceName).match;
 }
 
 export function findConnectedAliveDevice(devices, expectedId, expectedName) {
@@ -146,12 +225,17 @@ export function resolvePreferredMidiDeviceRoutes(deviceSnapshot, preference) {
   const inputs = Array.isArray(deviceSnapshot?.inputs) ? deviceSnapshot.inputs : [];
   const outputs = Array.isArray(deviceSnapshot?.outputs) ? deviceSnapshot.outputs : [];
   const routes = pref.routes.map((route) => {
-    const inputMatch = findPreferredDevice(inputs, route.inputDeviceId, route.inputDeviceName);
-    const outputMatch = findPreferredDevice(outputs, route.outputDeviceId, route.outputDeviceName);
+    const inputResolution = preferredDeviceMatch(inputs, route.inputDeviceId, route.inputDeviceName);
+    const outputResolution = preferredDeviceMatch(outputs, route.outputDeviceId, route.outputDeviceName);
+    const inputMatch = inputResolution.match;
+    const outputMatch = outputResolution.match;
     return {
       preference: route,
       inputMatch,
       outputMatch,
+      inputStatus: inputResolution.status,
+      outputStatus: outputResolution.status,
+      ambiguous: inputResolution.status === "ambiguous" || outputResolution.status === "ambiguous",
       available: Boolean(inputMatch && outputMatch),
     };
   });

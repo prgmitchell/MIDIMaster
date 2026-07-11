@@ -27,13 +27,14 @@ When a target changes, MIDIMaster can send feedback back to your MIDI controller
 4. Add one or more routes. Each route pairs:
    - MIDI Input (the device you move)
    - MIDI Output (the device MIDIMaster sends feedback to)
-5. Routes apply automatically once both devices are selected.
+5. Select `Apply Changes` to validate and activate the complete route set. Closing the popover or selecting `Cancel` discards uncommitted edits.
 
 Notes:
 
 - Every active MIDI input route requires an output device.
 - Motorized faders and LEDs receive feedback through the output paired with the binding's input route.
 - Duplicate input routes are prevented. Sharing one output is allowed and marked with a `Shared` badge.
+- If a saved route is temporarily unavailable, other routes remain active and MIDIMaster retries the missing route automatically.
 - Disable a route to disconnect that MIDI session while keeping it saved. `Disconnect All` disables all routes and stops MIDI until you re-enable a route.
 
 ### 2) Pick a Profile

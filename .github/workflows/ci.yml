@@ -62,6 +62,12 @@ jobs:
       - name: Test frontend MIDI device inventory consent
         run: node scripts/test-midi-device-inventory-consent.mjs
 
+      - name: Test frontend MIDI route resolution
+        run: node scripts/test-midi-hotplug.mjs
+
+      - name: Test frontend MIDI route lifecycle
+        run: node scripts/test-midi-feature.mjs
+
       - name: Test frontend focus target core
         run: node scripts/test-target-core-focus.mjs
 

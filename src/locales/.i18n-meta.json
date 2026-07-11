@@ -554,7 +554,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -1111,7 +1115,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1668,7 +1676,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2225,7 +2237,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2782,7 +2798,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3339,7 +3359,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3896,7 +3920,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4453,7 +4481,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5010,7 +5042,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5567,7 +5603,11 @@
     "bindings.feedbackControlLabel": "7ca8405192dd40c79ae4be7e773355f582534b968090ce8af43f7d16c889d8fb",
     "bindings.pitchBend": "a22b0633447ab650f798997c66156be8ff832b196e303e0ded2c3b6e8a7c6f0b",
     "bindings.learnFeedbackOutput": "2f77546fb74c52b7fc1b5f00aab22284f6563d46f22f41aee5b806ef48d7e781",
-    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907"
+    "bindings.resetFeedbackOutput": "56a30250a53ba6230dc2c43e0d5e24c7f9bc0c9483f100ea307d0db9f6ce6907",
+    "midi.applyChanges": "d80d0faa58963b92ed9852bcaab84b26d34ded47f6abe3ac786e9ad48c983aa2",
+    "midi.applyFailed": "83120587d63f6afa58d1b5531d12b932fe5714abe33b3ad8a96603f4e243310b",
+    "midi.partialRetrying": "c8dd60a9b4dffef902ee1d996a86cdfe34d393fc8c39d95ec11c1d634d7d38a2",
+    "midi.ambiguousRoute": "c7277ed8fa2c62da8c7881514bed05ca4c1ed19bce87c70dd3c0a1124a136d86"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

@@ -122,6 +122,109 @@ function testPreferredRoutesReturnByNameWithShiftedIds() {
   assert.equal(resolved.routes[1].outputMatch.id, "midi:14");
 }
 
+function testConnectedRoutesKeepProfileDisplayOrder() {
+  const platform = {
+    inputDeviceId: "midi:2",
+    outputDeviceId: "midi:3",
+    inputDeviceName: "Platform X+1 V2.13",
+    outputDeviceName: "Platform X+1 V2.13",
+  };
+  const midiMix = {
+    inputDeviceId: "midi:1",
+    outputDeviceId: "midi:2",
+    inputDeviceName: "MIDI Mix",
+    outputDeviceName: "MIDI Mix",
+  };
+
+  const ordered = midiPreferences.orderMidiRoutesByPreference(
+    [midiMix, platform],
+    [platform, midiMix],
+  );
+
+  assert.deepEqual(
+    ordered.map((route) => route.inputDeviceName),
+    ["Platform X+1 V2.13", "MIDI Mix"],
+    "the first saved route should remain the primary displayed route",
+  );
+}
+
+function testDuplicateDeviceNamesRemainAmbiguous() {
+  const devices = [
+    { id: "midi:2", name: "USB MIDI" },
+    { id: "midi:3", name: "USB MIDI" },
+  ];
+
+  assert.equal(
+    midiPreferences.findPreferredDevice(devices, "midi:0", "USB MIDI"),
+    null,
+    "a stale id must not guess between duplicate names",
+  );
+  assert.equal(
+    midiPreferences.preferredDeviceMatch(devices, "midi:0", "USB MIDI").status,
+    "ambiguous",
+    "duplicate-name recovery should be diagnosable as ambiguous",
+  );
+  assert.deepEqual(
+    midiPreferences.findPreferredDevice(devices, "midi:2", "USB MIDI"),
+    devices[0],
+    "an exact id and name remains safe",
+  );
+}
+
+function testInventoryRecoveryCanonicalizesEveryDesiredRoute() {
+  const preference = {
+    routes: [
+      {
+        inputDeviceId: "midi:0",
+        outputDeviceId: "midi:1",
+        inputDeviceName: "Platform X+1 V2.13",
+        outputDeviceName: "Platform X+1 V2.13",
+      },
+      {
+        inputDeviceId: "midi:1",
+        outputDeviceId: "midi:2",
+        inputDeviceName: "MIDI Mix",
+        outputDeviceName: "MIDI Mix",
+      },
+    ],
+  };
+
+  const startup = midiPreferences.resolvePreferredMidiDeviceRoutes({
+    inputs: [
+      { id: "midi:0", name: "Focusrite USB MIDI" },
+      { id: "midi:1", name: "MIDI Mix" },
+    ],
+    outputs: [
+      { id: "midi:0", name: "Microsoft GS Wavetable Synth" },
+      { id: "midi:1", name: "Focusrite USB MIDI" },
+      { id: "midi:2", name: "MIDI Mix" },
+    ],
+  }, preference);
+  assert.equal(startup.available, false);
+  assert.equal(startup.routes[0].available, false);
+  assert.equal(startup.routes[1].available, true);
+
+  const recovered = midiPreferences.resolvePreferredMidiDeviceRoutes({
+    inputs: [
+      { id: "midi:0", name: "Focusrite USB MIDI" },
+      { id: "midi:1", name: "MIDI Mix" },
+      { id: "midi:2", name: "Platform X+1 V2.13" },
+    ],
+    outputs: [
+      { id: "midi:0", name: "Microsoft GS Wavetable Synth" },
+      { id: "midi:1", name: "Focusrite USB MIDI" },
+      { id: "midi:2", name: "MIDI Mix" },
+      { id: "midi:3", name: "Platform X+1 V2.13" },
+    ],
+  }, preference);
+
+  assert.equal(recovered.available, true);
+  assert.equal(recovered.routes[0].inputMatch.id, "midi:2");
+  assert.equal(recovered.routes[0].outputMatch.id, "midi:3");
+  assert.equal(recovered.routes[1].inputMatch.id, "midi:1");
+  assert.equal(recovered.routes[1].outputMatch.id, "midi:2");
+}
+
 function testDuplicateInputsAndSharedOutputs() {
   const duplicateRoutes = [
     { inputDeviceId: "midi:0", outputDeviceId: "midi:10", inputDeviceName: "Deck A" },
@@ -400,6 +503,9 @@ testDropdownStateRequiresActiveConnection();
 testPreferredPairDisappearsAndReturnsByName();
 testLegacyPreferenceNormalizesToSingleRoute();
 testPreferredRoutesReturnByNameWithShiftedIds();
+testConnectedRoutesKeepProfileDisplayOrder();
+testDuplicateDeviceNamesRemainAmbiguous();
+testInventoryRecoveryCanonicalizesEveryDesiredRoute();
 testDuplicateInputsAndSharedOutputs();
 testTwoRoutesOneDisappearsOtherRemainsResolvable();
 testSavedRouteDoesNotMatchReusedIdWithDifferentName();

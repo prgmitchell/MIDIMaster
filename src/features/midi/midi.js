@@ -6,12 +6,14 @@ import {
 } from "../ui/dropdown_badges.js";
 import {
   buildPersistedMidiRoutes,
+  createMidiRouteDraftController,
   findConnectedAliveDevice,
   findPreferredDevice,
   hasDuplicateInputRoute,
   normalizeMidiPreference,
   normalizeMidiRoute,
   normalizeMidiRoutes,
+  orderMidiRoutesByPreference,
   resolvePreferredMidiDevicePair,
   resolvePreferredMidiDeviceRoutes,
   sharedOutputCounts,
@@ -28,8 +30,6 @@ export function createMidiFeature({
   onDisconnected,
   addBindingFromLearn,
   getSavedMidiDeviceIds,
-  saveMidiDeviceIds,
-  saveMidiDeviceRoutes,
   clearSavedMidiDeviceIds,
   onProfileDeviceSelected,
   onDeviceInventoryChanged,
@@ -70,8 +70,9 @@ export function createMidiFeature({
   let connectedInputName = "";
   let connectedOutputName = "";
   let connectedRoutes = [];
-  let routeDrafts = [];
+  const routeEditor = createMidiRouteDraftController();
   let currentProfilePreference = null;
+  let lastRouteResolutionIssueSignature = "";
   let inputStatusEl = null;
   let inputStatusDisplayEl = null;
   let outputStatusEl = null;
@@ -98,41 +99,19 @@ export function createMidiFeature({
     connectedOutputId = String(first.outputDeviceId || "");
     connectedInputName = String(first.inputDeviceName || "");
     connectedOutputName = String(first.outputDeviceName || "");
-    routeDrafts = mergeDraftRouteState(routeDrafts, connectedRoutes);
   }
 
-  function getCurrentConnectedPreference() {
-    return {
-      inputDeviceId: connectedInputId,
-      outputDeviceId: connectedOutputId,
-      inputDeviceName: connectedInputName,
-      outputDeviceName: connectedOutputName,
-      routes: connectedRoutes.slice(),
-    };
-  }
-
-  function mergeDraftRouteState(previous, nextConnected) {
-    const previousRoutes = normalizeMidiRoutes({ routes: previous });
-    const connected = normalizeMidiRoutes({ routes: nextConnected });
-    if (previousRoutes.length === 0) {
-      return connected.slice();
-    }
-    const merged = previousRoutes.map((route) => (
-      connected.find((candidate) => routeMatchesIdentity(route, candidate)) || route
-    ));
-    connected.forEach((route) => {
-      if (!merged.some((existing) => routeMatchesIdentity(existing, route))) {
-        merged.push(route);
-      }
-    });
-    return merged;
+  function getDesiredMidiPreference() {
+    return normalizeMidiPreference(currentProfilePreference);
   }
 
   function currentRoutesForSave() {
     const profileRoutes = normalizeMidiPreference(currentProfilePreference).routes;
-    return normalizeMidiRoutes({
-      routes: routeDrafts.length ? routeDrafts : (profileRoutes.length ? profileRoutes : connectedRoutes),
-    });
+    return routeEditor.current(profileRoutes.length ? profileRoutes : connectedRoutes);
+  }
+
+  function desiredRoutes() {
+    return normalizeMidiPreference(currentProfilePreference).routes;
   }
 
   function routeMatchesIdentity(route, candidate) {
@@ -151,7 +130,7 @@ export function createMidiFeature({
     const pref = normalizeMidiPreference(currentProfilePreference);
     const baseRoutes = pref.routes.length
       ? pref.routes
-      : (routeDrafts.length ? routeDrafts : connectedRoutes);
+      : connectedRoutes;
     const replacements = [...aliveRoutes, ...missingRoutes];
     const merged = normalizeMidiRoutes({ routes: baseRoutes }).map((route) => (
       replacements.find((candidate) => routeMatchesIdentity(route, candidate)) || route
@@ -171,15 +150,45 @@ export function createMidiFeature({
     return normalizeMidiRoutes({
       routes: resolved.map((route) => {
         if (route.preference?.enabled === false) return route.preference;
+        if (!route.inputMatch || !route.outputMatch) return route.preference;
         return {
-          inputDeviceId: route.inputMatch?.id || route.preference?.inputDeviceId,
-          outputDeviceId: route.outputMatch?.id || route.preference?.outputDeviceId,
-          inputDeviceName: route.inputMatch?.name || route.preference?.inputDeviceName,
-          outputDeviceName: route.outputMatch?.name || route.preference?.outputDeviceName,
+          inputDeviceId: route.inputMatch.id,
+          outputDeviceId: route.outputMatch.id,
+          inputDeviceName: route.inputMatch.name || route.preference?.inputDeviceName,
+          outputDeviceName: route.outputMatch.name || route.preference?.outputDeviceName,
           enabled: true,
         };
       }),
     });
+  }
+
+  function resolveDesiredRouteSet(snapshot, preference, context = "unknown") {
+    const resolved = resolvePreferredMidiDeviceRoutes(snapshot, preference);
+    const issues = resolved.routes
+      .filter((route) => route.preference?.enabled !== false && !route.available)
+      .map((route) => ({
+        inputDeviceName: route.preference?.inputDeviceName || route.preference?.inputDeviceId || "",
+        outputDeviceName: route.preference?.outputDeviceName || route.preference?.outputDeviceId || "",
+        inputStatus: route.inputStatus,
+        outputStatus: route.outputStatus,
+      }));
+    const signature = JSON.stringify(issues);
+    if (signature !== lastRouteResolutionIssueSignature) {
+      lastRouteResolutionIssueSignature = signature;
+      if (issues.length > 0) {
+        const kind = issues.some((issue) => (
+          issue.inputStatus === "ambiguous" || issue.outputStatus === "ambiguous"
+        )) ? "ambiguous" : "unavailable";
+        console.warn(`MIDI route resolution ${kind} (${context})`, issues);
+      }
+    }
+    return resolved;
+  }
+
+  function unresolvedRouteStatus(resolved, fallbackKey = "midi.partialRetrying") {
+    return resolved?.routes?.some((route) => route.ambiguous)
+      ? t("midi.ambiguousRoute")
+      : t(fallbackKey);
   }
 
   function markSelectedPairUnavailable(inputId, outputId, inputName, outputName) {
@@ -243,7 +252,7 @@ export function createMidiFeature({
     const seen = new Set();
     [
       normalizeMidiPreference(currentProfilePreference).routes,
-      normalizeMidiRoutes({ routes: routeDrafts }),
+      normalizeMidiRoutes({ routes: routeEditor.draft() || [] }),
       normalizeMidiRoutes({ routes: connectedRoutes }),
     ].forEach((list) => {
       list.forEach((route) => {
@@ -282,17 +291,44 @@ export function createMidiFeature({
     closeRoutesPopover();
   }
 
-  function closeRoutesPopover() {
-    if (routesPopoverEl) routesPopoverEl.classList.add("hidden");
-    if (routesButtonEl) routesButtonEl.setAttribute("aria-expanded", "false");
+  function discardRouteDrafts() {
+    routeEditor.discard();
   }
 
-  function toggleRoutesPopover() {
+  function closeRoutesPopover({ discard = true } = {}) {
+    if (discard) discardRouteDrafts();
+    if (routesPopoverEl) routesPopoverEl.classList.add("hidden");
+    if (routesButtonEl) routesButtonEl.setAttribute("aria-expanded", "false");
+    renderDeviceDropdowns();
+  }
+
+  async function toggleRoutesPopover() {
     ensureRoutesPopover();
     const opening = routesPopoverEl?.classList?.contains("hidden");
-    if (routesPopoverEl) routesPopoverEl.classList.toggle("hidden", !opening);
-    if (routesButtonEl) routesButtonEl.setAttribute("aria-expanded", String(Boolean(opening)));
-    if (opening) renderRoutesPopover();
+    if (!opening) {
+      closeRoutesPopover();
+      return;
+    }
+    const cachedResolution = resolveDesiredRouteSet(
+      lastDeviceSnapshot,
+      { routes: desiredRoutes(), configured: true },
+      "route_editor_open_cached",
+    );
+    routeEditor.begin(routesFromResolvedPreferences(cachedResolution));
+    if (routesPopoverEl) routesPopoverEl.classList.remove("hidden");
+    if (routesButtonEl) routesButtonEl.setAttribute("aria-expanded", "true");
+    renderRoutesPopover();
+
+    void refreshMidiDevices({ force: true, reason: "route_editor_open" }).then((snapshot) => {
+      if (routesPopoverEl?.classList?.contains("hidden") || routeEditor.isDirty()) return;
+      const refreshedResolution = resolveDesiredRouteSet(
+        snapshot,
+        { routes: desiredRoutes(), configured: true },
+        "route_editor_open_refreshed",
+      );
+      routeEditor.begin(routesFromResolvedPreferences(refreshedResolution));
+      renderRoutesPopover();
+    });
   }
 
   function ensureRoutesPopover() {
@@ -307,7 +343,7 @@ export function createMidiFeature({
       routesButtonEl.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        toggleRoutesPopover();
+        toggleRoutesPopover().catch(() => { });
       });
     }
     ensureOutputRouteShell();
@@ -395,6 +431,7 @@ export function createMidiFeature({
   }
 
   function ensureDeviceDropdowns() {
+    if (!d.midiSelect && !d.midiOutputSelect) return;
     const attachStatus = (selectEl, kind) => {
       if (!selectEl) return;
 
@@ -650,7 +687,12 @@ export function createMidiFeature({
     return wrapper;
   }
 
-  async function updateRouteFromSelect(index, kind, value) {
+  function markRouteEditorDirty(routes) {
+    routeEditor.replace(routes);
+    renderRoutesPopover();
+  }
+
+  function updateRouteFromSelect(index, kind, value) {
     const routes = currentRoutesForSave();
     const route = routes[index] || { enabled: true };
     const devices = kind === "input" ? lastDeviceSnapshot.inputs : lastDeviceSnapshot.outputs;
@@ -669,26 +711,23 @@ export function createMidiFeature({
       renderRoutesPopover();
       return;
     }
-    routeDrafts = routes;
-    await applyRouteDrafts({ source: "manual" });
+    markRouteEditorDirty(routes);
   }
 
-  async function setRouteEnabled(index, enabled) {
+  function setRouteEnabled(index, enabled) {
     const routes = currentRoutesForSave();
     if (!routes[index]) return;
     routes[index] = { ...routes[index], enabled: Boolean(enabled) };
-    routeDrafts = routes;
-    await applyRouteDrafts({ source: "manual" });
+    markRouteEditorDirty(routes);
   }
 
-  async function removeRoute(index) {
+  function removeRoute(index) {
     const routes = currentRoutesForSave();
     routes.splice(index, 1);
-    routeDrafts = routes;
-    await applyRoutes(routes, { source: "manual" });
+    markRouteEditorDirty(routes);
   }
 
-  async function addRoute() {
+  function addRoute() {
     const inputs = lastDeviceSnapshot.inputs || [];
     const outputs = lastDeviceSnapshot.outputs || [];
     const routes = currentRoutesForSave();
@@ -708,13 +747,50 @@ export function createMidiFeature({
       outputDeviceName: output.name,
       enabled: true,
     });
-    routeDrafts = routes;
-    await applyRouteDrafts({ source: "manual" });
+    markRouteEditorDirty(routes);
   }
 
   async function disableAllRoutes() {
-    routeDrafts = currentRoutesForSave().map((route) => ({ ...route, enabled: false }));
-    await applyRouteDrafts({ source: "manual" });
+    const routes = desiredRoutes().map((route) => ({ ...route, enabled: false }));
+    discardRouteDrafts();
+    await applyRoutes(routes, { source: "manual" });
+    closeRoutesPopover({ discard: false });
+  }
+
+  async function applyRouteEdits() {
+    if (!routeEditor.isDirty()) return;
+    const drafts = routeEditor.draft() || [];
+    for (let index = 0; index < drafts.length; index += 1) {
+      if (hasDuplicateInputRoute(drafts, drafts[index].inputDeviceId, index)) {
+        if (d.midiStatus) d.midiStatus.textContent = t("midi.duplicateInputRoute");
+        renderRoutesPopover();
+        return;
+      }
+    }
+
+    try {
+      await routeEditor.commit(async (routesToCommit) => {
+        const snapshot = await refreshMidiDevices({ force: true, reason: "route_editor_apply" });
+        const resolved = resolveDesiredRouteSet(
+          snapshot,
+          { routes: routesToCommit, configured: true },
+          "route_editor_apply",
+        );
+        const result = await applyRoutes(routesFromResolvedPreferences(resolved), {
+          source: "manual",
+          allowPartialUnavailable: true,
+          partialUnavailableStatus: unresolvedRouteStatus(resolved),
+        });
+        if (Array.isArray(result?.failures) && result.failures.length > 0) {
+          throw new Error(result.failures[0]?.reason || "MIDI route did not connect");
+        }
+        return result;
+      });
+      closeRoutesPopover({ discard: false });
+    } catch (error) {
+      if (d.midiStatus) d.midiStatus.textContent = t("midi.applyFailed", { message: error });
+      renderRoutesPopover();
+    }
   }
 
   function renderRoutesPopover() {
@@ -820,6 +896,8 @@ export function createMidiFeature({
 
     const footer = document.createElement("div");
     footer.className = "midi-routes-footer";
+    const routeActions = document.createElement("div");
+    routeActions.className = "midi-routes-footer-group";
     const add = document.createElement("button");
     add.type = "button";
     add.className = "midi-route-action-button secondary-action";
@@ -831,8 +909,27 @@ export function createMidiFeature({
     disableAll.textContent = t("midi.disconnectAll");
     disableAll.disabled = !routes.some((route) => route.enabled !== false);
     disableAll.addEventListener("click", disableAllRoutes);
-    footer.appendChild(add);
-    footer.appendChild(disableAll);
+    routeActions.appendChild(add);
+    routeActions.appendChild(disableAll);
+
+    const commitActions = document.createElement("div");
+    commitActions.className = "midi-routes-footer-group";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "midi-route-action-button secondary-action";
+    cancel.textContent = t("common.cancel");
+    cancel.addEventListener("click", () => closeRoutesPopover());
+    const apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = "midi-route-action-button primary-action";
+    apply.textContent = t("midi.applyChanges");
+    apply.disabled = !routeEditor.isDirty();
+    apply.addEventListener("click", applyRouteEdits);
+    commitActions.appendChild(cancel);
+    commitActions.appendChild(apply);
+
+    footer.appendChild(routeActions);
+    footer.appendChild(commitActions);
     routesPopoverEl.appendChild(footer);
   }
 
@@ -928,18 +1025,6 @@ export function createMidiFeature({
     );
   }
 
-  function routeHealthNeedsRediscovery(health) {
-    const reason = String(health?.reason || "");
-    return Boolean(
-      health?.inputNameMismatch
-      || health?.outputNameMismatch
-      || reason === "input_port_missing"
-      || reason === "output_port_missing"
-      || reason === "input_name_mismatch"
-      || reason === "output_name_mismatch"
-    );
-  }
-
   function refreshDevicesIfStale(reason) {
     if (Date.now() - lastDeviceRefreshAt < MIDI_ENUM_STALE_MS) return;
     refreshMidiDevices({ force: true, reason }).catch(() => { });
@@ -978,10 +1063,6 @@ export function createMidiFeature({
     });
   }
 
-  async function applyRouteDrafts(options = {}) {
-    return applyRoutes(currentRoutesForSave(), options);
-  }
-
   function routesEquivalent(left, right) {
     const a = normalizeMidiRoutes({ routes: left });
     const b = normalizeMidiRoutes({ routes: right });
@@ -993,24 +1074,6 @@ export function createMidiFeature({
         && route.outputDeviceId === other.outputDeviceId
         && (route.enabled !== false) === (other.enabled !== false);
     });
-  }
-
-  async function persistRoutes(routes) {
-    const normalized = normalizeMidiRoutes({ routes });
-    const first = normalized[0] || {};
-    if (typeof saveMidiDeviceRoutes === "function") {
-      await saveMidiDeviceRoutes(normalized);
-    } else if (typeof saveMidiDeviceIds === "function" && first.inputDeviceId && first.outputDeviceId) {
-      await saveMidiDeviceIds(
-        first.inputDeviceId,
-        first.outputDeviceId,
-        first.inputDeviceName,
-        first.outputDeviceName,
-      );
-      await invoke("set_midi_device_routes", { routes: buildPersistedMidiRoutes(normalized) }).catch(() => { });
-    } else {
-      await invoke("set_midi_device_routes", { routes: buildPersistedMidiRoutes(normalized) }).catch(() => { });
-    }
   }
 
   async function applyRoutes(routes, options = {}) {
@@ -1025,12 +1088,15 @@ export function createMidiFeature({
       }
     }
 
-    const normalized = normalizeMidiRoutes({ routes });
+    const requested = normalizeMidiRoutes({ routes });
+    const normalized = routesFromResolvedPreferences(resolveDesiredRouteSet(
+      lastDeviceSnapshot,
+      { routes: requested, configured: true },
+      options.source || "apply",
+    ));
     const enabledRoutes = normalized.filter((route) => route.enabled !== false);
-    const previousDrafts = routeDrafts.slice();
     const previousConnectedRoutes = connectedRoutes.slice();
 
-    routeDrafts = normalized;
     if (enabledRoutes.length === 0) {
       stopSessionRefresh();
       cancelLearnPanel();
@@ -1040,7 +1106,6 @@ export function createMidiFeature({
       if (typeof onDisconnected === "function") onDisconnected();
       renderDeviceDropdowns();
       await invoke("stop_midi_device").catch(() => { });
-      await persistRoutes(normalized);
       if (typeof onProfileDeviceSelected === "function") {
         await onProfileDeviceSelected(currentProfilePreference);
       }
@@ -1062,8 +1127,12 @@ export function createMidiFeature({
       }
       if (options.allowPartialUnavailable) {
         ensureUnavailableRouteOptions(lastDeviceSnapshot.inputs || [], lastDeviceSnapshot.outputs || []);
-        await persistRoutes(normalized);
         currentProfilePreference = normalizeMidiPreference({ routes: normalized, configured: true });
+        if (routesToStart.length === 0 && connectedRoutes.length > 0) {
+          await invoke("stop_midi_device").catch(() => { });
+          setConnectedRoutes([]);
+          if (typeof onDisconnected === "function") onDisconnected();
+        }
         if (typeof onProfileDeviceSelected === "function") {
           await onProfileDeviceSelected(currentProfilePreference);
         }
@@ -1082,7 +1151,6 @@ export function createMidiFeature({
         d.midiStatus.textContent = options.partialUnavailableStatus || t("midi.savedUnavailable");
       }
       renderDeviceDropdowns();
-      await persistRoutes(normalized);
       currentProfilePreference = normalizeMidiPreference({ routes: normalized });
       if (typeof onProfileDeviceSelected === "function") {
         await onProfileDeviceSelected(currentProfilePreference);
@@ -1100,29 +1168,38 @@ export function createMidiFeature({
     if (d.midiSelect) d.midiSelect.value = first.inputDeviceId || "";
     if (d.midiOutputSelect) d.midiOutputSelect.value = first.outputDeviceId || "";
 
-    setConnectedRoutes(routesToStart.map(routeWithResolvedNames));
-    renderDeviceDropdowns();
-
     stopSessionRefresh();
+    let applyResult = null;
     try {
-      await invoke("start_midi_device_routes", {
+      applyResult = await invoke("start_midi_device_routes", {
         routes: buildPersistedMidiRoutes(routesToStart),
         force: Boolean(options.force),
       });
     } catch (error) {
-      routeDrafts = previousDrafts;
       setConnectedRoutes(previousConnectedRoutes);
       renderDeviceDropdowns();
       if (d.midiStatus) d.midiStatus.textContent = t("midi.connectFailed", { message: error });
       throw error;
     }
 
-    await persistRoutes(normalized);
-    currentProfilePreference = normalizeMidiPreference({ routes: normalized });
-    suspendProfileAutoReconnect = false;
-    clearUnavailableDeviceSelections();
-    if (hasUnavailableRoutes && d.midiStatus) {
-      d.midiStatus.textContent = options.partialUnavailableStatus || t("midi.savedUnavailable");
+    const backendRoutes = normalizeMidiRoutes({
+      routes: applyResult?.connectedRoutes || applyResult?.connected_routes || routesToStart,
+    });
+    setConnectedRoutes(orderMidiRoutesByPreference(
+      backendRoutes.map(routeWithResolvedNames),
+      normalized,
+    ));
+    const backendFailures = Array.isArray(applyResult?.failedRoutes)
+      ? applyResult.failedRoutes
+      : (Array.isArray(applyResult?.failed_routes) ? applyResult.failed_routes : []);
+    const incompleteBackendApply = applyResult?.complete === false || backendFailures.length > 0;
+    if (!incompleteBackendApply) {
+      currentProfilePreference = normalizeMidiPreference({ routes: normalized });
+      suspendProfileAutoReconnect = false;
+      clearUnavailableDeviceSelections();
+    }
+    if ((hasUnavailableRoutes || incompleteBackendApply) && d.midiStatus) {
+      d.midiStatus.textContent = options.partialUnavailableStatus || t("midi.partialRetrying");
     }
 
     if (typeof showMain === "function") {
@@ -1143,19 +1220,20 @@ export function createMidiFeature({
         fromProfile: Boolean(options.fromProfile),
       });
     }
-    if (typeof onProfileDeviceSelected === "function") {
+    if (!incompleteBackendApply && typeof onProfileDeviceSelected === "function") {
       await onProfileDeviceSelected(currentProfilePreference);
     }
     renderDeviceDropdowns();
 
     return {
-      connected: true,
+      connected: connectedRoutes.length > 0,
       inputId: connectedInputId,
       outputId: connectedOutputId,
       inputName: connectedInputName,
       outputName: connectedOutputName,
-      partial: hasUnavailableRoutes,
+      partial: hasUnavailableRoutes || incompleteBackendApply,
       routes: connectedRoutes.slice(),
+      failures: backendFailures,
     };
   }
 
@@ -1282,31 +1360,27 @@ export function createMidiFeature({
         );
         if (suspectRoute && prefAvailable && !suspendProfileAutoReconnect) {
           try {
-            let routesToRecover = currentRoutesForSave();
-            let allowPartialUnavailable = false;
-            if (routeHealthNeedsRediscovery(suspectRoute)) {
-              let resolvedRoutes = resolvePreferredMidiDeviceRoutes(deviceSnapshot, pref);
-              if (!resolvedRoutes.available) {
-                const refreshed = await refreshMidiDevices({ force: true, reason: "suspect_reconnect" });
-                resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, pref);
-              }
-              const anyRouteAvailable = resolvedRoutes.routes.some((route) =>
-                route.preference.enabled !== false && route.inputMatch && route.outputMatch
-              );
-              if (resolvedRoutes.available || anyRouteAvailable) {
-                routesToRecover = routesFromResolvedPreferences(resolvedRoutes);
-                allowPartialUnavailable = !resolvedRoutes.available;
-              }
+            let resolvedRoutes = resolveDesiredRouteSet(deviceSnapshot, pref, "suspect_reconnect");
+            if (!resolvedRoutes.available) {
+              const refreshed = await refreshMidiDevices({ force: true, reason: "suspect_reconnect" });
+              resolvedRoutes = resolveDesiredRouteSet(refreshed, pref, "suspect_reconnect_retry");
             }
-            await applyRoutes(routesToRecover, {
-              auto: true,
-              fromProfile: true,
-              force: true,
-              allowPartialUnavailable,
-              partialUnavailableStatus: t("midi.savedUnavailable"),
-            });
-            if (d.midiStatus) {
-              d.midiStatus.textContent = t("midi.reconnectedProfile");
+            const anyRouteAvailable = resolvedRoutes.routes.some((route) =>
+              route.preference.enabled !== false && route.inputMatch && route.outputMatch
+            );
+            if (resolvedRoutes.available || anyRouteAvailable) {
+              const result = await applyRoutes(routesFromResolvedPreferences(resolvedRoutes), {
+                auto: true,
+                fromProfile: true,
+                allowPartialUnavailable: !resolvedRoutes.available,
+                partialUnavailableStatus: unresolvedRouteStatus(resolvedRoutes),
+              });
+              if (d.midiStatus) {
+                d.midiStatus.textContent = result?.partial
+                  ? unresolvedRouteStatus(resolvedRoutes)
+                  : t("midi.reconnectedProfile");
+              }
+              return;
             }
           } catch {
             const route = connectedRoutes.find((candidate) =>
@@ -1319,8 +1393,8 @@ export function createMidiFeature({
               route.inputDeviceName || suspectRoute.inputDeviceId,
               route.outputDeviceName || suspectRoute.outputDeviceId,
             );
+            return;
           }
-          return;
         }
 
         const aliveRoutes = [];
@@ -1341,8 +1415,7 @@ export function createMidiFeature({
             await invoke("stop_midi_route", { inputDeviceId: route.inputDeviceId }).catch(() => { });
           }
           setConnectedRoutes(aliveRoutes.map(routeWithResolvedNames));
-          routeDrafts = preservedDrafts;
-          currentProfilePreference = normalizeMidiPreference({ routes: preservedDrafts });
+          currentProfilePreference = normalizeMidiPreference({ routes: preservedDrafts, configured: true });
           if (typeof showMain === "function") {
             const displayRoute = aliveRoutes[0] || missingRoutes[0] || {};
             showMain(
@@ -1356,7 +1429,7 @@ export function createMidiFeature({
             );
           }
           if (d.midiStatus) {
-            d.midiStatus.textContent = t("midi.disconnected");
+            d.midiStatus.textContent = t("midi.partialRetrying");
           }
           if (aliveRoutes.length === 0) {
             stopSessionRefresh();
@@ -1367,15 +1440,16 @@ export function createMidiFeature({
       }
 
       if (prefAvailable && !suspendProfileAutoReconnect) {
-        let resolvedRoutes = resolvePreferredMidiDeviceRoutes(deviceSnapshot, pref);
+        let resolvedRoutes = resolveDesiredRouteSet(deviceSnapshot, pref, "availability");
         if (!resolvedRoutes.available) {
           const refreshed = await refreshMidiDevices({ snapshot: deviceSnapshot, reason: "reconnect_available" });
-          resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, pref);
+          resolvedRoutes = resolveDesiredRouteSet(refreshed, pref, "availability_retry");
         }
         const anyRouteAvailable = resolvedRoutes.routes.some((route) =>
           route.preference.enabled !== false && route.inputMatch && route.outputMatch
         );
         if (!resolvedRoutes.available && !anyRouteAvailable) {
+          if (d.midiStatus) d.midiStatus.textContent = unresolvedRouteStatus(resolvedRoutes);
           return;
         }
         const routes = routesFromResolvedPreferences(resolvedRoutes);
@@ -1385,8 +1459,10 @@ export function createMidiFeature({
           && findPreferredDevice(lastDeviceSnapshot.outputs, route.outputDeviceId, route.outputDeviceName)
         ));
         if (routesEquivalent(availableEnabledRoutes, connectedRoutes)) {
-          routeDrafts = routes;
           currentProfilePreference = normalizeMidiPreference({ routes });
+          if (typeof onProfileDeviceSelected === "function") {
+            await onProfileDeviceSelected(currentProfilePreference);
+          }
           renderDeviceDropdowns();
           return;
         }
@@ -1395,12 +1471,12 @@ export function createMidiFeature({
             auto: true,
             fromProfile: true,
             allowPartialUnavailable: !resolvedRoutes.available,
-            partialUnavailableStatus: t("midi.savedUnavailable"),
+            partialUnavailableStatus: unresolvedRouteStatus(resolvedRoutes),
           });
           if (d.midiStatus) {
             d.midiStatus.textContent = resolvedRoutes.available
               ? t("midi.reconnectedProfile")
-              : t("midi.savedUnavailable");
+              : unresolvedRouteStatus(resolvedRoutes);
           }
         } catch {
           // Ignore transient reconnect failures; watcher will retry.
@@ -1413,7 +1489,10 @@ export function createMidiFeature({
 
   function startAvailabilityMonitor() {
     if (availabilityTimer) return;
-    const delay = (connectedInputId && connectedOutputId)
+    const enabledDesired = desiredRoutes().filter((route) => route.enabled !== false);
+    const hasMissingDesiredRoute = enabledDesired.length > connectedRoutes.length
+      || !routesEquivalent(enabledDesired, connectedRoutes);
+    const delay = (!hasMissingDesiredRoute && connectedInputId && connectedOutputId)
       ? MIDI_AVAILABILITY_CONNECTED_INTERVAL_MS
       : MIDI_AVAILABILITY_DISCONNECTED_INTERVAL_MS;
     availabilityTimer = setTimeout(async () => {
@@ -1654,7 +1733,7 @@ export function createMidiFeature({
     const outputs = lastDeviceSnapshot.outputs || [];
     const input = inputs.find((device) => device.id === inputId);
     const output = outputs.find((device) => device.id === outputId);
-    const routes = currentRoutesForSave();
+    const routes = desiredRoutes();
     routes[0] = {
       inputDeviceId: inputId,
       outputDeviceId: outputId,
@@ -1662,8 +1741,7 @@ export function createMidiFeature({
       outputDeviceName: output?.name || connectedOutputName || outputId,
       enabled: true,
     };
-    routeDrafts = routes;
-    await applyRouteDrafts({ source: "manual" });
+    await applyRoutes(routes, { source: "manual" });
   }
 
   async function disconnect() {
@@ -1684,7 +1762,7 @@ export function createMidiFeature({
       await clearSavedMidiDeviceIds();
     }
     currentProfilePreference = normalizeMidiPreference({ routes: [], configured: true });
-    routeDrafts = [];
+    discardRouteDrafts();
     if (typeof onProfileDeviceSelected === "function") {
       await onProfileDeviceSelected(currentProfilePreference);
     }
@@ -1724,11 +1802,11 @@ export function createMidiFeature({
   async function loadMidiDevicesWithRetry() {
     const maxAttempts = 4;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const devices = await refreshMidiDevices();
-      if (devices.inputs.length > 0) {
+      const devices = await refreshMidiDevices({ force: true, reason: `startup_attempt_${attempt + 1}` });
+      if (devices.inputs.length > 0 && devices.outputs.length > 0) {
         return devices;
       }
-      await new Promise((resolve) => setTimeout(resolve, 750));
+      await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
     }
     startAutoRefresh(refreshMidiDevices);
     return { inputs: [], outputs: [] };
@@ -1789,11 +1867,15 @@ export function createMidiFeature({
       return { connected: false, reason: "missing_saved" };
     }
 
-    let resolvedRoutes = resolvePreferredMidiDeviceRoutes({ inputs, outputs }, currentProfilePreference);
+    let resolvedRoutes = resolveDesiredRouteSet(
+      { inputs, outputs },
+      currentProfilePreference,
+      "startup",
+    );
 
     if (!resolvedRoutes.available) {
       const refreshed = await refreshMidiDevices();
-      resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, currentProfilePreference);
+      resolvedRoutes = resolveDesiredRouteSet(refreshed, currentProfilePreference, "startup_retry");
     }
 
     const missingRoute = resolvedRoutes.routes.find((route) =>
@@ -1801,14 +1883,14 @@ export function createMidiFeature({
     );
     if (missingRoute) {
       if (d.midiStatus) {
-        d.midiStatus.textContent = t("midi.savedUnavailable");
+        d.midiStatus.textContent = unresolvedRouteStatus(resolvedRoutes, "midi.savedUnavailable");
       }
       try {
         const result = await applyRoutes(routesFromResolvedPreferences(resolvedRoutes), {
           source: "auto",
           auto: true,
           allowPartialUnavailable: true,
-          partialUnavailableStatus: t("midi.savedUnavailable"),
+          partialUnavailableStatus: unresolvedRouteStatus(resolvedRoutes, "midi.savedUnavailable"),
         });
         return {
           connected: Boolean(result?.connected),
@@ -1843,6 +1925,10 @@ export function createMidiFeature({
 
   async function syncToProfileDevice(profilePreference) {
     const pref = normalizeMidiPreference(profilePreference);
+    discardRouteDrafts();
+    if (routesPopoverEl && !routesPopoverEl.classList.contains("hidden")) {
+      closeRoutesPopover({ discard: false });
+    }
     currentProfilePreference = pref;
     suspendProfileAutoReconnect = false;
     if (pref.routes.length === 0) {
@@ -1859,27 +1945,24 @@ export function createMidiFeature({
       // Force UI selection back to the profile's connected pair.
       if (d.midiSelect) d.midiSelect.value = pref.inputDeviceId;
       if (d.midiOutputSelect) d.midiOutputSelect.value = pref.outputDeviceId;
-      routeDrafts = pref.routes.slice();
       clearUnavailableDeviceSelections();
       renderDeviceDropdowns();
       return { handled: true, connected: true, unchanged: true };
     }
 
-    const devices = await refreshMidiDevices();
-    let resolvedRoutes = resolvePreferredMidiDeviceRoutes(devices, pref);
+    const devices = await refreshMidiDevices({ force: true, reason: "profile_sync" });
+    let resolvedRoutes = resolveDesiredRouteSet(devices, pref, "profile_sync");
 
     if (!resolvedRoutes.available) {
-      const refreshed = await refreshMidiDevices();
-      resolvedRoutes = resolvePreferredMidiDeviceRoutes(refreshed, pref);
+      const refreshed = await refreshMidiDevices({ force: true, reason: "profile_sync_retry" });
+      resolvedRoutes = resolveDesiredRouteSet(refreshed, pref, "profile_sync_retry");
     }
 
     const missingRoute = resolvedRoutes.routes.find((route) =>
       route.preference.enabled !== false && (!route.inputMatch || !route.outputMatch)
     );
     if (missingRoute) {
-      const partialStatus = connectedInputId && connectedOutputId
-        ? t("midi.profileUnavailableKeepingCurrent")
-        : t("midi.savedProfileDevicesNotFound");
+      const partialStatus = unresolvedRouteStatus(resolvedRoutes);
       if (d.midiStatus) {
         d.midiStatus.textContent = partialStatus;
       }
@@ -1967,6 +2050,7 @@ export function createMidiFeature({
     connectSelected,
     disconnect,
     syncToProfileDevice,
-    getCurrentConnectedPreference,
+    getDesiredMidiPreference,
+    checkAvailabilityNow: checkAvailabilityLoop,
   };
 }

@@ -579,6 +579,12 @@ input::placeholder {
   min-width: 0;
 }
 
+.midi-routes-footer-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .midi-routes-body {
   display: flex;
   flex-direction: column;
@@ -716,6 +722,23 @@ input::placeholder {
   padding: 0 12px;
   font-size: 13px;
   font-weight: 700;
+}
+
+.midi-route-action-button.primary-action {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.midi-route-action-button.primary-action:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.midi-route-action-button.primary-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  outline-offset: 2px;
 }
 
 .midi-routes-empty {

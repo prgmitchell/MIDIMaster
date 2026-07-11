@@ -449,17 +449,6 @@ function midiDeviceLabelForBindingDevice(deviceId) {
   return normalizedId;
 }
 
-async function saveMidiDeviceIds(inputId, outputId, inputName = "", outputName = "") {
-  void inputId;
-  void outputId;
-  void inputName;
-  void outputName;
-}
-
-async function saveMidiDeviceRoutes(routes = []) {
-  void routes;
-}
-
 async function clearSavedMidiDeviceIds() {
 }
 
@@ -1146,7 +1135,7 @@ profilesFeature = createProfilesFeature({
   setOsdSettings: (next) => { osdSettings = next; },
   applyOsdSettings,
   getCurrentMidiPreference: () => (
-    midiFeature?.getCurrentConnectedPreference?.()
+    midiFeature?.getDesiredMidiPreference?.()
     || activeProfileMidiPreference
   ),
   getActiveProfileMidiPreference: () => activeProfileMidiPreference,
@@ -1427,8 +1416,6 @@ midiFeature = createMidiFeature({
     }
   },
   getSavedMidiDeviceIds,
-  saveMidiDeviceIds,
-  saveMidiDeviceRoutes,
   clearSavedMidiDeviceIds,
   onConnected: (connection = {}) => {
     activeMidiRouteCount = enabledMidiRouteCount(connection.routes || []);

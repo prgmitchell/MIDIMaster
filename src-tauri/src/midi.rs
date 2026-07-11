@@ -263,6 +263,25 @@ impl MidiManager {
         routes
     }
 
+    pub fn active_route_details(&self) -> Vec<MidiDeviceRoute> {
+        let mut routes = self
+            .input_routes
+            .values()
+            .map(|route| MidiDeviceRoute {
+                input_device_id: Some(route.input_device_id.clone()),
+                output_device_id: Some(route.output_device_id.clone()),
+                input_device_name: Some(route.input_device_name.clone()),
+                output_device_name: self
+                    .output_routes
+                    .get(&route.output_device_id)
+                    .map(|output| output.output_device_name.clone()),
+                enabled: true,
+            })
+            .collect::<Vec<_>>();
+        routes.sort_by(|a, b| a.input_id().cmp(&b.input_id()));
+        routes
+    }
+
     pub fn active_route_count(&self) -> usize {
         self.input_routes.len()
     }
@@ -372,6 +391,7 @@ impl MidiManager {
     }
 
     fn refresh_route_health_state(&mut self) {
+        let input_devices = self.list_devices().ok();
         let input_generation = inventory_generation("input");
         let input_device_ids = self.input_routes.keys().cloned().collect::<Vec<_>>();
         for input_device_id in input_device_ids {
@@ -388,8 +408,14 @@ impl MidiManager {
             };
 
             if let Some(expected_name) = expected_name.as_deref() {
-                match current_input_port_name(&input_device_id) {
-                    Ok(actual_name) if actual_name != expected_name => {
+                let actual_name = input_devices
+                    .as_ref()
+                    .map(|devices| {
+                        inventory_device_name(devices, &input_device_id).map(ToOwned::to_owned)
+                    })
+                    .unwrap_or_else(|| current_input_port_name(&input_device_id).ok());
+                match actual_name {
+                    Some(actual_name) if actual_name != expected_name => {
                         log_route_device_mismatch(
                             "input",
                             &input_device_id,
@@ -402,16 +428,28 @@ impl MidiManager {
                             Some(&actual_name),
                         );
                     }
-                    Ok(_) => {}
-                    Err(_) => {
+                    Some(_) => {
+                        if let Some(route) = self.input_routes.get_mut(&input_device_id) {
+                            route.input_inventory_generation = input_generation;
+                            if route.input_connection_suspect_reason.as_deref()
+                                == Some("input_inventory_changed")
+                            {
+                                route.input_connection_suspect = false;
+                                route.input_connection_suspect_reason = None;
+                            }
+                        }
+                    }
+                    None => {
                         log_route_device_mismatch("input", &input_device_id, expected_name, None);
                         self.mark_input_suspect(&input_device_id, "input_port_missing", None);
                     }
                 }
             }
 
-            if has_connection && input_generation != route_generation {
-                self.mark_input_suspect(&input_device_id, "input_inventory_changed", None);
+            if has_connection && input_generation != route_generation && expected_name.is_none() {
+                if let Some(route) = self.input_routes.get_mut(&input_device_id) {
+                    route.input_inventory_generation = input_generation;
+                }
             }
         }
 
@@ -658,21 +696,12 @@ impl MidiManager {
             });
         }
 
+        preflight_midi_routes(&next_routes)?;
+
         let desired_inputs = next_routes
             .iter()
             .map(|route| route.input_device_id.clone())
             .collect::<std::collections::HashSet<_>>();
-        let existing_inputs = self.input_routes.keys().cloned().collect::<Vec<_>>();
-        for input_device_id in existing_inputs {
-            if !desired_inputs.contains(&input_device_id) {
-                self.input_routes.remove(&input_device_id);
-                run_logger::info(
-                    "midi",
-                    "input_route_disconnected",
-                    &format!("input_device_id={}", input_device_id),
-                );
-            }
-        }
 
         for route in &next_routes {
             if force_reconnect {
@@ -713,18 +742,21 @@ impl MidiManager {
                     existing.output_device_id = route.output_device_id.clone();
                 }
                 if input_inventory_generation != existing.input_inventory_generation {
-                    existing.input_connection_suspect = true;
-                    existing.input_connection_suspect_reason =
-                        Some("input_inventory_changed".to_string());
-                    run_logger::warn(
+                    existing.input_inventory_generation = input_inventory_generation;
+                    if existing.input_connection_suspect_reason.as_deref()
+                        == Some("input_inventory_changed")
+                    {
+                        existing.input_connection_suspect = false;
+                        existing.input_connection_suspect_reason = None;
+                    }
+                    run_logger::info(
                         "midi",
-                        "input_marked_suspect",
+                        "input_inventory_revalidated",
                         &format!(
-                            "input_device_id={} output_device_id={} expected_input_name={} actual_input_name=<unknown> reason=input_inventory_changed previous_generation={} current_generation={}",
+                            "input_device_id={} output_device_id={} expected_input_name={} current_generation={}",
                             existing.input_device_id,
                             existing.output_device_id,
                             existing.input_device_name,
-                            existing.input_inventory_generation,
                             input_inventory_generation
                         ),
                     );
@@ -732,7 +764,6 @@ impl MidiManager {
                 force_reconnect
                     || existing.input_connection.is_none()
                     || existing.input_connection_suspect
-                    || input_inventory_generation != existing.input_inventory_generation
             } else {
                 true
             };
@@ -787,6 +818,20 @@ impl MidiManager {
                         route.output_device_id,
                         expected_input_device_name.as_deref().unwrap_or("")
                     ),
+                );
+            }
+        }
+
+        // Keep previous routes alive until every replacement that can be connected has
+        // succeeded. This makes a failed editor Apply non-destructive for old routes.
+        let existing_inputs = self.input_routes.keys().cloned().collect::<Vec<_>>();
+        for input_device_id in existing_inputs {
+            if !desired_inputs.contains(&input_device_id) {
+                self.input_routes.remove(&input_device_id);
+                run_logger::info(
+                    "midi",
+                    "input_route_disconnected",
+                    &format!("input_device_id={}", input_device_id),
                 );
             }
         }
@@ -1752,6 +1797,13 @@ fn clean_expected_device_name(value: Option<&str>) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
+fn inventory_device_name<'a>(devices: &'a [DeviceInfo], device_id: &str) -> Option<&'a str> {
+    devices
+        .iter()
+        .find(|device| device.id == device_id)
+        .map(|device| device.name.as_str())
+}
+
 fn parse_midi_port_index(device_id: &str, kind: &str) -> Result<usize> {
     device_id
         .strip_prefix(MIDI_PORT_PREFIX)
@@ -1792,6 +1844,28 @@ fn device_name_mismatch(expected_name: Option<&str>, actual_name: Option<&str>) 
         (Some(_), None) => true,
         _ => false,
     }
+}
+
+fn preflight_midi_routes(routes: &[PreparedMidiRoute]) -> Result<()> {
+    if routes.is_empty() {
+        return Ok(());
+    }
+
+    let midi_in = MidiInput::new("MIDIMaster preflight")?;
+    let midi_out = MidiOutput::new("MIDIMaster preflight")?;
+    for route in routes {
+        resolve_input_port(
+            &midi_in,
+            &route.input_device_id,
+            route.input_device_name.as_deref(),
+        )?;
+        resolve_output_port(
+            &midi_out,
+            &route.output_device_id,
+            route.output_device_name.as_deref(),
+        )?;
+    }
+    Ok(())
 }
 
 fn log_route_device_mismatch(
@@ -2173,6 +2247,58 @@ mod tests {
         assert!(message.contains("midi:1"));
         assert!(message.contains("Focusrite USB MIDI"));
         assert!(message.contains("Platform X+1 V2.13"));
+    }
+
+    #[test]
+    fn unrelated_inventory_addition_preserves_route_identity() {
+        let devices = vec![
+            DeviceInfo {
+                id: "midi:0".to_string(),
+                name: "MIDI Mix".to_string(),
+            },
+            DeviceInfo {
+                id: "midi:1".to_string(),
+                name: "Unrelated Controller".to_string(),
+            },
+        ];
+
+        assert_eq!(inventory_device_name(&devices, "midi:0"), Some("MIDI Mix"));
+    }
+
+    #[test]
+    fn inventory_identity_detects_actual_removal_and_id_reuse() {
+        let removed = vec![DeviceInfo {
+            id: "midi:1".to_string(),
+            name: "Unrelated Controller".to_string(),
+        }];
+        let reused = vec![DeviceInfo {
+            id: "midi:0".to_string(),
+            name: "Focusrite USB MIDI".to_string(),
+        }];
+
+        assert_eq!(inventory_device_name(&removed, "midi:0"), None);
+        assert_ne!(
+            inventory_device_name(&reused, "midi:0"),
+            Some("Platform X+1 V2.13")
+        );
+    }
+
+    #[test]
+    fn route_preflight_failure_preserves_existing_routes() {
+        let mut manager = manager_with_test_route("midi:998", "midi:999");
+        let before = manager.active_routes();
+        let requested = MidiDeviceRoute {
+            input_device_id: Some("midi:999999".to_string()),
+            output_device_id: Some("midi:999999".to_string()),
+            input_device_name: Some("Missing MIDI Input".to_string()),
+            output_device_name: Some("Missing MIDI Output".to_string()),
+            enabled: true,
+        };
+
+        let result = manager.set_device_routes(&[requested], Arc::new(|_| {}), false);
+
+        assert!(result.is_err());
+        assert_eq!(manager.active_routes(), before);
     }
 
     #[test]
