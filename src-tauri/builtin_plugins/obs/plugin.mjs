@@ -46,6 +46,13 @@ function shouldIgnoreLocalMuteEcho(intents, inputName, muted, now = Date.now()) 
   return true;
 }
 
+function inputMuteFeedbackBindingIds(volumeBindings, muteBindings, inputName) {
+  return new Set([
+    ...(volumeBindings?.get(inputName) || []),
+    ...(muteBindings?.get(inputName) || []),
+  ]);
+}
+
 function sourceFilterKey(sourceName, filterName) {
   return `${String(sourceName || "")}\u0000${String(filterName || "")}`;
 }
@@ -104,6 +111,7 @@ export const obsTestUtils = {
   rememberLocalMuteIntent,
   forgetLocalMuteIntent,
   shouldIgnoreLocalMuteEcho,
+  inputMuteFeedbackBindingIds,
   sourceFilterKey,
   normalizeSourceFilters,
   makeSourceFilterToggleTarget,
@@ -650,11 +658,13 @@ export async function activate(ctx) {
             await ctx.feedback.set(bid, vol, "Volume", { silent });
           }
         }
-        const muteBindings = bindingsByInputMute.get(inputName);
-        if (muteBindings) {
-          for (const bid of muteBindings) {
-            await ctx.feedback.set(bid, muted ? 1.0 : 0.0, "ToggleMute", { silent });
-          }
+        const muteFeedbackBindings = inputMuteFeedbackBindingIds(
+          bindingsByInputVolume,
+          bindingsByInputMute,
+          inputName,
+        );
+        for (const bid of muteFeedbackBindings) {
+          await ctx.feedback.set(bid, muted ? 1.0 : 0.0, "ToggleMute", { silent });
         }
       } catch {
         // ignore
@@ -971,12 +981,14 @@ export async function activate(ctx) {
             knownMutes.set(inputName, muted);
 
             if (!ignoreLocalEcho) {
-              const set = bindingsByInputMute.get(inputName);
-              if (set) {
-                set.forEach((bid) => {
-                  ctx.feedback.set(bid, muted ? 1.0 : 0.0, "ToggleMute", { silent: true }).catch(() => {});
-                });
-              }
+              const muteFeedbackBindings = inputMuteFeedbackBindingIds(
+                bindingsByInputVolume,
+                bindingsByInputMute,
+                inputName,
+              );
+              muteFeedbackBindings.forEach((bid) => {
+                ctx.feedback.set(bid, muted ? 1.0 : 0.0, "ToggleMute", { silent: true }).catch(() => {});
+              });
             }
           }
         }

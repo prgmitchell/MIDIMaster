@@ -54,6 +54,24 @@ function testMuteIntentsAreScopedByInput() {
   assert.equal(intents.has("Mic/Aux"), true);
 }
 
+function testInputMuteFeedbackIncludesVolumeAndMuteBindings() {
+  const volumeBindings = new Map([
+    ["Mic/Aux", new Set(["fader-1", "shared-binding"])],
+  ]);
+  const muteBindings = new Map([
+    ["Mic/Aux", new Set(["mute-button-1", "shared-binding"])],
+  ]);
+
+  assert.deepEqual(
+    [...obsTestUtils.inputMuteFeedbackBindingIds(volumeBindings, muteBindings, "Mic/Aux")],
+    ["fader-1", "shared-binding", "mute-button-1"],
+  );
+  assert.deepEqual(
+    [...obsTestUtils.inputMuteFeedbackBindingIds(volumeBindings, muteBindings, "Desktop Audio")],
+    [],
+  );
+}
+
 function testSourceFiltersNormalizeToStableEntries() {
   assert.deepEqual(
     obsTestUtils.normalizeSourceFilters([
@@ -102,6 +120,7 @@ testMatchingLocalMuteEchoIsIgnored();
 testOppositeMuteEventPassesImmediately();
 testExpiredMuteIntentPasses();
 testMuteIntentsAreScopedByInput();
+testInputMuteFeedbackIncludesVolumeAndMuteBindings();
 testSourceFiltersNormalizeToStableEntries();
 testSourceFilterActionTargetsFilterInsteadOfVisibility();
 testSourceFilterKeysUseSourceAndFilterNames();
