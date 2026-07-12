@@ -86,6 +86,7 @@ You may include additional assets:
   "name": "Demo Integration",
   "version": "0.1.0",
   "api_version": "1",
+  "min_app_version": "4.3.5",
   "entry": "plugin.mjs",
   "icon": "icon.svg"
 }
@@ -98,6 +99,7 @@ Fields:
 - `version` (string): informational.
 - `api_version` (string): must be `"1"`.
 - `entry` (string): entry file path relative to the plugin folder.
+- `min_app_version` (SemVer string, optional for legacy/manual packages): oldest MIDIMaster release that can run the plugin. It is required for Store publication.
 - `icon` (string, optional): relative path to a plugin icon.
 
 Security constraints:
@@ -622,6 +624,7 @@ Use this checklist when you are preparing a plugin to share with other users.
   - Bundle into one `plugin.mjs` (recommended).
   - Avoid relative ESM imports; Blob-based module loading does not reliably resolve `./foo.mjs`.
 - Include `manifest.json` and keep paths correct:
+  - Set valid SemVer values for `version` and `min_app_version`.
   - `entry` must exist and be readable.
   - `api_version` must be `"1"`.
 - Keep file paths portable:

@@ -567,7 +567,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -1137,7 +1142,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1707,7 +1717,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2277,7 +2292,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2847,7 +2867,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3417,7 +3442,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3987,7 +4017,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4557,7 +4592,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5127,7 +5167,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5697,7 +5742,12 @@
     "targets.description.profileTarget": "b876e2c6ba50d4239f040de8ca37ad0aea218eba2f8f26afbf2b4ac1b5f76072",
     "dialogs.profileSwitchUnavailableTitle": "d76555852697dcbd7a433840a502255a7a96574086d3f0b20c62342add40fba8",
     "dialogs.profileSwitchMissingTargetMessage": "007c0bd503eb5e00f350c3c0962a1bae49a991a88942b38c906e71fe855d5f10",
-    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656"
+    "dialogs.profileSwitchFailedMessage": "a110ed331eaf002379ccce3c104b4e472eb19ccb642eb1c6576e463ecd620656",
+    "plugins.updateAll": "3b12eecc4f7b67f08866e162b8c8dffa376f427c3cfa868299c67ff161b1858a",
+    "plugins.updateAllSuccess": "63038a63734d6931485a6cf6819406de7bd458e51c3e38d0415eb918e8cd0df2",
+    "plugins.updateAllPartial": "32349239a4707554532d66c71596f4ef7bfc4a214b0eea1ea53c5b1612418588",
+    "plugins.updateAllFailed": "c6dc4dd63765984f86f6923ab8c661dd509ce998e2361f1d9adf0ce021070771",
+    "plugins.incompatible": "52130b6f85cb384de265e864949a9ef2de24dff5a0231353875f4ae9521d0995"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

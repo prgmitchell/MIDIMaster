@@ -22,11 +22,12 @@ src-tauri/gen/
 .netlify/
 netlify.toml
 
-# Local store/operator workflow (keep private, local-only)
+# Local store/operator workflow (maintainer-only)
 plugin-staging/
-scripts/store/
 scripts/local-store/
+scripts/store/
 docs/STORE_OPERATOR_GUIDE.md
 src-tauri/src/bin/store_tool.rs
 store-private-key*.txt
 *.midimaster.key
+*.midimaster

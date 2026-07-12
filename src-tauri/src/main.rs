@@ -50,7 +50,7 @@ use plugin_api::{
     install_plugin_package, list_plugins, plugin_http_post_json, read_plugin_base64,
     read_plugin_text, set_plugin_enabled, uninstall_plugin,
 };
-use store_api::{fetch_store_catalog, install_store_plugin};
+use store_api::{fetch_store_catalog, install_store_plugin, install_store_plugins};
 use ws_bridge::{get_wavelink_ws_port, ws_close, ws_open, ws_send, WsHub};
 
 #[cfg(target_os = "windows")]
@@ -460,6 +460,7 @@ fn main() {
             get_wavelink_ws_port,
             fetch_store_catalog,
             install_store_plugin,
+            install_store_plugins,
             show_update_notification_window_if_main_hidden,
             close_update_notification_window,
             start_update_notification_window_drag,

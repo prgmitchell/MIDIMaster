@@ -43,33 +43,53 @@ function slugify(value) {
 }
 
 function parseSemver(v) {
-  const parts = String(v || "").split(".").map((x) => parseInt(x, 10));
-  if (parts.some((n) => !Number.isFinite(n))) return null;
-  return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+  const match = String(v || "").trim().match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
+  if (!match) return null;
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    prerelease: match[4] ? match[4].split(".") : [],
+  };
+}
+
+function compareSemver(leftValue, rightValue) {
+  const left = parseSemver(leftValue);
+  const right = parseSemver(rightValue);
+  if (!left || !right) return null;
+  for (let i = 0; i < 3; i++) {
+    if (left.core[i] !== right.core[i]) return left.core[i] < right.core[i] ? -1 : 1;
+  }
+  if (!left.prerelease.length && !right.prerelease.length) return 0;
+  if (!left.prerelease.length) return 1;
+  if (!right.prerelease.length) return -1;
+  const count = Math.max(left.prerelease.length, right.prerelease.length);
+  for (let i = 0; i < count; i++) {
+    if (left.prerelease[i] === undefined) return -1;
+    if (right.prerelease[i] === undefined) return 1;
+    const a = left.prerelease[i];
+    const b = right.prerelease[i];
+    if (a === b) continue;
+    const aNumeric = /^\d+$/.test(a);
+    const bNumeric = /^\d+$/.test(b);
+    if (aNumeric && bNumeric) return Number(a) < Number(b) ? -1 : 1;
+    if (aNumeric !== bNumeric) return aNumeric ? -1 : 1;
+    return a < b ? -1 : 1;
+  }
+  return 0;
 }
 
 function isUpdateAvailable(installedV, latestV) {
-  const a = parseSemver(installedV);
-  const b = parseSemver(latestV);
-  if (!a || !b) return false;
-  for (let i = 0; i < 3; i++) {
-    if (a[i] < b[i]) return true;
-    if (a[i] > b[i]) return false;
-  }
-  return false;
+  return compareSemver(installedV, latestV) === -1;
 }
 
 function compareVersionsDesc(a, b) {
-  const left = parseSemver(a);
-  const right = parseSemver(b);
-  if (!left && !right) return 0;
-  if (!left) return 1;
-  if (!right) return -1;
-  for (let i = 0; i < 3; i++) {
-    if (left[i] > right[i]) return -1;
-    if (left[i] < right[i]) return 1;
-  }
-  return 0;
+  const result = compareSemver(a, b);
+  return result === null ? 0 : -result;
+}
+
+function eligibleUpdateIds(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .filter((entry) => entry?.hasUpdate && entry?.compatible && !entry?.bundled)
+    .map((entry) => entry.id);
 }
 
 function normalizeCategories(...values) {
@@ -273,6 +293,8 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
           storePlugin?.categories,
           storePlugin?.tags,
         );
+        const compatible = storePlugin ? storePlugin.latest?.compatible !== false : true;
+        const compatibilityReason = String(storePlugin?.latest?.compatibility_reason || "");
 
         return {
           id,
@@ -290,6 +312,8 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
           isInstalled: Boolean(installedPlugin),
           isStoreOnly: !installedPlugin && Boolean(storePlugin),
           hasUpdate: Boolean(installedPlugin && storePlugin && isUpdateAvailable(installedVersion, latestVersion)),
+          compatible,
+          compatibilityReason,
           categories,
           categorySlugs: categories.map((category) => slugify(category)),
           searchText: [id, name, description, author, ...categories].join(" ").toLowerCase(),
@@ -489,6 +513,9 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
       const secondaryValue = entry.hasUpdate
         ? `<span class="plugins-browser-version plugins-browser-version--update">${escapeHtml(t("plugins.updateVersion", { version: entry.latestVersion }))}</span>`
         : "";
+      const compatibilityValue = entry.store && !entry.compatible
+        ? `<div class="plugins-browser-compatibility">${escapeHtml(entry.compatibilityReason || t("plugins.incompatible"))}</div>`
+        : "";
 
       row.innerHTML = `
         <div class="plugins-browser-card-media">
@@ -504,6 +531,7 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
           </div>
           <p class="plugins-browser-card-description">${escapeHtml(entry.description || t("plugins.noDescription"))}</p>
           <div class="plugins-browser-card-meta">${meta}</div>
+          ${compatibilityValue}
           ${tags ? `<div class="plugins-browser-card-tags">${tags}</div>` : ""}
         </div>
         <div class="plugins-browser-card-actions"></div>
@@ -532,7 +560,11 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
         primaryAction.type = "button";
         primaryAction.className = `plugins-browser-action ${entry.hasUpdate ? "is-accent" : ""}`;
         primaryAction.textContent = actionLabel;
-        if (entry.isInstalled && !entry.hasUpdate) {
+        if (!entry.compatible) {
+          primaryAction.disabled = true;
+          primaryAction.classList.add("is-disabled");
+          primaryAction.title = entry.compatibilityReason || t("plugins.incompatible");
+        } else if (entry.isInstalled && !entry.hasUpdate) {
           primaryAction.disabled = true;
           primaryAction.classList.add("is-disabled");
         } else {
@@ -618,6 +650,23 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
     return buildNavigationModel(buildEntries(data));
   }
 
+  async function updateAll(entries, setStatus) {
+    const ids = eligibleUpdateIds(entries);
+    if (!ids.length) return;
+    const results = await invoke("install_store_plugins", { pluginIds: ids, plugin_ids: ids });
+    const list = Array.isArray(results) ? results : [];
+    const succeeded = list.filter((result) => result?.status === "updated").length;
+    const failed = list.length - succeeded;
+    if (failed) {
+      setStatus(t("plugins.updateAllPartial", { succeeded, failed }), "error");
+    } else {
+      setStatus(t("plugins.updateAllSuccess", { count: succeeded }), "success");
+    }
+    await preloadInstalledPlugins(true);
+    await preloadStoreCatalog(true);
+    await reload();
+  }
+
   async function mountPluginsBrowserTab(container, options = {}) {
     const view = String(options.view || "installed");
     const label = String(options.label || "Plugins");
@@ -644,6 +693,7 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
                 <option value="version-desc">${escapeHtml(t("plugins.newestVersion"))}</option>
               </select>
             </label>
+            <button type="button" class="plugins-browser-install hidden" data-role="update-all">${escapeHtml(t("plugins.updateAll"))}</button>
             <button type="button" class="plugins-browser-install" data-role="install-file">${escapeHtml(t("plugins.addPlugin"))}</button>
           </div>
         </div>
@@ -661,6 +711,7 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
     const listEl = container.querySelector('[data-role="list"]');
     const footerEl = container.querySelector('[data-role="footer"]');
     const installButton = container.querySelector('[data-role="install-file"]');
+    const updateAllButton = container.querySelector('[data-role="update-all"]');
     const setStatus = createStatusSetter(statusEl);
 
     let model = null;
@@ -680,6 +731,11 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
         ? baseEntries.filter((entry) => entry.searchText.includes(q))
         : baseEntries;
       const visibleEntries = sortEntries(filteredEntries, sortValue);
+      const compatibleUpdates = model.entries.filter((entry) => entry.hasUpdate && entry.compatible && !entry.bundled);
+      if (updateAllButton) {
+        updateAllButton.classList.toggle("hidden", compatibleUpdates.length === 0);
+        updateAllButton.disabled = compatibleUpdates.length === 0;
+      }
 
       renderPluginCards({ listEl, entries: visibleEntries, view, setStatus, onOpenPluginPanel });
       const noun = visibleEntries.length === 1 ? t("plugins.pluginSingular") : t("plugins.pluginPlural");
@@ -726,6 +782,19 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
     if (installButton) {
       installButton.addEventListener("click", () => installPackageFromFile(setStatus));
     }
+    if (updateAllButton) {
+      updateAllButton.addEventListener("click", async () => {
+        if (!model) return;
+        updateAllButton.disabled = true;
+        try {
+          await updateAll(model.entries, setStatus);
+        } catch (error) {
+          console.error("Failed to update plugins", error);
+          setStatus(t("plugins.updateAllFailed"), "error");
+          updateAllButton.disabled = false;
+        }
+      });
+    }
 
     load().catch((error) => {
       console.error("Failed to render plugins browser", error);
@@ -740,3 +809,5 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
     mountPluginsBrowserTab,
   };
 }
+
+export const pluginStoreTestUtils = { parseSemver, compareSemver, isUpdateAvailable, eligibleUpdateIds };

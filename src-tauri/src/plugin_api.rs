@@ -1,4 +1,5 @@
 use base64::Engine;
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -32,6 +33,8 @@ pub struct PluginManifest {
     pub name: String,
     pub version: String,
     pub api_version: String,
+    #[serde(default)]
+    pub min_app_version: Option<String>,
     pub entry: String,
     #[serde(default)]
     pub icon: Option<String>,
@@ -49,6 +52,39 @@ pub struct PluginManifest {
 
 fn default_true() -> bool {
     true
+}
+
+fn validate_min_app_version(app: &AppHandle, manifest: &PluginManifest) -> Result<(), String> {
+    let Some(required_raw) = manifest.min_app_version.as_deref() else {
+        return Ok(());
+    };
+    let required = Version::parse(required_raw.trim())
+        .map_err(|_| "Invalid min_app_version in plugin manifest".to_string())?;
+    let current = Version::parse(&app.package_info().version.to_string())
+        .map_err(|_| "Invalid MIDIMaster application version".to_string())?;
+    if current < required {
+        return Err(format!(
+            "Plugin requires MIDIMaster {} or newer (current {})",
+            required, current
+        ));
+    }
+    Ok(())
+}
+
+pub fn read_package_manifest(bytes: &[u8]) -> Result<PluginManifest, String> {
+    let reader = Cursor::new(bytes);
+    let mut zip = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
+    for i in 0..zip.len() {
+        let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
+        let name = file.name().replace('\\', "/");
+        if name == "manifest.json" || name.ends_with("/manifest.json") {
+            use std::io::Read;
+            let mut text = String::new();
+            file.read_to_string(&mut text).map_err(|e| e.to_string())?;
+            return serde_json::from_str(&text).map_err(|e| e.to_string());
+        }
+    }
+    Err("Package is missing manifest.json".to_string())
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -777,6 +813,7 @@ pub fn install_plugin_package(
     if manifest.api_version.trim() != "1" {
         return Err("Unsupported api_version (expected \"1\")".to_string());
     }
+    validate_min_app_version(&app, &manifest)?;
     if is_bundled_plugin(&manifest.id) {
         return Err("Cannot install a plugin with a reserved bundled id".to_string());
     }
@@ -805,50 +842,66 @@ pub fn install_plugin_package(
     let temp_dir = installing_root.join(format!("{}-{}", manifest.id, uuid::Uuid::new_v4()));
     fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
-        let name = file.name().to_string();
-        if name.ends_with('/') {
-            continue;
+    let extraction_result = (|| -> Result<(), String> {
+        for i in 0..zip.len() {
+            let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+            if name.ends_with('/') {
+                continue;
+            }
+            let stripped = name.strip_prefix(&prefix).unwrap_or(name.as_str());
+            if stripped.is_empty() {
+                continue;
+            }
+            let rel = safe_rel_path(stripped)?;
+            let out_path = temp_dir.join(&rel);
+            if let Some(parent) = out_path.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            let mut out = fs::File::create(&out_path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut file, &mut out).map_err(|e| e.to_string())?;
         }
-        let stripped = name.strip_prefix(&prefix).unwrap_or(name.as_str());
-        if stripped.is_empty() {
-            continue;
+
+        if !temp_dir.join("manifest.json").exists() {
+            return Err("Extracted plugin is missing manifest.json at root".to_string());
         }
-        let rel = safe_rel_path(stripped)?;
-        let out_path = temp_dir.join(&rel);
-        if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        let mut out = fs::File::create(&out_path).map_err(|e| e.to_string())?;
-        std::io::copy(&mut file, &mut out).map_err(|e| e.to_string())?;
+        Ok(())
+    })();
+    if let Err(err) = extraction_result {
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err(err);
     }
 
-    // Ensure manifest.json exists at extracted root
-    let extracted_manifest_path = temp_dir.join("manifest.json");
-    if !extracted_manifest_path.exists() {
-        return Err("Extracted plugin is missing manifest.json at root".to_string());
-    }
-
-    // Install atomically
+    // Install transactionally, retaining at most one previous copy.
     let target_dir = root.join(&manifest.id);
     let mut replaced_existing = false;
+    let backup_root = root.join(".backup");
+    let backup_dir = backup_root.join(format!("{}.previous", manifest.id));
     if target_dir.exists() {
         replaced_existing = true;
-        let backup_root = root.join(".backup");
-        let _ = fs::create_dir_all(&backup_root);
-        let backup_dir = backup_root.join(format!("{}-{}", manifest.id, uuid::Uuid::new_v4()));
+        fs::create_dir_all(&backup_root).map_err(|e| e.to_string())?;
+        if backup_dir.exists() {
+            fs::remove_dir_all(&backup_dir).map_err(|e| e.to_string())?;
+        }
         fs::rename(&target_dir, &backup_dir).map_err(|e| e.to_string())?;
     }
-    fs::rename(&temp_dir, &target_dir).map_err(|e| e.to_string())?;
+    if let Err(err) = fs::rename(&temp_dir, &target_dir) {
+        if replaced_existing && backup_dir.exists() {
+            let _ = fs::rename(&backup_dir, &target_dir);
+        }
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err(format!("Failed to activate plugin package: {err}"));
+    }
 
-    // Enable by default
-    let mut state = load_plugins_state(&app);
-    state.disabled.retain(|id| id != &manifest.id);
-    let _ = save_plugins_state(&app, &state);
+    // Preserve disabled state when replacing; new installs are enabled by default.
+    if !replaced_existing {
+        let mut state = load_plugins_state(&app);
+        state.disabled.retain(|id| id != &manifest.id);
+        let _ = save_plugins_state(&app, &state);
+    }
 
     manifest.bundled = false;
-    manifest.enabled = true;
+    manifest.enabled = !load_plugins_state(&app).disabled.contains(&manifest.id);
 
     Ok(InstalledPluginInfo {
         manifest,

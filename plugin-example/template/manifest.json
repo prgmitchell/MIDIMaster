@@ -3,6 +3,7 @@
   "name": "My Plugin",
   "version": "0.1.0",
   "api_version": "1",
+  "min_app_version": "4.3.5",
   "entry": "plugin.mjs",
   "icon": "icon.svg"
 }

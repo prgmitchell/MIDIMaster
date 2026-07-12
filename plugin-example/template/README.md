@@ -15,6 +15,8 @@ How to use
    - `id`
    - `name`
    - `version`
+   - Set `min_app_version` to the oldest MIDIMaster release containing every API the plugin uses.
+
 3. Update `plugin.mjs`:
    - Replace the fake connect logic with your integration.
    - Replace `getTargetOptions` with real targets.

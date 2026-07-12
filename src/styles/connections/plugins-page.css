@@ -846,6 +846,16 @@ body[data-theme] .binding-config-curve-card.is-selected {
   border-color: var(--accent);
 }
 
+#plugins-page .plugins-browser-install.hidden {
+  display: none;
+}
+
+#plugins-page .plugins-browser-compatibility {
+  color: var(--warning, #f0b35a);
+  font-size: 12px;
+  margin-top: 5px;
+}
+
 body[data-theme] .binding-config-curve-card-visual path,
 body[data-theme] .binding-config-curve-card-visual polyline {
   stroke: var(--accent);

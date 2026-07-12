@@ -59,6 +59,9 @@ jobs:
       - name: Test frontend session refresh
         run: node scripts/test-session-refresh.mjs
 
+      - name: Test Plugin Store frontend behavior
+        run: node scripts/test-plugin-store.mjs
+
       - name: Test frontend MIDI device inventory consent
         run: node scripts/test-midi-device-inventory-consent.mjs
 

@@ -4,19 +4,13 @@ MIDIMaster includes an in-app "Store" tab that installs plugins from an official
 
 Plugins are distributed as a single `.midimaster` package file.
 
-## How to submit a plugin
+## Initial release policy
 
-1. Package your plugin as a `.midimaster` file.
-2. Send the file to the maintainer along with:
-   - plugin id
-   - plugin name
-   - version
-   - a short description
-   - homepage/source URL (recommended)
+The first Store phase publishes only first-party plugins owned and reviewed by MIDIMaster. Community submissions are not accepted yet. Package signing establishes publisher identity; it does not sandbox plugin JavaScript. A future third-party phase requires a separate permissions and review design.
 
 ## What the official Store is
 
-- The official Store is curated and may accept/reject/remove plugins at any time.
+- The official Store is curated and may remove plugins at any time.
 - Store downloads are signed. The app verifies signatures using a trusted public key.
 - The Store service/catalog and signing keys are maintained separately (not in this repository).
 
@@ -39,7 +33,8 @@ to distribute the code and any bundled assets (including icons and trademarks).
 ## Requirements
 
 - `manifest.json` must include:
-  - `id`, `name`, `version`, `api_version` (must be `"1"`), `entry`
+  - `id`, `name`, `version`, `min_app_version`, `api_version` (must be `"1"`), `entry`
+- `version` and `min_app_version` must be valid semantic versions
 - The plugin id should be stable and unique
 - The entry file should be an ESM module (use `.mjs`)
 

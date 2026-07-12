@@ -2203,6 +2203,7 @@ dependencies = [
  "midir",
  "rand 0.8.5",
  "rfd",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
