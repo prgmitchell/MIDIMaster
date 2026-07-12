@@ -51,14 +51,6 @@ node scripts/i18n/validate-locales.mjs
 
 Set `ARGOS_PYTHON` if the desired Python executable is not `python`.
 
-## OpenAI fallback
-
-```powershell
-$env:I18N_PROVIDER = "openai"
-$env:OPENAI_API_KEY = "..."
-node scripts/i18n/translate-locales.mjs
-```
-
 ## Options
 
 - `--force`: retranslates every string, including hand-edited strings.

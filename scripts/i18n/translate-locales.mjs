@@ -10,19 +10,6 @@ const metaPath = path.join(localeDir, ".i18n-meta.json");
 const locales = targetLocales.map((locale) => locale.code);
 const localeByCode = new Map(supportedLocales.map((locale) => [locale.code, locale]));
 
-const localeNames = {
-  fr: "French",
-  es: "Spanish",
-  de: "German",
-  it: "Italian",
-  "pt-BR": "Brazilian Portuguese",
-  nl: "Dutch",
-  pl: "Polish",
-  ja: "Japanese",
-  ko: "Korean",
-  "zh-Hans": "Simplified Chinese",
-};
-
 const provider = String(process.env.I18N_PROVIDER || "libretranslate").trim().toLowerCase();
 const force = process.argv.includes("--force");
 const dryRun = process.argv.includes("--dry-run");
@@ -74,44 +61,6 @@ function normalizeLibreTarget(locale) {
 
 function normalizeArgosTarget(locale) {
   return localeByCode.get(locale)?.libreTarget || locale;
-}
-
-async function translateWithOpenAi(locale, entries) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is required when I18N_PROVIDER=openai.");
-  }
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_TRANSLATION_MODEL || "gpt-4.1-mini",
-      input: [
-        {
-          role: "system",
-          content: "Translate short desktop app UI strings. Return only a valid JSON object with the same keys. Preserve placeholders like {version}, {input}, and {output} exactly. Do not translate product name MIDIMaster.",
-        },
-        {
-          role: "user",
-          content: `Target language: ${localeNames[locale]}\n\n${JSON.stringify(entries, null, 2)}`,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI translation failed for ${locale}: ${response.status} ${await response.text()}`);
-  }
-
-  const data = await response.json();
-  const text = data.output_text
-    || data.output?.flatMap((item) => item.content || []).map((item) => item.text || "").join("")
-    || "";
-  return JSON.parse(text);
 }
 
 async function translateTextWithLibreTranslate(locale, text) {
@@ -235,10 +184,9 @@ print(json.dumps(result, ensure_ascii=False))
 
 async function translateBatch(locale, entries) {
   if (Object.keys(entries).length === 0) return {};
-  if (provider === "openai") return translateWithOpenAi(locale, entries);
   if (provider === "libretranslate" || provider === "libre") return translateWithLibreTranslate(locale, entries);
   if (provider === "argos") return translateWithArgos(locale, entries);
-  throw new Error(`Unsupported I18N_PROVIDER "${provider}". Use libretranslate, argos, or openai.`);
+  throw new Error(`Unsupported I18N_PROVIDER "${provider}". Use libretranslate or argos.`);
 }
 
 function shouldTranslate({ key, englishValue, catalog, localeMeta }) {
