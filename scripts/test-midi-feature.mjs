@@ -178,11 +178,17 @@ await routeEditor.commit(async (routes) => {
   );
 });
 assert.equal(editorApplyCalls, 1, "committing two dropdown edits should apply once");
+assert.equal(routeEditor.isDirty(), false, "a successful Apply should disable Apply Changes again");
 
 routeEditor.begin(originalRoutes);
 routeEditor.replace([route("midi:2", "midi:3", "Platform X+1 V2.13")]);
 routeEditor.discard();
 assert.deepEqual(routeEditor.current(originalRoutes), originalRoutes, "Cancel must restore desired routes");
+
+routeEditor.begin(originalRoutes);
+routeEditor.replace([route("midi:2", "midi:3", "Platform X+1 V2.13")]);
+routeEditor.replace(originalRoutes);
+assert.equal(routeEditor.isDirty(), false, "reverting every edit must disable Apply Changes");
 
 routeEditor.begin(originalRoutes);
 routeEditor.replace([route("midi:2", "midi:3", "Platform X+1 V2.13")]);

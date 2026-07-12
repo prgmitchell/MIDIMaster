@@ -71,6 +71,7 @@ export function createMidiFeature({
   let connectedOutputName = "";
   let connectedRoutes = [];
   const routeEditor = createMidiRouteDraftController();
+  let routeEditorApplyInFlight = false;
   let currentProfilePreference = null;
   let lastRouteResolutionIssueSignature = "";
   let inputStatusEl = null;
@@ -618,6 +619,7 @@ export function createMidiFeature({
     button.type = "button";
     button.className = "target-button";
     button.title = placeholderText;
+    button.disabled = routeEditorApplyInFlight;
     button.setAttribute("aria-haspopup", "listbox");
     button.setAttribute("aria-expanded", "false");
 
@@ -656,11 +658,11 @@ export function createMidiFeature({
       optionButton.setAttribute("aria-selected", String(optionMatchesSelection));
       if (optionMatchesSelection) optionButton.classList.add("selected");
       if (option.unavailable) optionButton.classList.add("unavailable");
-      if (option.disabled && !optionMatchesSelection) {
+      if (routeEditorApplyInFlight || (option.disabled && !optionMatchesSelection)) {
         optionButton.disabled = true;
         optionButton.classList.add("is-disabled");
         optionButton.setAttribute("aria-disabled", "true");
-        optionButton.title = option.disabledReason;
+        if (option.disabledReason) optionButton.title = option.disabledReason;
       }
 
       const optionLabel = document.createElement("span");
@@ -758,7 +760,7 @@ export function createMidiFeature({
   }
 
   async function applyRouteEdits() {
-    if (!routeEditor.isDirty()) return;
+    if (routeEditorApplyInFlight || !routeEditor.isDirty()) return;
     const drafts = routeEditor.draft() || [];
     for (let index = 0; index < drafts.length; index += 1) {
       if (hasDuplicateInputRoute(drafts, drafts[index].inputDeviceId, index)) {
@@ -768,6 +770,8 @@ export function createMidiFeature({
       }
     }
 
+    routeEditorApplyInFlight = true;
+    renderRoutesPopover();
     try {
       await routeEditor.commit(async (routesToCommit) => {
         const snapshot = await refreshMidiDevices({ force: true, reason: "route_editor_apply" });
@@ -786,8 +790,11 @@ export function createMidiFeature({
         }
         return result;
       });
-      closeRoutesPopover({ discard: false });
+      routeEditorApplyInFlight = false;
+      routeEditor.begin(desiredRoutes());
+      renderRoutesPopover();
     } catch (error) {
+      routeEditorApplyInFlight = false;
       if (d.midiStatus) d.midiStatus.textContent = t("midi.applyFailed", { message: error });
       renderRoutesPopover();
     }
@@ -812,6 +819,7 @@ export function createMidiFeature({
     close.className = "midi-route-icon-button";
     close.title = t("common.close");
     close.setAttribute("aria-label", t("common.close"));
+    close.disabled = routeEditorApplyInFlight;
     setIconButton(close, "close");
     close.addEventListener("click", closeRoutesPopover);
     actions.appendChild(close);
@@ -859,6 +867,7 @@ export function createMidiFeature({
       const enable = document.createElement("input");
       enable.type = "checkbox";
       enable.checked = route.enabled !== false;
+      enable.disabled = routeEditorApplyInFlight;
       enable.addEventListener("change", () => setRouteEnabled(index, enable.checked));
       const enableUi = document.createElement("span");
       enableUi.className = "plugins-toggle-ui";
@@ -887,6 +896,7 @@ export function createMidiFeature({
       remove.className = "midi-route-icon-button is-danger";
       remove.title = t("midi.removeRoute");
       remove.setAttribute("aria-label", t("midi.removeRoute"));
+      remove.disabled = routeEditorApplyInFlight;
       setIconButton(remove, "trash");
       remove.addEventListener("click", () => removeRoute(index));
       row.appendChild(remove);
@@ -902,12 +912,13 @@ export function createMidiFeature({
     add.type = "button";
     add.className = "midi-route-action-button secondary-action";
     add.textContent = t("midi.addRoute");
+    add.disabled = routeEditorApplyInFlight;
     add.addEventListener("click", addRoute);
     const disableAll = document.createElement("button");
     disableAll.type = "button";
     disableAll.className = "midi-route-action-button secondary-action";
     disableAll.textContent = t("midi.disconnectAll");
-    disableAll.disabled = !routes.some((route) => route.enabled !== false);
+    disableAll.disabled = routeEditorApplyInFlight || !routes.some((route) => route.enabled !== false);
     disableAll.addEventListener("click", disableAllRoutes);
     routeActions.appendChild(add);
     routeActions.appendChild(disableAll);
@@ -918,12 +929,13 @@ export function createMidiFeature({
     cancel.type = "button";
     cancel.className = "midi-route-action-button secondary-action";
     cancel.textContent = t("common.cancel");
+    cancel.disabled = routeEditorApplyInFlight;
     cancel.addEventListener("click", () => closeRoutesPopover());
     const apply = document.createElement("button");
     apply.type = "button";
     apply.className = "midi-route-action-button primary-action";
     apply.textContent = t("midi.applyChanges");
-    apply.disabled = !routeEditor.isDirty();
+    apply.disabled = routeEditorApplyInFlight || !routeEditor.isDirty();
     apply.addEventListener("click", applyRouteEdits);
     commitActions.appendChild(cancel);
     commitActions.appendChild(apply);

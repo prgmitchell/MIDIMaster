@@ -60,6 +60,23 @@ export function normalizeMidiRoutes(source) {
   return routes;
 }
 
+export function midiRoutesEqual(left, right) {
+  const a = normalizeMidiRoutes({ routes: left });
+  const b = normalizeMidiRoutes({ routes: right });
+  if (a.length !== b.length) return false;
+  return a.every((route, index) => {
+    const other = b[index];
+    return Boolean(
+      other
+      && route.inputDeviceId === other.inputDeviceId
+      && route.outputDeviceId === other.outputDeviceId
+      && route.inputDeviceName === other.inputDeviceName
+      && route.outputDeviceName === other.outputDeviceName
+      && route.enabled === other.enabled
+    );
+  });
+}
+
 export function orderMidiRoutesByPreference(routes, preferredRoutes) {
   const remaining = normalizeMidiRoutes({ routes }).map((route) => ({ ...route }));
   const preferred = normalizeMidiRoutes({ routes: preferredRoutes });
@@ -93,19 +110,22 @@ export function orderMidiRoutesByPreference(routes, preferredRoutes) {
 
 export function createMidiRouteDraftController() {
   let draftRoutes = null;
+  let baselineRoutes = [];
   let dirty = false;
 
   return {
     begin(routes) {
       draftRoutes = normalizeMidiRoutes({ routes }).map((route) => ({ ...route }));
+      baselineRoutes = draftRoutes.map((route) => ({ ...route }));
       dirty = false;
     },
     replace(routes) {
       draftRoutes = normalizeMidiRoutes({ routes }).map((route) => ({ ...route }));
-      dirty = true;
+      dirty = !midiRoutesEqual(draftRoutes, baselineRoutes);
     },
     discard() {
       draftRoutes = null;
+      baselineRoutes = [];
       dirty = false;
     },
     current(fallbackRoutes = []) {
@@ -125,6 +145,7 @@ export function createMidiRouteDraftController() {
       if (!dirty || !Array.isArray(draftRoutes) || typeof apply !== "function") return null;
       const routes = draftRoutes.map((route) => ({ ...route }));
       const result = await apply(routes);
+      baselineRoutes = routes.map((route) => ({ ...route }));
       draftRoutes = null;
       dirty = false;
       return result;

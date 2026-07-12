@@ -736,6 +736,13 @@ input::placeholder {
   color: #fff;
 }
 
+.midi-route-action-button.primary-action:disabled {
+  border-color: var(--control-border);
+  background: var(--control-bg);
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
 .midi-route-action-button.primary-action:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
   outline-offset: 2px;
