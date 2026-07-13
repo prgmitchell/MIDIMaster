@@ -59,6 +59,7 @@ struct FeedbackMessage {
     logical_bytes: Vec<u8>,
     logical_raw_midi_value: u16,
     physical_bytes: Vec<u8>,
+    physical_messages: Vec<Vec<u8>>,
     physical_channel: u8,
     physical_controller: u8,
     physical_msg_type: MidiMessageType,
@@ -1120,7 +1121,12 @@ impl MidiManager {
             if route
                 .output_connection
                 .as_mut()
-                .map(|connection| connection.send(&feedback.physical_bytes).is_ok())
+                .map(|connection| {
+                    send_feedback_messages(&feedback.physical_messages, |message| {
+                        connection.send(message)
+                    })
+                    .is_ok()
+                })
                 .unwrap_or(false)
             {
                 send_success = true;
@@ -1228,10 +1234,11 @@ impl MidiManager {
                             .output_connection
                             .as_mut()
                             .and_then(|connection| {
-                                connection
-                                    .send(&feedback.physical_bytes)
-                                    .err()
-                                    .map(|error| error.to_string())
+                                send_feedback_messages(&feedback.physical_messages, |message| {
+                                    connection.send(message)
+                                })
+                                .err()
+                                .map(|error| error.to_string())
                             })
                             .or_else(|| {
                                 if route.output_connection.is_none() {
@@ -1381,11 +1388,28 @@ fn build_feedback_message(
 ) -> FeedbackMessage {
     let logical = build_direct_feedback_bytes(channel, controller, value, msg_type);
     if let Some(binding) = binding {
+        if let Some(physical) =
+            build_xtouch_mini_standard_feedback(binding, value, output_device_name)
+        {
+            return FeedbackMessage {
+                logical_bytes: logical.bytes,
+                logical_raw_midi_value: logical.raw_midi_value,
+                physical_bytes: physical.bytes,
+                physical_messages: physical.messages,
+                physical_channel: physical.channel,
+                physical_controller: physical.controller,
+                physical_msg_type: physical.msg_type,
+                physical_raw_midi_value: physical.raw_midi_value,
+                normalized_value: logical.normalized_value,
+                protocol: "xtouch_mini_standard_fan",
+            };
+        }
         if let Some(physical) = build_xtouch_mc_vpot_feedback(binding, value, output_device_name) {
             return FeedbackMessage {
                 logical_bytes: logical.bytes,
                 logical_raw_midi_value: logical.raw_midi_value,
                 physical_bytes: physical.bytes,
+                physical_messages: physical.messages,
                 physical_channel: physical.channel,
                 physical_controller: physical.controller,
                 physical_msg_type: physical.msg_type,
@@ -1399,7 +1423,8 @@ fn build_feedback_message(
     FeedbackMessage {
         logical_bytes: logical.bytes.clone(),
         logical_raw_midi_value: logical.raw_midi_value,
-        physical_bytes: logical.bytes,
+        physical_bytes: logical.bytes.clone(),
+        physical_messages: logical.messages,
         physical_channel: logical.channel,
         physical_controller: logical.controller,
         physical_msg_type: logical.msg_type,
@@ -1412,6 +1437,7 @@ fn build_feedback_message(
 #[derive(Debug, Clone, PartialEq)]
 struct FeedbackBytes {
     bytes: Vec<u8>,
+    messages: Vec<Vec<u8>>,
     channel: u8,
     controller: u8,
     msg_type: MidiMessageType,
@@ -1431,8 +1457,10 @@ fn build_direct_feedback_bytes(
         MidiMessageType::Note => {
             let status = 0x90 | (channel & 0x0F);
             let velocity = (normalized_value * 127.0).round() as u8;
+            let bytes = vec![status, controller, velocity];
             FeedbackBytes {
-                bytes: vec![status, controller, velocity],
+                messages: vec![bytes.clone()],
+                bytes,
                 channel: channel & 0x0F,
                 controller,
                 msg_type: msg_type.clone(),
@@ -1445,8 +1473,10 @@ fn build_direct_feedback_bytes(
             let value14 = (normalized_value * 16383.0).round() as u16;
             let lsb = (value14 & 0x7F) as u8;
             let msb = ((value14 >> 7) & 0x7F) as u8;
+            let bytes = vec![status, lsb, msb];
             FeedbackBytes {
-                bytes: vec![status, lsb, msb],
+                messages: vec![bytes.clone()],
+                bytes,
                 channel: channel & 0x0F,
                 controller: 0xE0,
                 msg_type: msg_type.clone(),
@@ -1457,8 +1487,10 @@ fn build_direct_feedback_bytes(
         MidiMessageType::ControlChange => {
             let status = 0xB0 | (channel & 0x0F);
             let value7 = (normalized_value * 127.0).round() as u8;
+            let bytes = vec![status, controller, value7];
             FeedbackBytes {
-                bytes: vec![status, controller, value7],
+                messages: vec![bytes.clone()],
+                bytes,
                 channel: channel & 0x0F,
                 controller,
                 msg_type: msg_type.clone(),
@@ -1468,8 +1500,10 @@ fn build_direct_feedback_bytes(
         }
         MidiMessageType::ProgramChange => {
             let status = 0xC0 | (channel & 0x0F);
+            let bytes = vec![status, controller & 0x7F];
             FeedbackBytes {
-                bytes: vec![status, controller & 0x7F],
+                messages: vec![bytes.clone()],
+                bytes,
                 channel: channel & 0x0F,
                 controller: controller & 0x7F,
                 msg_type: msg_type.clone(),
@@ -1478,6 +1512,40 @@ fn build_direct_feedback_bytes(
             }
         }
     }
+}
+
+fn build_xtouch_mini_standard_feedback(
+    binding: &Binding,
+    value: f32,
+    output_device_name: &str,
+) -> Option<FeedbackBytes> {
+    if !is_xtouch_mini_output(output_device_name)
+        || binding.action != BindingAction::Volume
+        || binding.is_button_binding()
+        || binding.control.msg_type != MidiMessageType::ControlChange
+        || !(1..=8).contains(&binding.control.controller)
+    {
+        return None;
+    }
+
+    let normalized_value = value.clamp(0.0, 1.0);
+    let channel = binding.control.channel & 0x0F;
+    let status = 0xB0 | channel;
+    let behavior_controller = binding.control.controller;
+    let value_controller = behavior_controller + 8;
+    let raw_midi_value = xtouch_mini_standard_ring_value(normalized_value);
+    let behavior_message = vec![status, behavior_controller, 2];
+    let value_message = vec![status, value_controller, raw_midi_value as u8];
+
+    Some(FeedbackBytes {
+        bytes: value_message.clone(),
+        messages: vec![behavior_message, value_message],
+        channel,
+        controller: value_controller,
+        msg_type: MidiMessageType::ControlChange,
+        normalized_value,
+        raw_midi_value,
+    })
 }
 
 fn build_xtouch_mc_vpot_feedback(
@@ -1499,14 +1567,22 @@ fn build_xtouch_mc_vpot_feedback(
     let knob_index = binding.control.controller - 16;
     let physical_controller = 48 + knob_index;
     let raw_midi_value = xtouch_mc_vpot_fan_value(normalized_value);
+    let bytes = vec![0xB0, physical_controller, raw_midi_value as u8];
     Some(FeedbackBytes {
-        bytes: vec![0xB0, physical_controller, raw_midi_value as u8],
+        messages: vec![bytes.clone()],
+        bytes,
         channel: 0,
         controller: physical_controller,
         msg_type: MidiMessageType::ControlChange,
         normalized_value,
         raw_midi_value,
     })
+}
+
+fn is_xtouch_mini_output(output_device_name: &str) -> bool {
+    output_device_name
+        .to_ascii_uppercase()
+        .contains("X-TOUCH MINI")
 }
 
 fn is_xtouch_mc_vpot_output(output_device_name: &str) -> bool {
@@ -1523,6 +1599,24 @@ fn xtouch_mc_vpot_fan_value(normalized_value: f32) -> u16 {
     }
     let led_value = (value * 11.0).ceil().clamp(1.0, 11.0) as u16;
     0x20 | led_value
+}
+
+fn xtouch_mini_standard_ring_value(normalized_value: f32) -> u16 {
+    let value = normalized_value.clamp(0.0, 1.0);
+    if value <= 0.0 {
+        return 0;
+    }
+    (value * 13.0).ceil().clamp(1.0, 13.0) as u16
+}
+
+fn send_feedback_messages<F, E>(messages: &[Vec<u8>], mut send: F) -> std::result::Result<(), E>
+where
+    F: FnMut(&[u8]) -> std::result::Result<(), E>,
+{
+    for message in messages {
+        send(message)?;
+    }
+    Ok(())
 }
 
 fn log_midi_input_if_needed(event: &MidiEvent, raw_message: &[u8]) {
@@ -2059,7 +2153,8 @@ mod tests {
         FeedbackMessage {
             logical_bytes: bytes.clone(),
             logical_raw_midi_value: raw_midi_value,
-            physical_bytes: bytes,
+            physical_bytes: bytes.clone(),
+            physical_messages: vec![bytes],
             physical_channel: channel,
             physical_controller: controller,
             physical_msg_type: msg_type,
@@ -2716,6 +2811,7 @@ mod tests {
         assert_eq!(off.protocol, "xtouch_mc_vpot_fan");
         assert_eq!(off.logical_bytes, vec![0xB0, 0x10, 0x00]);
         assert_eq!(off.physical_bytes, vec![0xB0, 0x30, 0x00]);
+        assert_eq!(off.physical_messages, vec![vec![0xB0, 0x30, 0x00]]);
 
         let halfway = build_feedback_message(
             0,
@@ -2738,6 +2834,164 @@ mod tests {
         );
         assert_eq!(full.logical_bytes, vec![0xB0, 0x10, 0x7F]);
         assert_eq!(full.physical_bytes, vec![0xB0, 0x30, 0x2B]);
+    }
+
+    #[test]
+    fn xtouch_mini_standard_knob_one_maps_to_full_ring_feedback() {
+        let mut binding = xtouch_mini_mc_volume_binding(1);
+        binding.control.channel = 10;
+        binding.mode = MidiMode::Absolute;
+
+        let off = build_feedback_message(
+            10,
+            1,
+            0.0,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-TOUCH MINI",
+        );
+        assert_eq!(off.protocol, "xtouch_mini_standard_fan");
+        assert_eq!(off.logical_bytes, vec![0xBA, 0x01, 0x00]);
+        assert_eq!(off.physical_bytes, vec![0xBA, 0x09, 0x00]);
+        assert_eq!(
+            off.physical_messages,
+            vec![vec![0xBA, 0x01, 0x02], vec![0xBA, 0x09, 0x00]]
+        );
+
+        let first_segment = build_feedback_message(
+            10,
+            1,
+            0.001,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-TOUCH MINI",
+        );
+        assert_eq!(first_segment.physical_bytes, vec![0xBA, 0x09, 0x01]);
+
+        let full = build_feedback_message(
+            10,
+            1,
+            1.0,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-TOUCH MINI",
+        );
+        assert_eq!(full.physical_bytes, vec![0xBA, 0x09, 0x0D]);
+    }
+
+    #[test]
+    fn xtouch_mini_standard_knob_eight_relative_volume_maps_to_ring_eight() {
+        let mut binding = xtouch_mini_mc_volume_binding(8);
+        binding.control.channel = 10;
+
+        let feedback = build_feedback_message(
+            10,
+            8,
+            0.5,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-Touch Mini MIDI 1",
+        );
+
+        assert_eq!(feedback.protocol, "xtouch_mini_standard_fan");
+        assert_eq!(feedback.physical_bytes, vec![0xBA, 0x10, 0x07]);
+        assert_eq!(
+            feedback.physical_messages,
+            vec![vec![0xBA, 0x08, 0x02], vec![0xBA, 0x10, 0x07]]
+        );
+    }
+
+    #[test]
+    fn xtouch_standard_detection_does_not_affect_extender_or_generic_outputs() {
+        let mut binding = xtouch_mini_mc_volume_binding(1);
+        binding.control.channel = 10;
+
+        for output_name in ["X-Touch-Ext", "X-TOUCH EXTENDER", "Generic MIDI Output"] {
+            let feedback = build_feedback_message(
+                10,
+                1,
+                0.5,
+                &MidiMessageType::ControlChange,
+                Some(&binding),
+                output_name,
+            );
+
+            assert_eq!(feedback.protocol, "direct", "output={output_name}");
+            assert_eq!(feedback.physical_bytes, vec![0xBA, 0x01, 0x40]);
+            assert_eq!(feedback.physical_messages.len(), 1);
+        }
+    }
+
+    #[test]
+    fn xtouch_standard_detection_requires_continuous_volume_cc_in_factory_range() {
+        let mut binding = xtouch_mini_mc_volume_binding(1);
+        binding.control.channel = 10;
+
+        binding.action = BindingAction::ToggleMute;
+        let non_volume = build_feedback_message(
+            10,
+            1,
+            0.5,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-TOUCH MINI",
+        );
+        assert_eq!(non_volume.protocol, "direct");
+
+        binding.action = BindingAction::Volume;
+        binding.control_kind = BindingControlKind::Button;
+        let button = build_feedback_message(
+            10,
+            1,
+            0.5,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-TOUCH MINI",
+        );
+        assert_eq!(button.protocol, "direct");
+
+        binding.control_kind = BindingControlKind::Continuous;
+        binding.control.controller = 9;
+        let outside_range = build_feedback_message(
+            10,
+            9,
+            0.5,
+            &MidiMessageType::ControlChange,
+            Some(&binding),
+            "X-TOUCH MINI",
+        );
+        assert_eq!(outside_range.protocol, "direct");
+    }
+
+    #[test]
+    fn ordered_feedback_retry_restarts_from_first_message() {
+        let messages = vec![vec![0xBA, 0x01, 0x02], vec![0xBA, 0x09, 0x07]];
+        let mut attempted = Vec::new();
+        let first_result = send_feedback_messages(&messages, |message| {
+            attempted.push(message.to_vec());
+            if attempted.len() == 2 {
+                Err("send failed")
+            } else {
+                Ok(())
+            }
+        });
+        assert_eq!(first_result, Err("send failed"));
+
+        let retry_result: std::result::Result<(), &str> =
+            send_feedback_messages(&messages, |message| {
+                attempted.push(message.to_vec());
+                Ok(())
+            });
+        assert_eq!(retry_result, Ok(()));
+        assert_eq!(
+            attempted,
+            vec![
+                vec![0xBA, 0x01, 0x02],
+                vec![0xBA, 0x09, 0x07],
+                vec![0xBA, 0x01, 0x02],
+                vec![0xBA, 0x09, 0x07]
+            ]
+        );
     }
 
     #[test]
