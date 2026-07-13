@@ -47,6 +47,9 @@ jobs:
       - name: Test frontend binding model
         run: node scripts/test-binding-model.mjs
 
+      - name: Test frontend binding density
+        run: node scripts/test-binding-density.mjs
+
       - name: Test frontend fader curve presets
         run: node scripts/test-fader-curve-presets.mjs
 

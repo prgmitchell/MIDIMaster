@@ -1565,6 +1565,7 @@ export function createSettingsFeature({
       startInTray: Boolean(settings.start_in_tray ?? settings.startInTray),
       minimizeToTray: Boolean(settings.minimize_to_tray ?? settings.minimizeToTray),
       exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
+      compactBindings: Boolean(settings.compact_bindings ?? settings.compactBindings),
       autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
       language: normalizeLanguage(settings.language ?? settings.languageCode ?? "en"),
       midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(

@@ -128,6 +128,7 @@ const {
   bindingsContainer,
   bindingTypeFilter,
   bindingSearchInput,
+  bindingDensityToggle,
   mainScreen,
   appShell,
   sidebarNav,
@@ -466,6 +467,7 @@ async function hydrateClientPreferences() {
     appSettings = {
       ...appSettings,
       appearance: savedAppearance,
+      compactBindings: Boolean(settings.compact_bindings ?? settings.compactBindings),
       midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(
         settings.midi_device_inventory_consent ?? settings.midiDeviceInventoryConsent,
       ),
@@ -478,6 +480,7 @@ async function hydrateClientPreferences() {
         settings.fader_curve_presets ?? settings.faderCurvePresets,
       ),
     };
+    bindingsFeature?.setCompactBindings?.(appSettings.compactBindings);
     applyAppearanceToDocument(savedAppearance, { matchMediaSource: window });
 
     const savedInputId = settings.midi_input_device_id ?? settings.midiInputDeviceId ?? "";
@@ -974,6 +977,7 @@ let appSettings = {
   minimizeToTray: false,
   exitToTray: false,
   autoCheckUpdates: true,
+  compactBindings: false,
   language: "en",
   appearance: defaultAppearanceSettings(),
   faderCurvePresets: [],
@@ -1093,6 +1097,7 @@ settingsFeature = createSettingsFeature({
         next?.faderCurvePresets ?? next?.fader_curve_presets ?? appSettings.faderCurvePresets,
       ),
     };
+    bindingsFeature?.setCompactBindings?.(appSettings.compactBindings);
   },
   applyAppearance: applyGlobalAppearance,
   showAlert: (title, message = "") => showAlert(title, message),
@@ -1208,6 +1213,8 @@ bindingsFeature = createBindingsFeature({
     bindingsContainer,
     bindingTypeFilter,
     bindingSearchInput,
+    bindingDensityToggle,
+    mainScreen,
     bindingConfigPanel,
     bindingConfigBack,
     bindingConfigTitle,

@@ -15,6 +15,7 @@ export function createDomRefs() {
   const bindingsContainer = document.getElementById("bindings");
   const bindingTypeFilter = document.getElementById("binding-type-filter");
   const bindingSearchInput = document.getElementById("binding-search");
+  const bindingDensityToggle = document.getElementById("binding-density-toggle");
   const mainScreen = document.getElementById("main-screen");
   const appShell = document.querySelector(".app-shell");
   const sidebarNav = document.querySelector(".sidebar-nav");
@@ -216,6 +217,7 @@ export function createDomRefs() {
     bindingsContainer,
     bindingTypeFilter,
     bindingSearchInput,
+    bindingDensityToggle,
     mainScreen,
     appShell,
     sidebarNav,

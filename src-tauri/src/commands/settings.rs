@@ -227,6 +227,26 @@ pub fn get_app_settings(state: State<AppState>) -> Result<AppSettings, String> {
 }
 
 #[tauri::command]
+pub fn set_compact_bindings(
+    state: State<AppState>,
+    compact_bindings: bool,
+) -> Result<bool, String> {
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    let mut updated = settings.clone();
+    updated.compact_bindings = compact_bindings;
+
+    state
+        .app_settings_store
+        .save(&updated)
+        .map_err(|err| err.to_string())?;
+    settings.compact_bindings = updated.compact_bindings;
+    Ok(updated.compact_bindings)
+}
+
+#[tauri::command]
 pub fn get_app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }

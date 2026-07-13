@@ -130,6 +130,18 @@
               <button id="binding-add-footer-button" type="button" class="binding-add-button">
                 <span data-i18n="bindings.addBinding">Add Binding</span>
               </button>
+              <div id="binding-density-toggle" class="binding-density-toggle" role="group" aria-label="Binding view density" data-i18n-aria-label="bindings.viewDensityLabel">
+                <button type="button" class="binding-density-option selected" data-density="comfortable" aria-pressed="true" aria-label="Comfortable view" title="Comfortable view" data-i18n-aria-label="bindings.comfortableView" data-i18n-title="bindings.comfortableView">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M5 5h14v5H5zM5 14h14v5H5z" />
+                  </svg>
+                </button>
+                <button type="button" class="binding-density-option" data-density="compact" aria-pressed="false" aria-label="Compact view" title="Compact view" data-i18n-aria-label="bindings.compactView" data-i18n-title="bindings.compactView">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M5 4h14v3H5zM5 10.5h14v3H5zM5 17h14v3H5z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 

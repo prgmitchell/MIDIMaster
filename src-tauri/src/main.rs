@@ -407,6 +407,7 @@ fn main() {
             update_osd_settings,
             preview_osd,
             get_app_settings,
+            set_compact_bindings,
             get_app_version,
             update_app_settings,
             update_midi_device_inventory_consent,

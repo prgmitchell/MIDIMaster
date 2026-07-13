@@ -192,6 +192,8 @@ export function createBindingsFeature({
   const getSearchQuery = () => String(d.bindingSearchInput?.value || "").trim().toLowerCase();
   const bindingTypeFilterValues = new Set(["all", "faders", "buttons"]);
   let bindingTypeFilter = "all";
+  let compactBindings = false;
+  let bindingDensitySaveSequence = 0;
   const bindingsCard = d.bindingsContainer.closest?.(".bindings-card") || null;
   let bindingsScrollbarWidth = 0;
   let bindingsLayoutSyncQueued = false;
@@ -268,6 +270,60 @@ export function createBindingsFeature({
     });
 
     updateBindingTypeFilterUi();
+  }
+
+  function updateBindingDensityUi() {
+    const density = compactBindings ? "compact" : "comfortable";
+    if (d.mainScreen) {
+      d.mainScreen.dataset.bindingsDensity = density;
+    }
+    d.bindingDensityToggle?.querySelectorAll("[data-density]").forEach((optionButton) => {
+      const selected = String(optionButton.dataset?.density || "") === density;
+      optionButton.classList.toggle("selected", selected);
+      optionButton.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+    queueBindingsScrollLayoutSync();
+  }
+
+  async function setCompactBindings(value, { persist = false } = {}) {
+    const next = Boolean(value);
+    const previous = compactBindings;
+    compactBindings = next;
+    updateBindingDensityUi();
+    if (!persist || next === previous) {
+      return compactBindings;
+    }
+
+    const sequence = ++bindingDensitySaveSequence;
+    try {
+      const saved = await invoke("set_compact_bindings", { compactBindings: next });
+      if (sequence !== bindingDensitySaveSequence) {
+        return compactBindings;
+      }
+      compactBindings = typeof saved === "boolean" ? saved : next;
+      updateBindingDensityUi();
+    } catch (error) {
+      if (sequence === bindingDensitySaveSequence) {
+        compactBindings = previous;
+        updateBindingDensityUi();
+        alertAction(t("dialogs.actionFailedTitle"), t("dialogs.actionFailedMessage"));
+      }
+      console.error("Failed to save binding view density", error);
+    }
+    return compactBindings;
+  }
+
+  function bindBindingDensityUi() {
+    const root = d.bindingDensityToggle;
+    if (!root) return;
+    root.querySelectorAll("[data-density]").forEach((optionButton) => {
+      optionButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void setCompactBindings(optionButton.dataset?.density === "compact", { persist: true });
+      });
+    });
+    updateBindingDensityUi();
   }
 
   function measureScrollbarWidth() {
@@ -5903,6 +5959,7 @@ export function createBindingsFeature({
 
   bindConfigModalUi();
   bindBindingTypeFilterUi();
+  bindBindingDensityUi();
   if (d.bindingSearchInput) {
     d.bindingSearchInput.addEventListener("input", () => {
       renderBindings();
@@ -5936,6 +5993,7 @@ export function createBindingsFeature({
     queueBindingReveal,
     openBindingTargetPicker,
     beginBindingEdit,
+    setCompactBindings,
     renderBindings,
     startBindingDrag,
     updateBindingDrag,

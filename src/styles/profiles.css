@@ -20,7 +20,7 @@ body[data-theme] .bindings-toolbar {
   width: 100%;
   margin-left: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
 }
@@ -64,6 +64,16 @@ body[data-theme] .binding-search-field:focus-within {
 body[data-theme] .binding-add-button {
   grid-column: 3;
   justify-self: end;
+}
+
+body[data-theme] .binding-density-toggle {
+  grid-column: 4;
+  justify-self: end;
+}
+
+body[data-theme] .bindings-toolbar .binding-density-toggle {
+  height: 40px;
+  min-height: 40px;
 }
 
 body[data-theme] .bindings-toolbar .binding-add-button {

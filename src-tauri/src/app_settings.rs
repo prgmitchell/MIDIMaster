@@ -197,6 +197,7 @@ pub struct AppSettings {
     pub midi_output_device_name: Option<String>,
     pub midi_device_routes: Vec<MidiDeviceRoute>,
     pub active_profile_name: Option<String>,
+    pub compact_bindings: bool,
     pub auto_check_updates: bool,
     pub language: String,
     pub appearance: AppAppearanceSettings,
@@ -221,6 +222,7 @@ impl Default for AppSettings {
             midi_output_device_name: None,
             midi_device_routes: Vec::new(),
             active_profile_name: None,
+            compact_bindings: false,
             auto_check_updates: true,
             language: "en".to_string(),
             appearance: AppAppearanceSettings::default(),
@@ -329,6 +331,7 @@ mod tests {
         assert!(settings.start_with_windows);
         assert_eq!(settings.startup_registration_version, 0);
         assert!(settings.minimize_to_tray);
+        assert!(!settings.compact_bindings);
         assert_eq!(settings.appearance.active_theme_id, "system");
         assert_eq!(settings.appearance.font_size, 14.0);
         assert_eq!(settings.appearance.surface_contrast, 50.0);
@@ -360,6 +363,19 @@ mod tests {
         assert_eq!(loaded.language, "fr");
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn compact_bindings_round_trips() {
+        let settings = AppSettings {
+            compact_bindings: true,
+            ..AppSettings::default()
+        };
+
+        let json = serde_json::to_string(&settings).expect("serialize settings");
+        let loaded: AppSettings = serde_json::from_str(&json).expect("deserialize settings");
+
+        assert!(loaded.compact_bindings);
     }
 
     #[test]
