@@ -3,7 +3,7 @@
   "name": "Voicemeeter",
   "version": "1.0.0",
   "api_version": "1",
-  "min_app_version": "4.3.5",
+  "min_app_version": "4.4.0",
   "entry": "plugin.mjs",
   "icon": "VoicemeeterLogo.png",
   "description": "Control Voicemeeter strips, buses, routing, hardware devices, MacroButtons, and presets.",
