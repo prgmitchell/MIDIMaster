@@ -32,4 +32,14 @@ pub(crate) fn ensure_builtin_plugins(app: &AppHandle) {
             include_bytes!("../builtin_plugins/obs/OBSLogo.png") as &[u8],
         )],
     );
+    ensure_builtin_plugin(
+        app,
+        "voicemeeter",
+        include_str!("../builtin_plugins/voicemeeter/manifest.json"),
+        include_str!("../builtin_plugins/voicemeeter/plugin.mjs"),
+        &[(
+            "VoicemeeterLogo.png",
+            include_bytes!("../builtin_plugins/voicemeeter/VoicemeeterLogo.png") as &[u8],
+        )],
+    );
 }

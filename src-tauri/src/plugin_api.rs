@@ -16,7 +16,7 @@ use url::Url;
 use crate::app_paths::app_data_root_dir;
 use crate::run_logger;
 
-const BUNDLED_PLUGIN_IDS: &[&str] = &["hue", "obs", "wavelink"];
+const BUNDLED_PLUGIN_IDS: &[&str] = &["hue", "obs", "voicemeeter", "wavelink"];
 const HUE_API_TIMEOUT_MS: u64 = 4500;
 const HUE_PAIR_TIMEOUT_MS: u64 = 3500;
 const PLUGIN_HTTP_DEFAULT_TIMEOUT_MS: u64 = 4500;

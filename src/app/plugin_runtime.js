@@ -18,6 +18,7 @@ export function createPluginRuntime({
   isBindingInteractionActive,
   requestBindingsRerender,
   mountConnectionsTabs,
+  showConfirm,
 }) {
   let pluginHost = null;
   let pluginHostStarted = false;
@@ -47,6 +48,7 @@ export function createPluginRuntime({
         listen,
         onUpdatePluginSettings: updateProfilePluginSettings,
         onInvalidateBindingsUI: createBindingsInvalidator(),
+        showConfirm,
       });
     }
 

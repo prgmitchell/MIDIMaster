@@ -1,3 +1,12 @@
+export function getNavIndicatorMetrics(sidebarRect, activeRect, scrollLeft = 0, scrollTop = 0) {
+  return {
+    width: activeRect.width,
+    height: activeRect.height,
+    x: activeRect.left - sidebarRect.left + scrollLeft,
+    y: activeRect.top - sidebarRect.top + scrollTop,
+  };
+}
+
 export function createConnectionsPanelController({
   dom,
   pluginsTabs,
@@ -22,11 +31,15 @@ export function createConnectionsPanelController({
       if (indicator) indicator.style.opacity = "0";
       return;
     }
-    const sidebarRect = d.connectionsSidebar.getBoundingClientRect();
-    const activeRect = active.getBoundingClientRect();
-    indicator.style.width = `${activeRect.width}px`;
-    indicator.style.height = `${activeRect.height}px`;
-    indicator.style.transform = `translate(${activeRect.left - sidebarRect.left}px, ${activeRect.top - sidebarRect.top}px)`;
+    const metrics = getNavIndicatorMetrics(
+      d.connectionsSidebar.getBoundingClientRect(),
+      active.getBoundingClientRect(),
+      d.connectionsSidebar.scrollLeft,
+      d.connectionsSidebar.scrollTop,
+    );
+    indicator.style.width = `${metrics.width}px`;
+    indicator.style.height = `${metrics.height}px`;
+    indicator.style.transform = `translate(${metrics.x}px, ${metrics.y}px)`;
     indicator.style.opacity = "1";
   }
 

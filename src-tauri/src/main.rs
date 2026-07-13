@@ -23,6 +23,7 @@ mod runtime_helpers;
 mod runtime_midi;
 mod store_api;
 mod telemetry;
+mod voicemeeter;
 mod windows_autostart;
 mod windows_display;
 mod ws_bridge;
@@ -51,6 +52,11 @@ use plugin_api::{
     read_plugin_text, set_plugin_enabled, uninstall_plugin,
 };
 use store_api::{fetch_store_catalog, install_store_plugin, install_store_plugins};
+use voicemeeter::{
+    voicemeeter_assign_device, voicemeeter_connect, voicemeeter_disconnect, voicemeeter_launch,
+    voicemeeter_list_devices, voicemeeter_safe_command, voicemeeter_snapshot, voicemeeter_status,
+    voicemeeter_write_parameters, VoicemeeterState,
+};
 use ws_bridge::{get_wavelink_ws_port, ws_close, ws_open, ws_send, WsHub};
 
 #[cfg(target_os = "windows")]
@@ -193,6 +199,7 @@ fn main() {
 
             // Shared WebSocket bridge for integration plugins.
             app.manage(WsHub::new());
+            app.manage(VoicemeeterState::new());
 
             app.manage(AppState {
                 audio,
@@ -458,6 +465,15 @@ fn main() {
             ws_send,
             ws_close,
             get_wavelink_ws_port,
+            voicemeeter_connect,
+            voicemeeter_disconnect,
+            voicemeeter_status,
+            voicemeeter_snapshot,
+            voicemeeter_write_parameters,
+            voicemeeter_list_devices,
+            voicemeeter_assign_device,
+            voicemeeter_launch,
+            voicemeeter_safe_command,
             fetch_store_catalog,
             install_store_plugin,
             install_store_plugins,

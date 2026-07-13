@@ -54,6 +54,10 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 semver = "1"
 rfd = "0.15"
 
+[target.'cfg(windows)'.dependencies]
+libloading = "0.8"
+winreg = "0.55"
+
 [profile.release]
 panic = "abort"
 codegen-units = 1
