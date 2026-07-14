@@ -79,6 +79,17 @@ function testTransientFailuresDoNotFlapConnection() {
   assert.equal(utils.shouldMarkDisconnected(3), true);
 }
 
+function testDisconnectedRetriesDoNotRebuildDashboard() {
+  assert.equal(utils.shouldRenderConnectionTransition(false, false), false);
+  assert.equal(utils.shouldRenderConnectionTransition(false, true), true);
+  assert.equal(utils.shouldRenderConnectionTransition(true, true), false);
+}
+
+function testProfileChangeEnvelopePreservesAutoConnect() {
+  assert.deepEqual(utils.profileSettingsFromEvent({ settings: { auto_connect: false } }), { auto_connect: false });
+  assert.deepEqual(utils.profileSettingsFromEvent({ auto_connect: true }), { auto_connect: true });
+}
+
 function testOnlyCoreBindingActionsAreEmitted() {
   const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
   for (const unsupported of [
@@ -113,6 +124,8 @@ testParameterIdentity();
 testMeterChangesDoNotInvalidateBindingUi();
 testMetersOnlyPollOnVisibleDashboard();
 testTransientFailuresDoNotFlapConnection();
+testDisconnectedRetriesDoNotRebuildDashboard();
+testProfileChangeEnvelopePreservesAutoConnect();
 testOnlyCoreBindingActionsAreEmitted();
 testDashboardUsesOneContentScrollbar();
 testDashboardUsesMidimasterConfirmation();

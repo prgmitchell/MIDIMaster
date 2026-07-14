@@ -82,6 +82,14 @@ function shouldMarkDisconnected(consecutiveFailures) {
   return Number(consecutiveFailures) >= DISCONNECT_FAILURE_THRESHOLD;
 }
 
+function shouldRenderConnectionTransition(wasConnected, isConnected) {
+  return !wasConnected && isConnected;
+}
+
+function profileSettingsFromEvent(value) {
+  return value?.settings && typeof value.settings === "object" ? value.settings : (value || {});
+}
+
 function editionCode(status) {
   return Number(status?.edition_code || 0);
 }
@@ -219,6 +227,8 @@ export const voicemeeterTestUtils = {
   pollingInterval,
   meterPollDue,
   shouldMarkDisconnected,
+  shouldRenderConnectionTransition,
+  profileSettingsFromEvent,
   capabilitiesForEdition: (code) => ({
     strip_count: code === 1 ? 3 : code === 2 ? 5 : 8,
     physical_strip_count: code === 1 ? 2 : code === 2 ? 3 : 5,
@@ -341,26 +351,28 @@ export async function activate(ctx) {
 
   async function connect({ manual = false } = {}) {
     if (state.connecting || state.disposed) return false;
+    const wasConnected = Boolean(state.status.connected);
+    let renderConnectedDashboard = false;
     state.connecting = true;
     if (manual) state.disconnectedByUser = false;
-    updateStatusUi("Connecting…");
+    if (manual) updateStatusUi("Connecting…");
     try {
       state.status = await ctx.tauri.invoke("voicemeeter_connect");
       if (state.status.connected) {
         state.consecutivePollFailures = 0;
         await refreshDevices();
         await poll(true);
+        renderConnectedDashboard = shouldRenderConnectionTransition(wasConnected, true);
       }
-      updateStatusUi();
-      renderDashboard();
       return Boolean(state.status.connected);
     } catch (error) {
       state.status = { ...state.status, connected: false, detail: String(error) };
-      updateStatusUi(String(error));
+      if (manual) updateStatusUi(String(error));
       return false;
     } finally {
       state.connecting = false;
-      updateStatusUi();
+      if (renderConnectedDashboard) renderDashboard();
+      else updateStatusUi();
     }
   }
 
@@ -624,6 +636,15 @@ export async function activate(ctx) {
     };
     root.querySelector('[data-role="refresh"]').onclick = async () => { await refreshDevices(); await poll(true); renderDashboard(); };
     root.querySelector('[data-role="save"]').onclick = async () => { await saveDashboardSettings(); ctx.app.invalidateBindingsUI(); };
+    state.ui.auto.onchange = async () => {
+      await saveDashboardSettings();
+      if (state.settings.auto_connect) {
+        state.disconnectedByUser = false;
+        connect().catch(() => {});
+      } else {
+        state.disconnectedByUser = true;
+      }
+    };
     state.lastStatusUiSignature = "";
     updateStatusUi(); renderMeters();
   }
@@ -645,7 +666,8 @@ export async function activate(ctx) {
     unmount: () => { state.mounted = false; state.meterElements.clear(); state.meterLayoutSignature = ""; state.ui = {}; },
   });
 
-  const applyProfile = (settings) => {
+  const applyProfile = (value) => {
+    const settings = profileSettingsFromEvent(value);
     state.settings = { auto_connect: settings?.auto_connect ?? true, preferred_edition: settings?.preferred_edition || "banana", macro_aliases: settings?.macro_aliases || {}, presets: Array.isArray(settings?.presets) ? settings.presets : [] };
     if (state.mounted) renderDashboard();
   };
