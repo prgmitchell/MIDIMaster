@@ -15,6 +15,7 @@ const pluginCode = `
 export async function activate(ctx) {
   const events = globalThis.__MIDIMASTER_PLUGIN_LIFECYCLE_TEST_EVENTS__;
   events.push("activate");
+  events.push(typeof ctx.app.showAlert === "function" ? "alert-api" : "missing-alert-api");
   events.push(typeof ctx.app.showConfirm === "function" ? "confirm-api" : "missing-confirm-api");
   ctx.lifecycle.onDispose(() => events.push("lifecycle-dispose"));
   ctx.profile.onChanged(() => events.push("profile"));
@@ -98,6 +99,7 @@ try {
     listen,
     onUpdatePluginSettings: async () => {},
     onInvalidateBindingsUI: () => {},
+    showAlert: async () => {},
     showConfirm: async () => true,
   });
 
@@ -130,6 +132,7 @@ try {
   assert.ok(lifecycleEvents.includes("api-dispose"));
   assert.ok(lifecycleEvents.includes("api-stop"));
   assert.ok(lifecycleEvents.includes("lifecycle-dispose"));
+  assert.ok(lifecycleEvents.includes("alert-api"));
   assert.ok(lifecycleEvents.includes("confirm-api"));
   assert.ok(closedWsIds.includes(7));
   assert.ok(unlistened.includes("delayed-plugin-event"));

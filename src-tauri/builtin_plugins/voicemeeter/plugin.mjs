@@ -6,6 +6,7 @@ const DISCONNECT_FAILURE_THRESHOLD = 3;
 const RECONNECT_MS = 2000;
 const WRITE_INTERVAL_MS = 16;
 const LOCAL_INTENT_MS = 900;
+const DEVICE_VERIFY_DELAYS_MS = [100, 250, 500, 1000];
 
 function clamp(value, min, max) {
   const number = Number(value);
@@ -88,6 +89,87 @@ function shouldRenderConnectionTransition(wasConnected, isConnected) {
 
 function profileSettingsFromEvent(value) {
   return value?.settings && typeof value.settings === "object" ? value.settings : (value || {});
+}
+
+function buttonAction(label, behavior = "stateful") {
+  const momentary = behavior === "momentary";
+  return {
+    label,
+    value: momentary ? "SetMainOutputDevice" : "ToggleEffect",
+    behavior: momentary ? "momentary" : "stateful",
+  };
+}
+
+function parameterButtonBehavior(scope, property) {
+  const normalizedScope = String(scope || "").toLowerCase();
+  const normalizedProperty = String(property || "").toLowerCase();
+  return normalizedScope === "bus" && (normalizedProperty.startsWith("mode.") || normalizedProperty === "sel")
+    ? "momentary"
+    : "stateful";
+}
+
+function isOneShotVoicemeeterTarget(target) {
+  const kind = String(target?.kind || "").toLowerCase();
+  if (["device_assignment", "preset", "command"].includes(kind)) return true;
+  if (kind !== "parameter") return false;
+  return parameterButtonBehavior(target?.data?.scope, target?.data?.property) === "momentary";
+}
+
+function targetUsesPersistentFeedback(target) {
+  if (String(target?.kind || "").toLowerCase() !== "parameter") return false;
+  if (isOneShotVoicemeeterTarget(target)) return false;
+  return String(target?.data?.action_kind || "").toLowerCase() !== "momentary";
+}
+
+function deviceSlotKey(scope, index) {
+  return `${String(scope || "").toLowerCase()}:${Number(index)}`;
+}
+
+function assignableDevices(devices, direction, index) {
+  const outputAfterA1 = String(direction).toLowerCase() === "output" && Number(index) > 0;
+  return (Array.isArray(devices) ? devices : []).filter((device) => !outputAfterA1 || String(device?.driver_type).toLowerCase() !== "asio");
+}
+
+function deviceVerificationResult(expectedName, observedState, error = null) {
+  const expected = String(expectedName || "");
+  const observed = String(observedState?.name || "");
+  const sampleRate = Number(observedState?.sample_rate || 0);
+  if (!expected && !observed) return { status: "success", observed, sampleRate };
+  if (expected && observed === expected && sampleRate > 0) return { status: "success", observed, sampleRate };
+  if (error) return { status: "read_error", observed, sampleRate, error: String(error) };
+  if (observed === expected) return { status: "not_initialized", observed, sampleRate };
+  return { status: "mismatch", observed, sampleRate };
+}
+
+async function verifyDeviceAssignment({ expectedName, readState, isCurrent, delays = DEVICE_VERIFY_DELAYS_MS, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
+  let lastState = null;
+  let lastError = null;
+  let previousDelay = 0;
+  for (const delay of delays) {
+    await wait(Math.max(0, Number(delay) - previousDelay));
+    previousDelay = Number(delay);
+    if (!isCurrent()) return { status: "superseded" };
+    try {
+      lastState = await readState();
+      lastError = null;
+      const result = deviceVerificationResult(expectedName, lastState);
+      if (result.status === "success") return result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  return deviceVerificationResult(expectedName, lastState, lastError);
+}
+
+function deviceFeedbackMatches(data, assignedName, confirmed, devices) {
+  const expectedName = String(data?.device_name || "");
+  if (!expectedName || String(assignedName || "") !== expectedName) return false;
+  const expectedDriver = String(data?.driver_type || "").toLowerCase();
+  if (confirmed?.name === expectedName) return confirmed.driver === expectedDriver;
+  const matchingDrivers = new Set((Array.isArray(devices) ? devices : [])
+    .filter((device) => String(device?.name || "") === expectedName)
+    .map((device) => String(device?.driver_type || "").toLowerCase()));
+  return matchingDrivers.size === 1 && matchingDrivers.has(expectedDriver);
 }
 
 function editionCode(status) {
@@ -190,11 +272,12 @@ function parameterOption(scope, index, spec, state, isButton) {
   const max = isButton ? (property === "mono" && scope === "bus" ? 2 : 1) : Number(spec[3]);
   const channel = displayChannelLabel(scope, index, state);
   const label = `${channel}: ${controlLabel}`;
+  const behavior = isButton ? parameterButtonBehavior(scope, property) : null;
   return {
     label,
     icon_data: state.icon,
-    ...(isButton ? { buttonActions: [{ label: controlLabel, value: "ToggleEffect", behavior: "stateful" }] } : {}),
-    target: makeParameterTarget(scope, index, property, label, min, max, isButton ? "stateful" : null),
+    ...(isButton ? { buttonActions: [buttonAction(controlLabel, behavior)] } : {}),
+    target: makeParameterTarget(scope, index, property, label, min, max, behavior),
   };
 }
 
@@ -229,6 +312,16 @@ export const voicemeeterTestUtils = {
   shouldMarkDisconnected,
   shouldRenderConnectionTransition,
   profileSettingsFromEvent,
+  buttonAction,
+  parameterButtonBehavior,
+  isOneShotVoicemeeterTarget,
+  targetUsesPersistentFeedback,
+  parameterOption,
+  deviceSlotKey,
+  assignableDevices,
+  deviceVerificationResult,
+  verifyDeviceAssignment,
+  deviceFeedbackMatches,
   capabilitiesForEdition: (code) => ({
     strip_count: code === 1 ? 3 : code === 2 ? 5 : 8,
     physical_strip_count: code === 1 ? 2 : code === 2 ? 3 : 5,
@@ -271,8 +364,9 @@ export async function activate(ctx) {
     lastPollAt: 0, lastMeterPollAt: 0, consecutivePollFailures: 0,
     settings: { auto_connect: true, preferred_edition: "banana", macro_aliases: {}, presets: [] },
     lastBindingUiSignature: "", lastStatusUiSignature: "", meterLayoutSignature: "", meterElements: new Map(),
-    parameterCache: [], feedbackCache: new Map(), deviceFeedbackCache: [],
+    parameterCache: [], feedbackCache: new Map(),
     ui: {}, pendingWrites: new Map(), localIntents: new Map(), writeTimer: null,
+    deviceRequestGenerations: new Map(), confirmedDevices: new Map(), lastDeviceDiagnostic: "",
   };
 
   function integrationTargets(binding) {
@@ -280,27 +374,38 @@ export async function activate(ctx) {
     return targets.map((target) => target?.Integration || target?.integration).filter((target) => target?.integration_id === INTEGRATION_ID);
   }
 
+  function bindingContainsOnlyOneShotVoicemeeterTargets(bindingId, fallbackTargetCount = 1) {
+    const binding = (ctx.bindings.getAll() || []).find((entry) => entry?.id === bindingId);
+    if (!binding) return Number(fallbackTargetCount) === 1;
+    const rawTargets = Array.isArray(binding.targets) && binding.targets.length ? binding.targets : [binding.target];
+    const targets = integrationTargets(binding);
+    return targets.length > 0 && rawTargets.length === targets.length && targets.every(isOneShotVoicemeeterTarget);
+  }
+
+  async function resetLegacyOneShotFeedback(payload) {
+    if (!payload?.binding_id || !["ToggleEffect", "ToggleMute"].includes(payload.action)) return;
+    if (!bindingContainsOnlyOneShotVoicemeeterTargets(payload.binding_id, payload.target_count)) return;
+    await ctx.feedback.set(payload.binding_id, 0, payload.action, { forceHardwareFeedback: true }).catch(() => {});
+  }
+
   function rebuildBindingCache() {
     const seen = new Map();
     const feedback = new Map();
-    const deviceFeedback = [];
     for (const binding of ctx.bindings.getAll() || []) {
       for (const target of integrationTargets(binding)) {
         const data = target.data || {};
         if (target.kind === "parameter" && data.scope && data.property != null) {
+          if (!targetUsesPersistentFeedback(target)) continue;
           const parameter = { scope: data.scope, index: Number(data.index), property: data.property };
           const key = parameterKey(parameter);
           seen.set(key, parameter);
           if (!feedback.has(key)) feedback.set(key, []);
           feedback.get(key).push({ id: binding.id, action: binding.action || "Volume", data });
-        } else if (target.kind === "device_assignment" && binding?.id) {
-          deviceFeedback.push({ binding, data });
         }
       }
     }
     state.parameterCache = Array.from(seen.values());
     state.feedbackCache = feedback;
-    state.deviceFeedbackCache = deviceFeedback;
   }
 
   function dashboardIsVisible() {
@@ -360,6 +465,7 @@ export async function activate(ctx) {
       state.status = await ctx.tauri.invoke("voicemeeter_connect");
       if (state.status.connected) {
         state.consecutivePollFailures = 0;
+        if (!wasConnected) state.confirmedDevices.clear();
         await refreshDevices();
         await poll(true);
         renderConnectedDashboard = shouldRenderConnectionTransition(wasConnected, true);
@@ -382,6 +488,8 @@ export async function activate(ctx) {
     state.consecutivePollFailures = 0;
     try { await ctx.tauri.invoke("voicemeeter_disconnect"); } catch { /* already disconnected */ }
     state.localIntents.clear();
+    state.deviceRequestGenerations.clear();
+    state.confirmedDevices.clear();
     state.status = { ...state.status, connected: false, detail: "Not connected" };
     updateStatusUi();
     renderDashboard();
@@ -403,21 +511,81 @@ export async function activate(ctx) {
         await ctx.feedback.set(binding.id, normalized, binding.action, { silent });
       }
     }
-    for (const entry of state.deviceFeedbackCache) {
-      const { binding, data } = entry;
-      const assigned = data.direction === "input"
-        ? snapshot.input_devices?.[Number(data.index)]
-        : snapshot.output_devices?.[Number(data.index)];
-      const selected = Boolean(data.device_name) && String(assigned || "") === String(data.device_name);
-      await ctx.feedback.set(binding.id, selected ? 1 : 0, binding.action || "ToggleEffect", { silent });
+  }
+
+  function setDeviceDiagnostic(message) {
+    state.lastDeviceDiagnostic = String(message || "");
+    if (state.ui.deviceDiagnostic) {
+      state.ui.deviceDiagnostic.textContent = state.lastDeviceDiagnostic;
+      state.ui.deviceDiagnostic.hidden = !state.lastDeviceDiagnostic;
     }
+  }
+
+  function assignmentFailureMessage(data, result, nativeError = null) {
+    const slot = data.direction === "input" ? `Hardware Input ${Number(data.index) + 1}` : `Hardware Output A${Number(data.index) + 1}`;
+    const driver = data.driver_type ? String(data.driver_type).toUpperCase() : "device clear";
+    const device = String(data.device_name || "No device");
+    const reason = nativeError
+      ? String(nativeError)
+      : result?.status === "not_initialized"
+        ? "Voicemeeter selected the device but could not initialize its audio driver."
+        : result?.status === "read_error"
+          ? `MIDIMaster could not verify the device state: ${result.error}`
+          : `Voicemeeter reported ${result?.observed ? `“${result.observed}”` : "no active device"} instead.`;
+    return { slot, summary: `${slot} — ${driver}: ${device}`, detail: reason };
+  }
+
+  async function assignAndVerifyDevice(data) {
+    const index = Number(data.index);
+    const slotKey = deviceSlotKey(data.scope, index);
+    const generation = Number(state.deviceRequestGenerations.get(slotKey) || 0) + 1;
+    state.deviceRequestGenerations.set(slotKey, generation);
+    const assignment = { scope: data.scope, index, direction: data.direction, driver_type: data.driver_type || null, name: data.device_name || "" };
+    try {
+      await ctx.tauri.invoke("voicemeeter_assign_device", { assignment });
+    } catch (error) {
+      if (state.deviceRequestGenerations.get(slotKey) !== generation) return;
+      state.confirmedDevices.delete(slotKey);
+      const failure = assignmentFailureMessage(data, null, error);
+      setDeviceDiagnostic(`${failure.summary} — ${failure.detail}`);
+      await ctx.app.showAlert("Voicemeeter device assignment failed", `${failure.summary}\n\n${failure.detail}`);
+      return;
+    }
+
+    const result = await verifyDeviceAssignment({
+      expectedName: data.device_name || "",
+      isCurrent: () => !state.disposed && state.deviceRequestGenerations.get(slotKey) === generation,
+      readState: () => ctx.tauri.invoke("voicemeeter_device_state", { scope: data.scope, index }),
+    });
+    if (result.status === "superseded") return;
+
+    const targetDevices = data.direction === "input" ? state.inputDevices : state.outputDevices;
+    targetDevices[index] = result.observed || "";
+    if (result.status === "success") {
+      if (data.device_name) state.confirmedDevices.set(slotKey, { name: String(data.device_name), driver: String(data.driver_type || "").toLowerCase() });
+      else state.confirmedDevices.delete(slotKey);
+      const slot = data.direction === "input" ? `Hardware Input ${index + 1}` : `Hardware Output A${index + 1}`;
+      const driver = data.driver_type ? `${String(data.driver_type).toUpperCase()} — ` : "";
+      const rate = result.sampleRate > 0 ? ` at ${Math.round(result.sampleRate)} Hz` : "";
+      setDeviceDiagnostic(`${slot}: ${driver}${data.device_name || "cleared"}${rate}`);
+      return;
+    }
+
+    state.confirmedDevices.delete(slotKey);
+    if (result.observed && result.observed === String(data.device_name || "")) {
+      state.confirmedDevices.set(slotKey, { name: result.observed, driver: "" });
+    }
+    const failure = assignmentFailureMessage(data, result);
+    setDeviceDiagnostic(`${failure.summary} — ${failure.detail}`);
+    console.warn("Voicemeeter device assignment failed", { assignment, observed: result.observed, sampleRate: result.sampleRate, status: result.status, error: result.error || null });
+    await ctx.app.showAlert("Voicemeeter device assignment failed", `${failure.summary}\n\n${failure.detail}`);
   }
 
   async function poll(force = false) {
     if (!state.status.connected || state.disposed || state.polling) return;
     const now = Date.now();
     const dashboardVisible = dashboardIsVisible();
-    const needsLiveFeedback = state.parameterCache.length > 0 || state.deviceFeedbackCache.length > 0;
+    const needsLiveFeedback = state.parameterCache.length > 0;
     const pollInterval = pollingInterval({ dashboardVisible, needsLiveFeedback });
     if (!force && (now - state.lastPollAt) < pollInterval) return;
     state.lastPollAt = now;
@@ -516,12 +684,17 @@ export async function activate(ctx) {
     }
     if (section === "device_choices") {
       const current = nav.direction === "input" ? state.inputDevices[nav.index] : state.outputDevices[nav.index];
-      const clear = { label: "Clear device", icon_data: icon, buttonActions: [{ label: "Clear Device", value: "SetMainOutputDevice", behavior: "momentary" }], target: { Integration: { integration_id: INTEGRATION_ID, kind: "device_assignment", data: { scope: nav.scope, index: Number(nav.index), direction: nav.direction, driver_type: null, device_name: "", label: `Clear ${nav.direction} device`, action_kind: "momentary" } } } };
-      return [clear, ...(state.devices[nav.direction] || []).map((device) => ({
-        label: `${device.driver_type.toUpperCase()}: ${device.name}${current === device.name ? " (Selected)" : ""}`, icon_data: icon,
-        buttonActions: [{ label: "Select Device", value: "ToggleEffect", behavior: "stateful" }],
-        target: { Integration: { integration_id: INTEGRATION_ID, kind: "device_assignment", data: { scope: nav.scope, index: Number(nav.index), direction: nav.direction, driver_type: device.driver_type, device_name: device.name, label: `${nav.direction === "input" ? "Input" : `A${Number(nav.index) + 1}`}: ${device.name}`, action_kind: "stateful" } } },
-      }))];
+      const clear = { label: "Clear device", icon_data: icon, buttonActions: [buttonAction("Clear Device", "momentary")], target: { Integration: { integration_id: INTEGRATION_ID, kind: "device_assignment", data: { scope: nav.scope, index: Number(nav.index), direction: nav.direction, driver_type: null, device_name: "", label: `Clear ${nav.direction} device`, action_kind: "momentary" } } } };
+      const devices = assignableDevices(state.devices[nav.direction], nav.direction, nav.index);
+      const confirmed = state.confirmedDevices.get(deviceSlotKey(nav.scope, nav.index));
+      return [clear, ...devices.map((device) => {
+        const selected = deviceFeedbackMatches({ device_name: device.name, driver_type: device.driver_type }, current, confirmed, state.devices[nav.direction]);
+        return {
+          label: `${device.driver_type.toUpperCase()}: ${device.name}${selected ? " (Selected)" : ""}`, icon_data: icon,
+          buttonActions: [buttonAction("Select Device", "momentary")],
+          target: { Integration: { integration_id: INTEGRATION_ID, kind: "device_assignment", data: { scope: nav.scope, index: Number(nav.index), direction: nav.direction, driver_type: device.driver_type, device_name: device.name, label: `${nav.direction === "input" ? "Input" : `A${Number(nav.index) + 1}`}: ${device.name}`, action_kind: "momentary" } } },
+        };
+      })];
     }
     if (section === "macros") {
       const offset = Number(nav.offset || 0); const aliases = state.settings.macro_aliases || {};
@@ -536,10 +709,10 @@ export async function activate(ctx) {
       if (offset + 20 < 80) options.push({ label: `MacroButtons ${offset + 21}–${Math.min(80, offset + 40)}`, icon_data: icon, nav: { section: "macros", offset: offset + 20 } });
       return options;
     }
-    if (section === "presets") return (state.settings.presets || []).map((preset) => ({ label: preset.label, icon_data: icon, buttonActions: [{ label: "Recall Preset", value: "SetMainOutputDevice", behavior: "momentary" }], target: { Integration: { integration_id: INTEGRATION_ID, kind: "preset", data: { slot: preset.slot, label: preset.label, action_kind: "momentary" } } } }));
+    if (section === "presets") return (state.settings.presets || []).map((preset) => ({ label: preset.label, icon_data: icon, buttonActions: [buttonAction("Recall Preset", "momentary")], target: { Integration: { integration_id: INTEGRATION_ID, kind: "preset", data: { slot: preset.slot, label: preset.label, action_kind: "momentary" } } } }));
     if (section === "commands") return [
-      { label: "Show Voicemeeter", icon_data: icon, buttonActions: [{ label: "Show", value: "SetMainOutputDevice", behavior: "momentary" }], target: { Integration: { integration_id: INTEGRATION_ID, kind: "command", data: { command: "show", label: "Show Voicemeeter", action_kind: "momentary" } } } },
-      { label: "Restart Audio Engine", icon_data: icon, buttonActions: [{ label: "Restart", value: "SetMainOutputDevice", behavior: "momentary" }], target: { Integration: { integration_id: INTEGRATION_ID, kind: "command", data: { command: "restart", label: "Restart Voicemeeter Audio Engine", action_kind: "momentary" } } } },
+      { label: "Show Voicemeeter", icon_data: icon, buttonActions: [buttonAction("Show", "momentary")], target: { Integration: { integration_id: INTEGRATION_ID, kind: "command", data: { command: "show", label: "Show Voicemeeter", action_kind: "momentary" } } } },
+      { label: "Restart Audio Engine", icon_data: icon, buttonActions: [buttonAction("Restart", "momentary")], target: { Integration: { integration_id: INTEGRATION_ID, kind: "command", data: { command: "restart", label: "Restart Voicemeeter Audio Engine", action_kind: "momentary" } } } },
     ];
     return [];
   }
@@ -547,19 +720,32 @@ export async function activate(ctx) {
   async function onTriggered(payload) {
     const target = payload?.target || {}; const data = target.data || {}; const value = clamp01(payload?.value);
     if (target.kind === "parameter") {
+      const oneShot = isOneShotVoicemeeterTarget(target);
+      const pressRelease = !oneShot && String(data.action_kind || "").toLowerCase() === "momentary";
+      if (oneShot && value <= 0) return;
       const min = Number(data.min ?? 0); const max = Number(data.max ?? 1);
-      const raw = payload.action === "Volume" ? denormalizeContinuous(value, min, max, data.property) : (max > 1 ? (value > 0.5 ? max : 0) : (value > 0.5 ? 1 : 0));
+      const raw = oneShot ? 1 : payload.action === "Volume" ? denormalizeContinuous(value, min, max, data.property) : (max > 1 ? (value > 0.5 ? max : 0) : (value > 0.5 ? 1 : 0));
       scheduleWrite({ scope: data.scope, index: Number(data.index), property: data.property }, raw);
-      if (payload.binding_id && payload.is_primary_target !== false) await ctx.feedback.set(payload.binding_id, value, payload.action);
+      if (oneShot) await resetLegacyOneShotFeedback(payload);
+      else if (!pressRelease && payload.binding_id && payload.is_primary_target !== false) await ctx.feedback.set(payload.binding_id, value, payload.action);
       return;
     }
     if (value <= 0) return;
     if (target.kind === "device_assignment") {
-      await ctx.tauri.invoke("voicemeeter_assign_device", { assignment: { scope: data.scope, index: Number(data.index), direction: data.direction, driver_type: data.driver_type || null, name: data.device_name || "" } });
-      await poll(true); return;
+      const assignment = assignAndVerifyDevice(data);
+      await resetLegacyOneShotFeedback(payload);
+      await assignment;
+      return;
     }
-    if (target.kind === "preset") { await ctx.tauri.invoke("voicemeeter_safe_command", { action: "preset", index: Number(data.slot) }); return; }
-    if (target.kind === "command") { await ctx.tauri.invoke("voicemeeter_safe_command", { action: data.command, index: null }); return; }
+    if (target.kind === "preset") {
+      try { await ctx.tauri.invoke("voicemeeter_safe_command", { action: "preset", index: Number(data.slot) }); }
+      finally { await resetLegacyOneShotFeedback(payload); }
+      return;
+    }
+    if (target.kind === "command") {
+      try { await ctx.tauri.invoke("voicemeeter_safe_command", { action: data.command, index: null }); }
+      finally { await resetLegacyOneShotFeedback(payload); }
+    }
   }
 
   function renderMeters() {
@@ -602,7 +788,7 @@ export async function activate(ctx) {
 
   function dashboardStyles() {
     return `<style>
-      .vm-shell{display:grid;gap:10px;color:var(--text-primary)}.vm-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--control-border);border-radius:8px;background:linear-gradient(110deg,color-mix(in srgb,var(--surface-raised) 92%,#ff9e2c 8%),var(--surface-raised))}.vm-kicker{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}.vm-hero h3{margin:2px 0;font-size:17px}.vm-hero p{margin:0;color:var(--text-muted);font-size:11px}.vm-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.vm-grid{display:grid;grid-template-columns:minmax(250px,.7fr) minmax(420px,1.6fr);gap:10px}.vm-card{padding:12px;border:1px solid var(--control-border);border-radius:8px;background:var(--surface-raised)}.vm-card h4{margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary)}.vm-field{display:grid;gap:4px;margin:0 0 8px}.vm-field label,.vm-help{font-size:10px;color:var(--text-muted)}.vm-field select,.vm-field textarea{width:100%;box-sizing:border-box;border:1px solid var(--control-border);border-radius:6px;background:var(--control-bg);color:var(--text-primary);padding:7px;font:inherit}.vm-field textarea{min-height:56px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px}.vm-check{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--text-secondary);margin:2px 0 8px}.vm-channels{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px;align-content:start;overflow:visible}.vm-channel{display:grid;grid-template-columns:minmax(95px,.9fr) minmax(55px,1fr) 40px;gap:6px;align-items:center;padding:6px 7px;border:1px solid color-mix(in srgb,var(--control-border) 72%,transparent);border-radius:5px;background:color-mix(in srgb,var(--surface) 58%,transparent)}.vm-channel-copy{display:grid;min-width:0}.vm-channel-copy strong,.vm-channel-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vm-channel-copy strong{font-size:10px}.vm-channel-copy span{font-size:8px;color:var(--text-muted)}.vm-meter{height:6px;border-radius:2px;background:var(--slider-track);overflow:hidden}.vm-meter i{display:block;width:var(--level);height:100%;background:linear-gradient(90deg,#53d18b 0 72%,#ffcc4d 72% 90%,#ff6262 90%);transition:width 70ms linear}.vm-state{font-size:8px;letter-spacing:.06em;color:var(--text-muted);text-align:right}.vm-empty{padding:24px;text-align:center;color:var(--text-muted);font-size:11px}.vm-statusline{display:flex;align-items:center;gap:8px}.vm-note{padding:8px 10px;border-left:3px solid #ff9e2c;background:color-mix(in srgb,#ff9e2c 8%,var(--surface));font-size:10px;color:var(--text-secondary)}@media(max-width:900px){.vm-grid{grid-template-columns:1fr}.vm-hero{grid-template-columns:1fr}.vm-actions{justify-content:flex-start}}
+      .vm-shell{display:grid;gap:10px;color:var(--text-primary)}.vm-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--control-border);border-radius:8px;background:linear-gradient(110deg,color-mix(in srgb,var(--surface-raised) 92%,#ff9e2c 8%),var(--surface-raised))}.vm-kicker{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}.vm-hero h3{margin:2px 0;font-size:17px}.vm-hero p{margin:0;color:var(--text-muted);font-size:11px}.vm-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.vm-grid{display:grid;grid-template-columns:minmax(250px,.7fr) minmax(420px,1.6fr);gap:10px}.vm-card{padding:12px;border:1px solid var(--control-border);border-radius:8px;background:var(--surface-raised)}.vm-card h4{margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary)}.vm-field{display:grid;gap:4px;margin:0 0 8px}.vm-field label,.vm-help{font-size:10px;color:var(--text-muted)}.vm-field select,.vm-field textarea{width:100%;box-sizing:border-box;border:1px solid var(--control-border);border-radius:6px;background:var(--control-bg);color:var(--text-primary);padding:7px;font:inherit}.vm-field textarea{min-height:56px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px}.vm-check{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--text-secondary);margin:2px 0 8px}.vm-channels{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px;align-content:start;overflow:visible}.vm-channel{display:grid;grid-template-columns:minmax(95px,.9fr) minmax(55px,1fr) 40px;gap:6px;align-items:center;padding:6px 7px;border:1px solid color-mix(in srgb,var(--control-border) 72%,transparent);border-radius:5px;background:color-mix(in srgb,var(--surface) 58%,transparent)}.vm-channel-copy{display:grid;min-width:0}.vm-channel-copy strong,.vm-channel-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vm-channel-copy strong{font-size:10px}.vm-channel-copy span{font-size:8px;color:var(--text-muted)}.vm-meter{height:6px;border-radius:2px;background:var(--slider-track);overflow:hidden}.vm-meter i{display:block;width:var(--level);height:100%;background:linear-gradient(90deg,#53d18b 0 72%,#ffcc4d 72% 90%,#ff6262 90%);transition:width 70ms linear}.vm-state{font-size:8px;letter-spacing:.06em;color:var(--text-muted);text-align:right}.vm-empty{padding:24px;text-align:center;color:var(--text-muted);font-size:11px}.vm-statusline{display:flex;align-items:center;gap:8px}.vm-note{padding:8px 10px;border-left:3px solid #ff9e2c;background:color-mix(in srgb,#ff9e2c 8%,var(--surface));font-size:10px;color:var(--text-secondary)}.vm-device-diagnostic{padding:7px 10px;border:1px solid var(--control-border);border-radius:6px;background:var(--surface-raised);font:10px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--text-muted)}@media(max-width:900px){.vm-grid{grid-template-columns:1fr}.vm-hero{grid-template-columns:1fr}.vm-actions{justify-content:flex-start}}
     </style>`;
   }
 
@@ -619,8 +805,8 @@ export async function activate(ctx) {
       <div class="connection-item-header"><div class="connection-info"><img class="connection-icon" src="${icon || ""}" alt=""><div><div class="connection-name">Voicemeeter</div><div class="vm-kicker">Native mixer bridge</div></div></div><div class="connection-status vm-statusline"><span class="connection-status-dot" data-role="dot"></span><span data-role="status">${escapeHtml(state.status.detail || "Not connected")}</span></div></div>
       <section class="vm-hero"><div><div class="vm-kicker">Signal desk</div><h3 data-role="edition">${escapeHtml(state.status.edition || "Voicemeeter")}</h3><p>MIDI control for strips, buses, routing, devices, MacroButtons, and presets.</p></div><div class="vm-actions"><button class="connection-button" data-role="connect">${state.status.connected ? "Disconnect" : "Connect"}</button><button class="connection-button" data-role="launch">Launch</button><button class="connection-button" data-role="show">Show</button><button class="connection-button" data-role="restart">Restart engine</button><button class="connection-button" data-role="refresh">Refresh</button></div></section>
       <div class="vm-grid"><section class="vm-card"><h4>Connection & target setup</h4><label class="vm-check"><input type="checkbox" data-role="auto" ${state.settings.auto_connect ? "checked" : ""}> Auto connect when Voicemeeter is running</label><div class="vm-field"><label>Edition used by the Launch button</label><select data-role="launch-edition">${editions.map((edition) => `<option value="${edition}" ${edition === preferred ? "selected" : ""}>${edition[0].toUpperCase()}${edition.slice(1)}</option>`).join("") || `<option value="banana">Banana</option>`}</select></div><div class="vm-field"><label>MacroButton aliases — one per line</label><textarea data-role="aliases" placeholder="1: Stream mute\n2: Push to talk">${escapeHtml(aliasesText)}</textarea></div><div class="vm-field"><label>Preset slots — one per line</label><textarea data-role="presets" placeholder="1: Streaming\n2: Headphones">${escapeHtml(presetsText)}</textarea></div><button class="connection-button" data-role="save">Save target setup</button><p class="vm-help">Aliases and preset labels are stored per MIDIMaster profile. Slot numbers are shown as 1-based here.</p></section><section class="vm-card"><h4>Live channels</h4><div class="vm-channels" data-role="meters"></div></section></div>
-      <div class="vm-note">Changing a hardware device can interrupt audio. Auto connect never launches Voicemeeter; use Launch explicitly.</div></div>`;
-    state.ui = { root, status: root.querySelector('[data-role="status"]'), dot: root.querySelector('[data-role="dot"]'), edition: root.querySelector('[data-role="edition"]'), connect: root.querySelector('[data-role="connect"]'), auto: root.querySelector('[data-role="auto"]'), launchEdition: root.querySelector('[data-role="launch-edition"]'), aliases: root.querySelector('[data-role="aliases"]'), presets: root.querySelector('[data-role="presets"]'), meters: root.querySelector('[data-role="meters"]') };
+      <div class="vm-note">Changing a hardware device can interrupt audio. Auto connect never launches Voicemeeter; use Launch explicitly.</div><div class="vm-device-diagnostic" data-role="device-diagnostic" ${state.lastDeviceDiagnostic ? "" : "hidden"}>${escapeHtml(state.lastDeviceDiagnostic)}</div></div>`;
+    state.ui = { root, status: root.querySelector('[data-role="status"]'), dot: root.querySelector('[data-role="dot"]'), edition: root.querySelector('[data-role="edition"]'), connect: root.querySelector('[data-role="connect"]'), auto: root.querySelector('[data-role="auto"]'), launchEdition: root.querySelector('[data-role="launch-edition"]'), aliases: root.querySelector('[data-role="aliases"]'), presets: root.querySelector('[data-role="presets"]'), meters: root.querySelector('[data-role="meters"]'), deviceDiagnostic: root.querySelector('[data-role="device-diagnostic"]') };
     state.ui.connect.onclick = () => state.status.connected ? disconnect({ manual: true }) : connect({ manual: true });
     root.querySelector('[data-role="launch"]').onclick = async () => { await saveDashboardSettings(); await ctx.tauri.invoke("voicemeeter_launch", { edition: state.ui.launchEdition.value }); setTimeout(() => connect({ manual: true }), 900); };
     root.querySelector('[data-role="show"]').onclick = () => ctx.tauri.invoke("voicemeeter_safe_command", { action: "show", index: null }).catch(() => {});
@@ -685,7 +871,7 @@ export async function activate(ctx) {
   ctx.lifecycle.onDispose(() => {
     state.disposed = true; clearInterval(pollTimer); clearInterval(reconnectTimer);
     if (state.writeTimer) clearTimeout(state.writeTimer);
-    state.pendingWrites.clear(); state.localIntents.clear();
+    state.pendingWrites.clear(); state.localIntents.clear(); state.deviceRequestGenerations.clear(); state.confirmedDevices.clear();
     ctx.tauri.invoke("voicemeeter_disconnect").catch(() => {});
   });
 }

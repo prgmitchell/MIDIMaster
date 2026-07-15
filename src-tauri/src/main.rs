@@ -53,9 +53,9 @@ use plugin_api::{
 };
 use store_api::{fetch_store_catalog, install_store_plugin, install_store_plugins};
 use voicemeeter::{
-    voicemeeter_assign_device, voicemeeter_connect, voicemeeter_disconnect, voicemeeter_launch,
-    voicemeeter_list_devices, voicemeeter_safe_command, voicemeeter_snapshot, voicemeeter_status,
-    voicemeeter_write_parameters, VoicemeeterState,
+    voicemeeter_assign_device, voicemeeter_connect, voicemeeter_device_state,
+    voicemeeter_disconnect, voicemeeter_launch, voicemeeter_list_devices, voicemeeter_safe_command,
+    voicemeeter_snapshot, voicemeeter_status, voicemeeter_write_parameters, VoicemeeterState,
 };
 use ws_bridge::{get_wavelink_ws_port, ws_close, ws_open, ws_send, WsHub};
 
@@ -472,6 +472,7 @@ fn main() {
             voicemeeter_snapshot,
             voicemeeter_write_parameters,
             voicemeeter_list_devices,
+            voicemeeter_device_state,
             voicemeeter_assign_device,
             voicemeeter_launch,
             voicemeeter_safe_command,

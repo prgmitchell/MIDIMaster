@@ -1043,6 +1043,7 @@ pluginRuntime = createPluginRuntime({
   isBindingInteractionActive,
   requestBindingsRerender,
   mountConnectionsTabs: (options) => connectionsController?.mountConnectionsTabs?.(options),
+  showAlert: (title, message = "") => showAlert(title, message),
   showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
 });
 

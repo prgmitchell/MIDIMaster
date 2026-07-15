@@ -7,7 +7,7 @@
 //
 // This file intentionally avoids any framework/bundler assumptions.
 
-export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInvalidateBindingsUI, showConfirm }) {
+export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInvalidateBindingsUI, showAlert, showConfirm }) {
   const integrations = new Map();
   const plugins = new Map();
 
@@ -240,6 +240,12 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
                   onInvalidateBindingsUI();
                 }
               } catch { }
+            },
+            showAlert: (title, message = "") => {
+              if (typeof showAlert !== "function") {
+                return Promise.resolve();
+              }
+              return Promise.resolve(showAlert(title, message)).catch(() => {});
             },
             showConfirm: (options = {}) => {
               if (typeof showConfirm !== "function") {

@@ -90,6 +90,100 @@ function testProfileChangeEnvelopePreservesAutoConnect() {
   assert.deepEqual(utils.profileSettingsFromEvent({ auto_connect: true }), { auto_connect: true });
 }
 
+function testButtonActionSemantics() {
+  assert.deepEqual(utils.buttonAction("Mute", "stateful"), {
+    label: "Mute", value: "ToggleEffect", behavior: "stateful",
+  });
+  assert.deepEqual(utils.buttonAction("Select Device", "momentary"), {
+    label: "Select Device", value: "SetMainOutputDevice", behavior: "momentary",
+  });
+  for (const property of ["mode.normal", "mode.amix", "mode.tvmix", "sel"]) {
+    assert.equal(utils.parameterButtonBehavior("bus", property), "momentary");
+    assert.equal(utils.isOneShotVoicemeeterTarget({ kind: "parameter", data: { scope: "bus", property } }), true);
+  }
+  for (const [scope, property] of [["strip", "mute"], ["strip", "a1"], ["bus", "mute"], ["bus", "monitor"], ["bus", "eq.on"]]) {
+    assert.equal(utils.parameterButtonBehavior(scope, property), "stateful");
+    assert.equal(utils.isOneShotVoicemeeterTarget({ kind: "parameter", data: { scope, property } }), false);
+  }
+  for (const kind of ["device_assignment", "preset", "command"]) {
+    assert.equal(utils.isOneShotVoicemeeterTarget({ kind, data: { action_kind: "stateful" } }), true);
+  }
+  assert.equal(utils.targetUsesPersistentFeedback({ kind: "parameter", data: { scope: "macro", property: "state", action_kind: "stateful" } }), true);
+  assert.equal(utils.targetUsesPersistentFeedback({ kind: "parameter", data: { scope: "macro", property: "state", action_kind: "momentary" } }), false);
+
+  const state = { icon: null, busLabels: ["Speakers"], stripLabels: [], status: { capabilities: { physical_bus_count: 1 } } };
+  const mode = utils.parameterOption("bus", 0, ["mode.normal", "Normal Mode", 1], state, true);
+  assert.deepEqual(mode.buttonActions, [{ label: "Normal Mode", value: "SetMainOutputDevice", behavior: "momentary" }]);
+  assert.equal(mode.target.Integration.data.action_kind, "momentary");
+  const mute = utils.parameterOption("bus", 0, ["mute", "Mute", 1], state, true);
+  assert.deepEqual(mute.buttonActions, [{ label: "Mute", value: "ToggleEffect", behavior: "stateful" }]);
+  assert.equal(mute.target.Integration.data.action_kind, "stateful");
+}
+
+function testAsioChoicesAreLimitedToA1() {
+  const devices = [
+    { driver_type: "asio", name: "Interface" },
+    { driver_type: "wdm", name: "Interface" },
+    { driver_type: "mme", name: "Speakers" },
+  ];
+  assert.deepEqual(utils.assignableDevices(devices, "output", 0), devices);
+  assert.deepEqual(utils.assignableDevices(devices, "output", 1), devices.slice(1));
+  assert.deepEqual(utils.assignableDevices(devices, "input", 1), devices);
+}
+
+function testDeviceFeedbackHandlesDuplicateDriverNames() {
+  const data = { device_name: "Interface", driver_type: "wdm" };
+  const duplicateDevices = [
+    { driver_type: "asio", name: "Interface" },
+    { driver_type: "wdm", name: "Interface" },
+  ];
+  assert.equal(utils.deviceFeedbackMatches(data, "Interface", null, duplicateDevices), false);
+  assert.equal(utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "wdm" }, duplicateDevices), true);
+  assert.equal(utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "asio" }, duplicateDevices), false);
+  assert.equal(utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "" }, [{ driver_type: "wdm", name: "Interface" }]), false);
+  assert.equal(utils.deviceFeedbackMatches(data, "Other", { name: "Interface", driver: "wdm" }, duplicateDevices), false);
+}
+
+async function testDeviceVerification() {
+  const waits = [];
+  let reads = 0;
+  const success = await utils.verifyDeviceAssignment({
+    expectedName: "Speakers",
+    delays: [100, 250, 500],
+    wait: async (ms) => { waits.push(ms); },
+    isCurrent: () => true,
+    readState: async () => (++reads === 1
+      ? { name: "Speakers", sample_rate: 0 }
+      : { name: "Speakers", sample_rate: 48000 }),
+  });
+  assert.equal(success.status, "success");
+  assert.equal(success.sampleRate, 48000);
+  assert.deepEqual(waits, [100, 150]);
+
+  const mismatch = await utils.verifyDeviceAssignment({
+    expectedName: "Headphones",
+    delays: [100],
+    wait: async () => {},
+    isCurrent: () => true,
+    readState: async () => ({ name: "Speakers", sample_rate: 48000 }),
+  });
+  assert.equal(mismatch.status, "mismatch");
+
+  const unhealthy = utils.deviceVerificationResult("Speakers", { name: "Speakers", sample_rate: 0 });
+  assert.equal(unhealthy.status, "not_initialized");
+  const cleared = utils.deviceVerificationResult("", { name: "", sample_rate: 0 });
+  assert.equal(cleared.status, "success");
+
+  const superseded = await utils.verifyDeviceAssignment({
+    expectedName: "Speakers",
+    delays: [100],
+    wait: async () => {},
+    isCurrent: () => false,
+    readState: async () => { throw new Error("must not read"); },
+  });
+  assert.equal(superseded.status, "superseded");
+}
+
 function testOnlyCoreBindingActionsAreEmitted() {
   const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
   for (const unsupported of [
@@ -113,7 +207,18 @@ function testDashboardUsesMidimasterConfirmation() {
   const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
   assert.equal(source.includes("window.confirm"), false);
   assert.equal(source.includes("ctx.app.showConfirm"), true);
+  assert.equal(source.includes("ctx.app.showAlert"), true);
+  assert.equal(source.includes("window.alert"), false);
   assert.equal(source.includes('state.lastStatusUiSignature = ""'), true);
+}
+
+function testOneShotTargetsDoNotUsePersistentFeedback() {
+  const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
+  assert.equal(source.includes('buttonActions: [buttonAction("Select Device", "momentary")]'), true);
+  assert.equal(source.includes('device_name: device.name, label:'), true);
+  assert.equal(source.includes('action_kind: "momentary"'), true);
+  assert.equal(source.includes("deviceFeedbackCache"), false);
+  assert.equal(source.includes("resetLegacyOneShotFeedback(payload)"), true);
 }
 
 testGainTaper();
@@ -126,7 +231,12 @@ testMetersOnlyPollOnVisibleDashboard();
 testTransientFailuresDoNotFlapConnection();
 testDisconnectedRetriesDoNotRebuildDashboard();
 testProfileChangeEnvelopePreservesAutoConnect();
+testButtonActionSemantics();
+testAsioChoicesAreLimitedToA1();
+testDeviceFeedbackHandlesDuplicateDriverNames();
+await testDeviceVerification();
 testOnlyCoreBindingActionsAreEmitted();
 testDashboardUsesOneContentScrollbar();
 testDashboardUsesMidimasterConfirmation();
+testOneShotTargetsDoNotUsePersistentFeedback();
 console.log("Voicemeeter plugin tests passed");

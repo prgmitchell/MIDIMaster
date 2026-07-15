@@ -70,10 +70,55 @@ pub struct DeviceAssignment {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct DeviceState {
+    pub scope: String,
+    pub index: usize,
+    pub name: String,
+    pub sample_rate: f32,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct MeterValue {
     pub scope: String,
     pub index: usize,
     pub level: f32,
+}
+
+fn validate_device_slot(
+    scope: &str,
+    direction: &str,
+    index: usize,
+    caps: &VoicemeeterCapabilities,
+) -> Result<&'static str, String> {
+    let (prefix, max) = if scope == "strip" && direction == "input" {
+        ("Strip", caps.physical_strip_count)
+    } else if scope == "bus" && direction == "output" {
+        ("Bus", caps.physical_bus_count)
+    } else {
+        return Err("Invalid Voicemeeter device assignment target".to_string());
+    };
+    if index >= max {
+        return Err("Voicemeeter device assignment index is out of range".to_string());
+    }
+    Ok(prefix)
+}
+
+fn supported_device_drivers(scope: &str, index: usize) -> &'static [&'static str] {
+    if scope == "bus" && index == 0 {
+        &["mme", "wdm", "ks", "asio"]
+    } else {
+        &["mme", "wdm", "ks"]
+    }
+}
+
+fn validate_device_driver(scope: &str, index: usize, driver: &str) -> Result<(), String> {
+    if driver == "asio" && (scope != "bus" || index != 0) {
+        return Err("ASIO output devices are supported only on hardware output A1".to_string());
+    }
+    if !supported_device_drivers(scope, index).contains(&driver) {
+        return Err("Unsupported Voicemeeter device driver type".to_string());
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -971,6 +1016,46 @@ pub fn voicemeeter_list_devices(
 }
 
 #[tauri::command]
+pub fn voicemeeter_device_state(
+    state: tauri::State<'_, VoicemeeterState>,
+    scope: String,
+    index: usize,
+) -> Result<DeviceState, String> {
+    let inner = state
+        .inner
+        .lock()
+        .map_err(|_| "Voicemeeter bridge lock failed".to_string())?;
+    let status = status_from_inner(&inner);
+    let caps = status
+        .capabilities
+        .ok_or_else(|| "Voicemeeter is not running".to_string())?;
+    let scope = scope.to_ascii_lowercase();
+    let direction = if scope == "strip" { "input" } else { "output" };
+    let prefix = validate_device_slot(&scope, direction, index, &caps)?;
+    #[cfg(target_os = "windows")]
+    {
+        let api = inner
+            .api
+            .as_ref()
+            .ok_or_else(|| "Voicemeeter API unavailable".to_string())?;
+        let name = api.get_string(&format!("{prefix}[{index}].device.name"))?;
+        let sample_rate = if name.is_empty() {
+            0.0
+        } else {
+            api.get_float(&format!("{prefix}[{index}].device.sr"))?
+        };
+        return Ok(DeviceState {
+            scope,
+            index,
+            name,
+            sample_rate,
+        });
+    }
+    #[cfg(not(target_os = "windows"))]
+    Err("Voicemeeter is supported only on Windows".to_string())
+}
+
+#[tauri::command]
 pub fn voicemeeter_assign_device(
     state: tauri::State<'_, VoicemeeterState>,
     assignment: DeviceAssignment,
@@ -985,36 +1070,27 @@ pub fn voicemeeter_assign_device(
         .ok_or_else(|| "Voicemeeter is not running".to_string())?;
     let scope = assignment.scope.to_ascii_lowercase();
     let direction = assignment.direction.to_ascii_lowercase();
-    let max = if scope == "strip" && direction == "input" {
-        caps.physical_strip_count
-    } else if scope == "bus" && direction == "output" {
-        caps.physical_bus_count
-    } else {
-        return Err("Invalid Voicemeeter device assignment target".to_string());
-    };
-    if assignment.index >= max {
-        return Err("Voicemeeter device assignment index is out of range".to_string());
-    }
+    let prefix = validate_device_slot(&scope, &direction, assignment.index, &caps)?;
     #[cfg(target_os = "windows")]
     {
         let api = inner
             .api
             .as_ref()
             .ok_or_else(|| "Voicemeeter API unavailable".to_string())?;
-        let prefix = if scope == "strip" { "Strip" } else { "Bus" };
         let name = assignment.name.unwrap_or_default();
-        let parameter = if name.is_empty() {
-            format!("{prefix}[{}].device", assignment.index)
+        if name.is_empty() {
+            for driver in supported_device_drivers(&scope, assignment.index) {
+                api.set_string(
+                    &format!("{prefix}[{}].device.{driver}", assignment.index),
+                    "",
+                )?;
+            }
         } else {
             let driver = assignment
                 .driver_type
                 .unwrap_or_default()
                 .to_ascii_lowercase();
-            if !["mme", "wdm", "ks", "asio"].contains(&driver.as_str())
-                || (direction == "input" && driver == "asio")
-            {
-                return Err("Unsupported Voicemeeter device driver type".to_string());
-            }
+            validate_device_driver(&scope, assignment.index, &driver)?;
             let found = api
                 .devices(&direction)?
                 .into_iter()
@@ -1022,9 +1098,11 @@ pub fn voicemeeter_assign_device(
             if !found {
                 return Err("Selected audio device is no longer available".to_string());
             }
-            format!("{prefix}[{}].device.{driver}", assignment.index)
-        };
-        api.set_string(&parameter, &name)?;
+            api.set_string(
+                &format!("{prefix}[{}].device.{driver}", assignment.index),
+                &name,
+            )?;
+        }
     }
     inner.revision = inner.revision.wrapping_add(1);
     Ok(())
@@ -1149,6 +1227,33 @@ mod tests {
     #[test]
     fn version_number_is_formatted_by_byte() {
         assert_eq!(format_version(0x02010508), "2.1.5.8");
+    }
+
+    #[test]
+    fn device_validation_enforces_asio_a1_only() {
+        let caps = capabilities_for(3).unwrap();
+        assert!(validate_device_slot("bus", "output", 0, &caps).is_ok());
+        assert!(validate_device_driver("bus", 0, "asio").is_ok());
+        assert!(validate_device_driver("bus", 1, "asio")
+            .unwrap_err()
+            .contains("A1"));
+        for driver in ["mme", "wdm", "ks"] {
+            assert!(validate_device_driver("bus", 4, driver).is_ok());
+            assert!(validate_device_driver("strip", 4, driver).is_ok());
+        }
+    }
+
+    #[test]
+    fn device_validation_rejects_invalid_targets_and_drivers() {
+        let caps = capabilities_for(2).unwrap();
+        assert!(validate_device_slot("bus", "output", 3, &caps).is_err());
+        assert!(validate_device_slot("strip", "output", 0, &caps).is_err());
+        assert!(validate_device_driver("bus", 0, "directsound").is_err());
+        assert_eq!(
+            supported_device_drivers("bus", 0),
+            &["mme", "wdm", "ks", "asio"]
+        );
+        assert_eq!(supported_device_drivers("bus", 1), &["mme", "wdm", "ks"]);
     }
 
     #[cfg(target_os = "windows")]
