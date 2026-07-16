@@ -32,12 +32,25 @@ const feedbackOutputControls = [
   ["binding-config-feedback-clear", "bindingConfigFeedbackClear"],
 ];
 
-for (const [elementId, refName] of [...indicatorControls, ...feedbackOutputControls]) {
+const assignModeControls = [
+  ["binding-config-assign-mode-add", "bindingConfigAssignModeAdd"],
+  ["binding-config-assign-mode-replace", "bindingConfigAssignModeReplace"],
+  ["binding-config-assign-mode-clear", "bindingConfigAssignModeClear"],
+];
+
+for (const [elementId, refName] of [...indicatorControls, ...feedbackOutputControls, ...assignModeControls]) {
   assert.match(files.html, new RegExp(`id="${elementId}"`), `${elementId} should exist in index.html`);
   assert.match(files.domRefs, new RegExp(`const ${refName} = document\\.getElementById\\("${elementId}"\\)`), `${refName} should be read from the DOM`);
   assert.match(files.domRefs, new RegExp(`\\b${refName},`), `${refName} should be returned from createDomRefs`);
   assert.match(files.appEntry, new RegExp(`\\b${refName},`), `${refName} should be passed into createBindingsFeature`);
 }
+
+assert.match(files.html, /id="binding-config-assign-mode-clear"[^>]*data-mode="Clear"[^>]*data-i18n="common\.clear"/, "Clear assign mode should appear as a localized menu option");
+assert.match(files.bindings, /binding\?\.assign_mode === "Clear" \? "Clear" : "Add"/, "assign badge should preserve Clear mode");
+assert.match(files.bindings, /currentMode === "Clear"/, "assign mode UI should select Clear mode");
+assert.match(files.bindings, /rawMode === "Clear" \? "Clear" : "Add"/, "assign mode click handling should accept Clear mode");
+assert.match(files.bindings, /bindingConfigAssignModeClear\.addEventListener\("click", onAssignModeOptionClick\)/, "Clear mode should use the shared selection handler");
+assert.match(files.bindings, /const sameBindingTransfer = conflict\.binding\.id === binding\.id;[\s\S]*?binding\[conflict\.field\] = null;[\s\S]*?configAcceptedTransfers\.delete\(field\);/s, "same-binding MIDI transfers should clear the previous role instead of preserving duplicate ownership");
 
 assert.doesNotMatch(files.html, /binding-config-indicator-mode/, "indicator output should not use a default/custom mode selector");
 assert.doesNotMatch(files.bindings, /bindingConfigIndicatorMode|indicatorModeDropdown|applyIndicatorModeSelection/, "bindings UI should not manage an indicator mode selector");

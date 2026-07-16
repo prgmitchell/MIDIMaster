@@ -612,7 +612,7 @@ export function normalizeBinding(binding) {
   if (out.indicator_control && indicatorIsFeedbackOutput) {
     out.indicator_control.control_kind = "Continuous";
   }
-  if (out.assign_mode !== "Replace") out.assign_mode = "Add";
+  if (out.assign_mode !== "Replace" && out.assign_mode !== "Clear") out.assign_mode = "Add";
   normalizeButtonLightFields(out);
   delete out.toggle_mute_light_mode;
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;

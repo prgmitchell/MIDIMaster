@@ -47,6 +47,9 @@ jobs:
       - name: Test frontend binding model
         run: node scripts/test-binding-model.mjs
 
+      - name: Test frontend binding configuration wiring
+        run: node scripts/test-binding-config-ui-wiring.mjs
+
       - name: Test Soundboard editor constraints
         run: node scripts/test-soundboard-editor.mjs
 
@@ -91,6 +94,9 @@ jobs:
 
       - name: Test bundled Hue plugin
         run: node scripts/test-hue-plugin.mjs
+
+      - name: Test bundled OBS plugin
+        run: node scripts/test-obs-plugin.mjs
 
       - name: Format (rustfmt)
         working-directory: src-tauri

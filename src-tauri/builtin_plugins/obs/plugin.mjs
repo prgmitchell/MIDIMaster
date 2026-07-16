@@ -53,6 +53,34 @@ function inputMuteFeedbackBindingIds(volumeBindings, muteBindings, inputName) {
   ]);
 }
 
+function bindingIntegrationTargets(binding) {
+  const targets = Array.isArray(binding?.targets) ? [...binding.targets] : [];
+  if (binding?.target != null) targets.push(binding.target);
+  return targets
+    .map((target) => target?.Integration || target?.integration)
+    .filter((target) => target && typeof target === "object");
+}
+
+function obsDisconnectedFeedbackUpdates(bindings) {
+  const updates = new Map();
+  for (const binding of Array.isArray(bindings) ? bindings : []) {
+    const bindingId = String(binding?.id || "").trim();
+    if (!bindingId) continue;
+    const obsTargets = bindingIntegrationTargets(binding)
+      .filter((target) => target.integration_id === "obs");
+    if (obsTargets.length === 0) continue;
+
+    const action = String(binding?.action || "Volume");
+    if (action === "ToggleMute" || action === "ToggleEffect") {
+      updates.set(`${bindingId}\u0000${action}`, { bindingId, action });
+    }
+    if (obsTargets.some((target) => target.kind === "input")) {
+      updates.set(`${bindingId}\u0000ToggleMute`, { bindingId, action: "ToggleMute" });
+    }
+  }
+  return Array.from(updates.values());
+}
+
 function sourceFilterKey(sourceName, filterName) {
   return `${String(sourceName || "")}\u0000${String(filterName || "")}`;
 }
@@ -112,6 +140,7 @@ export const obsTestUtils = {
   forgetLocalMuteIntent,
   shouldIgnoreLocalMuteEcho,
   inputMuteFeedbackBindingIds,
+  obsDisconnectedFeedbackUpdates,
   sourceFilterKey,
   normalizeSourceFilters,
   makeSourceFilterToggleTarget,
@@ -250,6 +279,34 @@ export async function activate(ctx) {
   const lastSentVolumeByInput = new Map(); // inputName -> volume
   let volumeFlushTimer = null;
   let volumeFlushInFlight = false;
+  let disconnectedFeedbackPromise = Promise.resolve();
+
+  function publishConnectionState(nextConnected) {
+    try {
+      return Promise.resolve(ctx.integration?.setConnected?.("obs", Boolean(nextConnected)));
+    } catch {
+      return Promise.resolve();
+    }
+  }
+
+  function queueDisconnectedFeedbackClear() {
+    statefulActionFeedback.clear();
+    disconnectedFeedbackPromise = disconnectedFeedbackPromise
+      .catch(() => {})
+      .then(async () => {
+        if (connected) return;
+        await publishConnectionState(false);
+        if (connected) return;
+        const updates = obsDisconnectedFeedbackUpdates(bindings);
+        await Promise.allSettled(updates.map(({ bindingId, action }) => (
+          ctx.feedback.set(bindingId, 0.0, action, {
+            silent: true,
+            forceHardwareFeedback: true,
+          })
+        )));
+      });
+    return disconnectedFeedbackPromise;
+  }
 
   function clearPendingRequests(errorMessage = null) {
     for (const entry of pending.values()) {
@@ -302,6 +359,7 @@ export async function activate(ctx) {
     localMuteIntentByInput.clear();
     localVolumeIntentByBinding.clear();
     resetAudioInputDiscovery();
+    return queueDisconnectedFeedbackClear();
   }
 
   ctx.lifecycle?.onDispose?.(disposeObsRuntime);
@@ -318,6 +376,9 @@ export async function activate(ctx) {
   function setBindings(next) {
     bindings = Array.isArray(next) ? next : [];
     rebuildBindingIndex();
+    if (!connected) {
+      queueDisconnectedFeedbackClear().catch(() => {});
+    }
   }
 
   function notifyTargetOptionsChanged() {
@@ -942,6 +1003,8 @@ export async function activate(ctx) {
         connecting = false;
         manualConnectRequested = false;
         setStatus(true, "Connected");
+        await disconnectedFeedbackPromise.catch(() => {});
+        await publishConnectionState(true);
         await refreshLists();
         resetAudioInputDiscovery();
         notifyTargetOptionsChanged();
@@ -1060,6 +1123,7 @@ export async function activate(ctx) {
       lastSentVolumeByInput.clear();
       resetAudioInputDiscovery();
       notifyTargetOptionsChanged();
+      queueDisconnectedFeedbackClear().catch(() => {});
     };
 
     ws.onerror = () => {
@@ -1603,6 +1667,7 @@ export async function activate(ctx) {
             connected = false;
             connecting = false;
             setStatus(false, "Disconnected", { disconnectedByUser: true });
+            queueDisconnectedFeedbackClear().catch(() => {});
             return;
           }
 

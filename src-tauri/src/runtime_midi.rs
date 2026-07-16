@@ -53,8 +53,8 @@ fn emit_macro_button_feedback(
     input_active: bool,
 ) {
     let input_value = if input_active { 1.0 } else { 0.0 };
-    let feedback_value = binding
-        .button_light_feedback_value(Some(input_active), None)
+    let feedback_value = state
+        .button_light_feedback_value(binding, Some(input_active), None)
         .unwrap_or(input_value);
 
     if !input_active {
@@ -241,8 +241,8 @@ pub(super) fn update_activity_button_light_hold_feedback(
         return;
     }
 
-    if binding
-        .button_light_hold_feedback_value(input_active)
+    if state
+        .button_light_hold_feedback_value(binding, input_active)
         .is_none()
         || !input_active
     {
@@ -333,6 +333,18 @@ pub(crate) fn apply_midi_event(
             "bindings",
             "binding_has_no_targets",
             &format!("binding_id={} action={:?}", binding.id, binding.action),
+        );
+        return Ok(());
+    }
+    if !state.binding_has_available_target(&binding) {
+        if binding_is_button(&binding) {
+            state.set_binding_action_value(&key, 0.0);
+            send_immediate_button_light_feedback(state, &binding, 0.0, "integration_unavailable");
+        }
+        run_logger::debug(
+            "bindings",
+            "binding_targets_unavailable",
+            &format!("binding_id={} targets={}", binding.id, targets.len()),
         );
         return Ok(());
     }
@@ -617,8 +629,8 @@ pub(crate) fn apply_midi_event(
             *last_update = Some(Instant::now());
         }
 
-        let feedback_value = binding
-            .button_light_feedback_value(Some(event.value > 0), Some(muted))
+        let feedback_value = state
+            .button_light_feedback_value(&binding, Some(event.value > 0), Some(muted))
             .unwrap_or(if muted { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if muted { 1.0 } else { 0.0 });
         send_immediate_button_light_feedback(state, &binding, feedback_value, "toggle_mute");
@@ -744,8 +756,8 @@ pub(crate) fn apply_midi_event(
             return Ok(());
         }
 
-        let feedback_value = binding
-            .button_light_feedback_value(Some(event.value > 0), Some(next_enabled))
+        let feedback_value = state
+            .button_light_feedback_value(&binding, Some(event.value > 0), Some(next_enabled))
             .unwrap_or(if next_enabled { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if next_enabled { 1.0 } else { 0.0 });
         send_immediate_button_light_feedback(
@@ -759,8 +771,8 @@ pub(crate) fn apply_midi_event(
 
     if binding_actions::action_is_momentary_integration_action(&binding.action) {
         if event.value == 0 {
-            let feedback_value = binding
-                .button_light_feedback_value(Some(false), None)
+            let feedback_value = state
+                .button_light_feedback_value(&binding, Some(false), None)
                 .unwrap_or(0.0);
             send_immediate_button_light_feedback(
                 state,
@@ -808,8 +820,8 @@ pub(crate) fn apply_midi_event(
             return Ok(());
         }
 
-        let feedback_value = binding
-            .button_light_feedback_value(Some(true), None)
+        let feedback_value = state
+            .button_light_feedback_value(&binding, Some(true), None)
             .unwrap_or(1.0);
         send_immediate_button_light_feedback(
             state,
@@ -981,7 +993,7 @@ pub(crate) fn apply_midi_event(
     }
 
     let button_light_feedback_value =
-        binding.button_light_feedback_value(Some(event.value > 0), None);
+        state.button_light_feedback_value(&binding, Some(event.value > 0), None);
     let primary_feedback_value = button_light_feedback_value.unwrap_or(volume);
 
     let input_active = event.value > 0;

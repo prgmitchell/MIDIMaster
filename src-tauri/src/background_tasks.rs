@@ -260,6 +260,25 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                                     }
                                 }
                             }
+                            if let Some((assign_control, assign_value)) =
+                                feedback::assign_button_feedback(binding)
+                            {
+                                let output_key = assign_control.to_binding_key();
+                                if should_send_feedback(
+                                    &mut last_sent_feedback,
+                                    output_key,
+                                    assign_value,
+                                    force_feedback_resend,
+                                ) {
+                                    let _ = midi.send_feedback(
+                                        &assign_control.device_id,
+                                        assign_control.channel,
+                                        assign_control.controller,
+                                        assign_value,
+                                        assign_control.msg_type,
+                                    );
+                                }
+                            }
                         }
                     }
                 }

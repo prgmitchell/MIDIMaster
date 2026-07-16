@@ -1,4 +1,6 @@
-use crate::{collect_monitor_descriptors, model::Profile, model::ProfileSummary, AppState};
+use crate::{
+    collect_monitor_descriptors, feedback, model::Profile, model::ProfileSummary, AppState,
+};
 use tauri::{AppHandle, State};
 
 fn heal_legacy_osd_monitor_id(app: &AppHandle, profile: &mut Profile) -> bool {
@@ -87,10 +89,20 @@ fn set_active_profile_state(
     app: &AppHandle,
     profile: &Profile,
 ) -> Result<(), String> {
-    *state
-        .active_profile
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())? = Some(profile.clone());
+    let previous_bindings = {
+        let mut active_profile = state
+            .active_profile
+            .lock()
+            .map_err(|_| "Lock poisoned".to_string())?;
+        let previous_bindings = active_profile
+            .as_ref()
+            .map(|profile| profile.bindings.clone())
+            .unwrap_or_default();
+        *active_profile = Some(profile.clone());
+        previous_bindings
+    };
+
+    feedback::reconcile_assign_feedback_outputs(state, &previous_bindings, &profile.bindings);
 
     if let Ok(mut values) = state.binding_action_values.lock() {
         values.clear();

@@ -226,6 +226,7 @@ fn main() {
                 binding_state: Arc::new(Mutex::new(HashMap::new())),
                 feedback_values: Arc::new(Mutex::new(HashMap::new())),
                 binding_action_values: Arc::new(Mutex::new(HashMap::new())),
+                integration_connection_states: Mutex::new(HashMap::new()),
                 activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
                 running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
                 soundboard: Arc::new(SoundboardService::default()),
@@ -467,6 +468,7 @@ fn main() {
             remove_binding,
             update_midi_feedback,
             set_binding_feedback,
+            set_integration_connection_state,
             apply_binding_action,
             pick_soundboard_audio,
             analyze_soundboard_audio,
@@ -628,6 +630,7 @@ mod tests {
             binding_state: Arc::new(Mutex::new(HashMap::new())),
             feedback_values: Arc::new(Mutex::new(HashMap::new())),
             binding_action_values: Arc::new(Mutex::new(HashMap::new())),
+            integration_connection_states: Mutex::new(HashMap::new()),
             activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
             running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
             soundboard: Arc::new(SoundboardService::default()),
@@ -1129,6 +1132,70 @@ mod tests {
         }];
 
         assert!(!state.current_binding_toggle_state(&targets, &key));
+    }
+
+    #[test]
+    fn disconnected_integration_clears_continuous_feedback_cache() {
+        let state = test_app_state(TestAudioBackend::new(vec![]));
+        let mut binding = focus_volume_binding(model::MidiMode::Absolute);
+        let obs_target = model::BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "input".to_string(),
+            data: serde_json::json!({ "input_name": "Mic/Aux" }),
+        };
+        binding.targets = vec![obs_target.clone()];
+        binding.target = obs_target;
+        let key = BindingKey::from_binding(&binding);
+        state
+            .feedback_values
+            .lock()
+            .unwrap()
+            .insert(key.clone(), 0.8);
+
+        state.set_integration_connection_state("obs", false);
+        state.sync_feedback_values(&profile_with_binding(binding));
+
+        assert!(!state.feedback_values.lock().unwrap().contains_key(&key));
+    }
+
+    #[test]
+    fn disconnected_integration_keeps_mapped_button_feedback_off() {
+        let state = test_app_state(TestAudioBackend::new(vec![]));
+        let mut binding = focus_volume_binding(model::MidiMode::Absolute);
+        let obs_target = model::BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "input".to_string(),
+            data: serde_json::json!({ "input_name": "Mic/Aux" }),
+        };
+        binding.targets = vec![obs_target.clone()];
+        binding.target = obs_target;
+        binding.control.msg_type = model::MidiMessageType::Note;
+        binding.control_kind = model::BindingControlKind::Button;
+        binding.action = model::BindingAction::ToggleMute;
+        binding.button_light_mode = model::ButtonLightMode::MappedWhenAssigned;
+        let key = BindingKey::from_binding(&binding);
+
+        assert_eq!(
+            state.button_light_feedback_value(&binding, Some(false), Some(true)),
+            Some(1.0)
+        );
+
+        state.set_integration_connection_state("obs", false);
+        state.sync_feedback_values(&profile_with_binding(binding.clone()));
+        assert_eq!(
+            state.button_light_feedback_value(&binding, Some(true), Some(true)),
+            Some(0.0)
+        );
+        assert_eq!(
+            state.feedback_values.lock().unwrap().get(&key).copied(),
+            Some(0.0)
+        );
+
+        state.set_integration_connection_state("obs", true);
+        assert_eq!(
+            state.button_light_feedback_value(&binding, Some(false), Some(false)),
+            Some(1.0)
+        );
     }
 
     #[test]

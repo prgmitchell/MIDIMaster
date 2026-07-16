@@ -106,9 +106,13 @@ export function modeTooltip(raw) {
 }
 
 export function assignModeTooltip(raw) {
-  return raw === "Replace"
-    ? "Replace: assigning a focused app replaces the current target list."
-    : "Add: assigning a focused app appends it to the current target list.";
+  if (raw === "Replace") {
+    return "Replace: assigning a focused app replaces the current target list.";
+  }
+  if (raw === "Clear") {
+    return "Clear: removes all targets; when empty, assigns the focused app.";
+  }
+  return "Add: assigning a focused app appends it to the current target list.";
 }
 
 export function normalizeFaderCurve(raw) {
@@ -295,6 +299,8 @@ export function ensureAuxShape(binding) {
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
   }
-  if (binding.assign_mode !== "Replace") binding.assign_mode = "Add";
+  if (binding.assign_mode !== "Replace" && binding.assign_mode !== "Clear") {
+    binding.assign_mode = "Add";
+  }
 }
 

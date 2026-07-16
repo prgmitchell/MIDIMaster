@@ -6,7 +6,9 @@ use futures_util::future::join_all;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(test)]
+use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 struct RunningMacroGuard {
@@ -745,7 +747,7 @@ pub(crate) fn add_binding_to_active_profile(
         return Err("Binding cannot have more than 8 targets".to_string());
     }
 
-    let (saved_profile, stale_feedback_bindings) = {
+    let (saved_profile, stale_feedback_bindings, previous_bindings) = {
         let mut profile_guard = state
             .active_profile
             .lock()
@@ -758,6 +760,7 @@ pub(crate) fn add_binding_to_active_profile(
             midi_device_preference: model::MidiDevicePreference::default(),
             midi_device_preference_set: false,
         });
+        let previous_bindings = profile.bindings.clone();
         let mut removed_bindings = Vec::new();
         profile.bindings.retain(|existing| {
             let remove = existing.id == binding.id
@@ -776,11 +779,12 @@ pub(crate) fn add_binding_to_active_profile(
             .save_profile(profile.clone())
             .map_err(|err| err.to_string())?;
         *profile_guard = Some(profile.clone());
-        (profile, stale_feedback_bindings)
+        (profile, stale_feedback_bindings, previous_bindings)
     };
     for binding in stale_feedback_bindings {
         clear_binding_feedback_output(state, &binding);
     }
+    feedback::reconcile_assign_feedback_outputs(state, &previous_bindings, &saved_profile.bindings);
     state.sync_feedback_values(&saved_profile);
     state.send_idle_button_light_feedback_values(&saved_profile);
     run_logger::info(
@@ -841,6 +845,16 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
 
     // Wait for any pending background loop iterations to finish.
     tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let current_bindings = saved_profile
+        .as_ref()
+        .map(|profile| profile.bindings.as_slice())
+        .unwrap_or(&[]);
+    feedback::reconcile_assign_feedback_outputs(
+        &state,
+        std::slice::from_ref(&binding),
+        current_bindings,
+    );
 
     // Send 0.0 value to the binding's feedback destination.
     if let Ok(mut midi) = state.midi.lock() {
@@ -910,7 +924,7 @@ pub fn update_midi_feedback(
         } else {
             None
         };
-        let button_light_value = binding.button_light_feedback_value(None, state_active);
+        let button_light_value = state.button_light_feedback_value(&binding, None, state_active);
         let feedback_value = button_light_value.unwrap_or(value);
 
         let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
@@ -1000,7 +1014,8 @@ pub fn set_binding_feedback(
     } else {
         None
     };
-    let button_light_value = binding.button_light_feedback_value(input_active, state_active);
+    let button_light_value =
+        state.button_light_feedback_value(&binding, input_active, state_active);
     let feedback_value = button_light_value.unwrap_or(value);
     if binding.uses_stateful_toggle_feedback()
         || matches!(
@@ -1077,7 +1092,7 @@ pub fn set_binding_feedback(
                 let primary_key = FeedbackControlKey::from_binding(candidate);
                 state.set_binding_action_value(&primary_key.to_binding_key(), value);
                 let candidate_button_light_value =
-                    candidate.button_light_feedback_value(None, Some(value > 0.5));
+                    state.button_light_feedback_value(candidate, None, Some(value > 0.5));
                 let emitted_key = resolved_binding_feedback_control_key(candidate);
                 if emitted_controls.insert(emitted_key) {
                     let candidate_value = candidate_button_light_value.unwrap_or(value);
@@ -1108,7 +1123,7 @@ pub fn set_binding_feedback(
             }
             state.sync_relative_volume_binding_state(candidate, value);
             let candidate_button_light_value =
-                candidate.button_light_feedback_value(input_active, None);
+                state.button_light_feedback_value(candidate, input_active, None);
             let emitted_key = resolved_binding_feedback_control_key(candidate);
             if emitted_controls.insert(emitted_key) {
                 let candidate_value = candidate_button_light_value.unwrap_or(value);
@@ -1122,10 +1137,6 @@ pub fn set_binding_feedback(
                 );
             }
         }
-    }
-
-    if let Ok(mut last_update) = state.osd_last_update.lock() {
-        *last_update = Some(Instant::now());
     }
 
     // Emit UI/OSD updates.
@@ -1183,6 +1194,31 @@ pub fn set_binding_feedback(
         _ => {}
     }
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_integration_connection_state(
+    state: State<'_, AppState>,
+    integration_id: String,
+    connected: bool,
+) -> Result<(), String> {
+    let integration_id = integration_id.trim();
+    if integration_id.is_empty() {
+        return Err("Integration ID is required".to_string());
+    }
+    if !state.set_integration_connection_state(integration_id, connected) {
+        return Ok(());
+    }
+    let profile = state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?
+        .clone();
+    if let Some(profile) = profile {
+        state.sync_feedback_values(&profile);
+        state.send_idle_button_light_feedback_values(&profile);
+    }
     Ok(())
 }
 

@@ -459,6 +459,7 @@ pub enum AssignMode {
     #[default]
     Add,
     Replace,
+    Clear,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -880,6 +881,13 @@ impl Binding {
     }
 
     pub fn mapped_button_light_feedback_value(&self) -> Option<f32> {
+        self.mapped_button_light_feedback_value_with_availability(|_| true)
+    }
+
+    pub fn mapped_button_light_feedback_value_with_availability(
+        &self,
+        target_is_available: impl Fn(&BindingTarget) -> bool,
+    ) -> Option<f32> {
         if !self.is_button_binding()
             || !matches!(&self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
         {
@@ -894,11 +902,17 @@ impl Binding {
             return Some(0.0);
         }
 
-        Some(if self.has_complete_mapped_button_light_target(&targets) {
-            1.0
-        } else {
-            0.0
-        })
+        let available_targets = targets
+            .into_iter()
+            .filter(target_is_available)
+            .collect::<Vec<_>>();
+        Some(
+            if self.has_complete_mapped_button_light_target(&available_targets) {
+                1.0
+            } else {
+                0.0
+            },
+        )
     }
 
     pub fn custom_feedback_output_control(&self) -> Option<&AuxiliaryControl> {
@@ -954,15 +968,6 @@ impl Binding {
         };
 
         Some(if active { 1.0 } else { 0.0 })
-    }
-
-    pub fn button_light_hold_feedback_value(&self, input_active: bool) -> Option<f32> {
-        let value = self.button_light_feedback_value(Some(input_active), None)?;
-        if value > 0.5 {
-            Some(value)
-        } else {
-            None
-        }
     }
 
     pub fn has_complete_mapped_button_light_target(&self, targets: &[BindingTarget]) -> bool {

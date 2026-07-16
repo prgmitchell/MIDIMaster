@@ -3240,7 +3240,9 @@ export function createBindingsFeature({
 
   function renderAssignMappingLabel(binding) {
     if (!d.bindingConfigAssignLabel) return;
-    const mode = binding?.assign_mode === "Replace" ? "Replace" : "Add";
+    const mode = binding?.assign_mode === "Replace"
+      ? "Replace"
+      : (binding?.assign_mode === "Clear" ? "Clear" : "Add");
     const mappingText = formatMidiControlLabel(binding?.assign_control);
     d.bindingConfigAssignLabel.innerHTML = "";
 
@@ -4714,7 +4716,7 @@ export function createBindingsFeature({
   }
 
   function syncAssignModeUi(mode) {
-    const currentMode = mode === "Replace" ? "Replace" : "Add";
+    const currentMode = mode === "Replace" ? "Replace" : (mode === "Clear" ? "Clear" : "Add");
     const tooltip = assignModeTooltip(currentMode);
     if (d.bindingConfigAssignModeButton) {
       d.bindingConfigAssignModeButton.title = tooltip;
@@ -4727,6 +4729,10 @@ export function createBindingsFeature({
     if (d.bindingConfigAssignModeReplace) {
       d.bindingConfigAssignModeReplace.classList.toggle("is-selected", currentMode === "Replace");
       d.bindingConfigAssignModeReplace.title = assignModeTooltip("Replace");
+    }
+    if (d.bindingConfigAssignModeClear) {
+      d.bindingConfigAssignModeClear.classList.toggle("is-selected", currentMode === "Clear");
+      d.bindingConfigAssignModeClear.title = assignModeTooltip("Clear");
     }
   }
 
@@ -4815,6 +4821,10 @@ export function createBindingsFeature({
     const binding = getConfigBinding();
     if (!binding) return;
     if (!conflict || !conflict.binding) return;
+    const sameBindingTransfer = conflict.binding.id === binding.id;
+    if (sameBindingTransfer && conflict.field !== field) {
+      binding[conflict.field] = null;
+    }
     if (field === "control") {
       binding.device_id = mapping.device_id;
       binding.control = {
@@ -4830,7 +4840,11 @@ export function createBindingsFeature({
       }
       binding[field] = mapping;
     }
-    configAcceptedTransfers.set(field, { field, mapping, conflict });
+    if (sameBindingTransfer) {
+      configAcceptedTransfers.delete(field);
+    } else {
+      configAcceptedTransfers.set(field, { field, mapping, conflict });
+    }
     if (field === "control") {
       await applyPrimaryControlPreview();
     }
@@ -6336,7 +6350,8 @@ export function createBindingsFeature({
       event.preventDefault();
       event.stopPropagation();
       const button = event.currentTarget;
-      const mode = button?.dataset?.mode === "Replace" ? "Replace" : "Add";
+      const rawMode = button?.dataset?.mode;
+      const mode = rawMode === "Replace" ? "Replace" : (rawMode === "Clear" ? "Clear" : "Add");
       const binding = getConfigBinding();
       if (!binding) return;
       binding.assign_mode = mode;
@@ -6350,6 +6365,9 @@ export function createBindingsFeature({
     }
     if (d.bindingConfigAssignModeReplace) {
       d.bindingConfigAssignModeReplace.addEventListener("click", onAssignModeOptionClick);
+    }
+    if (d.bindingConfigAssignModeClear) {
+      d.bindingConfigAssignModeClear.addEventListener("click", onAssignModeOptionClick);
     }
 
     if (d.learnPanel) {

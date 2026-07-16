@@ -1,9 +1,63 @@
 use crate::bindings::BindingKey;
 use crate::model::{self, MidiEvent, Profile};
-use crate::run_logger;
 use crate::{app_state::focused_application_name, AppState};
+use crate::{feedback, run_logger};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AssignTransition {
+    AddFocused,
+    ReplaceFocused,
+    ClearTargets,
+}
+
+fn resolve_assign_transition(
+    assign_mode: &model::AssignMode,
+    has_real_targets: bool,
+) -> AssignTransition {
+    match assign_mode {
+        model::AssignMode::Replace => AssignTransition::ReplaceFocused,
+        model::AssignMode::Clear if has_real_targets => AssignTransition::ClearTargets,
+        model::AssignMode::Add | model::AssignMode::Clear => AssignTransition::AddFocused,
+    }
+}
+
+fn apply_assign_transition(
+    binding: &mut model::Binding,
+    transition: AssignTransition,
+    focused_target: Option<&model::BindingTarget>,
+) -> bool {
+    binding.ensure_targets();
+    match transition {
+        AssignTransition::ClearTargets => {
+            let was_clear = binding.targets == vec![model::BindingTarget::Unset]
+                && binding.target == model::BindingTarget::Unset;
+            binding.targets = vec![model::BindingTarget::Unset];
+            binding.target = model::BindingTarget::Unset;
+            !was_clear
+        }
+        AssignTransition::ReplaceFocused => {
+            let Some(target) = focused_target else {
+                return false;
+            };
+            binding.targets = vec![target.clone()];
+            binding.ensure_targets();
+            true
+        }
+        AssignTransition::AddFocused => {
+            let Some(target) = focused_target else {
+                return false;
+            };
+            if binding.targets.contains(target) {
+                return false;
+            }
+            binding.targets.push(target.clone());
+            binding.ensure_targets();
+            true
+        }
+    }
+}
 
 pub(super) fn handle_aux_or_unmatched(
     state: &AppState,
@@ -30,6 +84,19 @@ pub(super) fn handle_aux_or_unmatched(
         let mut targets = owner.normalized_targets();
         targets.retain(|t| *t != model::BindingTarget::Unset);
         if role == "mute" && targets.is_empty() {
+            return Ok(());
+        }
+        if role == "mute" && !state.binding_has_available_target(&owner) {
+            feedback::send_feedback_to_control(
+                state,
+                &feedback::FeedbackControlKey::from_aux(&aux_mapping),
+                feedback::FeedbackSendOptions {
+                    value: 0.0,
+                    silent: false,
+                    force_hardware_feedback: true,
+                    context: &format!("mute_unavailable:{}", owner.id),
+                },
+            );
             return Ok(());
         }
 
@@ -65,112 +132,136 @@ pub(super) fn handle_aux_or_unmatched(
                         );
                     }
                 });
+            } else if role == "assign" {
+                let current_owner = state
+                    .active_profile
+                    .lock()
+                    .ok()
+                    .and_then(|profile| profile.as_ref().cloned())
+                    .and_then(|profile| {
+                        profile
+                            .bindings
+                            .into_iter()
+                            .find(|binding| binding.id == owner.id)
+                    })
+                    .unwrap_or_else(|| owner.clone());
+                feedback::send_assign_button_feedback(
+                    state,
+                    &current_owner,
+                    true,
+                    &format!("assign_release:{}", current_owner.id),
+                );
             }
             return Ok(());
         }
 
         if role == "assign" {
-            let focused = state
-                .audio
-                .focused_session()
-                .map_err(|err| err.to_string())?;
-            let (app_name, app_display_name, app_icon_data) = if let Some(focused) = focused {
-                focused
-                    .process_name
-                    .as_deref()
-                    .and_then(|name| name.strip_suffix(".exe").or(Some(name)))
-                    .map(|name| name.trim().to_string())
-                    .filter(|name| !name.is_empty())
-                    .map(|name| {
-                        (
-                            name,
-                            Some(focused.display_name.clone()),
-                            focused.icon_data.clone(),
-                        )
-                    })
-                    .unwrap_or_else(|| {
-                        (
-                            focused.display_name.clone(),
-                            Some(focused.display_name.clone()),
-                            focused.icon_data.clone(),
-                        )
-                    })
+            let transition = resolve_assign_transition(&owner.assign_mode, !targets.is_empty());
+            let new_target = if transition == AssignTransition::ClearTargets {
+                None
             } else {
-                (focused_application_name().unwrap_or_default(), None, None)
-            };
-            if !app_name.is_empty() {
-                let new_target = model::BindingTarget::Application {
+                let focused = state
+                    .audio
+                    .focused_session()
+                    .map_err(|err| err.to_string())?;
+                let (app_name, app_display_name, app_icon_data) = if let Some(focused) = focused {
+                    focused
+                        .process_name
+                        .as_deref()
+                        .and_then(|name| name.strip_suffix(".exe").or(Some(name)))
+                        .map(|name| name.trim().to_string())
+                        .filter(|name| !name.is_empty())
+                        .map(|name| {
+                            (
+                                name,
+                                Some(focused.display_name.clone()),
+                                focused.icon_data.clone(),
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            (
+                                focused.display_name.clone(),
+                                Some(focused.display_name.clone()),
+                                focused.icon_data.clone(),
+                            )
+                        })
+                } else {
+                    (focused_application_name().unwrap_or_default(), None, None)
+                };
+                if app_name.is_empty() {
+                    let _ = app.emit(
+                        "binding_aux_error",
+                        serde_json::json!({
+                            "binding_id": owner.id,
+                            "kind": "assign",
+                            "reason": "focused_app_unavailable"
+                        }),
+                    );
+                    return Ok(());
+                }
+                Some(model::BindingTarget::Application {
                     name: app_name,
                     display_name: app_display_name,
                     icon_data: app_icon_data,
-                };
-                let already_present = targets.contains(&new_target);
-                let should_replace = matches!(owner.assign_mode, model::AssignMode::Replace);
-                if should_replace || !already_present {
-                    if !should_replace && targets.len() >= 8 {
-                        let _ = app.emit(
-                            "binding_aux_error",
-                            serde_json::json!({
-                                "binding_id": owner.id,
-                                "kind": "assign",
-                                "reason": "target_list_full"
-                            }),
-                        );
-                    } else {
-                        let mut updated_targets: Option<Vec<model::BindingTarget>> = None;
-                        let mut guard = state
-                            .active_profile
-                            .lock()
-                            .map_err(|_| "Lock poisoned".to_string())?;
-                        if let Some(active_profile) = guard.as_ref() {
-                            let mut updated_profile = active_profile.clone();
-                            if let Some(stored) = updated_profile
-                                .bindings
-                                .iter_mut()
-                                .find(|b| b.id == owner.id)
-                            {
-                                stored.ensure_targets();
-                                if should_replace {
-                                    stored.targets = vec![new_target.clone()];
-                                    stored.ensure_targets();
-                                    updated_targets = Some(stored.normalized_targets());
-                                } else if !stored.targets.contains(&new_target) {
-                                    stored.targets.push(new_target.clone());
-                                    stored.ensure_targets();
-                                    updated_targets = Some(stored.normalized_targets());
-                                }
-                            }
-                            if updated_targets.is_some() {
-                                state
-                                    .profile_store
-                                    .save_profile(updated_profile.clone())
-                                    .map_err(|err| err.to_string())?;
-                                *guard = Some(updated_profile.clone());
-                                state.sync_feedback_values(&updated_profile);
-                                state.send_idle_button_light_feedback_values(&updated_profile);
-                            }
-                        }
-                        if let Some(updated_targets) = updated_targets {
-                            let _ = app.emit(
-                                "binding_aux_assign_update",
-                                serde_json::json!({
-                                    "binding_id": owner.id,
-                                    "target": new_target,
-                                    "targets": updated_targets
-                                }),
-                            );
-                        }
-                    }
-                }
-            } else {
+                })
+            };
+
+            if transition == AssignTransition::AddFocused
+                && new_target
+                    .as_ref()
+                    .is_some_and(|target| targets.contains(target))
+            {
+                return Ok(());
+            }
+            if transition == AssignTransition::AddFocused && targets.len() >= 8 {
                 let _ = app.emit(
                     "binding_aux_error",
                     serde_json::json!({
                         "binding_id": owner.id,
                         "kind": "assign",
-                        "reason": "focused_app_unavailable"
+                        "reason": "target_list_full"
                     }),
                 );
+                return Ok(());
+            }
+
+            let mut updated_targets: Option<Vec<model::BindingTarget>> = None;
+            let mut guard = state
+                .active_profile
+                .lock()
+                .map_err(|_| "Lock poisoned".to_string())?;
+            if let Some(active_profile) = guard.as_ref() {
+                let mut updated_profile = active_profile.clone();
+                if let Some(stored) = updated_profile
+                    .bindings
+                    .iter_mut()
+                    .find(|binding| binding.id == owner.id)
+                {
+                    if apply_assign_transition(stored, transition, new_target.as_ref()) {
+                        updated_targets = Some(stored.normalized_targets());
+                    }
+                }
+                if updated_targets.is_some() {
+                    state
+                        .profile_store
+                        .save_profile(updated_profile.clone())
+                        .map_err(|err| err.to_string())?;
+                    *guard = Some(updated_profile.clone());
+                    state.sync_feedback_values(&updated_profile);
+                    state.send_idle_button_light_feedback_values(&updated_profile);
+                }
+            }
+            drop(guard);
+
+            if let Some(updated_targets) = updated_targets {
+                let mut payload = serde_json::json!({
+                    "binding_id": owner.id,
+                    "targets": updated_targets
+                });
+                if let Some(target) = new_target {
+                    payload["target"] = serde_json::json!(target);
+                }
+                let _ = app.emit("binding_aux_assign_update", payload);
             }
             return Ok(());
         }
@@ -320,4 +411,104 @@ pub(super) fn handle_aux_or_unmatched(
         ),
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assignment_binding(targets: serde_json::Value) -> model::Binding {
+        serde_json::from_value(serde_json::json!({
+            "id": "assign-test",
+            "name": "Assign Test",
+            "device_id": "midi-dev",
+            "control": {
+                "channel": 0,
+                "controller": 7,
+                "msg_type": "ControlChange"
+            },
+            "control_kind": "Continuous",
+            "targets": targets,
+            "action": "Volume",
+            "mode": "Absolute",
+            "deadzone": 0.0,
+            "debounce_ms": 0
+        }))
+        .expect("test binding should deserialize")
+    }
+
+    #[test]
+    fn assign_transition_resolves_every_mode_and_target_state() {
+        assert_eq!(
+            resolve_assign_transition(&model::AssignMode::Add, false),
+            AssignTransition::AddFocused
+        );
+        assert_eq!(
+            resolve_assign_transition(&model::AssignMode::Add, true),
+            AssignTransition::AddFocused
+        );
+        assert_eq!(
+            resolve_assign_transition(&model::AssignMode::Replace, false),
+            AssignTransition::ReplaceFocused
+        );
+        assert_eq!(
+            resolve_assign_transition(&model::AssignMode::Replace, true),
+            AssignTransition::ReplaceFocused
+        );
+        assert_eq!(
+            resolve_assign_transition(&model::AssignMode::Clear, false),
+            AssignTransition::AddFocused
+        );
+        assert_eq!(
+            resolve_assign_transition(&model::AssignMode::Clear, true),
+            AssignTransition::ClearTargets
+        );
+    }
+
+    #[test]
+    fn clear_transition_canonically_clears_modern_and_legacy_targets() {
+        let mut binding = assignment_binding(serde_json::json!(["Master", "Focus"]));
+        binding.ensure_targets();
+
+        assert!(apply_assign_transition(
+            &mut binding,
+            AssignTransition::ClearTargets,
+            None
+        ));
+        assert_eq!(binding.targets, vec![model::BindingTarget::Unset]);
+        assert_eq!(binding.target, model::BindingTarget::Unset);
+
+        binding.ensure_targets();
+        assert_eq!(binding.targets, vec![model::BindingTarget::Unset]);
+        assert_eq!(binding.target, model::BindingTarget::Unset);
+    }
+
+    #[test]
+    fn add_and_replace_transitions_update_targets_as_expected() {
+        let mut binding = assignment_binding(serde_json::json!(["Master"]));
+        let focused = model::BindingTarget::Application {
+            name: "spotify".to_string(),
+            display_name: Some("Spotify".to_string()),
+            icon_data: None,
+        };
+
+        assert!(apply_assign_transition(
+            &mut binding,
+            AssignTransition::AddFocused,
+            Some(&focused)
+        ));
+        assert_eq!(binding.normalized_targets().len(), 2);
+        assert!(!apply_assign_transition(
+            &mut binding,
+            AssignTransition::AddFocused,
+            Some(&focused)
+        ));
+
+        assert!(apply_assign_transition(
+            &mut binding,
+            AssignTransition::ReplaceFocused,
+            Some(&focused)
+        ));
+        assert_eq!(binding.normalized_targets(), vec![focused]);
+    }
 }

@@ -178,6 +178,27 @@ fn deserialize_binding_indicator_control_defaults_to_none() {
 }
 
 #[test]
+fn assign_mode_clear_round_trips_and_missing_mode_defaults_to_add() {
+    assert_eq!(
+        serde_json::to_value(AssignMode::Clear).expect("Clear should serialize"),
+        serde_json::json!("Clear")
+    );
+
+    let mut explicit = binding_base_json();
+    explicit
+        .as_object_mut()
+        .unwrap()
+        .insert("assign_mode".to_string(), serde_json::json!("Clear"));
+    let clear_binding: Binding =
+        serde_json::from_value(explicit).expect("Clear binding should deserialize");
+    assert_eq!(clear_binding.assign_mode, AssignMode::Clear);
+
+    let default_binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("legacy binding should deserialize");
+    assert_eq!(default_binding.assign_mode, AssignMode::Add);
+}
+
+#[test]
 fn deserialize_binding_indicator_control_round_trips_note_mapping() {
     let mut json = binding_base_json();
     json.as_object_mut().unwrap().insert(
@@ -769,6 +790,27 @@ fn mapped_button_light_marks_stateful_integration_actions_as_mapped() {
     );
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
     assert_eq!(binding.button_light_feedback_value(None, None), Some(1.0));
+}
+
+#[test]
+fn mapped_button_light_respects_integration_target_availability() {
+    let binding = mapped_button_binding(
+        BindingAction::ToggleMute,
+        vec![BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "input".to_string(),
+            data: serde_json::json!({ "input_name": "Mic/Aux" }),
+        }],
+    );
+
+    assert_eq!(
+        binding.mapped_button_light_feedback_value_with_availability(|_| false),
+        Some(0.0)
+    );
+    assert_eq!(
+        binding.mapped_button_light_feedback_value_with_availability(|_| true),
+        Some(1.0)
+    );
 }
 
 #[test]

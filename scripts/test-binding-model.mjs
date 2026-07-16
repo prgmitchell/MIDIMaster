@@ -873,6 +873,16 @@ function testMacroAndSoundboardConflictKeepsOneSpecialTarget() {
   assert.equal(soundboardPreferred.soundboard.path, "clip.wav");
 }
 
+function testNormalizeAssignModeSupportsClearAndDefaultsUnknownValues() {
+  for (const mode of ["Add", "Replace", "Clear"]) {
+    const normalized = bindingModel.normalizeBinding(buttonBinding({ assign_mode: mode }));
+    assert.equal(normalized.assign_mode, mode);
+  }
+
+  const unknown = bindingModel.normalizeBinding(buttonBinding({ assign_mode: "Unknown" }));
+  assert.equal(unknown.assign_mode, "Add");
+}
+
 testNormalizeBindingPreservesExplicitRelativeFormat();
 testCustomCurveNormalizationPreservesSegmentBend();
 testCustomCurveInterpolationAppliesSegmentBend();
@@ -923,5 +933,6 @@ testSoundboardMappingRejectsBlankPathAndClampsEnd();
 testSoundboardIsUniqueAndNormalizesPlaybackOptions();
 testSoundboardCoexistsWithPrimaryMediaAction();
 testMacroAndSoundboardConflictKeepsOneSpecialTarget();
+testNormalizeAssignModeSupportsClearAndDefaultsUnknownValues();
 
 console.log("Binding model tests passed");

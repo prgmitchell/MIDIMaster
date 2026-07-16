@@ -345,6 +345,12 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
               });
             },
           },
+          integration: {
+            setConnected: (integrationId, connected) => invoke("set_integration_connection_state", {
+              integrationId,
+              connected: Boolean(connected),
+            }),
+          },
           ws: {
             open: async (url, headers = {}, connectTimeoutMs = 500) => {
               const id = await invoke("ws_open", {

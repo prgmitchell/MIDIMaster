@@ -20,8 +20,8 @@ fn emit_button_feedback(
 ) {
     let key = BindingKey::from_event(event);
     let input_active = event.value > 0;
-    let feedback_value = binding
-        .button_light_feedback_value(Some(input_active), None)
+    let feedback_value = state
+        .button_light_feedback_value(binding, Some(input_active), None)
         .unwrap_or(value);
     if !input_active {
         update_activity_button_light_hold_feedback(state, binding, key.clone(), false);

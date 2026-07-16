@@ -86,6 +86,7 @@ pub(crate) struct AppState {
     pub(crate) binding_state: Arc<Mutex<HashMap<BindingKey, BindingState>>>,
     pub(crate) feedback_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
     pub(crate) binding_action_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
+    pub(crate) integration_connection_states: Mutex<HashMap<String, bool>>,
     pub(crate) activity_button_light_generations: Arc<Mutex<HashMap<BindingKey, u64>>>,
     pub(crate) running_macros: Arc<Mutex<std::collections::HashSet<String>>>,
     pub(crate) soundboard: Arc<SoundboardService>,
@@ -158,6 +159,72 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
 }
 
 impl AppState {
+    pub(crate) fn set_integration_connection_state(
+        &self,
+        integration_id: &str,
+        connected: bool,
+    ) -> bool {
+        if let Ok(mut states) = self.integration_connection_states.lock() {
+            if states.get(integration_id).copied() == Some(connected) {
+                return false;
+            }
+            states.insert(integration_id.to_string(), connected);
+            return true;
+        }
+        false
+    }
+
+    fn binding_target_is_available(&self, target: &model::BindingTarget) -> bool {
+        let model::BindingTarget::Integration { integration_id, .. } = target else {
+            return true;
+        };
+        self.integration_connection_states
+            .lock()
+            .ok()
+            .and_then(|states| states.get(integration_id).copied())
+            .unwrap_or(true)
+    }
+
+    pub(crate) fn binding_has_available_target(&self, binding: &model::Binding) -> bool {
+        let targets = binding
+            .normalized_targets()
+            .into_iter()
+            .filter(|target| !matches!(target, model::BindingTarget::Unset))
+            .collect::<Vec<_>>();
+        targets.is_empty()
+            || targets
+                .iter()
+                .any(|target| self.binding_target_is_available(target))
+    }
+
+    pub(crate) fn button_light_feedback_value(
+        &self,
+        binding: &model::Binding,
+        input_active: Option<bool>,
+        state_active: Option<bool>,
+    ) -> Option<f32> {
+        if binding.is_button_binding() && !self.binding_has_available_target(binding) {
+            return Some(0.0);
+        }
+        if let Some(value) =
+            binding.mapped_button_light_feedback_value_with_availability(|target| {
+                self.binding_target_is_available(target)
+            })
+        {
+            return Some(value);
+        }
+        binding.button_light_feedback_value(input_active, state_active)
+    }
+
+    pub(crate) fn button_light_hold_feedback_value(
+        &self,
+        binding: &model::Binding,
+        input_active: bool,
+    ) -> Option<f32> {
+        let value = self.button_light_feedback_value(binding, Some(input_active), None)?;
+        (value > 0.5).then_some(value)
+    }
+
     fn clear_focus_volume_failure_log(&self, binding_id: &str) {
         if let Ok(mut logs) = self.focus_volume_failure_logs.lock() {
             logs.remove(binding_id);
@@ -474,6 +541,24 @@ impl AppState {
 
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
+            if let Some((assign_control, value)) = feedback::assign_button_feedback(binding) {
+                feedback.insert(assign_control.to_binding_key(), value);
+            }
+            if !self.binding_has_available_target(binding) {
+                let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
+                if binding.is_button_binding() {
+                    feedback.insert(key.clone(), 0.0);
+                    if output_key != key {
+                        feedback.insert(output_key, 0.0);
+                    }
+                } else {
+                    feedback.remove(&key);
+                    if output_key != key {
+                        feedback.remove(&output_key);
+                    }
+                }
+                continue;
+            }
             let input_active = self.activity_button_light_input_active(&key);
             let cached_state_active = if binding.uses_stateful_toggle_feedback() {
                 self.binding_action_value(&key).map(|value| value > 0.5)
@@ -481,7 +566,7 @@ impl AppState {
                 None
             };
             let idle_feedback_value =
-                binding.button_light_feedback_value(Some(input_active), cached_state_active);
+                self.button_light_feedback_value(binding, Some(input_active), cached_state_active);
 
             let primary_target = binding.primary_target();
             if matches!(
@@ -668,8 +753,8 @@ impl AppState {
                 } else {
                     cached_state_active
                 };
-                let feedback_value = binding
-                    .button_light_feedback_value(Some(input_active), state_active)
+                let feedback_value = self
+                    .button_light_feedback_value(binding, Some(input_active), state_active)
                     .unwrap_or(val);
                 let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
                 feedback.insert(key.clone(), feedback_value);
@@ -707,7 +792,8 @@ impl AppState {
                 } else {
                     None
                 };
-                if let Some(value) = binding.button_light_feedback_value(Some(false), state_active)
+                if let Some(value) =
+                    self.button_light_feedback_value(binding, Some(false), state_active)
                 {
                     feedback_values.insert(key.clone(), value);
                     let output_key =
@@ -727,12 +813,22 @@ impl AppState {
                 } else {
                     None
                 };
-                let Some(value) = binding.button_light_feedback_value(Some(false), state_active)
+                let Some(value) =
+                    self.button_light_feedback_value(binding, Some(false), state_active)
                 else {
                     continue;
                 };
                 let _ = midi.send_binding_light_feedback(binding, value);
             }
+        }
+
+        for binding in &profile.bindings {
+            feedback::send_assign_button_feedback(
+                self,
+                binding,
+                true,
+                &format!("assign_idle:{}", binding.id),
+            );
         }
     }
 }

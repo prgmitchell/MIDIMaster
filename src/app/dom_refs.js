@@ -101,6 +101,7 @@ export function createDomRefs() {
   const bindingConfigAssignModeMenu = document.getElementById("binding-config-assign-mode-menu");
   const bindingConfigAssignModeAdd = document.getElementById("binding-config-assign-mode-add");
   const bindingConfigAssignModeReplace = document.getElementById("binding-config-assign-mode-replace");
+  const bindingConfigAssignModeClear = document.getElementById("binding-config-assign-mode-clear");
   const bindingConfigCurveCards = document.getElementById("binding-config-curve-cards");
   const bindingConfigCurveHelp = document.getElementById("binding-config-curve-help");
   const bindingConfigCurvePresetRoot = document.getElementById("binding-config-curve-preset-root");
@@ -323,6 +324,7 @@ export function createDomRefs() {
     bindingConfigAssignModeMenu,
     bindingConfigAssignModeAdd,
     bindingConfigAssignModeReplace,
+    bindingConfigAssignModeClear,
     bindingConfigCurveCards,
     bindingConfigCurveHelp,
     bindingConfigCurvePresetRoot,

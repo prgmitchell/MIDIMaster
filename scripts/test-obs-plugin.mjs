@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 import { obsTestUtils } from "../src-tauri/builtin_plugins/obs/plugin.mjs";
+import { readFile } from "node:fs/promises";
+
+const obsPluginSource = await readFile(
+  new URL("../src-tauri/builtin_plugins/obs/plugin.mjs", import.meta.url),
+  "utf8",
+);
 
 function testMatchingLocalMuteEchoIsIgnored() {
   const intents = new Map();
@@ -116,6 +122,62 @@ function testSourceFilterKeysUseSourceAndFilterNames() {
   );
 }
 
+function testDisconnectFeedbackClearsObsMuteAndStatefulLights() {
+  const bindings = [
+    {
+      id: "obs-fader",
+      action: "Volume",
+      targets: [{ Integration: { integration_id: "obs", kind: "input", data: { input_name: "Mic/Aux" } } }],
+    },
+    {
+      id: "obs-mute",
+      action: "ToggleMute",
+      target: { Integration: { integration_id: "obs", kind: "input", data: { input_name: "Desktop Audio" } } },
+    },
+    {
+      id: "obs-source",
+      action: "ToggleMute",
+      target: { Integration: { integration_id: "obs", kind: "source", data: { source_name: "Camera" } } },
+    },
+    {
+      id: "obs-filter",
+      action: "ToggleEffect",
+      target: { Integration: { integration_id: "obs", kind: "source_filter", data: { filter_name: "Chroma Key" } } },
+    },
+  ];
+
+  assert.deepEqual(obsTestUtils.obsDisconnectedFeedbackUpdates(bindings), [
+    { bindingId: "obs-fader", action: "ToggleMute" },
+    { bindingId: "obs-mute", action: "ToggleMute" },
+    { bindingId: "obs-source", action: "ToggleMute" },
+    { bindingId: "obs-filter", action: "ToggleEffect" },
+  ]);
+}
+
+function testDisconnectFeedbackIgnoresUnrelatedAndMomentaryBindings() {
+  const bindings = [
+    {
+      id: "wavelink-mute",
+      action: "ToggleMute",
+      target: { Integration: { integration_id: "wavelink", kind: "input", data: {} } },
+    },
+    {
+      id: "obs-scene",
+      action: "Volume",
+      target: { Integration: { integration_id: "obs", kind: "scene", data: { scene_name: "Main" } } },
+    },
+  ];
+
+  assert.deepEqual(obsTestUtils.obsDisconnectedFeedbackUpdates(bindings), []);
+}
+
+function testDisconnectFeedbackDoesNotOpenTheOsd() {
+  assert.match(
+    obsPluginSource,
+    /queueDisconnectedFeedbackClear\(\)[\s\S]*?ctx\.feedback\.set\(bindingId, 0\.0, action, \{[\s\S]*?silent: true,/,
+  );
+}
+
 testMatchingLocalMuteEchoIsIgnored();
 testOppositeMuteEventPassesImmediately();
 testExpiredMuteIntentPasses();
@@ -124,5 +186,8 @@ testInputMuteFeedbackIncludesVolumeAndMuteBindings();
 testSourceFiltersNormalizeToStableEntries();
 testSourceFilterActionTargetsFilterInsteadOfVisibility();
 testSourceFilterKeysUseSourceAndFilterNames();
+testDisconnectFeedbackClearsObsMuteAndStatefulLights();
+testDisconnectFeedbackIgnoresUnrelatedAndMomentaryBindings();
+testDisconnectFeedbackDoesNotOpenTheOsd();
 
 console.log("OBS plugin tests passed");

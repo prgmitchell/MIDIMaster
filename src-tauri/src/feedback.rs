@@ -2,6 +2,7 @@ use crate::bindings::{BindingKey, BindingState};
 use crate::model::{self, AuxiliaryControl, Binding};
 use crate::run_logger;
 use crate::AppState;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FeedbackControlKey {
@@ -98,6 +99,103 @@ pub fn binding_feedback_control_key(binding: &Binding) -> FeedbackControlKey {
         .custom_feedback_output_control()
         .map(FeedbackControlKey::from_aux)
         .unwrap_or_else(|| FeedbackControlKey::from_binding(binding))
+}
+
+pub fn assign_button_feedback(binding: &Binding) -> Option<(FeedbackControlKey, f32)> {
+    let control = binding.assign_control.as_ref()?;
+    if matches!(control.msg_type, model::MidiMessageType::ProgramChange) {
+        return None;
+    }
+    let assign_control = FeedbackControlKey::from_aux(control);
+    let conflicts_with_existing_role = FeedbackControlKey::from_binding(binding) == assign_control
+        || binding
+            .mute_control
+            .as_ref()
+            .map(FeedbackControlKey::from_aux)
+            .is_some_and(|candidate| candidate == assign_control)
+        || binding
+            .indicator_control
+            .as_ref()
+            .map(FeedbackControlKey::from_aux)
+            .is_some_and(|candidate| candidate == assign_control);
+    if conflicts_with_existing_role {
+        return None;
+    }
+    let has_real_targets = binding
+        .normalized_targets()
+        .iter()
+        .any(|target| !matches!(target, model::BindingTarget::Unset));
+    Some((assign_control, if has_real_targets { 1.0 } else { 0.0 }))
+}
+
+pub fn send_assign_button_feedback(
+    state: &AppState,
+    binding: &Binding,
+    force_hardware_feedback: bool,
+    context: &str,
+) {
+    let Some((control, value)) = assign_button_feedback(binding) else {
+        return;
+    };
+    send_feedback_to_control(
+        state,
+        &control,
+        FeedbackSendOptions {
+            value,
+            silent: false,
+            force_hardware_feedback,
+            context,
+        },
+    );
+}
+
+fn assign_feedback_outputs(bindings: &[Binding]) -> HashSet<FeedbackControlKey> {
+    bindings
+        .iter()
+        .filter_map(|binding| assign_button_feedback(binding).map(|(control, _)| control))
+        .collect()
+}
+
+fn stale_assign_feedback_outputs(
+    previous_bindings: &[Binding],
+    current_bindings: &[Binding],
+) -> HashSet<FeedbackControlKey> {
+    let mut current_outputs = assign_feedback_outputs(current_bindings);
+    for binding in current_bindings {
+        current_outputs.insert(binding_feedback_control_key(binding));
+        if let Some(control) = binding.mute_control.as_ref() {
+            current_outputs.insert(FeedbackControlKey::from_aux(control));
+        }
+        if let Some(control) = binding.indicator_control.as_ref() {
+            current_outputs.insert(FeedbackControlKey::from_aux(control));
+        }
+    }
+    assign_feedback_outputs(previous_bindings)
+        .into_iter()
+        .filter(|control| !current_outputs.contains(control))
+        .collect()
+}
+
+pub fn reconcile_assign_feedback_outputs(
+    state: &AppState,
+    previous_bindings: &[Binding],
+    current_bindings: &[Binding],
+) {
+    for control in stale_assign_feedback_outputs(previous_bindings, current_bindings) {
+        let key = control.to_binding_key();
+        if let Ok(mut feedback_values) = state.feedback_values.lock() {
+            feedback_values.remove(&key);
+        }
+        if let Ok(mut midi) = state.midi.lock() {
+            let _ = midi.send_feedback(
+                &control.device_id,
+                control.channel,
+                control.controller,
+                0.0,
+                control.msg_type,
+            );
+        }
+    }
 }
 
 fn primary_button_light_suppression_control(
@@ -345,5 +443,94 @@ mod tests {
         let output_key = button_light_feedback_control_key(&binding).to_binding_key();
 
         assert!(primary_button_light_suppression_control(&binding, &output_key).is_none());
+    }
+
+    #[test]
+    fn assign_feedback_tracks_any_real_target_type() {
+        let target_sets = vec![
+            vec![model::BindingTarget::Application {
+                name: "spotify".to_string(),
+                display_name: None,
+                icon_data: None,
+            }],
+            vec![model::BindingTarget::Master],
+            vec![model::BindingTarget::Focus],
+            vec![model::BindingTarget::Device {
+                device_id: "speakers".to_string(),
+            }],
+            vec![model::BindingTarget::Integration {
+                integration_id: "wavelink".to_string(),
+                kind: "input".to_string(),
+                data: serde_json::json!({ "id": "voice" }),
+            }],
+        ];
+
+        for targets in target_sets {
+            let mut binding = button_binding(21);
+            binding.targets = targets;
+            binding.assign_control = Some(indicator_control(30));
+
+            let (control, value) = assign_button_feedback(&binding).expect("assign feedback");
+            assert_eq!(control.controller, 30);
+            assert_eq!(value, 1.0);
+        }
+    }
+
+    #[test]
+    fn assign_feedback_is_off_for_unset_and_unsupported_for_program_change() {
+        let mut binding = button_binding(21);
+        binding.targets = vec![model::BindingTarget::Unset];
+        binding.target = model::BindingTarget::Unset;
+        binding.assign_control = Some(indicator_control(30));
+
+        let (_, value) = assign_button_feedback(&binding).expect("assign feedback");
+        assert_eq!(value, 0.0);
+
+        binding.assign_control.as_mut().unwrap().msg_type = model::MidiMessageType::ProgramChange;
+        assert!(assign_button_feedback(&binding).is_none());
+    }
+
+    #[test]
+    fn assign_feedback_yields_to_an_existing_control_role_on_the_same_address() {
+        let mut binding = button_binding(21);
+        binding.assign_control = Some(indicator_control(30));
+        binding.mute_control = Some(indicator_control(30));
+
+        assert!(assign_button_feedback(&binding).is_none());
+
+        binding.mute_control = None;
+        binding.control.controller = 30;
+        assert!(assign_button_feedback(&binding).is_none());
+
+        binding.control.controller = 21;
+        binding.indicator_control = Some(indicator_control(30));
+        assert!(assign_button_feedback(&binding).is_none());
+    }
+
+    #[test]
+    fn stale_assign_feedback_keeps_addresses_still_in_use() {
+        let mut previous = button_binding(21);
+        previous.assign_control = Some(indicator_control(30));
+
+        let mut same_output = button_binding(22);
+        same_output.id = "b2".to_string();
+        same_output.assign_control = Some(indicator_control(30));
+        assert!(stale_assign_feedback_outputs(&[previous.clone()], &[same_output]).is_empty());
+
+        let stale = stale_assign_feedback_outputs(&[previous], &[]);
+        assert_eq!(stale.len(), 1);
+        assert_eq!(stale.iter().next().unwrap().controller, 30);
+    }
+
+    #[test]
+    fn stale_assign_feedback_does_not_clear_an_address_transferred_to_mute() {
+        let mut previous = button_binding(21);
+        previous.assign_control = Some(indicator_control(30));
+
+        let mut current = button_binding(22);
+        current.assign_control = None;
+        current.mute_control = Some(indicator_control(30));
+
+        assert!(stale_assign_feedback_outputs(&[previous], &[current]).is_empty());
     }
 }
