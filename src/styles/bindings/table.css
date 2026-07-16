@@ -1561,7 +1561,11 @@ body[data-theme] .binding-volume-slider {
 body[data-theme] .binding-volume-slider::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: inherit;
-  background: transparent;
+  background: linear-gradient(
+    to right,
+    var(--slider-fill) 0 var(--range-fill, 0%),
+    var(--slider-track) var(--range-fill, 0%) 100%
+  );
 }
 
 body[data-theme] .binding-volume-slider::-webkit-slider-thumb {

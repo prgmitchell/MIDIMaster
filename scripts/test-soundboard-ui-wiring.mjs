@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [html, domRefs, bindings, targets, tableCss, configCss] = await Promise.all([
+const [html, domRefs, bindings, targets, tableCss, configCss, controlsCss] = await Promise.all([
   readFile(new URL("../src/index.html", import.meta.url), "utf8"),
   readFile(new URL("../src/app/dom_refs.js", import.meta.url), "utf8"),
   readFile(new URL("../src/features/bindings/bindings.js", import.meta.url), "utf8"),
   readFile(new URL("../src/features/targets/targets.js", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/bindings/table.css", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/bindings/config-panel.css", import.meta.url), "utf8"),
+  readFile(new URL("../src/styles/osd-and-controls.css", import.meta.url), "utf8"),
 ]);
 
 for (const id of [
@@ -59,6 +60,9 @@ assert.match(configCss, /binding-config-panel--button\.binding-config-panel--sou
 assert.match(bindings, /bindingConfigSoundboardStart[\s\S]*?bindingConfigSoundboardEnd[\s\S]*?bindingConfigSoundboardVolume[\s\S]*?updateSliderFill/, "Soundboard ranges should calculate exact endpoint fills");
 assert.match(bindings, /style\.setProperty\("--range-fill", `\$\{percent\}%`\)/, "Soundboard ranges should expose their exact fill percentage to CSS");
 assert.match(configCss, /webkit-slider-runnable-track[\s\S]*?var\(--slider-fill\) 0 var\(--range-fill\)[\s\S]*?var\(--slider-track\) var\(--range-fill\) 100%/, "Soundboard range tracks should render their progress fill at exact endpoints");
+assert.match(controlsCss, /\.binding-volume-slider\s*\{[^}]*background-size:\s*var\(--range-fill, 0%\) 100%/, "binding value sliders should render their calculated progress fill");
+assert.match(controlsCss, /body\.dark-mode \.binding-row input\.binding-volume-slider\s*\{[^}]*background-size:\s*var\(--range-fill, 0%\) 100%/, "dark binding value sliders should preserve their calculated progress fill");
+assert.match(tableCss, /binding-volume-slider::\-webkit-slider-runnable-track\s*\{[^}]*var\(--slider-fill\) 0 var\(--range-fill, 0%\)[^}]*var\(--slider-track\) var\(--range-fill, 0%\) 100%/, "binding value tracks should explicitly split filled and unfilled colors in every theme");
 assert.match(configCss, /--soundboard-waveform-background: var\(--surface-subtle\)[\s\S]*?--soundboard-waveform-color:[^;]*var\(--accent\)/, "the waveform should use active theme tokens");
 assert.match(configCss, /soundboard-transport-button[\s\S]*?color: var\(--accent\)[\s\S]*?background: var\(--accent-soft\)/, "the preview transport should use active theme tokens");
 assert.match(bindings, /soundboardWaveformColors[\s\S]*?getComputedStyle[\s\S]*?drawSoundboardWaveform/, "canvas drawing should resolve waveform colors from the active theme");
