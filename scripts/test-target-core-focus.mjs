@@ -171,6 +171,39 @@ function testSystemSoundsApplicationTargetUsesReportedSession() {
   });
 }
 
+function testAudioDeviceDisplaysExposeSemanticFallbackIcons() {
+  const core = createTargetCore({
+    masterIconData: "master",
+    focusIconData: "focus",
+    mediaPlayPauseIconData: "media",
+    getSessions: () => [],
+    getPlaybackDevices: () => [{
+      id: "voicemeeter",
+      display_name: "Voicemeeter Input",
+      icon_data: null,
+    }],
+    getRecordingDevices: () => [{
+      id: "microphone",
+      display_name: "Microphone",
+      icon_data: null,
+    }],
+    getFocusedSession: () => null,
+    getPluginHost: () => null,
+    getIntegrationTargetState: () => null,
+  });
+
+  assert.deepEqual(core.resolveOsdTarget({ Device: { device_id: "playback:voicemeeter" } }), {
+    label: "Voicemeeter Input",
+    icon_data: null,
+    icon_kind: "playback-device",
+  });
+  assert.deepEqual(core.resolveOsdTarget({ Device: { device_id: "recording:microphone" } }), {
+    label: "Microphone",
+    icon_data: null,
+    icon_kind: "recording-device",
+  });
+}
+
 async function testFocusRefreshUpdatesTargetDisplaysWithoutSessionListChanges() {
   let state = {
     sessions: [],
@@ -228,6 +261,7 @@ testNormalizeSessionKeyAvoidsPidOnlyFallback();
 testNormalizeSessionKeyAvoidsWebView2Fallback();
 testPackageProductNameMatchesLegacyApplicationTarget();
 testSystemSoundsApplicationTargetUsesReportedSession();
+testAudioDeviceDisplaysExposeSemanticFallbackIcons();
 await testFocusRefreshUpdatesTargetDisplaysWithoutSessionListChanges();
 
 console.log("Target core focus tests passed");

@@ -40,6 +40,35 @@
   object-fit: contain;
 }
 
+.target-icon--system {
+  --target-system-icon-background: #2b2d42;
+  --target-system-icon-foreground: #fff;
+  overflow: hidden;
+}
+
+.target-icon--system .target-icon-backdrop {
+  fill: var(--target-system-icon-background);
+}
+
+.target-icon--system .target-icon-glyph--fill {
+  fill: var(--target-system-icon-foreground);
+}
+
+.target-icon--system .target-icon-glyph--stroke {
+  fill: none;
+  stroke: var(--target-system-icon-foreground);
+}
+
+body[data-theme="light"] .target-icon--system {
+  --target-system-icon-background: var(--accent-soft);
+  --target-system-icon-foreground: var(--accent-strong);
+}
+
+body[data-theme] .target-icon--device {
+  --target-system-icon-background: color-mix(in srgb, var(--accent-soft) 78%, var(--surface-raised) 22%);
+  --target-system-icon-foreground: var(--accent-strong);
+}
+
 .target-icon.fallback {
   display: flex;
   align-items: center;

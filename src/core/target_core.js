@@ -259,6 +259,7 @@ export function createTargetCore({
       return {
         label: device?.display_name || "Audio Device",
         icon_data: device?.icon_data ?? null,
+        icon_kind: `${kind}-device`,
       };
     }
 

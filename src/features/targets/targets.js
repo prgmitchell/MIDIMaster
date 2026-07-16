@@ -46,6 +46,17 @@ export function createTargetsFeature({
   const SNIP_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 5h10v10H5z' stroke='%2398a6cc' stroke-width='1.2' stroke-dasharray='2 2'/><path d='M7 13l6-6M7 7l6 6' stroke='%238fd5ff' stroke-width='1.3' stroke-linecap='round'/></svg>";
   const RECORD_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='3' y='5' width='14' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><circle cx='10' cy='10' r='2.6' fill='%23f26d6d'/></svg>";
   const PROFILE_SWITCH_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><circle cx='7' cy='7' r='2.5' stroke='%23c7d2f3' stroke-width='1.2'/><path d='M2.8 14.8c.6-2.5 2-3.8 4.2-3.8 1.4 0 2.5.5 3.3 1.5' stroke='%23c7d2f3' stroke-width='1.2' stroke-linecap='round'/><path d='M11.5 6.2h5.2m0 0-2-2m2 2-2 2M16.7 12.8h-5.2m0 0 2-2m-2 2 2 2' stroke='%238fd5ff' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+  const SYSTEM_TARGET_ICON_MARKUP = Object.freeze({
+    master: "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M5 4h2v10H5zM11 4h2v10h-2z'/>",
+    focus: "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><circle class='target-icon-glyph target-icon-glyph--stroke' cx='9' cy='9' r='5.5' stroke-width='2'/><circle class='target-icon-glyph target-icon-glyph--fill' cx='9' cy='9' r='1.5'/>",
+    "media-play-pause": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M4.5 4.2l4.4 4.8-4.4 4.8z'/><rect class='target-icon-glyph target-icon-glyph--fill' x='10.5' y='4.3' width='1.8' height='9.4' rx='.4'/><rect class='target-icon-glyph target-icon-glyph--fill' x='13.1' y='4.3' width='1.8' height='9.4' rx='.4'/>",
+    "media-next": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M4 4l5 5-5 5zM9 4l5 5-5 5z'/><rect class='target-icon-glyph target-icon-glyph--fill' x='14' y='4' width='1.5' height='10'/>",
+    "media-previous": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M14 4L9 9l5 5zM9 4L4 9l5 5z'/><rect class='target-icon-glyph target-icon-glyph--fill' x='2.5' y='4' width='1.5' height='10'/>",
+    "media-stop": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><rect class='target-icon-glyph target-icon-glyph--fill' x='5' y='5' width='8' height='8' rx='1.2'/>",
+    hotkey: "<rect class='target-icon-backdrop' x='1.8' y='3.6' width='14.4' height='10.8' rx='2.7'/><rect class='target-icon-glyph target-icon-glyph--stroke' x='1.8' y='3.6' width='14.4' height='10.8' rx='2.7' stroke-width='1.1'/><path class='target-icon-glyph target-icon-glyph--stroke' d='M4.1 6.8h1.5M7 6.8h1.5m1.4 0h1.5m1.4 0h1.1M4.8 10.5h8.4' stroke-width='1.7' stroke-linecap='round'/>",
+    "playback-device": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M3.3 7.4v3.2h2.4l3.1 2.7V4.7L5.7 7.4z'/><path class='target-icon-glyph target-icon-glyph--stroke' d='M11.4 6.5c1.4 1.4 1.4 3.6 0 5M13.5 4.9c2.3 2.3 2.3 5.9 0 8.2' stroke-width='1.35' stroke-linecap='round'/>",
+    "recording-device": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><rect class='target-icon-glyph target-icon-glyph--stroke' x='6.2' y='3.2' width='5.6' height='8.1' rx='2.8' stroke-width='1.35'/><path class='target-icon-glyph target-icon-glyph--stroke' d='M4.7 8.8c0 3 1.7 4.7 4.3 4.7s4.3-1.7 4.3-4.7M9 13.5v2M6.7 15.5h4.6' stroke-width='1.35' stroke-linecap='round'/>",
+  });
 
   function normalizeOpenApplication(raw) {
     if (!raw || typeof raw !== "object") return null;
@@ -169,7 +180,56 @@ export function createTargetsFeature({
     closeOpenDropdowns({ except });
   }
 
+  function systemTargetIconKind(option) {
+    const requestedKind = String(option?.icon_kind || "");
+    const source = option?.icon_data;
+    if (SYSTEM_TARGET_ICON_MARKUP[requestedKind] && (!source || !requestedKind.endsWith("-device"))) {
+      return requestedKind;
+    }
+
+    if (source) {
+      if (source === masterIconData) return "master";
+      if (source === focusIconData) return "focus";
+      if (source === mediaPlayPauseIconData) return "media-play-pause";
+      if (source === mediaNextTrackIconData) return "media-next";
+      if (source === mediaPrevTrackIconData) return "media-previous";
+      if (source === mediaStopIconData) return "media-stop";
+      if (source === HOTKEY_ICON_DATA) return "hotkey";
+    }
+
+    if (!source && option?.kind === "device") {
+      return String(option.value || "").startsWith("recording:")
+        ? "recording-device"
+        : "playback-device";
+    }
+    return null;
+  }
+
+  function createSystemTargetIcon(kind) {
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("viewBox", "0 0 18 18");
+    icon.setAttribute("aria-hidden", "true");
+    icon.setAttribute("focusable", "false");
+    icon.classList.add("target-icon", "target-icon--system", `target-icon--${kind}`);
+    if (kind.endsWith("-device")) icon.classList.add("target-icon--device");
+    icon.innerHTML = SYSTEM_TARGET_ICON_MARKUP[kind];
+    return icon;
+  }
+
+  function createFallbackTargetIcon(option) {
+    const systemKind = systemTargetIconKind({ ...option, icon_data: null });
+    if (systemKind) return createSystemTargetIcon(systemKind);
+
+    const fallback = document.createElement("span");
+    fallback.className = "target-icon fallback";
+    fallback.textContent = option?.label?.[0]?.toUpperCase() || "?";
+    return fallback;
+  }
+
   function createTargetIcon(option) {
+    const systemKind = systemTargetIconKind(option);
+    if (systemKind) return createSystemTargetIcon(systemKind);
+
     if (option?.icon_data) {
       const icon = document.createElement("img");
       icon.className = "target-icon";
@@ -178,12 +238,16 @@ export function createTargetsFeature({
       icon.src = src.startsWith("data:") || src.startsWith("assets/")
         ? src
         : `data:image/png;base64,${src}`;
+      icon.addEventListener("error", () => {
+        const fallback = createFallbackTargetIcon(option);
+        if (icon.classList.contains("target-chip-icon")) {
+          fallback.classList.add("target-chip-icon");
+        }
+        icon.replaceWith(fallback);
+      }, { once: true });
       return icon;
     }
-    const fallback = document.createElement("span");
-    fallback.className = "target-icon fallback";
-    fallback.textContent = option?.label?.[0]?.toUpperCase() || "?";
-    return fallback;
+    return createFallbackTargetIcon(option);
   }
 
   const INTEGRATION_META = {
@@ -818,6 +882,7 @@ export function createTargetsFeature({
           value: `playback:${device.id}`,
           label: device.display_name,
           icon_data: device.icon_data,
+          icon_kind: "playback-device",
           kind: "device",
         });
       });
@@ -830,6 +895,7 @@ export function createTargetsFeature({
           value: `recording:${device.id}`,
           label: device.display_name,
           icon_data: device.icon_data,
+          icon_kind: "recording-device",
           kind: "device",
         });
       });
@@ -1162,6 +1228,8 @@ export function createTargetsFeature({
         icon_data: (resolved?.icon_data ?? cached?.icon_data ?? null),
         ghost: Boolean(resolved?.ghost),
       };
+      const iconKind = resolved?.icon_kind || cached?.icon_kind || null;
+      if (iconKind) merged.icon_kind = iconKind;
       targetDisplayCache.set(key, merged);
       return merged;
     };

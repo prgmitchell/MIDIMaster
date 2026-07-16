@@ -169,12 +169,17 @@ export function createOsdFeature({
       displayLabel,
       String(display?.label || ""),
       String(display?.icon_data || ""),
+      String(display?.icon_kind || ""),
     ].join("|");
     if (item.displaySignature !== displaySignature) {
       item.displaySignature = displaySignature;
       renderLabelWithTags(refs.labelSpan, displayLabel);
       refs.iconDiv.innerHTML = "";
-      const icon = iconFor({ label: display.label, icon_data: display.icon_data });
+      const icon = iconFor({
+        label: display.label,
+        icon_data: display.icon_data,
+        icon_kind: display.icon_kind,
+      });
       refs.iconDiv.appendChild(icon);
 
       refs.fillDiv.style.backgroundColor = "";

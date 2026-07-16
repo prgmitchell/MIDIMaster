@@ -180,6 +180,24 @@ pub fn extract_executable_icon_base64(path: &str) -> Option<String> {
     extract_icon_data(path, 0)
 }
 
+fn restore_legacy_icon_alpha(pixels: &mut [u8], mask_pixels: Option<&[u8]>) {
+    if pixels.chunks_exact(4).any(|pixel| pixel[3] != 0) {
+        return;
+    }
+
+    if let Some(mask) = mask_pixels.filter(|mask| mask.len() >= pixels.len()) {
+        for (pixel, mask_pixel) in pixels.chunks_exact_mut(4).zip(mask.chunks_exact(4)) {
+            let transparent = mask_pixel[0] != 0 || mask_pixel[1] != 0 || mask_pixel[2] != 0;
+            pixel[3] = if transparent { 0 } else { u8::MAX };
+        }
+        return;
+    }
+
+    for pixel in pixels.chunks_exact_mut(4) {
+        pixel[3] = u8::MAX;
+    }
+}
+
 pub(super) fn icon_to_png_base64(icon: HICON) -> Option<String> {
     let mut icon_info = ICONINFO::default();
     unsafe { GetIconInfo(icon, &mut icon_info).ok()? };
@@ -252,6 +270,39 @@ pub(super) fn icon_to_png_base64(icon: HICON) -> Option<String> {
             DIB_RGB_COLORS,
         )
     };
+    let mask_pixels = if lines != 0
+        && pixels.chunks_exact(4).all(|pixel| pixel[3] == 0)
+        && !icon_info.hbmColor.is_invalid()
+        && !icon_info.hbmMask.is_invalid()
+    {
+        let mut mask_info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width,
+                biHeight: -height,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut mask = vec![0u8; pixels.len()];
+        let mask_lines = unsafe {
+            GetDIBits(
+                hdc,
+                icon_info.hbmMask,
+                0,
+                height as u32,
+                Some(mask.as_mut_ptr() as *mut _),
+                &mut mask_info,
+                DIB_RGB_COLORS,
+            )
+        };
+        (mask_lines != 0).then_some(mask)
+    } else {
+        None
+    };
     unsafe {
         ReleaseDC(None, hdc);
         let _ = DeleteObject(icon_info.hbmColor.into());
@@ -262,6 +313,7 @@ pub(super) fn icon_to_png_base64(icon: HICON) -> Option<String> {
         return None;
     }
 
+    restore_legacy_icon_alpha(&mut pixels, mask_pixels.as_deref());
     for chunk in pixels.chunks_exact_mut(4) {
         chunk.swap(0, 2);
     }
@@ -1039,6 +1091,27 @@ mod tests {
     use super::*;
     use std::ptr;
     use windows::Win32::System::Com::CoTaskMemAlloc;
+
+    #[test]
+    fn legacy_icon_alpha_uses_the_and_mask_when_color_alpha_is_empty() {
+        let mut pixels = vec![10, 20, 30, 0, 40, 50, 60, 0];
+        let mask = vec![0, 0, 0, 0, 255, 255, 255, 0];
+
+        restore_legacy_icon_alpha(&mut pixels, Some(&mask));
+
+        assert_eq!(pixels[3], 255);
+        assert_eq!(pixels[7], 0);
+    }
+
+    #[test]
+    fn modern_icon_alpha_is_preserved() {
+        let mut pixels = vec![10, 20, 30, 128, 40, 50, 60, 0];
+        let original = pixels.clone();
+
+        restore_legacy_icon_alpha(&mut pixels, None);
+
+        assert_eq!(pixels, original);
+    }
 
     #[test]
     fn owned_pwstr_to_string_copies_and_frees_com_allocated_memory() {
