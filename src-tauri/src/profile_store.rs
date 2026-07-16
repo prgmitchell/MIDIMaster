@@ -68,7 +68,11 @@ impl ProfileStore {
     }
 
     fn load_all(&self) -> Result<Vec<Profile>> {
-        self.storage.load_or_default()
+        let mut profiles: Vec<Profile> = self.storage.load_or_default()?;
+        for profile in &mut profiles {
+            profile.restore_from_storage();
+        }
+        Ok(profiles)
     }
 
     #[cfg(test)]
@@ -87,7 +91,7 @@ fn normalize_profiles(profiles: &mut [Profile]) {
 mod tests {
     use super::ProfileStore;
     use crate::durable_json_store::new_recovery_notices;
-    use crate::model::Profile;
+    use crate::model::{AssignMode, Binding, Profile};
     use std::collections::BTreeSet;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -108,6 +112,30 @@ mod tests {
             midi_device_preference: Default::default(),
             midi_device_preference_set: false,
         }
+    }
+
+    fn profile_with_clear_assign_mode(name: &str) -> Profile {
+        let mut profile = profile(name);
+        let binding: Binding = serde_json::from_value(serde_json::json!({
+            "id": "clear-binding",
+            "name": "Clear assign",
+            "device_id": "midi:0",
+            "control": {
+                "channel": 0,
+                "controller": 7,
+                "msg_type": "ControlChange"
+            },
+            "control_kind": "Continuous",
+            "targets": ["Master"],
+            "action": "Volume",
+            "mode": "Absolute",
+            "deadzone": 0.0,
+            "debounce_ms": 0,
+            "assign_mode": "Clear"
+        }))
+        .expect("clear assign binding");
+        profile.bindings.push(binding);
+        profile
     }
 
     fn unsafe_light_profiles_json() -> serde_json::Value {
@@ -149,6 +177,49 @@ mod tests {
         let profiles: Vec<Profile> = serde_json::from_str(&backup).expect("parse backup");
         assert_eq!(profiles.len(), 1);
         assert_eq!(profiles[0].name, "first");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn clear_assign_mode_uses_legacy_compatible_storage_and_survives_other_saves() {
+        let dir = test_dir("clear-assign-compat");
+        let store = ProfileStore::new(dir.clone());
+
+        store
+            .save_profile(profile_with_clear_assign_mode("clear"))
+            .expect("save clear profile");
+
+        let raw = std::fs::read_to_string(dir.join("profiles.json")).expect("profiles json");
+        assert!(!raw.contains(r#""assign_mode": "Clear""#));
+        let stored: serde_json::Value = serde_json::from_str(&raw).expect("stored profiles");
+        assert_eq!(stored[0]["bindings"][0]["assign_mode"], "Add");
+        assert_eq!(
+            stored[0]["plugin_settings"]["__midimaster_core_assign_modes"]["clear_binding_ids"][0],
+            "clear-binding"
+        );
+
+        let loaded = store
+            .load_profile("clear")
+            .expect("load clear profile")
+            .expect("clear profile");
+        assert_eq!(loaded.bindings[0].assign_mode, AssignMode::Clear);
+        assert!(!loaded
+            .plugin_settings
+            .contains_key("__midimaster_core_assign_modes"));
+
+        store
+            .save_profile(profile("unrelated"))
+            .expect("save unrelated profile");
+        let reloaded = store
+            .load_profile("clear")
+            .expect("reload clear profile")
+            .expect("clear profile after unrelated save");
+        assert_eq!(reloaded.bindings[0].assign_mode, AssignMode::Clear);
+
+        let raw_after_other_save =
+            std::fs::read_to_string(dir.join("profiles.json")).expect("profiles json");
+        assert!(!raw_after_other_save.contains(r#""assign_mode": "Clear""#));
 
         let _ = std::fs::remove_dir_all(dir);
     }

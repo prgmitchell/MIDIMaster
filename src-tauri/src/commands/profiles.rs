@@ -223,6 +223,7 @@ pub fn export_current_profile(
         return Ok(None);
     };
 
+    profile.normalize_for_storage();
     let json = serde_json::to_string_pretty(&profile).map_err(|err| err.to_string())?;
     std::fs::write(&path, json).map_err(|err| err.to_string())?;
 
@@ -241,6 +242,7 @@ pub fn import_profile_from_file() -> Result<Option<Profile>, String> {
     let data = std::fs::read_to_string(&path).map_err(|err| err.to_string())?;
     let mut profile: Profile =
         serde_json::from_str(&data).map_err(|err| format!("Invalid profile JSON: {}", err))?;
+    profile.restore_from_storage();
 
     profile.name = profile.name.trim().to_string();
     if profile.name.is_empty() {

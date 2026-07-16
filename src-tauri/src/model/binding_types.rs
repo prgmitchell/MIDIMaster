@@ -456,10 +456,12 @@ fn normalize_macro_action_text(value: Option<&str>) -> Option<String> {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum AssignMode {
-    #[default]
-    Add,
     Replace,
     Clear,
+    #[default]
+    // A future assign mode must not make an entire profile store unreadable.
+    #[serde(other)]
+    Add,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]

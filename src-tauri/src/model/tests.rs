@@ -178,7 +178,7 @@ fn deserialize_binding_indicator_control_defaults_to_none() {
 }
 
 #[test]
-fn assign_mode_clear_round_trips_and_missing_mode_defaults_to_add() {
+fn assign_mode_clear_round_trips_and_missing_or_unknown_mode_defaults_to_add() {
     assert_eq!(
         serde_json::to_value(AssignMode::Clear).expect("Clear should serialize"),
         serde_json::json!("Clear")
@@ -196,6 +196,15 @@ fn assign_mode_clear_round_trips_and_missing_mode_defaults_to_add() {
     let default_binding: Binding =
         serde_json::from_value(binding_base_json()).expect("legacy binding should deserialize");
     assert_eq!(default_binding.assign_mode, AssignMode::Add);
+
+    let mut unknown = binding_base_json();
+    unknown
+        .as_object_mut()
+        .unwrap()
+        .insert("assign_mode".to_string(), serde_json::json!("FutureMode"));
+    let unknown_binding: Binding = serde_json::from_value(unknown)
+        .expect("an unknown assign mode must not invalidate the binding or profile");
+    assert_eq!(unknown_binding.assign_mode, AssignMode::Add);
 }
 
 #[test]
