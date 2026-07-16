@@ -775,6 +775,74 @@
               <div id="binding-config-macro-list" class="binding-config-macro-list"></div>
             </section>
 
+            <section id="binding-config-soundboard-summary-section" class="binding-config-section binding-config-section--soundboard-summary hidden">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title" data-i18n="soundboard.title">Soundboard</span>
+                <div class="binding-config-title-actions">
+                  <button id="binding-config-soundboard-edit" type="button" class="binding-config-button binding-config-button--primary" data-i18n="soundboard.edit">Edit Sound</button>
+                </div>
+              </div>
+              <div id="binding-config-soundboard-summary" class="binding-config-soundboard-summary"></div>
+            </section>
+
+            <section id="binding-config-soundboard-section" class="binding-config-section binding-config-section--soundboard hidden">
+              <div class="soundboard-file-row">
+                <div class="soundboard-file-copy">
+                  <span class="binding-config-toggle-title" data-i18n="soundboard.audioFile">Audio file</span>
+                  <span id="binding-config-soundboard-file" class="soundboard-file-name"></span>
+                  <span id="binding-config-soundboard-status" class="soundboard-file-status" role="status" aria-live="polite"></span>
+                </div>
+                <div class="soundboard-transport">
+                  <button id="binding-config-soundboard-preview" type="button" class="soundboard-transport-button" data-state="stopped" aria-label="Play preview" data-i18n-aria-label="soundboard.previewPlay">
+                    <svg class="soundboard-transport-icon soundboard-transport-icon--play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+                    <svg class="soundboard-transport-icon soundboard-transport-icon--pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z"></path></svg>
+                  </button>
+                  <span id="binding-config-soundboard-playback-time" class="soundboard-playback-time">0:00.000</span>
+                </div>
+                <button id="binding-config-soundboard-replace" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="soundboard.pickSound">Pick Sound</button>
+              </div>
+              <div class="soundboard-waveform-shell">
+                <canvas id="binding-config-soundboard-waveform" class="soundboard-waveform" width="1024" height="240" tabindex="0" aria-label="Sound waveform with draggable trim handles" data-i18n-aria-label="soundboard.waveformLabel"></canvas>
+                <div class="soundboard-waveform-empty" aria-hidden="true">
+                  <svg viewBox="0 0 64 32" aria-hidden="true">
+                    <path d="M3 16h5m4-7v14m6-19v24m6-17v10m6-15v20m6-11v2m6-9v16m6-5v10m6-13v6m5-6h2"></path>
+                  </svg>
+                  <strong data-i18n="soundboard.noFile">No audio file selected</strong>
+                </div>
+              </div>
+              <div class="soundboard-time-row" aria-live="polite">
+                <span><span data-i18n="soundboard.start">Start</span> <strong id="binding-config-soundboard-start-time">0:00.000</strong></span>
+                <span><span data-i18n="soundboard.selection">Selection</span> <strong id="binding-config-soundboard-selection-time">0:00.000</strong></span>
+                <span><span data-i18n="soundboard.end">End</span> <strong id="binding-config-soundboard-end-time">0:00.000</strong></span>
+              </div>
+              <div class="soundboard-accessible-controls">
+                <label>
+                  <span data-i18n="soundboard.startHandle">Trim start</span>
+                  <input id="binding-config-soundboard-start" type="range" min="0" max="0" step="10" value="0" />
+                </label>
+                <label>
+                  <span data-i18n="soundboard.endHandle">Trim end</span>
+                  <input id="binding-config-soundboard-end" type="range" min="0" max="0" step="10" value="0" />
+                </label>
+              </div>
+              <div class="soundboard-options-grid">
+                <div class="soundboard-output-row">
+                  <span id="binding-config-soundboard-output-label" data-i18n="soundboard.outputDevice">Output device</span>
+                  <select id="binding-config-soundboard-output" aria-labelledby="binding-config-soundboard-output-label"></select>
+                </div>
+                <label class="soundboard-slider-row">
+                  <span data-i18n="soundboard.speed">Speed</span>
+                  <input id="binding-config-soundboard-speed" type="range" min="50" max="200" step="5" value="100" />
+                  <strong id="binding-config-soundboard-speed-value">1.00×</strong>
+                </label>
+                <label class="soundboard-slider-row">
+                  <span data-i18n="soundboard.volume">Sound volume</span>
+                  <input id="binding-config-soundboard-volume" type="range" min="0" max="100" step="1" value="100" />
+                  <strong id="binding-config-soundboard-volume-value">100%</strong>
+                </label>
+              </div>
+            </section>
+
             <section id="binding-config-curve-section" class="binding-config-section binding-config-section--curve">
               <div class="binding-config-title-row">
                 <span class="binding-config-title" data-i18n="bindings.curve">Curve</span>

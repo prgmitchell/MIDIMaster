@@ -307,6 +307,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            soundboard: None,
             macro_steps: Vec::new(),
         }
     }

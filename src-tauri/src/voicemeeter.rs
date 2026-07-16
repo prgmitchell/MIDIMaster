@@ -1044,12 +1044,12 @@ pub fn voicemeeter_device_state(
         } else {
             api.get_float(&format!("{prefix}[{index}].device.sr"))?
         };
-        return Ok(DeviceState {
+        Ok(DeviceState {
             scope,
             index,
             name,
             sample_rate,
-        });
+        })
     }
     #[cfg(not(target_os = "windows"))]
     Err("Voicemeeter is supported only on Windows".to_string())

@@ -359,6 +359,11 @@
   max-width: none;
 }
 
+.binding-value-cell--soundboard .binding-momentary-value {
+  min-width: 88px;
+  max-width: none;
+}
+
 .binding-macro-edit-button {
   flex: 0 0 auto;
   height: 28px;

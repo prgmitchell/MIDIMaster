@@ -118,6 +118,43 @@ fn focus_target_name(targets: &[BindingTarget]) -> Option<String> {
     })
 }
 
+pub(super) fn trigger_supplemental_soundboard(
+    state: &AppState,
+    app: &AppHandle,
+    binding: &Binding,
+    targets: &[BindingTarget],
+    event: &MidiEvent,
+) {
+    if binding.action == model::BindingAction::Soundboard
+        || !targets
+            .iter()
+            .any(|target| matches!(target, BindingTarget::Soundboard))
+        || !crate::soundboard::should_trigger_from_input(f32::from(event.value))
+    {
+        return;
+    }
+    let result = binding
+        .soundboard
+        .as_ref()
+        .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())
+        .and_then(|mapping| state.soundboard.play_binding(&binding.id, mapping));
+    if let Err(err) = result {
+        run_logger::warn(
+            "bindings",
+            "soundboard_play_failed",
+            &format!("binding_id={} error={}", binding.id, err),
+        );
+        emit_localized_action_error(
+            app,
+            "soundboard_play_failed",
+            &binding.id,
+            "dialogs.soundboardPlaybackFailedTitle",
+            "dialogs.soundboardPlaybackFailedMessage",
+            serde_json::json!({ "message": err }),
+        );
+    }
+}
+
 pub(super) fn handle_special_action(
     state: &AppState,
     app: &AppHandle,
@@ -129,6 +166,44 @@ pub(super) fn handle_special_action(
         clear_profile_switch_button_feedback(state, app, binding, event, targets);
         if event.value > 0 {
             binding_actions::request_profile_switch(app, binding, "bindings");
+        }
+        return Ok(true);
+    }
+
+    if binding.action == model::BindingAction::Soundboard {
+        let input_active = crate::soundboard::should_trigger_from_input(f32::from(event.value));
+        emit_button_feedback(
+            state,
+            app,
+            binding,
+            event,
+            targets,
+            if input_active { 1.0 } else { 0.0 },
+        );
+        if !input_active {
+            return Ok(true);
+        }
+        let result = binding
+            .soundboard
+            .as_ref()
+            .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())
+            .and_then(|mapping| state.soundboard.play_binding(&binding.id, mapping));
+        if let Err(err) = result {
+            run_logger::warn(
+                "bindings",
+                "soundboard_play_failed",
+                &format!("binding_id={} error={}", binding.id, err),
+            );
+            let _ = app.emit(
+                "binding_action_error",
+                serde_json::json!({
+                    "reason": "soundboard_play_failed",
+                    "binding_id": binding.id,
+                    "title_key": "dialogs.soundboardPlaybackFailedTitle",
+                    "message_key": "dialogs.soundboardPlaybackFailedMessage",
+                    "params": { "message": err },
+                }),
+            );
         }
         return Ok(true);
     }

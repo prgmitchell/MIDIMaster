@@ -57,7 +57,7 @@ assert.match(files.html, /id="binding-config-mute-learn"[^>]*binding-config-icon
 assert.match(files.html, /id="binding-config-mute-clear"[^>]*binding-config-icon-button[^>]*aria-label="Clear"[^>]*>/, "mute clear should be an icon button");
 assert.match(files.html, /id="binding-config-assign-learn"[^>]*binding-config-icon-button[^>]*aria-label="Learn"[^>]*>/, "assign learn should be an icon button");
 assert.match(files.html, /id="binding-config-assign-clear"[^>]*binding-config-icon-button[^>]*aria-label="Clear"[^>]*>/, "assign clear should be an icon button");
-assert.match(files.bindings, /bindingConfigFeedbackOutputSection\)\s*d\.bindingConfigFeedbackOutputSection\.classList\.toggle\("hidden", isButton \|\| showMacroPage\)/, "fader feedback output section should only show for fader config");
+assert.match(files.bindings, /bindingConfigFeedbackOutputSection\)\s*d\.bindingConfigFeedbackOutputSection\.classList\.toggle\("hidden", isButton \|\| showSpecialPage\)/, "fader feedback output section should only show for fader config");
 assert.match(files.bindings, /d\.bindingConfigFeedbackLearn\.addEventListener\("click", async \(\) => \{\s*await startAuxLearn\("indicator_control"\);/s, "fader feedback learn should use the shared indicator_control learn flow");
 assert.match(files.bindings, /binding\.indicator_control = null;[\s\S]*?syncFeedbackOutputUi\(binding\);/, "fader feedback reset should clear the custom output and resync defaults");
 assert.doesNotMatch(files.bindings, /indicatorLearn\.textContent/, "indicator learn state should preserve its icon markup");

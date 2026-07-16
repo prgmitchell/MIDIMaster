@@ -775,6 +775,104 @@ function testNormalizeBindingDropsPitchBendButtonIndicatorControl() {
   assert.equal(normalized.indicator_control, null);
 }
 
+function testNormalizeSoundboardBindingAndDefaults() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "Soundboard",
+    target: "Soundboard",
+    targets: ["Soundboard"],
+    soundboard: {
+      path: "C:\\sounds\\intro.mp3",
+      display: "",
+      trim_start_ms: -20,
+      trim_end_ms: 2500,
+      volume: 4,
+    },
+  }));
+
+  assert.equal(normalized.action, "Soundboard");
+  assert.deepEqual(normalized.targets, ["Soundboard"]);
+  assert.deepEqual(normalized.soundboard, {
+    path: "C:\\sounds\\intro.mp3",
+    display: "intro.mp3",
+    trim_start_ms: 0,
+    trim_end_ms: 2500,
+    volume: 1,
+    speed: 1,
+    output_device_id: null,
+    output_device_display: null,
+  });
+  assert.equal(bindingModel.buttonVisualBehavior(normalized), "momentary");
+}
+
+function testSoundboardMappingRejectsBlankPathAndClampsEnd() {
+  assert.equal(bindingModel.normalizeSoundboardMapping({ path: "" }), null);
+  assert.deepEqual(bindingModel.normalizeSoundboardMapping({
+    path: "clip.wav",
+    trim_start_ms: 500,
+    trim_end_ms: 100,
+  }), {
+    path: "clip.wav",
+    display: "clip.wav",
+    trim_start_ms: 500,
+    trim_end_ms: 501,
+    volume: 1,
+    speed: 1,
+    output_device_id: null,
+    output_device_display: null,
+  });
+}
+
+function testSoundboardIsUniqueAndNormalizesPlaybackOptions() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "Soundboard",
+    targets: ["Soundboard", "Master", "Soundboard"],
+    soundboard: {
+      path: "clip.wav",
+      speed: 4,
+      output_device_id: " device-1 ",
+      output_device_display: " Speakers ",
+    },
+  }));
+  assert.deepEqual(normalized.targets, ["Soundboard", "Master"]);
+  assert.equal(normalized.soundboard.speed, 2);
+  assert.equal(normalized.soundboard.output_device_id, "device-1");
+  assert.equal(normalized.soundboard.output_device_display, "Speakers");
+}
+
+function testSoundboardCoexistsWithPrimaryMediaAction() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "MediaPlayPause",
+    targets: ["Soundboard", "MediaControl"],
+    soundboard: { path: "clip.wav" },
+  }));
+  assert.equal(normalized.action, "MediaPlayPause");
+  assert.deepEqual(normalized.targets, ["Soundboard", "MediaControl"]);
+  assert.equal(normalized.soundboard.path, "clip.wav");
+}
+
+function testMacroAndSoundboardConflictKeepsOneSpecialTarget() {
+  const normalized = bindingModel.normalizeBinding(buttonBinding({
+    action: "MediaPlayPause",
+    targets: ["Macro", "Soundboard", "MediaControl"],
+    macro_name: "My Macro",
+    macro_steps: [],
+    soundboard: { path: "clip.wav" },
+  }));
+  assert.equal(normalized.action, "MediaPlayPause");
+  assert.deepEqual(normalized.targets, ["Macro", "MediaControl"]);
+  assert.equal(normalized.soundboard, null);
+
+  const soundboardPreferred = bindingModel.normalizeBinding(buttonBinding({
+    action: "Soundboard",
+    targets: ["Macro", "Soundboard"],
+    macro_name: "Discard me",
+    soundboard: { path: "clip.wav" },
+  }));
+  assert.deepEqual(soundboardPreferred.targets, ["Soundboard"]);
+  assert.equal(soundboardPreferred.macro_name, "");
+  assert.equal(soundboardPreferred.soundboard.path, "clip.wav");
+}
+
 testNormalizeBindingPreservesExplicitRelativeFormat();
 testCustomCurveNormalizationPreservesSegmentBend();
 testCustomCurveInterpolationAppliesSegmentBend();
@@ -820,5 +918,10 @@ testNormalizeBindingPreservesFaderFeedbackOutputControl();
 testNormalizeBindingPreservesPitchBendFaderFeedbackOutputControl();
 testNormalizeBindingDropsUnsupportedIndicatorControl();
 testNormalizeBindingDropsPitchBendButtonIndicatorControl();
+testNormalizeSoundboardBindingAndDefaults();
+testSoundboardMappingRejectsBlankPathAndClampsEnd();
+testSoundboardIsUniqueAndNormalizesPlaybackOptions();
+testSoundboardCoexistsWithPrimaryMediaAction();
+testMacroAndSoundboardConflictKeepsOneSpecialTarget();
 
 console.log("Binding model tests passed");

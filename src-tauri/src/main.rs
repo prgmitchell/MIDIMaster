@@ -21,6 +21,7 @@ mod profile_store;
 mod run_logger;
 mod runtime_helpers;
 mod runtime_midi;
+mod soundboard;
 mod store_api;
 mod telemetry;
 mod voicemeeter;
@@ -38,6 +39,7 @@ use midi_event_queue::MidiEventQueue;
 use model::OsdSettings;
 
 use profile_store::ProfileStore;
+use soundboard::SoundboardService;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -66,6 +68,7 @@ use audio::windows::WindowsAudioBackend;
 use audio::unsupported::UnsupportedAudioBackend;
 
 fn shutdown_lights(state: &AppState) {
+    state.soundboard.stop_all();
     run_logger::info("app", "shutdown_lights_start", "");
     state.cancel_activity_button_light_holds();
     if let Ok(profile_guard) = state.active_profile.lock() {
@@ -213,6 +216,7 @@ fn main() {
                 binding_action_values: Arc::new(Mutex::new(HashMap::new())),
                 activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
                 running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
+                soundboard: Arc::new(SoundboardService::default()),
                 last_mute_input_active: Mutex::new(HashMap::new()),
                 focus_volume_failure_logs: Mutex::new(HashMap::new()),
                 mute_transition_until: Mutex::new(HashMap::new()),
@@ -450,6 +454,13 @@ fn main() {
             update_midi_feedback,
             set_binding_feedback,
             apply_binding_action,
+            pick_soundboard_audio,
+            analyze_soundboard_audio,
+            preview_soundboard_audio,
+            list_soundboard_output_devices,
+            set_soundboard_preview_volume,
+            set_soundboard_preview_paused,
+            stop_soundboard_preview,
             get_plugins_dir,
             list_plugins,
             read_plugin_text,
@@ -605,6 +616,7 @@ mod tests {
             binding_action_values: Arc::new(Mutex::new(HashMap::new())),
             activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
             running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            soundboard: Arc::new(SoundboardService::default()),
             last_mute_input_active: Mutex::new(HashMap::new()),
             focus_volume_failure_logs: Mutex::new(HashMap::new()),
             mute_transition_until: Mutex::new(HashMap::new()),
@@ -691,6 +703,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            soundboard: None,
             macro_steps: Vec::new(),
         }
     }
@@ -726,6 +739,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            soundboard: None,
             macro_steps: Vec::new(),
         }
     }

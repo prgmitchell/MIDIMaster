@@ -393,7 +393,12 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
 
-    if matches!(binding.action, model::BindingAction::Macro) {
+    actions::trigger_supplemental_soundboard(state, app, &binding, &targets, &event);
+
+    let has_macro_target = targets
+        .iter()
+        .any(|target| matches!(target, model::BindingTarget::Macro));
+    if has_macro_target {
         if !binding_is_button(&binding) {
             run_logger::warn(
                 "bindings",
@@ -404,18 +409,29 @@ pub(crate) fn apply_midi_event(
         }
 
         let input_active = event.value > 0;
-        emit_macro_button_feedback(state, app, &binding, &key, input_active);
+        if matches!(binding.action, model::BindingAction::Macro) {
+            emit_macro_button_feedback(state, app, &binding, &key, input_active);
+        }
+        if input_active {
+            crate::commands::bindings::spawn_macro_binding(app.clone(), binding.id.clone(), false);
+        }
+        if matches!(binding.action, model::BindingAction::Macro) {
+            if !input_active {
+                run_logger::debug(
+                    "bindings",
+                    "macro_release_ignored",
+                    &format!("binding_id={}", binding.id),
+                );
+            }
+            return Ok(());
+        }
         if !input_active {
             run_logger::debug(
                 "bindings",
-                "macro_release_ignored",
+                "supplemental_macro_release_ignored",
                 &format!("binding_id={}", binding.id),
             );
-            return Ok(());
         }
-
-        crate::commands::bindings::spawn_macro_binding(app.clone(), binding.id.clone(), false);
-        return Ok(());
     }
 
     if actions::handle_special_action(state, app, &binding, &targets, &event)? {
@@ -583,7 +599,8 @@ pub(crate) fn apply_midi_event(
                 | model::BindingTarget::OpenApplication
                 | model::BindingTarget::AutoHotkeyScript
                 | model::BindingTarget::Profile { .. }
-                | model::BindingTarget::Macro => {}
+                | model::BindingTarget::Macro
+                | model::BindingTarget::Soundboard => {}
             }
         }
 
@@ -926,7 +943,8 @@ pub(crate) fn apply_midi_event(
             | model::BindingTarget::OpenApplication
             | model::BindingTarget::AutoHotkeyScript
             | model::BindingTarget::Profile { .. }
-            | model::BindingTarget::Macro => {}
+            | model::BindingTarget::Macro
+            | model::BindingTarget::Soundboard => {}
         }
     }
 

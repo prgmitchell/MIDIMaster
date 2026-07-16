@@ -139,6 +139,7 @@ pub enum BindingAction {
     RunAutoHotkeyScript,
     SwitchProfile,
     Macro,
+    Soundboard,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -165,6 +166,86 @@ pub struct AutoHotkeyScriptMapping {
     pub path: String,
     #[serde(default)]
     pub display: String,
+}
+
+fn default_soundboard_volume() -> f32 {
+    1.0
+}
+
+fn default_soundboard_speed() -> f32 {
+    1.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SoundboardMapping {
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub display: String,
+    #[serde(default)]
+    pub trim_start_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trim_end_ms: Option<u64>,
+    #[serde(default = "default_soundboard_volume")]
+    pub volume: f32,
+    #[serde(default = "default_soundboard_speed")]
+    pub speed: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_device_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_device_display: Option<String>,
+}
+
+impl SoundboardMapping {
+    pub fn normalized(&self) -> Option<Self> {
+        let path = self.path.trim();
+        if path.is_empty() {
+            return None;
+        }
+        let display = self.display.trim();
+        let trim_end_ms = self
+            .trim_end_ms
+            .map(|end| end.max(self.trim_start_ms.saturating_add(1)));
+        let output_device_id = self
+            .output_device_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let output_device_display = output_device_id.as_ref().and_then(|_| {
+            self.output_device_display
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        });
+        Some(Self {
+            path: path.to_string(),
+            display: if display.is_empty() {
+                std::path::Path::new(path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or(path)
+                    .to_string()
+            } else {
+                display.to_string()
+            },
+            trim_start_ms: self.trim_start_ms,
+            trim_end_ms,
+            volume: if self.volume.is_finite() {
+                self.volume.clamp(0.0, 1.0)
+            } else {
+                1.0
+            },
+            speed: if self.speed.is_finite() {
+                self.speed.clamp(0.5, 2.0)
+            } else {
+                1.0
+            },
+            output_device_id,
+            output_device_display,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -286,14 +367,22 @@ pub fn normalize_macro_draft_steps(steps: &[MacroStep]) -> Vec<MacroStep> {
 }
 
 fn normalize_macro_action_step(step: &MacroActionStep) -> Option<MacroActionStep> {
-    if matches!(step.action, BindingAction::Macro) {
+    if matches!(
+        step.action,
+        BindingAction::Macro | BindingAction::Soundboard
+    ) {
         return None;
     }
 
     let targets: Vec<BindingTarget> = step
         .targets
         .iter()
-        .filter(|target| !matches!(target, BindingTarget::Unset | BindingTarget::Macro))
+        .filter(|target| {
+            !matches!(
+                target,
+                BindingTarget::Unset | BindingTarget::Macro | BindingTarget::Soundboard
+            )
+        })
         .take(8)
         .cloned()
         .collect();
@@ -317,7 +406,10 @@ fn normalize_macro_action_step(step: &MacroActionStep) -> Option<MacroActionStep
 }
 
 fn normalize_macro_draft_action_step(step: &MacroActionStep) -> Option<MacroActionStep> {
-    let is_nested_macro_action = matches!(step.action, BindingAction::Macro);
+    let is_nested_macro_action = matches!(
+        step.action,
+        BindingAction::Macro | BindingAction::Soundboard
+    );
     let action = if is_nested_macro_action {
         BindingAction::Volume
     } else {
@@ -328,7 +420,12 @@ fn normalize_macro_draft_action_step(step: &MacroActionStep) -> Option<MacroActi
     } else {
         step.targets
             .iter()
-            .filter(|target| !matches!(target, BindingTarget::Unset | BindingTarget::Macro))
+            .filter(|target| {
+                !matches!(
+                    target,
+                    BindingTarget::Unset | BindingTarget::Macro | BindingTarget::Soundboard
+                )
+            })
             .take(8)
             .cloned()
             .collect()
@@ -404,6 +501,7 @@ pub enum BindingTarget {
         name: String,
     },
     Macro,
+    Soundboard,
     #[default]
     Unset,
 }
@@ -419,6 +517,7 @@ impl PartialEq for BindingTarget {
             | (BindingTarget::OpenApplication, BindingTarget::OpenApplication)
             | (BindingTarget::AutoHotkeyScript, BindingTarget::AutoHotkeyScript)
             | (BindingTarget::Macro, BindingTarget::Macro)
+            | (BindingTarget::Soundboard, BindingTarget::Soundboard)
             | (BindingTarget::Unset, BindingTarget::Unset) => true,
             (
                 BindingTarget::Session { session_id: a },
@@ -476,6 +575,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
             "OpenApplication" => Ok(BindingTarget::OpenApplication),
             "AutoHotkeyScript" => Ok(BindingTarget::AutoHotkeyScript),
             "Macro" => Ok(BindingTarget::Macro),
+            "Soundboard" => Ok(BindingTarget::Soundboard),
             "Unset" => Ok(BindingTarget::Unset),
             other => Err(format!("Unknown BindingTarget string: {}", other)),
         };
@@ -568,6 +668,7 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
         "OpenApplication" => Ok(BindingTarget::OpenApplication),
         "AutoHotkeyScript" => Ok(BindingTarget::AutoHotkeyScript),
         "Macro" => Ok(BindingTarget::Macro),
+        "Soundboard" => Ok(BindingTarget::Soundboard),
 
         // New generic integration target
         "Integration" => {
@@ -730,6 +831,8 @@ pub struct Binding {
     pub open_application: Option<OpenApplicationMapping>,
     #[serde(default)]
     pub autohotkey_script: Option<AutoHotkeyScriptMapping>,
+    #[serde(default)]
+    pub soundboard: Option<SoundboardMapping>,
     #[serde(default)]
     pub macro_steps: Vec<MacroStep>,
 }
@@ -900,6 +1003,16 @@ impl Binding {
                     .any(|target| matches!(target, BindingTarget::Macro))
                     && !normalize_macro_steps(&self.macro_steps).is_empty()
             }
+            BindingAction::Soundboard => {
+                targets
+                    .iter()
+                    .any(|target| matches!(target, BindingTarget::Soundboard))
+                    && self
+                        .soundboard
+                        .as_ref()
+                        .and_then(SoundboardMapping::normalized)
+                        .is_some()
+            }
             BindingAction::MediaPlayPause
             | BindingAction::MediaNextTrack
             | BindingAction::MediaPrevTrack
@@ -982,7 +1095,8 @@ impl Binding {
             | BindingTarget::Focus
             | BindingTarget::MediaControl
             | BindingTarget::CaptureControl
-            | BindingTarget::Macro => true,
+            | BindingTarget::Macro
+            | BindingTarget::Soundboard => true,
             BindingTarget::Session { session_id } => !session_id.trim().is_empty(),
             BindingTarget::Application { name, .. } => !name.trim().is_empty(),
             BindingTarget::Device { device_id } => !device_id.trim().is_empty(),
@@ -1015,20 +1129,49 @@ impl Binding {
     }
 
     pub fn ensure_targets(&mut self) {
-        if matches!(self.action, BindingAction::Macro)
-            && self.targets.is_empty()
-            && self.target == BindingTarget::Unset
-        {
-            self.targets.push(BindingTarget::Macro);
-        }
         if self.targets.is_empty() && self.target != BindingTarget::Unset {
             self.targets.push(self.target.clone());
         }
+        let preferred_special = match self.action {
+            BindingAction::Macro => Some(BindingTarget::Macro),
+            BindingAction::Soundboard => Some(BindingTarget::Soundboard),
+            _ => None,
+        };
+        let mut selected_special: Option<BindingTarget> = None;
+        self.targets.retain(|target| match target {
+            BindingTarget::Macro | BindingTarget::Soundboard => {
+                if preferred_special
+                    .as_ref()
+                    .is_some_and(|preferred| preferred != target)
+                    || selected_special.is_some()
+                {
+                    false
+                } else {
+                    selected_special = Some(target.clone());
+                    true
+                }
+            }
+            _ => true,
+        });
         if self.targets.len() > 1 {
             self.targets.retain(|t| *t != BindingTarget::Unset);
         }
         if self.targets.len() > 8 {
             self.targets.truncate(8);
+        }
+        selected_special = self
+            .targets
+            .iter()
+            .find(|target| matches!(target, BindingTarget::Macro | BindingTarget::Soundboard))
+            .cloned();
+        if let Some(preferred) = preferred_special {
+            if selected_special.is_none() {
+                if self.targets.len() >= 8 {
+                    self.targets.truncate(7);
+                }
+                self.targets.push(preferred.clone());
+                selected_special = Some(preferred);
+            }
         }
         if let Some(first) = self.targets.first().cloned() {
             self.target = first;
@@ -1045,5 +1188,16 @@ impl Binding {
         } else {
             normalize_macro_steps(&self.macro_steps)
         };
+        if !matches!(selected_special, Some(BindingTarget::Macro)) {
+            self.macro_name.clear();
+            self.macro_steps.clear();
+        }
+        self.soundboard = self
+            .soundboard
+            .as_ref()
+            .and_then(SoundboardMapping::normalized);
+        if !matches!(selected_special, Some(BindingTarget::Soundboard)) {
+            self.soundboard = None;
+        }
     }
 }

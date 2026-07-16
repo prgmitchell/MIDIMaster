@@ -80,9 +80,16 @@ Buttons typically support:
 - `Hotkey`
 - `Open Application`
 - `AutoHotkey Script` (runs a selected `.ahk` file through Windows' configured AutoHotkey association)
+- `Soundboard` (plays a linked audio file when the button is pressed)
 - `Switch Profile` (loads a selected saved profile, including its bindings, MIDI routes, plugin settings, and OSD settings)
 
 Integrations may interpret actions differently depending on the plugin.
+
+### Soundboard Buttons
+
+Choose `Soundboard` from the target picker's Actions category, then select an MP3, WAV, FLAC, OGG/Vorbis, M4A, MP4, or AAC file. A button can contain either one Soundboard or one Macro alongside its normal targets, but never both. Adding a duplicate special target or trying to combine Macro and Soundboard shows an alert without changing the binding. The compact Configure Soundboard editor has play/pause preview controls, a moving waveform playhead and time ruler, draggable start and end handles, playback speed and volume controls, and an output-device selector. The keyboard-accessible trim sliders move by 10 ms with the arrow keys or 100 ms with Shift+arrow.
+
+Soundboard files stay linked at their original absolute paths; profile export does not copy the audio. If a file is moved or unavailable, MIDIMaster preserves the link. Use `Edit Sound` and then `Pick Sound` to choose it again. The selected output is saved with the sound; `System default` keeps following the operating system's default playback device. Audio files must be no larger than 100 MB and no longer than 10 minutes. Pressing the same Soundboard button restarts its sound, while different Soundboard buttons can overlap, including when they use different outputs. Playback continues while MIDIMaster is minimized to the tray.
 
 ## Targets
 
@@ -92,7 +99,7 @@ Integrations may interpret actions differently depending on the plugin.
 - `Focus`: the currently focused session
 - `Applications`: discovered audio sessions
 - `Playback Devices` / `Recording Devices`
-- `Utilities`: media controls, hotkeys, window focus, capture controls, application launch, AutoHotkey scripts, and profile switching
+- `Utilities`: media controls, macros, Soundboard, hotkeys, window focus, capture controls, application launch, AutoHotkey scripts, and profile switching
 
 If an application or device disappears, MIDIMaster will show an unavailable entry (greyed).
 

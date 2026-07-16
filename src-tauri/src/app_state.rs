@@ -10,6 +10,7 @@ use crate::model::{self, LearnedControl, MidiEvent, OsdSettings, Profile};
 use crate::profile_store::ProfileStore;
 use crate::run_logger;
 use crate::runtime_helpers::LearnCandidate;
+use crate::soundboard::SoundboardService;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -86,6 +87,7 @@ pub(crate) struct AppState {
     pub(crate) binding_action_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
     pub(crate) activity_button_light_generations: Arc<Mutex<HashMap<BindingKey, u64>>>,
     pub(crate) running_macros: Arc<Mutex<std::collections::HashSet<String>>>,
+    pub(crate) soundboard: Arc<SoundboardService>,
     pub(crate) last_mute_input_active: Mutex<HashMap<BindingKey, bool>>,
     pub(crate) focus_volume_failure_logs: Mutex<HashMap<String, Instant>>,
     pub(crate) mute_transition_until: Mutex<HashMap<BindingKey, Instant>>,
@@ -145,6 +147,7 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
             | model::BindingTarget::AutoHotkeyScript
             | model::BindingTarget::Profile { .. }
             | model::BindingTarget::Macro
+            | model::BindingTarget::Soundboard
             | model::BindingTarget::Integration { .. } => {}
         }
     }
@@ -554,6 +557,7 @@ impl AppState {
                     model::BindingTarget::AutoHotkeyScript => None,
                     model::BindingTarget::Profile { .. } => None,
                     model::BindingTarget::Macro => None,
+                    model::BindingTarget::Soundboard => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             } else {
@@ -621,6 +625,7 @@ impl AppState {
                     model::BindingTarget::AutoHotkeyScript => None,
                     model::BindingTarget::Profile { .. } => None,
                     model::BindingTarget::Macro => None,
+                    model::BindingTarget::Soundboard => None,
                     model::BindingTarget::Integration { .. } => None,
                 }
             };

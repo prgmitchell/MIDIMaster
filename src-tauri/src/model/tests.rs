@@ -160,6 +160,7 @@ fn serialize_binding_uses_targets_not_target() {
         hotkey: None,
         open_application: None,
         autohotkey_script: None,
+        soundboard: None,
         macro_steps: Vec::new(),
     };
 
@@ -954,4 +955,157 @@ fn mapped_button_light_overrides_stateful_integration_feedback() {
         binding.button_light_feedback_value(Some(false), Some(false)),
         Some(1.0)
     );
+}
+
+#[test]
+fn soundboard_mapping_serializes_and_round_trips() {
+    let mut binding: Binding = serde_json::from_value(binding_base_json()).unwrap();
+    binding.control_kind = BindingControlKind::Button;
+    binding.action = BindingAction::Soundboard;
+    binding.targets = vec![BindingTarget::Soundboard];
+    binding.soundboard = Some(SoundboardMapping {
+        path: r"C:\sounds\intro.mp3".to_string(),
+        display: "intro.mp3".to_string(),
+        trim_start_ms: 125,
+        trim_end_ms: Some(1_875),
+        volume: 0.65,
+        speed: 1.25,
+        output_device_id: Some("wasapi:device-1".to_string()),
+        output_device_display: Some("Studio Speakers".to_string()),
+    });
+
+    let json = serde_json::to_value(&binding).unwrap();
+    assert_eq!(json["action"], "Soundboard");
+    assert_eq!(json["targets"][0], "Soundboard");
+    assert_eq!(json["soundboard"]["trim_start_ms"], 125);
+    assert_eq!(json["soundboard"]["trim_end_ms"], 1_875);
+    let volume = json["soundboard"]["volume"].as_f64().unwrap();
+    assert!((volume - 0.65).abs() < 0.000_001);
+    assert_eq!(json["soundboard"]["speed"], 1.25);
+    assert_eq!(
+        json["soundboard"]["output_device_display"],
+        "Studio Speakers"
+    );
+
+    let restored: Binding = serde_json::from_value(json).unwrap();
+    assert_eq!(restored.soundboard, binding.soundboard);
+}
+
+#[test]
+fn soundboard_defaults_preserve_old_profiles() {
+    let binding: Binding = serde_json::from_value(binding_base_json()).unwrap();
+    assert!(binding.soundboard.is_none());
+
+    let mapping: SoundboardMapping = serde_json::from_value(serde_json::json!({
+        "path": "clip.wav",
+        "display": "clip.wav"
+    }))
+    .unwrap();
+    assert_eq!(mapping.trim_start_ms, 0);
+    assert_eq!(mapping.trim_end_ms, None);
+    assert_eq!(mapping.volume, 1.0);
+    assert_eq!(mapping.speed, 1.0);
+    assert_eq!(mapping.output_device_id, None);
+}
+
+#[test]
+fn soundboard_normalization_clamps_volume_and_invalid_end() {
+    let mapping = SoundboardMapping {
+        path: " clip.wav ".to_string(),
+        display: " ".to_string(),
+        trim_start_ms: 500,
+        trim_end_ms: Some(100),
+        volume: 5.0,
+        speed: 0.1,
+        output_device_id: Some(" device ".to_string()),
+        output_device_display: Some(" Speakers ".to_string()),
+    }
+    .normalized()
+    .unwrap();
+
+    assert_eq!(mapping.path, "clip.wav");
+    assert_eq!(mapping.display, "clip.wav");
+    assert_eq!(mapping.trim_start_ms, 500);
+    assert_eq!(mapping.trim_end_ms, Some(501));
+    assert_eq!(mapping.volume, 1.0);
+    assert_eq!(mapping.speed, 0.5);
+    assert_eq!(mapping.output_device_id.as_deref(), Some("device"));
+    assert_eq!(mapping.output_device_display.as_deref(), Some("Speakers"));
+}
+
+#[test]
+fn soundboard_button_mapping_is_complete_and_momentary() {
+    let mut binding =
+        mapped_button_binding(BindingAction::Soundboard, vec![BindingTarget::Soundboard]);
+    binding.soundboard = Some(SoundboardMapping {
+        path: "clip.wav".to_string(),
+        display: "clip.wav".to_string(),
+        trim_start_ms: 0,
+        trim_end_ms: None,
+        volume: 1.0,
+        speed: 1.0,
+        output_device_id: None,
+        output_device_display: None,
+    });
+
+    assert!(binding.has_complete_mapped_button_light_target(&binding.targets));
+    assert_eq!(
+        binding.normalized_targets(),
+        vec![BindingTarget::Soundboard]
+    );
+}
+
+#[test]
+fn soundboard_normalization_preserves_other_targets_and_deduplicates_soundboard() {
+    let mut binding = mapped_button_binding(
+        BindingAction::Soundboard,
+        vec![
+            BindingTarget::Soundboard,
+            BindingTarget::Master,
+            BindingTarget::Soundboard,
+        ],
+    );
+    binding.ensure_targets();
+    assert_eq!(binding.action, BindingAction::Soundboard);
+    assert_eq!(
+        binding.targets,
+        vec![BindingTarget::Soundboard, BindingTarget::Master]
+    );
+}
+
+#[test]
+fn soundboard_target_preserves_primary_media_action() {
+    let mut binding = mapped_button_binding(
+        BindingAction::MediaPlayPause,
+        vec![BindingTarget::Soundboard, BindingTarget::MediaControl],
+    );
+    binding.ensure_targets();
+    assert_eq!(binding.action, BindingAction::MediaPlayPause);
+    assert_eq!(
+        binding.targets,
+        vec![BindingTarget::Soundboard, BindingTarget::MediaControl]
+    );
+}
+
+#[test]
+fn macro_and_soundboard_conflict_keeps_only_the_preferred_special_target() {
+    let mut binding = mapped_button_binding(
+        BindingAction::Soundboard,
+        vec![BindingTarget::Macro, BindingTarget::Soundboard],
+    );
+    binding.macro_name = "Discard me".to_string();
+    binding.soundboard = Some(SoundboardMapping {
+        path: "clip.wav".to_string(),
+        display: "clip.wav".to_string(),
+        trim_start_ms: 0,
+        trim_end_ms: None,
+        volume: 1.0,
+        speed: 1.0,
+        output_device_id: None,
+        output_device_display: None,
+    });
+    binding.ensure_targets();
+    assert_eq!(binding.targets, vec![BindingTarget::Soundboard]);
+    assert!(binding.macro_name.is_empty());
+    assert!(binding.soundboard.is_some());
 }

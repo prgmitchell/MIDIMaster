@@ -28,6 +28,7 @@ import {
   isHotkeyTarget,
   isMacroTarget,
   isOpenApplicationTarget,
+  isSoundboardTarget,
   MACRO_MAX_PARALLEL_STEPS,
   MACRO_MAX_TOP_LEVEL_STEPS,
   MACRO_MAX_WAIT_MS,
@@ -43,10 +44,18 @@ import {
   normalizeMacroSteps,
   normalizeMuteBehavior,
   normalizeRelativeFormat,
+  normalizeSoundboardMapping,
   presetCurvePoints,
   resolveButtonVisualActive,
   setTargets,
 } from "./shape_helpers.js";
+import {
+  clampSoundboardTrim,
+  drawSoundboardWaveform,
+  formatSoundboardTime,
+  soundboardArrowStep,
+  waveformTimeFromPointer,
+} from "./soundboard_editor.js";
 import {
   resolveBindingVolumeValue,
   resolveTargetChangeVolumeValue,
@@ -878,6 +887,8 @@ export function createBindingsFeature({
       displayModeName(binding),
       JSON.stringify(getTargets(binding)),
       binding?.action || "",
+      binding?.soundboard?.display || "",
+      binding?.soundboard?.path || "",
     ].join(" ").toLowerCase();
   }
 
@@ -931,8 +942,9 @@ export function createBindingsFeature({
     const min = parseFloat(slider.min) || 0;
     const max = parseFloat(slider.max) || 1;
     const val = parseFloat(slider.value) || 0;
-    const percent = ((val - min) / (max - min)) * 100;
-    slider.style.backgroundSize = `${percent}% 100%`;
+    const span = max - min;
+    const percent = span > 0 ? Math.min(100, Math.max(0, ((val - min) / span) * 100)) : 0;
+    slider.style.setProperty("--range-fill", `${percent}%`);
   }
 
   function updateVolumePercentForSlider(slider) {
@@ -1124,6 +1136,19 @@ export function createBindingsFeature({
   let configBindingId = null;
   let configDraft = null;
   let configMacroPageOpen = false;
+  let configSoundboardPageOpen = false;
+  let configRemoveEmptySoundboardTargetOnCancel = false;
+  let soundboardAnalysis = null;
+  let soundboardAnalysisError = "";
+  let soundboardAnalysisToken = 0;
+  let soundboardPreviewState = "stopped";
+  let soundboardPreviewStartedAt = 0;
+  let soundboardPreviewElapsedMs = 0;
+  let soundboardPreviewAnimationFrame = null;
+  let soundboardOutputDevices = [];
+  let soundboardOutputDevicesLoaded = false;
+  let soundboardOutputDropdown = null;
+  let soundboardPointerHandle = null;
   let configMacroSelectedPath = null;
   let configMacroPendingSelectedScroll = false;
   let configPreviewOriginalBindings = null;
@@ -4096,7 +4121,423 @@ export function createBindingsFeature({
     commitCustomCurvePoints(points, { keepPointer: true });
   }
 
+  function cancelSoundboardPreviewFrame() {
+    if (soundboardPreviewAnimationFrame == null) return;
+    if (typeof window.cancelAnimationFrame === "function") {
+      window.cancelAnimationFrame(soundboardPreviewAnimationFrame);
+    } else {
+      window.clearTimeout(soundboardPreviewAnimationFrame);
+    }
+    soundboardPreviewAnimationFrame = null;
+  }
+
+  function showSoundboardAlreadyConfiguredError() {
+    alertAction(
+      t("dialogs.soundboardAlreadyConfiguredTitle"),
+      t("dialogs.soundboardAlreadyConfiguredMessage"),
+    );
+  }
+
+  function showSpecialActionConflictError() {
+    alertAction(
+      t("dialogs.specialActionConflictTitle"),
+      t("dialogs.specialActionConflictMessage"),
+    );
+  }
+
+  function scheduleSoundboardPreviewFrame() {
+    cancelSoundboardPreviewFrame();
+    const callback = () => {
+      soundboardPreviewAnimationFrame = null;
+      updateSoundboardPreviewFrame();
+    };
+    soundboardPreviewAnimationFrame = typeof window.requestAnimationFrame === "function"
+      ? window.requestAnimationFrame(callback)
+      : window.setTimeout(callback, 16);
+  }
+
+  function currentSoundboardPreviewPosition(mapping) {
+    if (!mapping || soundboardPreviewState === "stopped") return null;
+    const running = soundboardPreviewState === "playing"
+      ? (performance.now() - soundboardPreviewStartedAt) * mapping.speed
+      : 0;
+    return mapping.trim_start_ms + soundboardPreviewElapsedMs + running;
+  }
+
+  function soundboardWaveformColors(canvas) {
+    const styles = getComputedStyle(canvas);
+    const color = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+    return {
+      background: color("--soundboard-waveform-background", "#111827"),
+      waveform: color("--soundboard-waveform-color", "#9edcff"),
+      grid: color("--soundboard-waveform-grid", "rgba(158, 220, 255, .16)"),
+      label: color("--soundboard-waveform-label", "rgba(224, 236, 255, .72)"),
+      excluded: color("--soundboard-waveform-excluded", "rgba(3, 7, 18, .68)"),
+      handle: color("--soundboard-waveform-handle", "#66d9ff"),
+      playhead: color("--soundboard-waveform-playhead", "#ffffff"),
+    };
+  }
+
+  function renderSoundboardPreviewVisual() {
+    const binding = getConfigBinding();
+    const mapping = normalizeSoundboardMapping(binding?.soundboard);
+    const duration = Number(soundboardAnalysis?.duration_ms) || 0;
+    const end = mapping ? soundboardEndMs(mapping) : 0;
+    const position = currentSoundboardPreviewPosition(mapping);
+    if (d.bindingConfigSoundboardPreview) {
+      d.bindingConfigSoundboardPreview.dataset.state = soundboardPreviewState;
+      const label = soundboardPreviewState === "playing" ? t("soundboard.previewPause") : t("soundboard.previewPlay");
+      d.bindingConfigSoundboardPreview.setAttribute("aria-label", label);
+      d.bindingConfigSoundboardPreview.title = label;
+    }
+    if (d.bindingConfigSoundboardPlaybackTime) {
+      d.bindingConfigSoundboardPlaybackTime.textContent = formatSoundboardTime(position ?? mapping?.trim_start_ms ?? 0);
+    }
+    drawSoundboardWaveform(
+      d.bindingConfigSoundboardWaveform,
+      soundboardAnalysis?.peaks,
+      duration,
+      mapping?.trim_start_ms || 0,
+      end,
+      soundboardWaveformColors(d.bindingConfigSoundboardWaveform),
+      position,
+    );
+  }
+
+  function clearSoundboardPreviewState() {
+    soundboardPreviewState = "stopped";
+    soundboardPreviewStartedAt = 0;
+    soundboardPreviewElapsedMs = 0;
+    cancelSoundboardPreviewFrame();
+    renderSoundboardPreviewVisual();
+  }
+
+  function updateSoundboardPreviewFrame() {
+    if (soundboardPreviewState !== "playing") return;
+    const mapping = normalizeSoundboardMapping(getConfigBinding()?.soundboard);
+    if (!mapping) {
+      clearSoundboardPreviewState();
+      return;
+    }
+    const position = currentSoundboardPreviewPosition(mapping);
+    if (position == null || position >= soundboardEndMs(mapping)) {
+      clearSoundboardPreviewState();
+      return;
+    }
+    renderSoundboardPreviewVisual();
+    scheduleSoundboardPreviewFrame();
+  }
+
+  async function stopSoundboardPreview() {
+    clearSoundboardPreviewState();
+    try { await invoke("stop_soundboard_preview"); } catch { }
+  }
+
+  async function loadSoundboardOutputDevices() {
+    soundboardOutputDevicesLoaded = false;
+    try {
+      const devices = await invoke("list_soundboard_output_devices");
+      soundboardOutputDevices = Array.isArray(devices) ? devices : [];
+    } catch {
+      soundboardOutputDevices = [];
+    }
+    soundboardOutputDevicesLoaded = true;
+    const binding = getConfigBinding();
+    if (binding && configSoundboardPageOpen) renderSoundboardEditor(binding);
+  }
+
+  function renderSoundboardOutputOptions(mapping) {
+    const select = d.bindingConfigSoundboardOutput;
+    if (!select) return;
+    const systemDefaultValue = "__system_default__";
+    if (!soundboardOutputDropdown) {
+      soundboardOutputDropdown = createSelectDropdownShell({
+        selectEl: select,
+        rootClass: "settings-select-dropdown soundboard-output-dropdown",
+        title: t("soundboard.outputDevice"),
+      });
+    }
+    select.innerHTML = "";
+    const defaultOption = document.createElement("option");
+    defaultOption.value = systemDefaultValue;
+    defaultOption.textContent = soundboardOutputDevicesLoaded
+      ? t("soundboard.systemDefault")
+      : t("soundboard.loadingDevices");
+    select.append(defaultOption);
+    soundboardOutputDevices.forEach((device) => {
+      const option = document.createElement("option");
+      option.value = String(device.id || "");
+      option.textContent = device.is_default
+        ? t("soundboard.defaultDevice", { device: device.display })
+        : String(device.display || device.id || "");
+      select.append(option);
+    });
+    if (mapping?.output_device_id && !soundboardOutputDevices.some((device) => device.id === mapping.output_device_id)) {
+      const unavailable = document.createElement("option");
+      unavailable.value = mapping.output_device_id;
+      unavailable.textContent = t("soundboard.deviceUnavailable", {
+        device: mapping.output_device_display || mapping.output_device_id,
+      });
+      select.append(unavailable);
+    }
+    select.value = mapping?.output_device_id || systemDefaultValue;
+    renderNativeSelectDropdown({
+      entry: soundboardOutputDropdown,
+      selectEl: select,
+      fallbackText: t("soundboard.systemDefault"),
+      formatOptionText: (option) => option.textContent || t("soundboard.systemDefault"),
+    });
+  }
+
+  function soundboardEndMs(mapping) {
+    const duration = Number(soundboardAnalysis?.duration_ms) || 0;
+    return mapping?.trim_end_ms == null ? duration : Math.min(duration, Number(mapping.trim_end_ms) || 0);
+  }
+
+  function setSoundboardTrim(changed, value) {
+    const binding = getConfigBinding();
+    const mapping = normalizeSoundboardMapping(binding?.soundboard);
+    const duration = Number(soundboardAnalysis?.duration_ms) || 0;
+    if (!binding || !mapping || duration <= 0) return;
+    const next = clampSoundboardTrim(
+      changed === "start" ? value : mapping.trim_start_ms,
+      changed === "end" ? value : soundboardEndMs(mapping),
+      duration,
+      changed,
+    );
+    mapping.trim_start_ms = next.startMs;
+    mapping.trim_end_ms = next.endMs >= duration ? null : next.endMs;
+    binding.soundboard = mapping;
+    stopSoundboardPreview().catch(() => { });
+    renderSoundboardEditor(binding);
+  }
+
+  function renderSoundboardSummary(binding) {
+    if (!d.bindingConfigSoundboardSummary) return;
+    wireSoundboardEditor();
+    const mapping = normalizeSoundboardMapping(binding?.soundboard);
+    d.bindingConfigSoundboardSummary.innerHTML = "";
+    const name = document.createElement("strong");
+    name.textContent = mapping?.display || t("soundboard.noFile");
+    const detail = document.createElement("span");
+    detail.textContent = mapping
+      ? t("soundboard.summary", { volume: Math.round(mapping.volume * 100), speed: mapping.speed.toFixed(2) })
+      : t("soundboard.unavailable");
+    d.bindingConfigSoundboardSummary.append(name, detail);
+  }
+
+  async function loadSoundboardAnalysis(binding, { force = false } = {}) {
+    const mapping = normalizeSoundboardMapping(binding?.soundboard);
+    if (!mapping || (!force && soundboardAnalysis?.path === mapping.path)) return;
+    const token = ++soundboardAnalysisToken;
+    soundboardAnalysis = null;
+    soundboardAnalysisError = "";
+    renderSoundboardEditor(binding);
+    try {
+      const analysis = await invoke("analyze_soundboard_audio", { path: mapping.path });
+      if (token !== soundboardAnalysisToken || getConfigBinding()?.soundboard?.path !== mapping.path) return;
+      soundboardAnalysis = analysis;
+      const draft = getConfigBinding();
+      const current = normalizeSoundboardMapping(draft?.soundboard);
+      if (draft && current) {
+        const duration = Number(analysis.duration_ms) || 0;
+        const next = clampSoundboardTrim(
+          current.trim_start_ms,
+          current.trim_end_ms ?? duration,
+          duration,
+          "start",
+        );
+        current.trim_start_ms = next.startMs;
+        current.trim_end_ms = next.endMs >= duration ? null : next.endMs;
+        draft.soundboard = current;
+      }
+    } catch (error) {
+      if (token !== soundboardAnalysisToken) return;
+      soundboardAnalysisError = String(error || t("soundboard.unavailable"));
+    }
+    renderSoundboardEditor(getConfigBinding());
+  }
+
+  function wireSoundboardEditor() {
+    if (d.bindingConfigSoundboardEdit) d.bindingConfigSoundboardEdit.onclick = () => {
+      configSoundboardPageOpen = true;
+      loadSoundboardOutputDevices().catch(() => { });
+      renderConfigModal();
+    };
+    if (d.bindingConfigSoundboardReplace) d.bindingConfigSoundboardReplace.onclick = async () => {
+      try {
+        const analysis = await invoke("pick_soundboard_audio");
+        if (!analysis) return;
+        const binding = getConfigBinding();
+        if (!binding) return;
+        await stopSoundboardPreview();
+        binding.soundboard = {
+          path: analysis.path,
+          display: analysis.display,
+          trim_start_ms: 0,
+          trim_end_ms: null,
+          volume: normalizeSoundboardMapping(binding.soundboard)?.volume ?? 1,
+          speed: normalizeSoundboardMapping(binding.soundboard)?.speed ?? 1,
+          output_device_id: normalizeSoundboardMapping(binding.soundboard)?.output_device_id ?? null,
+          output_device_display: normalizeSoundboardMapping(binding.soundboard)?.output_device_display ?? null,
+        };
+        soundboardAnalysis = analysis;
+        soundboardAnalysisError = "";
+        renderSoundboardEditor(binding);
+      } catch (error) {
+        soundboardAnalysisError = String(error || t("soundboard.unavailable"));
+        renderSoundboardEditor(getConfigBinding());
+      }
+    };
+    if (d.bindingConfigSoundboardPreview) d.bindingConfigSoundboardPreview.onclick = async () => {
+      const mapping = normalizeSoundboardMapping(getConfigBinding()?.soundboard);
+      if (!mapping) return;
+      if (soundboardPreviewState === "playing") {
+        soundboardPreviewElapsedMs += (performance.now() - soundboardPreviewStartedAt) * mapping.speed;
+        soundboardPreviewState = "paused";
+        cancelSoundboardPreviewFrame();
+        await invoke("set_soundboard_preview_paused", { paused: true });
+        renderSoundboardPreviewVisual();
+        return;
+      }
+      if (soundboardPreviewState === "paused") {
+        await invoke("set_soundboard_preview_paused", { paused: false });
+        soundboardPreviewState = "playing";
+        soundboardPreviewStartedAt = performance.now();
+        renderSoundboardPreviewVisual();
+        scheduleSoundboardPreviewFrame();
+        return;
+      }
+      try {
+        await invoke("preview_soundboard_audio", { mapping });
+        soundboardPreviewState = "playing";
+        soundboardPreviewElapsedMs = 0;
+        soundboardPreviewStartedAt = performance.now();
+        renderSoundboardPreviewVisual();
+        scheduleSoundboardPreviewFrame();
+      } catch (error) {
+        soundboardAnalysisError = String(error || t("soundboard.unavailable"));
+        renderSoundboardEditor(getConfigBinding());
+      }
+    };
+    if (d.bindingConfigSoundboardSpeed) d.bindingConfigSoundboardSpeed.oninput = () => {
+      const binding = getConfigBinding();
+      const mapping = normalizeSoundboardMapping(binding?.soundboard);
+      if (!binding || !mapping) return;
+      mapping.speed = Math.min(2, Math.max(0.5, Number(d.bindingConfigSoundboardSpeed.value) / 100));
+      binding.soundboard = mapping;
+      d.bindingConfigSoundboardSpeedValue.textContent = `${mapping.speed.toFixed(2)}×`;
+      updateSliderFill(d.bindingConfigSoundboardSpeed);
+      stopSoundboardPreview().catch(() => { });
+    };
+    if (d.bindingConfigSoundboardOutput) d.bindingConfigSoundboardOutput.onchange = () => {
+      const binding = getConfigBinding();
+      const mapping = normalizeSoundboardMapping(binding?.soundboard);
+      if (!binding || !mapping) return;
+      const selectedValue = String(d.bindingConfigSoundboardOutput.value || "");
+      const selectedId = selectedValue === "__system_default__" ? "" : selectedValue;
+      const selected = soundboardOutputDevices.find((device) => device.id === selectedId);
+      mapping.output_device_id = selectedId || null;
+      mapping.output_device_display = selectedId ? (selected?.display || mapping.output_device_display || null) : null;
+      binding.soundboard = mapping;
+      stopSoundboardPreview().catch(() => { });
+      renderSoundboardEditor(binding);
+    };
+    if (d.bindingConfigSoundboardVolume) d.bindingConfigSoundboardVolume.oninput = () => {
+      const binding = getConfigBinding();
+      const mapping = normalizeSoundboardMapping(binding?.soundboard);
+      if (!binding || !mapping) return;
+      mapping.volume = Math.min(1, Math.max(0, Number(d.bindingConfigSoundboardVolume.value) / 100));
+      binding.soundboard = mapping;
+      d.bindingConfigSoundboardVolumeValue.textContent = `${Math.round(mapping.volume * 100)}%`;
+      updateSliderFill(d.bindingConfigSoundboardVolume);
+      invoke("set_soundboard_preview_volume", { volume: mapping.volume }).catch(() => { });
+    };
+    [[d.bindingConfigSoundboardStart, "start"], [d.bindingConfigSoundboardEnd, "end"]].forEach(([input, handle]) => {
+      if (!input) return;
+      input.oninput = () => setSoundboardTrim(handle, Number(input.value));
+      input.onkeydown = (event) => {
+        if (!["ArrowLeft", "ArrowDown", "ArrowRight", "ArrowUp"].includes(event.key)) return;
+        event.preventDefault();
+        const direction = event.key === "ArrowLeft" || event.key === "ArrowDown" ? -1 : 1;
+        setSoundboardTrim(handle, Number(input.value) + (direction * soundboardArrowStep(event)));
+      };
+    });
+    const canvas = d.bindingConfigSoundboardWaveform;
+    if (canvas && !canvas.dataset.soundboardWired) {
+      canvas.dataset.soundboardWired = "true";
+      canvas.addEventListener("pointerdown", (event) => {
+        const duration = Number(soundboardAnalysis?.duration_ms) || 0;
+        const mapping = normalizeSoundboardMapping(getConfigBinding()?.soundboard);
+        if (!mapping || duration <= 0) return;
+        const time = waveformTimeFromPointer(event, canvas, duration);
+        soundboardPointerHandle = Math.abs(time - mapping.trim_start_ms) <= Math.abs(time - soundboardEndMs(mapping)) ? "start" : "end";
+        canvas.setPointerCapture(event.pointerId);
+        setSoundboardTrim(soundboardPointerHandle, time);
+      });
+      canvas.addEventListener("pointermove", (event) => {
+        if (!soundboardPointerHandle || !canvas.hasPointerCapture(event.pointerId)) return;
+        setSoundboardTrim(soundboardPointerHandle, waveformTimeFromPointer(event, canvas, Number(soundboardAnalysis?.duration_ms) || 0));
+      });
+      const release = (event) => {
+        if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+        soundboardPointerHandle = null;
+      };
+      canvas.addEventListener("pointerup", release);
+      canvas.addEventListener("pointercancel", release);
+    }
+  }
+
+  function renderSoundboardEditor(binding) {
+    if (!binding || !d.bindingConfigSoundboardSection) return;
+    wireSoundboardEditor();
+    const mapping = normalizeSoundboardMapping(binding.soundboard);
+    const analysis = soundboardAnalysis?.path === mapping?.path ? soundboardAnalysis : null;
+    const duration = Number(analysis?.duration_ms) || 0;
+    const end = mapping ? (mapping.trim_end_ms == null ? duration : Math.min(duration, mapping.trim_end_ms)) : 0;
+    d.bindingConfigSoundboardSection.classList.toggle("is-empty", !mapping);
+    d.bindingConfigSoundboardFile.textContent = mapping?.display || t("soundboard.noFile");
+    d.bindingConfigSoundboardStatus.textContent = !mapping
+      ? ""
+      : soundboardAnalysisError
+        ? t("soundboard.unavailableRelink")
+        : (analysis ? t("soundboard.ready") : t("soundboard.analyzing"));
+    d.bindingConfigSoundboardStatus.classList.toggle("is-error", Boolean(soundboardAnalysisError));
+    d.bindingConfigSoundboardPreview.disabled = !analysis || Boolean(soundboardAnalysisError);
+    d.bindingConfigSoundboardStart.max = String(duration);
+    d.bindingConfigSoundboardStart.value = String(mapping?.trim_start_ms || 0);
+    d.bindingConfigSoundboardStart.disabled = !analysis;
+    d.bindingConfigSoundboardEnd.max = String(duration);
+    d.bindingConfigSoundboardEnd.value = String(end);
+    d.bindingConfigSoundboardEnd.disabled = !analysis;
+    d.bindingConfigSoundboardStartTime.textContent = formatSoundboardTime(mapping?.trim_start_ms || 0);
+    d.bindingConfigSoundboardEndTime.textContent = formatSoundboardTime(end);
+    d.bindingConfigSoundboardSelectionTime.textContent = formatSoundboardTime(Math.max(0, end - (mapping?.trim_start_ms || 0)));
+    d.bindingConfigSoundboardVolume.value = String(Math.round((mapping?.volume ?? 1) * 100));
+    d.bindingConfigSoundboardVolumeValue.textContent = `${Math.round((mapping?.volume ?? 1) * 100)}%`;
+    d.bindingConfigSoundboardSpeed.value = String(Math.round((mapping?.speed ?? 1) * 100));
+    d.bindingConfigSoundboardSpeedValue.textContent = `${(mapping?.speed ?? 1).toFixed(2)}×`;
+    [
+      d.bindingConfigSoundboardStart,
+      d.bindingConfigSoundboardEnd,
+      d.bindingConfigSoundboardSpeed,
+      d.bindingConfigSoundboardVolume,
+    ].forEach((input) => input && updateSliderFill(input));
+    renderSoundboardOutputOptions(mapping);
+    renderSoundboardPreviewVisual();
+  }
+
   async function closeConfigModal({ commit = false } = {}) {
+    const emptySoundboardBindingToClean = !commit
+      && configRemoveEmptySoundboardTargetOnCancel
+      && !normalizeSoundboardMapping(configDraft?.soundboard)
+      ? cloneBindingDraft(getBindingById(configBindingId))
+      : null;
+    await stopSoundboardPreview();
+    soundboardAnalysisToken += 1;
+    soundboardAnalysis = null;
+    soundboardAnalysisError = "";
+    soundboardPointerHandle = null;
     stopHotkeyLearn();
     stopAuxLearn();
     clearTransferPrompt();
@@ -4112,11 +4553,34 @@ export function createBindingsFeature({
     if (!commit) {
       await restoreConfigPreviewBindings();
     }
+    if (emptySoundboardBindingToClean) {
+      try {
+        setTargets(
+          emptySoundboardBindingToClean,
+          getTargets(emptySoundboardBindingToClean).filter((target) => !isSoundboardTarget(target)),
+        );
+        emptySoundboardBindingToClean.soundboard = null;
+        if (emptySoundboardBindingToClean.action === "Soundboard") {
+          emptySoundboardBindingToClean.action = "ToggleMute";
+        }
+        ensureBindingShape(emptySoundboardBindingToClean);
+        await persistBindingBackend(emptySoundboardBindingToClean);
+        setB(getB().map((binding) => (
+          binding.id === emptySoundboardBindingToClean.id ? emptySoundboardBindingToClean : binding
+        )));
+        renderBindings();
+        finishBindingUiMutation("cancel empty soundboard target");
+      } catch (error) {
+        console.error("Failed to remove canceled Soundboard target:", error);
+      }
+    }
     configPreviewOriginalBindings = null;
     configAcceptedTransfers.clear();
     configDraft = null;
     configBindingId = null;
     configMacroPageOpen = false;
+    configSoundboardPageOpen = false;
+    configRemoveEmptySoundboardTargetOnCancel = false;
     configMacroSelectedPath = null;
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.add("hidden");
   }
@@ -4144,10 +4608,16 @@ export function createBindingsFeature({
     ensureMacroConfigDom();
     const isButton = effectiveIsButton(binding);
     const isMacroBinding = isButton && binding.action === "Macro";
+    const isSoundboardBinding = isButton && (binding.action === "Soundboard" || getTargets(binding).some(isSoundboardTarget));
     const showMacroPage = isMacroBinding && configMacroPageOpen;
+    const showSoundboardPage = isSoundboardBinding && configSoundboardPageOpen;
+    const showSpecialPage = showMacroPage || showSoundboardPage;
+    if (d.bindingConfigSave) d.bindingConfigSave.disabled = false;
     if (d.bindingConfigTitle) {
       d.bindingConfigTitle.textContent = showMacroPage
-        ? "Configure Macro"
+        ? t("macro.configure")
+        : showSoundboardPage
+          ? t("soundboard.configure")
         : (isButton ? t("bindings.buttonConfiguration") : t("bindings.faderConfiguration"));
     }
     if (d.bindingConfigBack) {
@@ -4158,27 +4628,36 @@ export function createBindingsFeature({
       d.bindingConfigPanel.classList.toggle("binding-config-panel--button", isButton);
       d.bindingConfigPanel.classList.toggle("binding-config-panel--fader", !isButton);
       d.bindingConfigPanel.classList.toggle("binding-config-panel--macro-page", showMacroPage);
+      d.bindingConfigPanel.classList.toggle("binding-config-panel--soundboard-page", showSoundboardPage);
     }
     const nameSection = d.bindingConfigName?.closest?.(".binding-config-section");
-    if (nameSection) nameSection.classList.toggle("hidden", showMacroPage);
-    if (d.bindingConfigButtonLightSection) d.bindingConfigButtonLightSection.classList.toggle("hidden", !isButton || showMacroPage);
-    if (d.bindingConfigButtonLearnSection) d.bindingConfigButtonLearnSection.classList.toggle("hidden", !isButton || showMacroPage);
+    if (nameSection) nameSection.classList.toggle("hidden", showSpecialPage);
+    if (d.bindingConfigButtonLightSection) d.bindingConfigButtonLightSection.classList.toggle("hidden", !isButton || showSpecialPage);
+    if (d.bindingConfigButtonLearnSection) d.bindingConfigButtonLearnSection.classList.toggle("hidden", !isButton || showSpecialPage);
     if (d.bindingConfigMacroSummarySection) d.bindingConfigMacroSummarySection.classList.add("hidden");
     if (d.bindingConfigMacroSection) d.bindingConfigMacroSection.classList.toggle("hidden", !showMacroPage);
-    if (d.bindingConfigPreviewLearnShell) d.bindingConfigPreviewLearnShell.classList.toggle("hidden", isButton || showMacroPage);
-    if (d.bindingConfigCurveSection) d.bindingConfigCurveSection.classList.toggle("hidden", isButton || showMacroPage);
-    if (d.bindingConfigFeedbackOutputSection) d.bindingConfigFeedbackOutputSection.classList.toggle("hidden", isButton || showMacroPage);
-    if (d.bindingConfigMuteSection) d.bindingConfigMuteSection.classList.toggle("hidden", isButton || showMacroPage);
-    if (d.bindingConfigAssignSection) d.bindingConfigAssignSection.classList.toggle("hidden", isButton || showMacroPage);
+    if (d.bindingConfigSoundboardSummarySection) d.bindingConfigSoundboardSummarySection.classList.toggle("hidden", !isSoundboardBinding || showSoundboardPage);
+    if (d.bindingConfigSoundboardSection) d.bindingConfigSoundboardSection.classList.toggle("hidden", !showSoundboardPage);
+    if (d.bindingConfigPreviewLearnShell) d.bindingConfigPreviewLearnShell.classList.toggle("hidden", isButton || showSpecialPage);
+    if (d.bindingConfigCurveSection) d.bindingConfigCurveSection.classList.toggle("hidden", isButton || showSpecialPage);
+    if (d.bindingConfigFeedbackOutputSection) d.bindingConfigFeedbackOutputSection.classList.toggle("hidden", isButton || showSpecialPage);
+    if (d.bindingConfigMuteSection) d.bindingConfigMuteSection.classList.toggle("hidden", isButton || showSpecialPage);
+    if (d.bindingConfigAssignSection) d.bindingConfigAssignSection.classList.toggle("hidden", isButton || showSpecialPage);
     if (d.bindingConfigName) d.bindingConfigName.value = binding.name?.trim() || "";
     if (isButton) {
       syncButtonLightUi(binding);
       if (showMacroPage) {
         renderMacroEditor(binding);
+      } else if (showSoundboardPage) {
+        renderSoundboardEditor(binding);
+        if (soundboardAnalysis?.path !== binding.soundboard?.path && !soundboardAnalysisError) {
+          loadSoundboardAnalysis(binding).catch(() => { });
+        }
       } else if (d.bindingConfigMacroList) {
         d.bindingConfigMacroList.innerHTML = "";
         if (d.bindingConfigMacroSummary) d.bindingConfigMacroSummary.innerHTML = "";
       }
+      if (isSoundboardBinding && !showSoundboardPage) renderSoundboardSummary(binding);
     } else {
       syncCurvePresetToolbar(binding);
       renderCurveCards();
@@ -4478,10 +4957,22 @@ export function createBindingsFeature({
       options.macroPage && (configDraft?.action === "Macro" || getTargets(configDraft).some(isMacroTarget)),
     );
     configMacroSelectedPath = configMacroPageOpen ? macroPathForFirstStep(configDraft) : null;
+    configSoundboardPageOpen = Boolean(
+      options.soundboardPage && (configDraft?.action === "Soundboard" || getTargets(configDraft).some(isSoundboardTarget)),
+    );
+    configRemoveEmptySoundboardTargetOnCancel = Boolean(
+      options.removeEmptySoundboardTargetOnCancel
+      && configSoundboardPageOpen
+      && !normalizeSoundboardMapping(configDraft.soundboard),
+    );
+    soundboardAnalysis = options.soundboardAnalysis || null;
+    soundboardAnalysisError = "";
+    soundboardOutputDevicesLoaded = false;
     configAcceptedTransfers.clear();
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.remove("hidden");
     startConfigPreviewTimer();
     renderConfigModal();
+    if (configSoundboardPageOpen) loadSoundboardOutputDevices().catch(() => { });
   }
 
   async function saveConfigModal() {
@@ -4887,6 +5378,13 @@ export function createBindingsFeature({
               binding.action === "Macro" || getTargets(binding).some(isMacroTarget)
             ),
             onMacroAlreadyConfigured: showMacroAlreadyConfiguredError,
+            soundboardAlreadyConfigured: isButton && (
+              binding.action === "Soundboard" || getTargets(binding).some(isSoundboardTarget)
+            ),
+            onSoundboardAlreadyConfigured: showSoundboardAlreadyConfiguredError,
+            macroBlockedBySoundboard: isButton && getTargets(binding).some(isSoundboardTarget),
+            soundboardBlockedByMacro: isButton && getTargets(binding).some(isMacroTarget),
+            onSpecialActionConflict: showSpecialActionConflictError,
           },
         );
         targetSelect.addEventListener("change", async () => {
@@ -4895,6 +5393,7 @@ export function createBindingsFeature({
           const previousHadOpenApplicationTarget = previousTargets.some(isOpenApplicationTarget);
           const previousHadAutoHotkeyScriptTarget = previousTargets.some(isAutoHotkeyScriptTarget);
           const previousHadMacroTarget = previousTargets.some(isMacroTarget);
+          const previousHadSoundboardTarget = previousTargets.some(isSoundboardTarget);
           const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
             ? targetSelect.__selectedTargets
             : (targetSelect.__selectedTarget ? [targetSelect.__selectedTarget] : []);
@@ -4903,15 +5402,18 @@ export function createBindingsFeature({
           const hasOpenApplicationTarget = selectedTargets.some(isOpenApplicationTarget);
           const hasAutoHotkeyScriptTarget = selectedTargets.some(isAutoHotkeyScriptTarget);
           const hasMacroTarget = selectedTargets.some(isMacroTarget);
+          const hasSoundboardTarget = selectedTargets.some(isSoundboardTarget);
+          const hasRegularTarget = selectedTargets.some((target) => !isMacroTarget(target) && !isSoundboardTarget(target));
           const previousAction = binding.action;
           const previousHotkey = normalizeHotkeyMapping(binding.hotkey);
           const previousOpenApplication = normalizeOpenApplicationMapping(binding.open_application);
           const previousAutoHotkeyScript = normalizeAutoHotkeyScriptMapping(binding.autohotkey_script);
+          const previousSoundboard = normalizeSoundboardMapping(binding.soundboard);
 
-          if (isButton && (previousHadMacroTarget || previousAction === "Macro") && hasMacroTarget) {
-            showMacroAlreadyConfiguredError();
+          if (isButton && hasMacroTarget && hasSoundboardTarget) {
+            showSpecialActionConflictError();
             renderBindings();
-            finishBindingUiMutation("macro target already configured");
+            finishBindingUiMutation("special action conflict");
             return;
           }
 
@@ -4920,14 +5422,15 @@ export function createBindingsFeature({
           if (isButton) {
             if (!hasSelectedTarget) {
               binding.action = "ToggleMute";
+            } else if (hasRegularTarget) {
+              const requestedAction = targetSelect.dataset.action || binding.action || "ToggleMute";
+              binding.action = requestedAction === "Macro" || requestedAction === "Soundboard"
+                ? ((previousAction === "Macro" || previousAction === "Soundboard") ? "ToggleMute" : previousAction)
+                : requestedAction;
             } else if (hasMacroTarget) {
               binding.action = "Macro";
-            } else if (hasHotkeyTarget) {
-              binding.action = "Hotkey";
-            } else if (hasOpenApplicationTarget) {
-              binding.action = "OpenApplication";
-            } else if (hasAutoHotkeyScriptTarget) {
-              binding.action = "RunAutoHotkeyScript";
+            } else if (hasSoundboardTarget) {
+              binding.action = "Soundboard";
             } else {
               binding.action = targetSelect.dataset.action || binding.action || "ToggleMute";
             }
@@ -4936,14 +5439,16 @@ export function createBindingsFeature({
           }
 
           if (isButton && hasMacroTarget) {
-            setTargets(binding, ["Macro"]);
             binding.macro_steps = previousHadMacroTarget
               ? normalizeMacroSteps(binding.macro_steps)
               : [];
             ensureMacroName(binding, { defaultIfBlank: !previousHadMacroTarget });
-            binding.hotkey = null;
-            binding.open_application = null;
-            binding.autohotkey_script = null;
+          }
+
+          if (isButton && hasSoundboardTarget) {
+            binding.soundboard = previousSoundboard;
+          } else if (previousHadSoundboardTarget || previousAction === "Soundboard") {
+            binding.soundboard = null;
           }
 
           if (isButton && previousHadMacroTarget && !hasMacroTarget) {
@@ -4951,7 +5456,7 @@ export function createBindingsFeature({
             binding.macro_name = "";
           }
 
-          if (isButton && !hasMacroTarget && !hasHotkeyTarget && previousHadHotkeyTarget) {
+          if (isButton && !hasHotkeyTarget && previousHadHotkeyTarget) {
             binding.hotkey = null;
             targetSelect?.setHotkeyDisplay?.("");
             if (binding.action === "Hotkey") {
@@ -4959,21 +5464,21 @@ export function createBindingsFeature({
             }
           }
 
-          if (isButton && !hasMacroTarget && !hasOpenApplicationTarget && previousHadOpenApplicationTarget) {
+          if (isButton && !hasOpenApplicationTarget && previousHadOpenApplicationTarget) {
             binding.open_application = null;
             if (binding.action === "OpenApplication") {
               binding.action = targetSelect.dataset.action || "ToggleMute";
             }
           }
 
-          if (isButton && !hasMacroTarget && !hasAutoHotkeyScriptTarget && previousHadAutoHotkeyScriptTarget) {
+          if (isButton && !hasAutoHotkeyScriptTarget && previousHadAutoHotkeyScriptTarget) {
             binding.autohotkey_script = null;
             if (binding.action === "RunAutoHotkeyScript") {
               binding.action = targetSelect.dataset.action || "ToggleMute";
             }
           }
 
-          if (isButton && !hasMacroTarget && hasHotkeyTarget && !previousHadHotkeyTarget) {
+          if (isButton && hasHotkeyTarget && !previousHadHotkeyTarget) {
             const learnedHotkey = await startHotkeyLearn(binding);
             if (!learnedHotkey) {
               setTargets(binding, previousTargets);
@@ -4981,6 +5486,7 @@ export function createBindingsFeature({
               binding.hotkey = previousHotkey;
               binding.open_application = previousOpenApplication;
               binding.autohotkey_script = previousAutoHotkeyScript;
+              binding.soundboard = previousSoundboard;
               await invoke("add_binding", { binding });
               renderBindings();
               finishBindingUiMutation("target rollback");
@@ -5058,8 +5564,13 @@ export function createBindingsFeature({
           await invoke("add_binding", { binding });
           renderBindings();
           finishBindingUiMutation("target change");
-          if (isButton && hasMacroTarget) {
+          if (isButton && hasMacroTarget && !previousHadMacroTarget) {
             openConfigModal(binding.id, { macroPage: true });
+          } else if (isButton && hasSoundboardTarget && !previousHadSoundboardTarget) {
+            openConfigModal(binding.id, {
+              soundboardPage: true,
+              removeEmptySoundboardTargetOnCancel: true,
+            });
           }
         });
 
@@ -5292,7 +5803,7 @@ export function createBindingsFeature({
             await releaseMomentary();
           });
           valueGroup.appendChild(pulse);
-          if (binding.action === "Macro") {
+          if (getTargets(binding).some(isMacroTarget)) {
             valueGroup.classList.add("binding-value-cell--macro");
             const editMacroButton = document.createElement("button");
             editMacroButton.type = "button";
@@ -5305,6 +5816,20 @@ export function createBindingsFeature({
               openConfigModal(binding.id, { macroPage: true });
             });
             valueGroup.appendChild(editMacroButton);
+          }
+          if (getTargets(binding).some(isSoundboardTarget)) {
+            valueGroup.classList.add("binding-value-cell--soundboard");
+            const editSoundButton = document.createElement("button");
+            editSoundButton.type = "button";
+            editSoundButton.className = "binding-macro-edit-button binding-soundboard-edit-button";
+            editSoundButton.textContent = t("soundboard.edit");
+            editSoundButton.title = t("soundboard.edit");
+            editSoundButton.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openConfigModal(binding.id, { soundboardPage: true });
+            });
+            valueGroup.appendChild(editSoundButton);
           }
           if (binding.action === "ToggleMute") {
             valueGroup.appendChild(muteButton);

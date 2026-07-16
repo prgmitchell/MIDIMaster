@@ -9,7 +9,8 @@ pub use binding_types::{
     AuxiliaryControl, Binding, BindingAction, BindingControlKind, BindingTarget,
     ButtonLightBehavior, ButtonLightMode, FaderCurve, FaderCurvePoint, HotkeyMapping,
     MacroActionState, MacroActionStep, MacroStep, MidiMode, MuteBehavior, OpenApplicationMapping,
-    RelativeFormat, MACRO_MAX_PARALLEL_STEPS, MACRO_MAX_TOP_LEVEL_STEPS, MACRO_MAX_WAIT_MS,
+    RelativeFormat, SoundboardMapping, MACRO_MAX_PARALLEL_STEPS, MACRO_MAX_TOP_LEVEL_STEPS,
+    MACRO_MAX_WAIT_MS,
 };
 #[allow(unused_imports)]
 pub use midi_types::{

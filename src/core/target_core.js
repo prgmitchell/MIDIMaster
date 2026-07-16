@@ -175,6 +175,9 @@ export function createTargetCore({
       if (target === "Macro") {
         return { label: "Macro", icon_data: null };
       }
+      if (target === "Soundboard") {
+        return { label: "Soundboard", icon_data: null };
+      }
       if (target === "Hotkey") {
         return { label: "Hotkey", icon_data: null };
       }

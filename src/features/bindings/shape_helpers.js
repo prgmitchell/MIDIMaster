@@ -22,6 +22,7 @@ import {
   normalizeMacroSteps,
   normalizeHotkeyKeyFromEvent,
   normalizeRelativeFormat as normalizeCoreRelativeFormat,
+  normalizeSoundboardMapping,
   presetCurvePoints as corePresetCurvePoints,
   resolveButtonVisualActive as coreResolveButtonVisualActive,
   setBindingTargets,
@@ -39,6 +40,7 @@ export {
   normalizeMacroStep,
   normalizeMacroSteps,
   normalizeHotkeyKeyFromEvent,
+  normalizeSoundboardMapping,
 };
 
 export function normalizeControlKind(raw) {
@@ -220,12 +222,27 @@ export function ensureBindingShape(binding) {
   } else {
     binding.indicator_control = null;
   }
-  if (getBindingTargets(binding).some(isMacroTarget)) {
-    binding.action = "Macro";
-  }
   if (binding.action === "Macro" && !getBindingTargets(binding).some(isMacroTarget)) {
-    setBindingTargets(binding, ["Macro"]);
+    setBindingTargets(binding, [...getBindingTargets(binding), "Macro"]);
   }
+  if (binding.action === "Soundboard" && !getBindingTargets(binding).some(isSoundboardTarget)) {
+    setBindingTargets(binding, [...getBindingTargets(binding), "Soundboard"]);
+  }
+  const specialTargets = getBindingTargets(binding).filter((target) => isMacroTarget(target) || isSoundboardTarget(target));
+  if (specialTargets.length > 1) {
+    const preferred = binding.action === "Macro" || binding.action === "Soundboard"
+      ? binding.action
+      : specialTargets[0];
+    setBindingTargets(binding, getBindingTargets(binding).filter((target) => (
+      (!isMacroTarget(target) && !isSoundboardTarget(target)) || target === preferred
+    )));
+    if (preferred !== "Macro") {
+      binding.macro_name = "";
+      binding.macro_steps = [];
+    }
+    if (preferred !== "Soundboard") binding.soundboard = null;
+  }
+  binding.soundboard = normalizeSoundboardMapping(binding.soundboard);
   binding.macro_steps = binding.action === "Macro" || getBindingTargets(binding).some(isMacroTarget)
     ? normalizeMacroDraftSteps(binding.macro_steps)
     : normalizeMacroSteps(binding.macro_steps);
@@ -252,6 +269,10 @@ export function isAutoHotkeyScriptTarget(target) {
 
 export function isMacroTarget(target) {
   return target === "Macro";
+}
+
+export function isSoundboardTarget(target) {
+  return target === "Soundboard";
 }
 
 export function getTargets(binding) {

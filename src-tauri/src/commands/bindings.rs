@@ -400,6 +400,7 @@ fn action_can_run_from_command(action: &model::BindingAction) -> bool {
             | model::BindingAction::MediaStop
             | model::BindingAction::SwitchProfile
             | model::BindingAction::Macro
+            | model::BindingAction::Soundboard
     )
 }
 
@@ -1187,6 +1188,40 @@ pub async fn apply_binding_action(
     };
 
     let effective_action = action.unwrap_or_else(|| binding.action.clone());
+    let targets = binding.normalized_targets();
+    if value > 0.0 && binding.is_button_binding() {
+        if !matches!(effective_action, model::BindingAction::Macro)
+            && targets
+                .iter()
+                .any(|target| matches!(target, model::BindingTarget::Macro))
+        {
+            spawn_macro_binding(app.clone(), binding.id.clone(), silent.unwrap_or(false));
+        }
+        if !matches!(effective_action, model::BindingAction::Soundboard)
+            && targets
+                .iter()
+                .any(|target| matches!(target, model::BindingTarget::Soundboard))
+        {
+            let sound_result = binding
+                .soundboard
+                .as_ref()
+                .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())
+                .and_then(|mapping| state.soundboard.play_binding(&binding.id, mapping));
+            if let Err(err) = sound_result {
+                let _ = app.emit(
+                    "binding_action_error",
+                    serde_json::json!({
+                        "reason": "soundboard_play_failed",
+                        "binding_id": binding.id,
+                        "title_key": "dialogs.soundboardPlaybackFailedTitle",
+                        "message_key": "dialogs.soundboardPlaybackFailedMessage",
+                        "params": { "message": err },
+                        "silent": silent,
+                    }),
+                );
+            }
+        }
+    }
     if matches!(effective_action, model::BindingAction::Macro) {
         if value <= 0.0 {
             return Ok(());
@@ -1200,6 +1235,43 @@ pub async fn apply_binding_action(
             return Ok(());
         }
         return run_macro_binding(app, state.inner(), binding, silent.unwrap_or(false)).await;
+    }
+
+    if matches!(effective_action, model::BindingAction::Soundboard) {
+        if !crate::soundboard::should_trigger_from_input(value) {
+            return Ok(());
+        }
+        if !binding.is_button_binding() {
+            return Err("Soundboard actions require a button binding".to_string());
+        }
+        let mapping = binding
+            .soundboard
+            .as_ref()
+            .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())?;
+        if let Err(err) = state.soundboard.play_binding(&binding.id, mapping) {
+            let _ = app.emit(
+                "binding_action_error",
+                serde_json::json!({
+                    "reason": "soundboard_play_failed",
+                    "binding_id": binding.id,
+                    "title_key": "dialogs.soundboardPlaybackFailedTitle",
+                    "message_key": "dialogs.soundboardPlaybackFailedMessage",
+                    "params": { "message": err },
+                    "silent": silent,
+                }),
+            );
+            return Err(err);
+        }
+        return set_binding_feedback(
+            app,
+            state,
+            binding.id.clone(),
+            value,
+            Some(effective_action),
+            silent,
+            None,
+            None,
+        );
     }
 
     if !action_can_run_from_command(&effective_action) {
@@ -1317,6 +1389,7 @@ mod tests {
             hotkey: None,
             open_application: None,
             autohotkey_script: None,
+            soundboard: None,
             macro_steps: Vec::new(),
         }
     }

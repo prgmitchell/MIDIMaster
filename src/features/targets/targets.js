@@ -38,6 +38,7 @@ export function createTargetsFeature({
   const OPEN_APPLICATION_TARGET_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='3.6' width='15.6' height='12.8' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6.2 7.3h4.9M6.2 10h7.6M6.2 12.7h5.7' stroke='%23c7d2f3' stroke-width='1.3' stroke-linecap='round'/><path d='M12.3 5.2l2.9 2.9-2.9 2.9' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const AUTOHOTKEY_SCRIPT_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 2.8h7.1L16 6.7v10.5H5V2.8z' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M12.1 2.8v4h3.9' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M7.3 12.6l1.9-4.2 1.9 4.2M8 11.1h2.4M12.6 9.1v3.5' stroke='%238fd5ff' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const MACRO_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M4 5.5h4.4M11.6 5.5H16M4 10h12M4 14.5h4.4M11.6 14.5H16' stroke='%2398a6cc' stroke-width='1.2' stroke-linecap='round'/><path d='M8.8 3.7 11.2 5.5 8.8 7.3M8.8 12.7l2.4 1.8-2.4 1.8' stroke='%238fd5ff' stroke-width='1.35' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+  const SOUNDBOARD_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M3 8.2v3.6h2.7l3.4 2.8V5.4L5.7 8.2H3z' fill='%23c7d2f3'/><path d='M12.1 7.1c1.6 1.7 1.6 4.1 0 5.8M14.4 5.3c2.7 2.7 2.7 6.7 0 9.4' stroke='%238fd5ff' stroke-width='1.35' stroke-linecap='round'/></svg>";
   const TOGGLE_MUTE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M3 8.2v3.6h2.6l3.3 2.8V5.4L5.6 8.2H3z' fill='%23c7d2f3'/><path d='M12.4 7.1l4.5 5.8M16.9 7.1l-4.5 5.8' stroke='%23f7a7a7' stroke-width='1.5' stroke-linecap='round'/></svg>";
   const SET_DEFAULT_DEVICE_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='5' width='15.6' height='10' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6 10h4.6M8.6 7.4L11.2 10l-2.6 2.6' stroke='%23c7d2f3' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/><path d='M13.7 8.1v3.8M15.6 10l-1.9 1.9M11.8 10l1.9 1.9' stroke='%2386d6a7' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const WINDOW_FOCUS_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.5' y='4' width='15' height='12' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M2.5 7.5h15' stroke='%2398a6cc' stroke-width='1.2'/><path d='M8 11h4M10 9v4' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round'/></svg>";
@@ -228,7 +229,7 @@ export function createTargetsFeature({
     if (option.category) return option.category;
     if (option.integrationId || option.integration_id) return "integrations";
     if (option.kind === "master" || option.kind === "focus") return "builtIn";
-    if (option.kind === "media-control" || option.kind === "capture-control" || option.kind === "macro-target" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "profile-switch-root" || option.kind === "profile-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
+    if (option.kind === "media-control" || option.kind === "capture-control" || option.kind === "macro-target" || option.kind === "soundboard-target" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "profile-switch-root" || option.kind === "profile-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
     if (option.kind === "integration-root" || option.kind === "integration-target" || option.kind === "integration-nav") return "integrations";
     if (option.kind === "session") return "applications";
     if (option.kind === "device") {
@@ -248,7 +249,8 @@ export function createTargetsFeature({
     if (option?.kind === "focus") return t("targets.description.focus");
     if (option?.kind === "media-control") return t("targets.description.mediaControl");
     if (option?.kind === "capture-control") return t("targets.description.captureControls");
-    if (option?.kind === "macro-target") return "Run an ordered action macro from this button.";
+    if (option?.kind === "macro-target") return t("targets.description.macro");
+    if (option?.kind === "soundboard-target") return t("targets.description.soundboard");
     if (option?.kind === "hotkey-target") return t("targets.description.hotkey");
     if (option?.kind === "open-application-target") return t("targets.description.openApplication");
     if (option?.kind === "autohotkey-script-target") return t("targets.description.autoHotkeyScript");
@@ -667,6 +669,7 @@ export function createTargetsFeature({
       else if (currentTarget === "MediaControl") selectedKind = "media-control";
       else if (currentTarget === "CaptureControl") selectedKind = "capture-control";
       else if (currentTarget === "Macro") selectedKind = "macro-target";
+      else if (currentTarget === "Soundboard") selectedKind = "soundboard-target";
       else if (currentTarget === "Hotkey") selectedKind = "hotkey-target";
       else if (currentTarget === "OpenApplication") selectedKind = "open-application-target";
       else if (currentTarget === "AutoHotkeyScript") selectedKind = "autohotkey-script-target";
@@ -677,7 +680,7 @@ export function createTargetsFeature({
     else if (selectedKind === "session") selectedValue = selectedAppKey || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
     else if (selectedKind === "profile-target") selectedValue = selectedProfileName || "";
-    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "macro-target" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
+    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "macro-target" || selectedKind === "soundboard-target" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
     const options = [
@@ -698,9 +701,15 @@ export function createTargetsFeature({
     if (isButton) {
       options.push({
         value: "macro-target",
-        label: "Macro",
+        label: t("macro.title"),
         icon_data: MACRO_ICON_DATA,
         kind: "macro-target",
+      });
+      options.push({
+        value: "soundboard-target",
+        label: t("soundboard.title"),
+        icon_data: SOUNDBOARD_ICON_DATA,
+        kind: "soundboard-target",
       });
       options.push({
         value: "media-control",
@@ -909,9 +918,19 @@ export function createTargetsFeature({
     const onMacroAlreadyConfigured = (typeof selectOptions?.onMacroAlreadyConfigured === "function")
       ? selectOptions.onMacroAlreadyConfigured
       : null;
+    const soundboardAlreadyConfigured = Boolean(selectOptions?.soundboardAlreadyConfigured);
+    const onSoundboardAlreadyConfigured = (typeof selectOptions?.onSoundboardAlreadyConfigured === "function")
+      ? selectOptions.onSoundboardAlreadyConfigured
+      : null;
+    const macroBlockedBySoundboard = Boolean(selectOptions?.macroBlockedBySoundboard);
+    const soundboardBlockedByMacro = Boolean(selectOptions?.soundboardBlockedByMacro);
+    const onSpecialActionConflict = (typeof selectOptions?.onSpecialActionConflict === "function")
+      ? selectOptions.onSpecialActionConflict
+      : null;
 
     const filterPickerOptions = (list) => (Array.isArray(list) ? list : [])
       .filter((option) => !(excludeMacroTarget && option?.kind === "macro-target"))
+      .filter((option) => !(excludeMacroTarget && option?.kind === "soundboard-target"))
       .filter((option) => !(targetOnly && option?.kind === "profile-switch-root"));
 
     const button = document.createElement("button");
@@ -945,6 +964,7 @@ export function createTargetsFeature({
       if (target === "MediaControl") return "media-control";
       if (target === "CaptureControl") return "capture-control";
       if (target === "Macro") return "macro-target";
+      if (target === "Soundboard") return "soundboard-target";
       if (target === "Hotkey") return "hotkey-target";
       if (target === "OpenApplication") return "open-application-target";
       if (target === "AutoHotkeyScript") return "autohotkey-script-target";
@@ -1032,6 +1052,8 @@ export function createTargetsFeature({
     }
 
     const actionLabel = (action, target = null) => {
+      if (target === "Macro") return t("macro.title");
+      if (target === "Soundboard") return t("soundboard.title");
       const integ = integrationFromTarget(target);
       if (action === "Volume" && selectedActionRole === "value") {
         return t("targets.action.setValue");
@@ -1067,6 +1089,7 @@ export function createTargetsFeature({
       if (action === "SnipScreenshot") return t("targets.action.snipScreenshot");
       if (action === "ToggleScreenRecording") return t("targets.action.toggleScreenRecording");
       if (action === "Macro") return "Macro";
+      if (action === "Soundboard") return t("soundboard.title");
       if (action === "Hotkey") return t("targets.hotkey");
       if (action === "RunAutoHotkeyScript") return t("targets.autoHotkeyScript");
       if (action === "SwitchProfile") return t("targets.switchProfile");
@@ -1127,6 +1150,12 @@ export function createTargetsFeature({
           icon_data: MACRO_ICON_DATA,
         };
       }
+      if (target === "Soundboard") {
+        return {
+          label: t("soundboard.title"),
+          icon_data: SOUNDBOARD_ICON_DATA,
+        };
+      }
       const resolved = resolveDisplay(target);
       const merged = {
         label: (resolved?.label || cached?.label || "Target"),
@@ -1151,6 +1180,9 @@ export function createTargetsFeature({
       }
       if (target === "CaptureControl") {
         return { value: "capture-control", label: t("targets.captureControls"), icon_data: CAPTURE_ICON_DATA, kind: "capture-control" };
+      }
+      if (target === "Soundboard") {
+        return { value: "soundboard-target", label: t("soundboard.title"), icon_data: SOUNDBOARD_ICON_DATA, kind: "soundboard-target" };
       }
       if (target === "Hotkey") {
         return { value: "hotkey-target", label: t("targets.hotkey"), icon_data: HOTKEY_ICON_DATA, kind: "hotkey-target" };
@@ -1333,6 +1365,9 @@ export function createTargetsFeature({
       }
       if (option.kind === "macro-target") {
         return "Macro";
+      }
+      if (option.kind === "soundboard-target") {
+        return "Soundboard";
       }
       if (option.kind === "hotkey-target") {
         return "Hotkey";
@@ -1556,6 +1591,9 @@ export function createTargetsFeature({
       if (targetOption.kind === "hotkey-target") {
         return [{ label: t("targets.hotkey"), value: "Hotkey", kind: "action", icon_data: HOTKEY_ICON_DATA, role: "command" }];
       }
+      if (targetOption.kind === "soundboard-target") {
+        return [{ label: t("soundboard.title"), value: "Soundboard", kind: "action", icon_data: SOUNDBOARD_ICON_DATA, role: "command" }];
+      }
       if (targetOption.kind === "open-application-target") {
         return [{ label: t("targets.openApplication"), value: "OpenApplication", kind: "action", icon_data: OPEN_APPLICATION_TARGET_ICON_DATA, role: "command" }];
       }
@@ -1713,8 +1751,21 @@ export function createTargetsFeature({
       }
 
       const mapped = mapOptionToTarget(targetSourceOption);
+      if ((mapped === "Macro" && macroBlockedBySoundboard)
+        || (mapped === "Soundboard" && soundboardBlockedByMacro)) {
+        onSpecialActionConflict?.();
+        closeTargetPanel();
+        syncContainerValue(false);
+        return;
+      }
       if (mapped === "Macro" && macroAlreadyConfigured) {
         onMacroAlreadyConfigured?.();
+        closeTargetPanel();
+        syncContainerValue(false);
+        return;
+      }
+      if (mapped === "Soundboard" && soundboardAlreadyConfigured) {
+        onSoundboardAlreadyConfigured?.();
         closeTargetPanel();
         syncContainerValue(false);
         return;
@@ -1724,6 +1775,9 @@ export function createTargetsFeature({
       }
       if (mapped === "Macro") {
         selectedAction = "Macro";
+      }
+      if (mapped === "Soundboard") {
+        selectedAction = "Soundboard";
       }
       if (mapped === "OpenApplication") {
         selectedAction = "OpenApplication";
@@ -1752,7 +1806,7 @@ export function createTargetsFeature({
       const updatesExistingAction = exists >= 0 && nextActionValue;
       const updatesExistingFileTarget = exists >= 0
         && (option?.kind === "open-application-target" || option?.kind === "autohotkey-script-target");
-      if (mapped === "Macro" || mappedIsProfile || replacesProfileTarget) {
+      if (mappedIsProfile || replacesProfileTarget) {
         selectedTargets = [mapped];
       } else if (updatesExistingAction || updatesExistingFileTarget) {
         selectedTargets[exists] = mapped;
@@ -2152,6 +2206,14 @@ export function createTargetsFeature({
               selectOption(targetOption, {
                 value: "Macro",
                 label: "Macro",
+              });
+              return true;
+            }
+
+            if (isBindingButton && targetOption.kind === "soundboard-target") {
+              selectOption(targetOption, {
+                value: "Soundboard",
+                label: t("soundboard.title"),
               });
               return true;
             }

@@ -47,6 +47,12 @@ jobs:
       - name: Test frontend binding model
         run: node scripts/test-binding-model.mjs
 
+      - name: Test Soundboard editor constraints
+        run: node scripts/test-soundboard-editor.mjs
+
+      - name: Test Soundboard UI wiring
+        run: node scripts/test-soundboard-ui-wiring.mjs
+
       - name: Test frontend binding density
         run: node scripts/test-binding-density.mjs
 

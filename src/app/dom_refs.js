@@ -55,6 +55,26 @@ export function createDomRefs() {
   const bindingConfigMacroAddAction = document.getElementById("binding-config-macro-add-action");
   const bindingConfigMacroAddWait = document.getElementById("binding-config-macro-add-wait");
   const bindingConfigMacroAddParallel = document.getElementById("binding-config-macro-add-parallel");
+  const bindingConfigSoundboardSummarySection = document.getElementById("binding-config-soundboard-summary-section");
+  const bindingConfigSoundboardSummary = document.getElementById("binding-config-soundboard-summary");
+  const bindingConfigSoundboardEdit = document.getElementById("binding-config-soundboard-edit");
+  const bindingConfigSoundboardSection = document.getElementById("binding-config-soundboard-section");
+  const bindingConfigSoundboardFile = document.getElementById("binding-config-soundboard-file");
+  const bindingConfigSoundboardStatus = document.getElementById("binding-config-soundboard-status");
+  const bindingConfigSoundboardReplace = document.getElementById("binding-config-soundboard-replace");
+  const bindingConfigSoundboardPreview = document.getElementById("binding-config-soundboard-preview");
+  const bindingConfigSoundboardPlaybackTime = document.getElementById("binding-config-soundboard-playback-time");
+  const bindingConfigSoundboardWaveform = document.getElementById("binding-config-soundboard-waveform");
+  const bindingConfigSoundboardStart = document.getElementById("binding-config-soundboard-start");
+  const bindingConfigSoundboardEnd = document.getElementById("binding-config-soundboard-end");
+  const bindingConfigSoundboardStartTime = document.getElementById("binding-config-soundboard-start-time");
+  const bindingConfigSoundboardEndTime = document.getElementById("binding-config-soundboard-end-time");
+  const bindingConfigSoundboardSelectionTime = document.getElementById("binding-config-soundboard-selection-time");
+  const bindingConfigSoundboardVolume = document.getElementById("binding-config-soundboard-volume");
+  const bindingConfigSoundboardVolumeValue = document.getElementById("binding-config-soundboard-volume-value");
+  const bindingConfigSoundboardSpeed = document.getElementById("binding-config-soundboard-speed");
+  const bindingConfigSoundboardSpeedValue = document.getElementById("binding-config-soundboard-speed-value");
+  const bindingConfigSoundboardOutput = document.getElementById("binding-config-soundboard-output");
   const bindingConfigCurveSection = document.getElementById("binding-config-curve-section");
   const bindingConfigFeedbackOutputSection = document.getElementById("binding-config-feedback-output-section");
   const bindingConfigFeedbackOutputCustom = document.getElementById("binding-config-feedback-output-custom");
@@ -257,6 +277,26 @@ export function createDomRefs() {
     bindingConfigMacroAddAction,
     bindingConfigMacroAddWait,
     bindingConfigMacroAddParallel,
+    bindingConfigSoundboardSummarySection,
+    bindingConfigSoundboardSummary,
+    bindingConfigSoundboardEdit,
+    bindingConfigSoundboardSection,
+    bindingConfigSoundboardFile,
+    bindingConfigSoundboardStatus,
+    bindingConfigSoundboardReplace,
+    bindingConfigSoundboardPreview,
+    bindingConfigSoundboardPlaybackTime,
+    bindingConfigSoundboardWaveform,
+    bindingConfigSoundboardStart,
+    bindingConfigSoundboardEnd,
+    bindingConfigSoundboardStartTime,
+    bindingConfigSoundboardEndTime,
+    bindingConfigSoundboardSelectionTime,
+    bindingConfigSoundboardVolume,
+    bindingConfigSoundboardVolumeValue,
+    bindingConfigSoundboardSpeed,
+    bindingConfigSoundboardSpeedValue,
+    bindingConfigSoundboardOutput,
     bindingConfigCurveSection,
     bindingConfigFeedbackOutputSection,
     bindingConfigFeedbackOutputCustom,

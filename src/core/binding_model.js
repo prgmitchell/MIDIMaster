@@ -124,6 +124,7 @@ function targetIsCompleteForMappedLight(target) {
     || target === "MediaControl"
     || target === "CaptureControl"
     || target === "Macro"
+    || target === "Soundboard"
   ) {
     return true;
   }
@@ -145,6 +146,10 @@ function targetIsCompleteForMappedLight(target) {
 
 function isMacroTarget(target) {
   return target === "Macro";
+}
+
+function isSoundboardTarget(target) {
+  return target === "Soundboard";
 }
 
 function mappedButtonLightTargetComplete(binding) {
@@ -189,6 +194,10 @@ function mappedButtonLightTargetComplete(binding) {
   }
   if (action === "SetDefaultDevice") {
     return targets.some((target) => Boolean(String((target?.Device || target?.device)?.device_id || "").trim()));
+  }
+  if (action === "Soundboard") {
+    return targets.some(isSoundboardTarget)
+      && Boolean(normalizeSoundboardMapping(binding?.soundboard));
   }
   if (action === "SwitchProfile") {
     return targets.some((target) => Boolean(String((target?.Profile || target?.profile)?.name || "").trim()));
@@ -444,7 +453,7 @@ function normalizeMacroActionText(raw) {
 function normalizeMacroTargets(rawTargets) {
   const targets = Array.isArray(rawTargets) ? rawTargets : [];
   return targets
-    .filter((target) => targetIsAssigned(target) && !isMacroTarget(target))
+    .filter((target) => targetIsAssigned(target) && !isMacroTarget(target) && !isSoundboardTarget(target))
     .slice(0, 8);
 }
 
@@ -510,7 +519,7 @@ export function normalizeMacroSteps(steps) {
 function normalizeMacroDraftActionStep(step) {
   if (!step || typeof step !== "object") return null;
   const rawAction = String(step.action || "");
-  const isNestedMacroAction = rawAction === "Macro";
+  const isNestedMacroAction = rawAction === "Macro" || rawAction === "Soundboard";
   const action = !isNestedMacroAction && MACRO_ACTIONS.has(rawAction) ? rawAction : "Volume";
   const targets = isNestedMacroAction ? [] : normalizeMacroTargets(step.targets);
   const value = Number(step.value);
@@ -568,10 +577,21 @@ export function normalizeMacroDraftSteps(steps) {
 export function normalizeBinding(binding) {
   if (!binding || typeof binding !== "object") return binding;
   const out = { ...binding };
-  setBindingTargets(out, getBindingTargets(out));
-  if (getBindingTargets(out).some(isMacroTarget)) {
-    out.action = "Macro";
+  const preferredSpecial = out.action === "Macro" || out.action === "Soundboard" ? out.action : null;
+  let selectedSpecial = null;
+  const normalizedTargets = getBindingTargets(out).filter((target) => {
+    if (!isMacroTarget(target) && !isSoundboardTarget(target)) return true;
+    if (preferredSpecial && target !== preferredSpecial) return false;
+    if (selectedSpecial) return false;
+    selectedSpecial = target;
+    return true;
+  });
+  if (preferredSpecial && !selectedSpecial) {
+    if (normalizedTargets.length >= 8) normalizedTargets.length = 7;
+    normalizedTargets.push(preferredSpecial);
+    selectedSpecial = preferredSpecial;
   }
+  setBindingTargets(out, normalizedTargets);
   out.macro_name = normalizeMacroName(out.macro_name);
   out.mode = (out.mode === "Relative") ? "Relative" : "Absolute";
   out.relative_format = normalizeRelativeFormat(out.relative_format);
@@ -613,13 +633,45 @@ export function normalizeBinding(binding) {
     const display = String(out.autohotkey_script.display || "").trim();
     out.autohotkey_script = path ? { path, display: display || path } : null;
   }
-  if (out.action === "Macro" && !getBindingTargets(out).some(isMacroTarget)) {
-    setBindingTargets(out, ["Macro"]);
+  out.soundboard = normalizeSoundboardMapping(out.soundboard);
+  if (selectedSpecial !== "Soundboard") out.soundboard = null;
+  if (selectedSpecial !== "Macro") {
+    out.macro_name = "";
+    out.macro_steps = [];
   }
   out.macro_steps = out.action === "Macro" || getBindingTargets(out).some(isMacroTarget)
     ? normalizeMacroDraftSteps(out.macro_steps)
     : normalizeMacroSteps(out.macro_steps);
   return out;
+}
+
+export function normalizeSoundboardMapping(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const path = String(raw.path || "").trim();
+  if (!path) return null;
+  const pathParts = path.split(/[\\/]/);
+  const fallbackDisplay = pathParts[pathParts.length - 1] || path;
+  const startRaw = Math.round(Number(raw.trim_start_ms ?? raw.trimStartMs ?? 0));
+  const start = Math.max(0, Number.isFinite(startRaw) ? startRaw : 0);
+  const endRaw = raw.trim_end_ms ?? raw.trimEndMs;
+  const parsedEnd = endRaw == null ? null : Math.round(Number(endRaw));
+  const end = parsedEnd == null || !Number.isFinite(parsedEnd)
+    ? null
+    : Math.max(start + 1, parsedEnd);
+  const volumeRaw = Number(raw.volume);
+  const speedRaw = Number(raw.speed);
+  const outputDeviceId = String(raw.output_device_id ?? raw.outputDeviceId ?? "").trim();
+  const outputDeviceDisplay = String(raw.output_device_display ?? raw.outputDeviceDisplay ?? "").trim();
+  return {
+    path,
+    display: String(raw.display || "").trim() || fallbackDisplay,
+    trim_start_ms: start,
+    trim_end_ms: end,
+    volume: Number.isFinite(volumeRaw) ? Math.min(1, Math.max(0, volumeRaw)) : 1,
+    speed: Number.isFinite(speedRaw) ? Math.min(2, Math.max(0.5, speedRaw)) : 1,
+    output_device_id: outputDeviceId || null,
+    output_device_display: outputDeviceId ? (outputDeviceDisplay || null) : null,
+  };
 }
 
 export function normalizeRelativeFormat(raw) {
