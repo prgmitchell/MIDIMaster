@@ -1,21 +1,32 @@
-use crate::model::{Profile, ProfileSummary};
-use anyhow::{anyhow, Context};
-use std::{
-    fs,
-    path::{Path, PathBuf},
+#[cfg(test)]
+use crate::durable_json_store::new_recovery_notices;
+use crate::{
+    durable_json_store::{DurableJsonStore, StorageRecoveryNotices},
+    model::{Profile, ProfileSummary},
 };
+use std::path::PathBuf;
 
 type Result<T> = anyhow::Result<T>;
 
 #[derive(Clone)]
 pub struct ProfileStore {
-    path: PathBuf,
+    storage: DurableJsonStore,
 }
 
 impl ProfileStore {
+    #[cfg(test)]
     pub fn new(config_dir: PathBuf) -> Self {
+        Self::with_recovery_notices(config_dir, new_recovery_notices())
+    }
+
+    pub(crate) fn with_recovery_notices(
+        config_dir: PathBuf,
+        recovery_notices: StorageRecoveryNotices,
+    ) -> Self {
         let path = config_dir.join("profiles.json");
-        Self { path }
+        Self {
+            storage: DurableJsonStore::new(path, "profiles", recovery_notices),
+        }
     }
 
     pub fn list_profiles(&self) -> Result<Vec<ProfileSummary>> {
@@ -32,156 +43,52 @@ impl ProfileStore {
     }
 
     pub fn save_profile(&self, profile: Profile) -> Result<()> {
-        let mut profiles = self.load_all_for_update()?;
-        if let Some(existing) = profiles
-            .iter_mut()
-            .find(|existing| existing.name == profile.name)
-        {
-            *existing = profile;
-        } else {
-            profiles.push(profile);
-        }
-        self.write_all(&profiles)
+        self.storage.update::<Vec<Profile>, _, _>(|profiles| {
+            if let Some(existing) = profiles
+                .iter_mut()
+                .find(|existing| existing.name == profile.name)
+            {
+                *existing = profile;
+            } else {
+                profiles.push(profile);
+            }
+            normalize_profiles(profiles);
+        })
     }
 
     pub fn delete_profile(&self, name: &str) -> Result<()> {
-        let profiles = self
-            .load_all_for_update()?
-            .into_iter()
-            .filter(|profile| profile.name != name)
-            .collect::<Vec<_>>();
-        self.write_all(&profiles)
+        self.storage.update::<Vec<Profile>, _, _>(|profiles| {
+            profiles.retain(|profile| profile.name != name);
+            normalize_profiles(profiles);
+        })
     }
 
     pub fn clear_all(&self) -> Result<()> {
-        if self.path.exists() {
-            self.backup_existing_file()?;
-            fs::remove_file(&self.path)
-                .with_context(|| format!("Failed deleting {}", self.path.display()))?;
-        }
-        Ok(())
+        self.storage.clear()
     }
 
     fn load_all(&self) -> Result<Vec<Profile>> {
-        if !self.path.exists() {
-            return self.load_backup_or_empty();
-        }
-        let data = read_to_string(&self.path)?;
-        if data.trim().is_empty() {
-            return Ok(Vec::new());
-        }
-        match serde_json::from_str(&data) {
-            Ok(profiles) => Ok(profiles),
-            Err(primary_err) => {
-                let backup_path = self.backup_path();
-                if backup_path.exists() {
-                    if let Ok(Some(profiles)) = read_profiles_file(&backup_path) {
-                        return Ok(profiles);
-                    }
-                }
-                Err(primary_err).with_context(|| format!("Failed parsing {}", self.path.display()))
-            }
-        }
+        self.storage.load_or_default()
     }
 
-    fn write_all(&self, profiles: &[Profile]) -> Result<()> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed creating {}", parent.display()))?;
-        }
-        let mut profiles = profiles.to_vec();
-        for profile in &mut profiles {
-            profile.normalize_for_storage();
-        }
-        let data = serde_json::to_string_pretty(&profiles)?;
-        self.write_atomically(data.as_bytes())?;
-        Ok(())
-    }
-
-    fn write_atomically(&self, data: &[u8]) -> Result<()> {
-        let tmp_path = self.path.with_extension("json.tmp");
-        fs::write(&tmp_path, data)
-            .with_context(|| format!("Failed writing {}", tmp_path.display()))?;
-
-        self.backup_existing_file()?;
-        replace_file(&tmp_path, &self.path)
-    }
-
-    fn backup_existing_file(&self) -> Result<()> {
-        if matches!(read_profiles_file(&self.path), Ok(Some(_))) {
-            fs::copy(&self.path, self.backup_path())
-                .with_context(|| format!("Failed backing up {}", self.path.display()))?;
-        }
-        Ok(())
-    }
-
-    fn backup_path(&self) -> PathBuf {
-        self.path.with_extension("json.bak")
-    }
-
-    fn load_backup_or_empty(&self) -> Result<Vec<Profile>> {
-        match read_profiles_file(&self.backup_path())? {
-            Some(profiles) => Ok(profiles),
-            None => Ok(Vec::new()),
-        }
-    }
-
-    fn load_all_for_update(&self) -> Result<Vec<Profile>> {
-        if !self.path.exists() {
-            return self.load_backup_or_empty();
-        }
-
-        let data = read_to_string(&self.path)?;
-        if data.trim().is_empty() {
-            return Ok(Vec::new());
-        }
-
-        match serde_json::from_str(&data) {
-            Ok(profiles) => Ok(profiles),
-            Err(_) => self.load_backup_or_empty(),
-        }
+    #[cfg(test)]
+    pub(crate) fn set_failure_point(&self, point: crate::durable_json_store::FailurePoint) {
+        self.storage.set_failure_point(point);
     }
 }
 
-fn replace_file(tmp_path: &Path, destination: &Path) -> Result<()> {
-    if destination.exists() {
-        fs::remove_file(destination)
-            .with_context(|| format!("Failed replacing {}", destination.display()))?;
+fn normalize_profiles(profiles: &mut [Profile]) {
+    for profile in profiles {
+        profile.normalize_for_storage();
     }
-
-    match fs::rename(tmp_path, destination) {
-        Ok(()) => Ok(()),
-        Err(rename_err) => {
-            let _ = fs::remove_file(tmp_path);
-            Err(anyhow!(rename_err))
-                .with_context(|| format!("Failed replacing {}", destination.display()))
-        }
-    }
-}
-
-fn read_profiles_file(path: &Path) -> Result<Option<Vec<Profile>>> {
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    let data = read_to_string(path)?;
-    if data.trim().is_empty() {
-        return Ok(Some(Vec::new()));
-    }
-
-    let profiles = serde_json::from_str(&data)
-        .with_context(|| format!("Failed parsing {}", path.display()))?;
-    Ok(Some(profiles))
-}
-
-fn read_to_string(path: &Path) -> Result<String> {
-    fs::read_to_string(path).with_context(|| format!("Failed reading {}", path.display()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::ProfileStore;
+    use crate::durable_json_store::new_recovery_notices;
     use crate::model::Profile;
+    use std::collections::BTreeSet;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_dir(name: &str) -> std::path::PathBuf {
@@ -260,6 +167,9 @@ mod tests {
             .expect("load from backup")
             .expect("profile");
         assert_eq!(loaded.name, "recovered");
+        let repaired = std::fs::read_to_string(dir.join("profiles.json")).expect("repaired");
+        let repaired_profiles: Vec<Profile> = serde_json::from_str(&repaired).expect("profiles");
+        assert_eq!(repaired_profiles[0].name, "recovered");
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -307,7 +217,9 @@ mod tests {
             .expect("load")
             .expect("profile");
         assert_eq!(loaded.name, "Default");
-        assert!(!dir.join("profiles.json.bak").exists());
+        let backup = std::fs::read_to_string(dir.join("profiles.json.bak")).expect("backup");
+        let backup_profiles: Vec<Profile> = serde_json::from_str(&backup).expect("backup json");
+        assert!(backup_profiles.is_empty());
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -334,6 +246,128 @@ mod tests {
             serde_json::json!("Pressed")
         );
         assert_eq!(profiles[1]["name"], serde_json::json!("next"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn load_profile_recovers_from_second_backup_when_newer_generations_are_corrupt() {
+        let dir = test_dir("second-backup");
+        std::fs::create_dir_all(&dir).expect("create dir");
+        std::fs::write(dir.join("profiles.json"), b"\0primary").expect("primary");
+        std::fs::write(dir.join("profiles.json.bak"), b"").expect("backup");
+        std::fs::write(
+            dir.join("profiles.json.bak.2"),
+            serde_json::to_vec_pretty(&vec![profile("recovered")]).expect("json"),
+        )
+        .expect("second backup");
+        let store = ProfileStore::new(dir.clone());
+
+        let loaded = store
+            .load_profile("recovered")
+            .expect("load")
+            .expect("profile");
+        assert_eq!(loaded.name, "recovered");
+
+        let repaired: Vec<Profile> = serde_json::from_slice(
+            &std::fs::read(dir.join("profiles.json")).expect("repaired primary"),
+        )
+        .expect("parse repaired primary");
+        assert_eq!(repaired[0].name, "recovered");
+        let quarantined_count = std::fs::read_dir(&dir)
+            .expect("read dir")
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_name().to_string_lossy().contains(".corrupt-"))
+            .count();
+        assert_eq!(quarantined_count, 2);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn all_corrupt_generations_are_preserved_before_defaults_are_initialized() {
+        let dir = test_dir("all-corrupt");
+        std::fs::create_dir_all(&dir).expect("create dir");
+        let corrupt_values = [
+            b"primary".as_slice(),
+            b"\0\0".as_slice(),
+            b"backup-two".as_slice(),
+        ];
+        for (path, value) in [
+            (dir.join("profiles.json"), corrupt_values[0]),
+            (dir.join("profiles.json.bak"), corrupt_values[1]),
+            (dir.join("profiles.json.bak.2"), corrupt_values[2]),
+        ] {
+            std::fs::write(path, value).expect("write corrupt generation");
+        }
+        let notices = new_recovery_notices();
+        let store = ProfileStore::with_recovery_notices(dir.clone(), notices.clone());
+
+        assert!(store.list_profiles().expect("load defaults").is_empty());
+        let notice = notices.lock().expect("notices")[0].clone();
+        assert_eq!(notice.store, "profiles");
+        assert_eq!(notice.action, "reset_to_defaults");
+        assert_eq!(notice.quarantined_paths.len(), 3);
+
+        let preserved = notice
+            .quarantined_paths
+            .iter()
+            .map(std::fs::read)
+            .collect::<std::io::Result<Vec<_>>>()
+            .expect("read quarantined files")
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        let expected = corrupt_values
+            .into_iter()
+            .map(|value| value.to_vec())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(preserved, expected);
+        let primary: Vec<Profile> = serde_json::from_slice(
+            &std::fs::read(dir.join("profiles.json")).expect("default primary"),
+        )
+        .expect("default json");
+        assert!(primary.is_empty());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn first_run_missing_files_do_not_emit_recovery_notice() {
+        let dir = test_dir("first-run");
+        let notices = new_recovery_notices();
+        let store = ProfileStore::with_recovery_notices(dir.clone(), notices.clone());
+
+        assert!(store.list_profiles().expect("first run").is_empty());
+        assert!(notices.lock().expect("notices").is_empty());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn concurrent_profile_saves_do_not_lose_updates() {
+        let dir = test_dir("concurrent");
+        let store = ProfileStore::new(dir.clone());
+        let threads = (0..12)
+            .map(|index| {
+                let store = store.clone();
+                std::thread::spawn(move || {
+                    store
+                        .save_profile(profile(&format!("profile-{index}")))
+                        .expect("save profile");
+                })
+            })
+            .collect::<Vec<_>>();
+        for thread in threads {
+            thread.join().expect("join");
+        }
+
+        let profiles = store.list_profiles().expect("profiles");
+        assert_eq!(profiles.len(), 12);
+        let names = profiles
+            .into_iter()
+            .map(|profile| profile.name)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(names.len(), 12);
 
         let _ = std::fs::remove_dir_all(dir);
     }

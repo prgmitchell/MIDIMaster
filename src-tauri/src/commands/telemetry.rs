@@ -48,17 +48,9 @@ pub fn submit_midi_device_inventory(
 
     post_midi_device_inventory_payload(&payload)?;
 
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    settings.midi_device_inventory_last_sent_hash = Some(hash);
-    let updated = settings.clone();
-    drop(settings);
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
+    super::settings::persist_app_settings_update(state.inner(), |settings| {
+        settings.midi_device_inventory_last_sent_hash = Some(hash);
+    })?;
 
     run_logger::info(
         "telemetry",

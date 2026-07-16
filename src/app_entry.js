@@ -1005,6 +1005,7 @@ let appSettings = {
   midiDeviceInventoryNoticeVersion: 0,
 };
 let appStarted = false;
+let storageRecoveryNoticeShown = false;
 
 function applyGlobalAppearance(nextAppearance) {
   const appearance = normalizeAppearanceSettings(nextAppearance || appSettings.appearance);
@@ -2790,6 +2791,47 @@ async function loadStartupProfile(preferredName) {
   return false;
 }
 
+function storageRecoveryStoreLabel(notices) {
+  const stores = new Set(notices.map((notice) => String(notice?.store || "")));
+  if (stores.has("profiles") && stores.has("app_settings")) {
+    return t("storage.profilesAndSettings");
+  }
+  if (stores.has("profiles")) {
+    return t("storage.profiles");
+  }
+  return t("storage.appSettings");
+}
+
+async function showStorageRecoveryNotices() {
+  try {
+    const notices = await invoke("take_storage_recovery_notices");
+    if (!Array.isArray(notices) || notices.length === 0) {
+      return;
+    }
+
+    const stores = storageRecoveryStoreLabel(notices);
+    const quarantinedPaths = Array.from(new Set(
+      notices.flatMap((notice) => Array.isArray(notice?.quarantinedPaths)
+        ? notice.quarantinedPaths.map((path) => String(path || "").trim()).filter(Boolean)
+        : []),
+    ));
+    const details = quarantinedPaths.length > 0
+      ? t("storage.recoveryPreserved", { paths: quarantinedPaths.join("\n") })
+      : "";
+    const resetToDefaults = notices.some((notice) => notice?.action === "reset_to_defaults");
+    storageRecoveryNoticeShown = true;
+    showAlert(
+      t(resetToDefaults ? "storage.recoveryResetTitle" : "storage.recoveryTitle"),
+      t(
+        resetToDefaults ? "storage.recoveryResetMessage" : "storage.recoveryRestoredMessage",
+        { stores, details },
+      ),
+    );
+  } catch (error) {
+    diagnosticError("storage_recovery_notice_failed", error);
+  }
+}
+
 async function startMainApp() {
   if (appStarted) {
     return;
@@ -2838,6 +2880,7 @@ async function startMainApp() {
   if (usedLegacyFallback && savedDevice && midiStatus) {
     midiStatus.textContent = t("midi.selectAvailableReconnect");
   }
+  await showStorageRecoveryNotices();
   queueMidiDeviceInventorySubmit("startup");
 }
 
@@ -2899,6 +2942,9 @@ async function init() {
   await startMainApp();
   diagnosticInfo("start_main_app_done");
   setTimeout(() => {
+    if (storageRecoveryNoticeShown) {
+      return;
+    }
     maybePromptMidiDeviceInventoryConsent().catch((error) => {
       diagnosticError("midi_device_inventory_prompt_failed", error);
     });
@@ -2915,6 +2961,7 @@ async function init() {
   if (appSettings.autoCheckUpdates !== false) {
     settingsFeature?.checkForUpdates?.({ silent: true }).then((info) => {
       if (!info || !info.available) return;
+      if (storageRecoveryNoticeShown) return;
       const latest = String(info.latestVersion || "").trim();
       const current = String(info.currentVersion || "").trim();
       if (!latest) return;

@@ -266,6 +266,8 @@ body.dragging-binding {
   font-size: 15px;
   line-height: 1.5;
   color: #2b2d42;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 
 .alert-panel-actions {

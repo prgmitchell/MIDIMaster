@@ -625,17 +625,19 @@ pub fn start_midi_device_routes(
             .lock()
             .map_err(|_| "Lock poisoned".to_string())?;
 
-        if let Some(profile) = profile_guard.as_mut() {
+        if let Some(profile) = profile_guard.as_ref() {
+            let mut updated = profile.clone();
             let migrations;
             (migrated_count, migrations) =
-                migrate_profile_route_inputs(profile, &requested_connected_routes);
+                migrate_profile_route_inputs(&mut updated, &requested_connected_routes);
 
             if migrated_count > 0 {
                 state
                     .profile_store
-                    .save_profile(profile.clone())
+                    .save_profile(updated.clone())
                     .map_err(|err| err.to_string())?;
-                profile_for_sync = Some((profile.clone(), migrations));
+                *profile_guard = Some(updated.clone());
+                profile_for_sync = Some((updated, migrations));
             }
         }
     }

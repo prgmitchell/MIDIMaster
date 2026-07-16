@@ -10,6 +10,7 @@ mod bindings;
 mod builtin_plugins;
 mod commands;
 mod device_target;
+mod durable_json_store;
 mod feedback;
 mod midi;
 mod midi_event_queue;
@@ -34,6 +35,7 @@ use app_settings::{AppSettings, AppSettingsStore, CURRENT_STARTUP_REGISTRATION_V
 pub(crate) use app_state::AppState;
 use audio::AudioBackend;
 use commands::*;
+use durable_json_store::new_recovery_notices;
 use midi::MidiManager;
 use midi_event_queue::MidiEventQueue;
 use model::OsdSettings;
@@ -108,14 +110,16 @@ fn migrate_startup_registration_if_needed(
 
     match migration_result {
         Ok(()) => {
-            app_settings.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
-            if let Err(err) = app_settings_store.save(app_settings) {
+            let mut updated = app_settings.clone();
+            updated.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
+            if let Err(err) = app_settings_store.save(&updated) {
                 run_logger::warn(
                     "app",
                     "startup_registration_migration_save_failed",
                     &err.to_string(),
                 );
             } else {
+                *app_settings = updated;
                 run_logger::info(
                     "app",
                     "startup_registration_migrated",
@@ -125,14 +129,17 @@ fn migrate_startup_registration_if_needed(
         }
         Err(err) if windows_autostart::startup_requires_installed_app(&err) => {
             let _ = windows_autostart::clear_windows_autostart_artifacts();
-            app_settings.start_with_windows = false;
-            app_settings.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
-            if let Err(save_err) = app_settings_store.save(app_settings) {
+            let mut updated = app_settings.clone();
+            updated.start_with_windows = false;
+            updated.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
+            if let Err(save_err) = app_settings_store.save(&updated) {
                 run_logger::warn(
                     "app",
                     "startup_registration_migration_save_failed",
                     &save_err.to_string(),
                 );
+            } else {
+                *app_settings = updated;
             }
             run_logger::warn("app", "startup_registration_disabled_uninstalled", &err);
         }
@@ -174,9 +181,14 @@ fn main() {
             );
 
             builtin_plugins::ensure_builtin_plugins(app.handle());
-            let profile_store = ProfileStore::new(config_dir.clone());
-            let app_settings_store = AppSettingsStore::new(config_dir);
-            let mut app_settings = app_settings_store.load().unwrap_or_default();
+            let recovery_notices = new_recovery_notices();
+            let profile_store =
+                ProfileStore::with_recovery_notices(config_dir.clone(), recovery_notices.clone());
+            let app_settings_store =
+                AppSettingsStore::with_recovery_notices(config_dir, recovery_notices.clone());
+            let mut app_settings = app_settings_store
+                .load()
+                .map_err(|err| format!("Unable to load app settings: {err}"))?;
             migrate_startup_registration_if_needed(&app_settings_store, &mut app_settings);
             run_logger::info(
                 "app",
@@ -227,6 +239,7 @@ fn main() {
                 osd_last_update: Mutex::new(None),
                 osd_settings: Mutex::new(OsdSettings::default()),
                 app_settings: Mutex::new(app_settings.clone()),
+                storage_recovery_notices: recovery_notices,
             });
 
             let osd_window =
@@ -411,6 +424,7 @@ fn main() {
             update_osd_settings,
             preview_osd,
             get_app_settings,
+            take_storage_recovery_notices,
             set_compact_bindings,
             get_app_version,
             update_app_settings,
@@ -627,6 +641,7 @@ mod tests {
             osd_last_update: Mutex::new(None),
             osd_settings: Mutex::new(OsdSettings::default()),
             app_settings: Mutex::new(app_settings::AppSettings::default()),
+            storage_recovery_notices: new_recovery_notices(),
         }
     }
 
@@ -1114,5 +1129,66 @@ mod tests {
         }];
 
         assert!(!state.current_binding_toggle_state(&targets, &key));
+    }
+
+    #[test]
+    fn failed_settings_persistence_does_not_publish_candidate_state() {
+        let state = test_app_state(TestAudioBackend::new(vec![]));
+        state
+            .app_settings_store
+            .save(&app_settings::AppSettings::default())
+            .expect("initial settings");
+        state
+            .app_settings_store
+            .set_failure_point(crate::durable_json_store::FailurePoint::BeforePrimaryReplace);
+
+        let result = crate::commands::settings::persist_app_settings_update(&state, |settings| {
+            settings.language = "fr".to_string();
+        });
+
+        assert!(result.is_err());
+        assert_eq!(state.app_settings.lock().expect("settings").language, "en");
+    }
+
+    #[test]
+    fn failed_binding_add_does_not_change_profile_or_feedback() {
+        let state = test_app_state(TestAudioBackend::new(vec![]));
+        let original = model::Profile {
+            name: "Default".to_string(),
+            bindings: Vec::new(),
+            osd_settings: Default::default(),
+            plugin_settings: Default::default(),
+            midi_device_preference: Default::default(),
+            midi_device_preference_set: false,
+        };
+        state
+            .profile_store
+            .save_profile(original.clone())
+            .expect("initial profile");
+        *state.active_profile.lock().expect("active profile") = Some(original);
+        state
+            .profile_store
+            .set_failure_point(crate::durable_json_store::FailurePoint::BeforePrimaryReplace);
+
+        let result = crate::commands::bindings::add_binding_to_active_profile(
+            &state,
+            focus_volume_binding(model::MidiMode::Absolute),
+        );
+
+        assert!(result.is_err());
+        assert!(state
+            .active_profile
+            .lock()
+            .expect("active profile")
+            .as_ref()
+            .expect("profile")
+            .bindings
+            .is_empty());
+        assert!(state.feedback_values.lock().expect("feedback").is_empty());
+        assert!(state
+            .binding_action_values
+            .lock()
+            .expect("binding values")
+            .is_empty());
     }
 }

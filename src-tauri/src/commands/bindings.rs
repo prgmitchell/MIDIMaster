@@ -704,7 +704,14 @@ pub fn spawn_macro_binding(app: AppHandle, binding_id: String, silent: bool) {
 }
 
 #[tauri::command]
-pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), String> {
+pub fn add_binding(state: State<AppState>, binding: Binding) -> Result<(), String> {
+    add_binding_to_active_profile(state.inner(), binding)
+}
+
+pub(crate) fn add_binding_to_active_profile(
+    state: &AppState,
+    mut binding: Binding,
+) -> Result<(), String> {
     run_logger::info(
         "bindings_cmd",
         "add_requested",
@@ -738,13 +745,12 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
         return Err("Binding cannot have more than 8 targets".to_string());
     }
 
-    let stale_feedback_bindings;
-    let profile_to_save = {
+    let (saved_profile, stale_feedback_bindings) = {
         let mut profile_guard = state
             .active_profile
             .lock()
             .map_err(|_| "Lock poisoned".to_string())?;
-        let profile = profile_guard.get_or_insert(model::Profile {
+        let mut profile = profile_guard.clone().unwrap_or(model::Profile {
             name: "Default".to_string(),
             bindings: Vec::new(),
             osd_settings: model::OsdSettings::default(),
@@ -763,28 +769,29 @@ pub fn add_binding(state: State<AppState>, mut binding: Binding) -> Result<(), S
         });
         profile.bindings.push(binding);
         let active_outputs = active_feedback_outputs(&profile.bindings);
-        stale_feedback_bindings =
+        let stale_feedback_bindings =
             stale_feedback_bindings_for_removed_outputs(&removed_bindings, &active_outputs);
-        state.sync_feedback_values(profile);
-        state.send_idle_button_light_feedback_values(profile);
-        run_logger::info(
-            "bindings_cmd",
-            "add_succeeded",
-            &format!(
-                "profile={} binding_count={}",
-                profile.name,
-                profile.bindings.len()
-            ),
-        );
-        profile.clone()
+        state
+            .profile_store
+            .save_profile(profile.clone())
+            .map_err(|err| err.to_string())?;
+        *profile_guard = Some(profile.clone());
+        (profile, stale_feedback_bindings)
     };
     for binding in stale_feedback_bindings {
-        clear_binding_feedback_output(&state, &binding);
+        clear_binding_feedback_output(state, &binding);
     }
-    state
-        .profile_store
-        .save_profile(profile_to_save)
-        .map_err(|err| err.to_string())?;
+    state.sync_feedback_values(&saved_profile);
+    state.send_idle_button_light_feedback_values(&saved_profile);
+    run_logger::info(
+        "bindings_cmd",
+        "add_succeeded",
+        &format!(
+            "profile={} binding_count={}",
+            saved_profile.name,
+            saved_profile.bindings.len()
+        ),
+    );
     Ok(())
 }
 
@@ -795,27 +802,30 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
         "remove_requested",
         &format!("binding_id={} device_id={}", binding.id, binding.device_id),
     );
-    // 1. Remove the binding from the active profile FIRST to stop the background loop
-    {
+    // Persist a candidate first, then publish it to the background loop.
+    let saved_profile = {
         let mut profile_guard = state
             .active_profile
             .lock()
             .map_err(|_| "Lock poisoned".to_string())?;
 
-        if let Some(profile) = profile_guard.as_mut() {
-            profile
+        if let Some(profile) = profile_guard.as_ref() {
+            let mut updated = profile.clone();
+            updated
                 .bindings
                 .retain(|existing| existing.id != binding.id);
-
-            // Save the updated profile to disk
             state
                 .profile_store
-                .save_profile(profile.clone())
+                .save_profile(updated.clone())
                 .map_err(|err| err.to_string())?;
+            *profile_guard = Some(updated.clone());
+            Some(updated)
+        } else {
+            None
         }
-    }
+    };
 
-    // 2. Clear internal state
+    // Clear internal state only after the profile save succeeds.
     let key = BindingKey::from_binding(&binding);
     let output_key = resolved_binding_feedback_control_key(&binding).to_binding_key();
     if let Ok(mut feedback) = state.feedback_values.lock() {
@@ -829,10 +839,10 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
         states.remove(&key);
     }
 
-    // 3. Wait for any pending background loop iterations to finish
+    // Wait for any pending background loop iterations to finish.
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // 4. Send 0.0 value to the binding's feedback destination
+    // Send 0.0 value to the binding's feedback destination.
     if let Ok(mut midi) = state.midi.lock() {
         if binding.is_button_binding() {
             let _ = midi.send_binding_light_feedback(&binding, 0.0);
@@ -840,6 +850,19 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
             let _ = midi.send_binding_feedback(&binding, 0.0);
         }
     }
+
+    run_logger::info(
+        "bindings_cmd",
+        "remove_succeeded",
+        &format!(
+            "binding_id={} binding_count={}",
+            binding.id,
+            saved_profile
+                .as_ref()
+                .map(|profile| profile.bindings.len())
+                .unwrap_or(0)
+        ),
+    );
 
     Ok(())
 }

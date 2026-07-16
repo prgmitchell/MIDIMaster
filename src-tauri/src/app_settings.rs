@@ -1,7 +1,11 @@
-use crate::model::{normalized_routes_with_legacy, FaderCurvePoint, MidiDeviceRoute};
-use anyhow::Context;
+#[cfg(test)]
+use crate::durable_json_store::new_recovery_notices;
+use crate::{
+    durable_json_store::{DurableJsonStore, StorageRecoveryNotices},
+    model::{normalized_routes_with_legacy, FaderCurvePoint, MidiDeviceRoute},
+};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf};
 
 fn default_active_theme_id() -> String {
     "system".to_string()
@@ -250,46 +254,40 @@ type Result<T> = anyhow::Result<T>;
 
 #[derive(Clone)]
 pub struct AppSettingsStore {
-    path: PathBuf,
+    storage: DurableJsonStore,
 }
 
 impl AppSettingsStore {
+    #[cfg(test)]
     pub fn new(config_dir: PathBuf) -> Self {
+        Self::with_recovery_notices(config_dir, new_recovery_notices())
+    }
+
+    pub(crate) fn with_recovery_notices(
+        config_dir: PathBuf,
+        recovery_notices: StorageRecoveryNotices,
+    ) -> Self {
         let path = config_dir.join("app_settings.json");
-        Self { path }
+        Self {
+            storage: DurableJsonStore::new(path, "app_settings", recovery_notices),
+        }
     }
 
     pub fn load(&self) -> Result<AppSettings> {
-        if !self.path.exists() {
-            return Ok(AppSettings::default());
-        }
-        let data = fs::read_to_string(&self.path)
-            .with_context(|| format!("Failed reading {}", self.path.display()))?;
-        if data.trim().is_empty() {
-            return Ok(AppSettings::default());
-        }
-        let settings = serde_json::from_str(&data)
-            .with_context(|| format!("Failed parsing {}", self.path.display()))?;
-        Ok(settings)
+        self.storage.load_or_default()
     }
 
     pub fn save(&self, settings: &AppSettings) -> Result<()> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed creating {}", parent.display()))?;
-        }
-        let data = serde_json::to_string_pretty(settings)?;
-        fs::write(&self.path, data)
-            .with_context(|| format!("Failed writing {}", self.path.display()))?;
-        Ok(())
+        self.storage.save(settings)
     }
 
     pub fn clear(&self) -> Result<()> {
-        if self.path.exists() {
-            fs::remove_file(&self.path)
-                .with_context(|| format!("Failed deleting {}", self.path.display()))?;
-        }
-        Ok(())
+        self.storage.clear()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_failure_point(&self, point: crate::durable_json_store::FailurePoint) {
+        self.storage.set_failure_point(point);
     }
 }
 
@@ -299,6 +297,7 @@ mod tests {
         AppAppearanceSettings, AppSettings, AppSettingsStore, AppearanceTheme, FaderCurvePreset,
         MidiDeviceInventoryConsent,
     };
+    use crate::durable_json_store::new_recovery_notices;
     use crate::model::FaderCurvePoint;
     use std::collections::BTreeMap;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -361,6 +360,44 @@ mod tests {
         store.save(&settings).expect("save settings");
         let loaded = store.load().expect("load settings");
         assert_eq!(loaded.language, "fr");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn corrupt_settings_primary_is_recovered_and_repaired_from_backup() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("midimaster-settings-recovery-{unique}"));
+        std::fs::create_dir_all(&dir).expect("create dir");
+        let recovered = AppSettings {
+            language: "fr".to_string(),
+            compact_bindings: true,
+            ..AppSettings::default()
+        };
+        std::fs::write(
+            dir.join("app_settings.json.bak"),
+            serde_json::to_vec_pretty(&recovered).expect("settings json"),
+        )
+        .expect("backup");
+        std::fs::write(dir.join("app_settings.json"), b"\0\0\0\0").expect("corrupt primary");
+        let notices = new_recovery_notices();
+        let store = AppSettingsStore::with_recovery_notices(dir.clone(), notices.clone());
+
+        let loaded = store.load().expect("recover settings");
+        assert_eq!(loaded.language, "fr");
+        assert!(loaded.compact_bindings);
+        let repaired: AppSettings = serde_json::from_slice(
+            &std::fs::read(dir.join("app_settings.json")).expect("repaired primary"),
+        )
+        .expect("repaired settings");
+        assert_eq!(repaired.language, "fr");
+        let notice = notices.lock().expect("notices")[0].clone();
+        assert_eq!(notice.store, "app_settings");
+        assert_eq!(notice.action, "restored_backup");
+        assert_eq!(notice.quarantined_paths.len(), 1);
 
         let _ = std::fs::remove_dir_all(dir);
     }

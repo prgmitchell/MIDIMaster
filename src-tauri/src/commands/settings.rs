@@ -5,6 +5,7 @@ use crate::{
         MidiDeviceInventoryConsent, CURRENT_STARTUP_REGISTRATION_VERSION,
     },
     collect_monitor_descriptors,
+    durable_json_store::StorageRecoveryNotice,
     model::{FaderCurvePoint, MidiDevicePreference, MidiDeviceRoute, OsdSettings},
     run_logger, AppState,
 };
@@ -166,30 +167,36 @@ pub fn update_osd_settings(
             next_scale
         ),
     );
+    let mut profile_guard = state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
     let mut settings = state
         .osd_settings
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
-    settings.enabled = enabled;
-    settings.monitor_index = monitor_index;
-    settings.monitor_name = monitor_name;
-    settings.monitor_id = monitor_id;
-    settings.anchor = anchor;
-    settings.style = next_style;
-    settings.opacity = next_opacity;
-    settings.scale = next_scale;
-    let updated = settings.clone();
-    drop(settings);
+    let mut updated = settings.clone();
+    updated.enabled = enabled;
+    updated.monitor_index = monitor_index;
+    updated.monitor_name = monitor_name;
+    updated.monitor_id = monitor_id;
+    updated.anchor = anchor;
+    updated.style = next_style;
+    updated.opacity = next_opacity;
+    updated.scale = next_scale;
 
-    if let Ok(mut profile_guard) = state.active_profile.lock() {
-        if let Some(profile) = profile_guard.as_mut() {
-            profile.osd_settings = updated.clone();
-            state
-                .profile_store
-                .save_profile(profile.clone())
-                .map_err(|err| err.to_string())?;
-        }
+    if let Some(profile) = profile_guard.as_ref() {
+        let mut updated_profile = profile.clone();
+        updated_profile.osd_settings = updated.clone();
+        state
+            .profile_store
+            .save_profile(updated_profile.clone())
+            .map_err(|err| err.to_string())?;
+        *profile_guard = Some(updated_profile);
     }
+    *settings = updated.clone();
+    drop(settings);
+    drop(profile_guard);
 
     crate::AppState::apply_osd_settings(&app, &updated);
     crate::osd_window::emit_osd_settings_update(&app, &updated);
@@ -226,23 +233,95 @@ pub fn get_app_settings(state: State<AppState>) -> Result<AppSettings, String> {
         .map_err(|_| "Lock poisoned".to_string())
 }
 
-#[tauri::command]
-pub fn set_compact_bindings(
-    state: State<AppState>,
-    compact_bindings: bool,
-) -> Result<bool, String> {
+pub(crate) fn persist_app_settings_update<F>(
+    state: &AppState,
+    update: F,
+) -> Result<AppSettings, String>
+where
+    F: FnOnce(&mut AppSettings),
+{
     let mut settings = state
         .app_settings
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
     let mut updated = settings.clone();
-    updated.compact_bindings = compact_bindings;
-
+    update(&mut updated);
     state
         .app_settings_store
         .save(&updated)
         .map_err(|err| err.to_string())?;
-    settings.compact_bindings = updated.compact_bindings;
+    *settings = updated.clone();
+    Ok(updated)
+}
+
+fn persist_midi_preference_update<F>(state: &AppState, update: F) -> Result<(), String>
+where
+    F: FnOnce(&mut AppSettings),
+{
+    let mut settings = state
+        .app_settings
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    let mut active_profile = state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    let mut updated_settings = settings.clone();
+    update(&mut updated_settings);
+    let updated_profile = active_profile.as_ref().map(|profile| {
+        let mut profile = profile.clone();
+        profile.midi_device_preference = MidiDevicePreference {
+            input_device_id: updated_settings.midi_input_device_id.clone(),
+            output_device_id: updated_settings.midi_output_device_id.clone(),
+            input_device_name: updated_settings.midi_input_device_name.clone(),
+            output_device_name: updated_settings.midi_output_device_name.clone(),
+            routes: updated_settings.midi_device_routes.clone(),
+        };
+        profile.midi_device_preference_set = true;
+        profile
+    });
+
+    state
+        .app_settings_store
+        .save(&updated_settings)
+        .map_err(|err| err.to_string())?;
+    if let Some(profile) = &updated_profile {
+        if let Err(error) = state.profile_store.save_profile(profile.clone()) {
+            if let Err(rollback_error) = state.app_settings_store.save(&settings) {
+                run_logger::error(
+                    "settings",
+                    "midi_preference_rollback_failed",
+                    &format!("save_error={} rollback_error={}", error, rollback_error),
+                );
+            }
+            return Err(error.to_string());
+        }
+    }
+
+    *settings = updated_settings;
+    *active_profile = updated_profile;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn take_storage_recovery_notices(
+    state: State<AppState>,
+) -> Result<Vec<StorageRecoveryNotice>, String> {
+    let mut notices = state
+        .storage_recovery_notices
+        .lock()
+        .map_err(|_| "Lock poisoned".to_string())?;
+    Ok(std::mem::take(&mut *notices))
+}
+
+#[tauri::command]
+pub fn set_compact_bindings(
+    state: State<AppState>,
+    compact_bindings: bool,
+) -> Result<bool, String> {
+    let updated = persist_app_settings_update(state.inner(), |settings| {
+        settings.compact_bindings = compact_bindings;
+    })?;
     Ok(updated.compact_bindings)
 }
 
@@ -282,25 +361,29 @@ pub fn update_app_settings(
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
     let start_with_windows_changed = settings.start_with_windows != start_with_windows;
+    let previous_start_with_windows = settings.start_with_windows;
     if start_with_windows_changed {
         crate::windows_autostart::set_windows_autostart(start_with_windows)?;
     }
-    settings.start_with_windows = start_with_windows;
+    let mut updated = settings.clone();
+    updated.start_with_windows = start_with_windows;
     if start_with_windows_changed {
-        settings.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
+        updated.startup_registration_version = CURRENT_STARTUP_REGISTRATION_VERSION;
     }
-    settings.start_in_tray = start_in_tray;
-    settings.minimize_to_tray = minimize_to_tray;
-    settings.exit_to_tray = exit_to_tray;
-    settings.auto_check_updates = auto_check_updates;
-    settings.language = normalized_language;
-    let updated = settings.clone();
-    drop(settings);
+    updated.start_in_tray = start_in_tray;
+    updated.minimize_to_tray = minimize_to_tray;
+    updated.exit_to_tray = exit_to_tray;
+    updated.auto_check_updates = auto_check_updates;
+    updated.language = normalized_language;
 
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
+    if let Err(error) = state.app_settings_store.save(&updated) {
+        if start_with_windows_changed {
+            let _ = crate::windows_autostart::set_windows_autostart(previous_start_with_windows);
+        }
+        return Err(error.to_string());
+    }
+    *settings = updated.clone();
+    drop(settings);
     crate::AppState::apply_app_settings(&app, &updated);
     Ok(updated)
 }
@@ -318,23 +401,14 @@ pub fn update_midi_device_inventory_consent(
         "update_midi_device_inventory_consent",
         &format!("consent={:?} notice_version={}", consent, notice_version),
     );
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    let consent_changed = settings.midi_device_inventory_consent != consent;
-    settings.midi_device_inventory_consent = consent;
-    settings.midi_device_inventory_notice_version = notice_version;
-    if consent_changed {
-        settings.midi_device_inventory_last_sent_hash = None;
-    }
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
+    let updated = persist_app_settings_update(state.inner(), |settings| {
+        let consent_changed = settings.midi_device_inventory_consent != consent;
+        settings.midi_device_inventory_consent = consent;
+        settings.midi_device_inventory_notice_version = notice_version;
+        if consent_changed {
+            settings.midi_device_inventory_last_sent_hash = None;
+        }
+    })?;
     Ok(updated)
 }
 
@@ -354,19 +428,10 @@ pub fn update_appearance_settings(
         ),
     );
 
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    settings.ui_theme = legacy_theme_for_appearance(&normalized);
-    settings.appearance = normalized.clone();
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
+    let updated = persist_app_settings_update(state.inner(), |settings| {
+        settings.ui_theme = legacy_theme_for_appearance(&normalized);
+        settings.appearance = normalized.clone();
+    })?;
     Ok(updated.appearance)
 }
 
@@ -382,18 +447,9 @@ pub fn update_fader_curve_presets(
         &format!("preset_count={}", normalized.len()),
     );
 
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    settings.fader_curve_presets = normalized.clone();
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
+    persist_app_settings_update(state.inner(), |settings| {
+        settings.fader_curve_presets = normalized.clone();
+    })?;
     Ok(normalized)
 }
 
@@ -442,7 +498,8 @@ pub fn import_appearance_theme(
         .app_settings
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
-    let mut appearance = normalize_appearance_settings(settings.appearance.clone())?;
+    let mut updated = settings.clone();
+    let mut appearance = normalize_appearance_settings(updated.appearance.clone())?;
     imported.name = unique_theme_name(&appearance.custom_themes, &imported.name);
     imported.id = unique_theme_id(&appearance.custom_themes, &imported.name);
 
@@ -462,15 +519,13 @@ pub fn import_appearance_theme(
     appearance.custom_themes.push(imported);
     let appearance = normalize_appearance_settings(appearance)?;
 
-    settings.ui_theme = legacy_theme_for_appearance(&appearance);
-    settings.appearance = appearance.clone();
-    let updated = settings.clone();
-    drop(settings);
-
+    updated.ui_theme = legacy_theme_for_appearance(&appearance);
+    updated.appearance = appearance.clone();
     state
         .app_settings_store
         .save(&updated)
         .map_err(|err| err.to_string())?;
+    *settings = updated.clone();
     Ok(Some(updated.appearance))
 }
 
@@ -809,19 +864,10 @@ pub fn set_theme_preference(state: State<AppState>, theme: String) -> Result<(),
         _ => "light".to_string(),
     };
 
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    settings.ui_theme = normalized.clone();
-    settings.appearance.active_theme_id = normalized;
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
+    persist_app_settings_update(state.inner(), |settings| {
+        settings.ui_theme = normalized.clone();
+        settings.appearance.active_theme_id = normalized;
+    })?;
     Ok(())
 }
 
@@ -844,38 +890,13 @@ pub fn set_midi_device_preferences(
             output_device_name.as_deref().unwrap_or("")
         ),
     );
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    settings.midi_input_device_id = Some(input_device_id);
-    settings.midi_output_device_id = Some(output_device_id);
-    settings.midi_input_device_name = input_device_name;
-    settings.midi_output_device_name = output_device_name;
-    settings.midi_device_routes = settings.normalized_midi_routes();
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
-    if let Ok(mut profile_guard) = state.active_profile.lock() {
-        if let Some(profile) = profile_guard.as_mut() {
-            profile.midi_device_preference = MidiDevicePreference {
-                input_device_id: updated.midi_input_device_id.clone(),
-                output_device_id: updated.midi_output_device_id.clone(),
-                input_device_name: updated.midi_input_device_name.clone(),
-                output_device_name: updated.midi_output_device_name.clone(),
-                routes: updated.midi_device_routes.clone(),
-            };
-            profile.midi_device_preference_set = true;
-            state
-                .profile_store
-                .save_profile(profile.clone())
-                .map_err(|err| err.to_string())?;
-        }
-    }
+    persist_midi_preference_update(state.inner(), |settings| {
+        settings.midi_input_device_id = Some(input_device_id);
+        settings.midi_output_device_id = Some(output_device_id);
+        settings.midi_input_device_name = input_device_name;
+        settings.midi_output_device_name = output_device_name;
+        settings.midi_device_routes = settings.normalized_midi_routes();
+    })?;
     Ok(())
 }
 
@@ -890,77 +911,33 @@ pub fn set_midi_device_routes(
         "set_midi_device_routes",
         &format!("route_count={}", normalized.len()),
     );
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    settings.midi_device_routes = normalized.clone();
-    if let Some(first) = normalized.first() {
-        settings.midi_input_device_id = first.input_device_id.clone();
-        settings.midi_output_device_id = first.output_device_id.clone();
-        settings.midi_input_device_name = first.input_device_name.clone();
-        settings.midi_output_device_name = first.output_device_name.clone();
-    } else {
-        settings.midi_input_device_id = None;
-        settings.midi_output_device_id = None;
-        settings.midi_input_device_name = None;
-        settings.midi_output_device_name = None;
-    }
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
-    if let Ok(mut profile_guard) = state.active_profile.lock() {
-        if let Some(profile) = profile_guard.as_mut() {
-            profile.midi_device_preference = MidiDevicePreference {
-                input_device_id: updated.midi_input_device_id.clone(),
-                output_device_id: updated.midi_output_device_id.clone(),
-                input_device_name: updated.midi_input_device_name.clone(),
-                output_device_name: updated.midi_output_device_name.clone(),
-                routes: normalized,
-            };
-            profile.midi_device_preference_set = true;
-            state
-                .profile_store
-                .save_profile(profile.clone())
-                .map_err(|err| err.to_string())?;
+    persist_midi_preference_update(state.inner(), |settings| {
+        settings.midi_device_routes = normalized.clone();
+        if let Some(first) = normalized.first() {
+            settings.midi_input_device_id = first.input_device_id.clone();
+            settings.midi_output_device_id = first.output_device_id.clone();
+            settings.midi_input_device_name = first.input_device_name.clone();
+            settings.midi_output_device_name = first.output_device_name.clone();
+        } else {
+            settings.midi_input_device_id = None;
+            settings.midi_output_device_id = None;
+            settings.midi_input_device_name = None;
+            settings.midi_output_device_name = None;
         }
-    }
+    })?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn clear_midi_device_preferences(state: State<AppState>) -> Result<(), String> {
     run_logger::info("settings", "clear_midi_device_preferences", "");
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
-    settings.midi_input_device_id = None;
-    settings.midi_output_device_id = None;
-    settings.midi_input_device_name = None;
-    settings.midi_output_device_name = None;
-    settings.midi_device_routes = Vec::new();
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
-    if let Ok(mut profile_guard) = state.active_profile.lock() {
-        if let Some(profile) = profile_guard.as_mut() {
-            profile.midi_device_preference = MidiDevicePreference::default();
-            profile.midi_device_preference_set = true;
-            state
-                .profile_store
-                .save_profile(profile.clone())
-                .map_err(|err| err.to_string())?;
-        }
-    }
+    persist_midi_preference_update(state.inner(), |settings| {
+        settings.midi_input_device_id = None;
+        settings.midi_output_device_id = None;
+        settings.midi_input_device_name = None;
+        settings.midi_output_device_name = None;
+        settings.midi_device_routes = Vec::new();
+    })?;
     Ok(())
 }
 
@@ -969,23 +946,14 @@ pub fn set_active_profile_preference(
     state: State<AppState>,
     profile_name: String,
 ) -> Result<(), String> {
-    let mut settings = state
-        .app_settings
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())?;
     let trimmed = profile_name.trim().to_string();
-    settings.active_profile_name = if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed)
-    };
-    let updated = settings.clone();
-    drop(settings);
-
-    state
-        .app_settings_store
-        .save(&updated)
-        .map_err(|err| err.to_string())?;
+    persist_app_settings_update(state.inner(), |settings| {
+        settings.active_profile_name = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        };
+    })?;
     Ok(())
 }
 

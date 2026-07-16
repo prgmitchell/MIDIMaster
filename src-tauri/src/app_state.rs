@@ -3,6 +3,7 @@ use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo}
 use crate::audio::AudioBackend;
 use crate::bindings::{BindingKey, BindingState};
 use crate::device_target::{parse_device_target, DeviceTargetKind};
+use crate::durable_json_store::StorageRecoveryNotices;
 use crate::feedback;
 use crate::midi::MidiManager;
 use crate::midi_event_queue::MidiEventQueue;
@@ -98,6 +99,7 @@ pub(crate) struct AppState {
     pub(crate) osd_last_update: Mutex<Option<Instant>>,
     pub(crate) osd_settings: Mutex<OsdSettings>,
     pub(crate) app_settings: Mutex<AppSettings>,
+    pub(crate) storage_recovery_notices: StorageRecoveryNotices,
 }
 
 pub(crate) struct FeedbackSyncSnapshot {

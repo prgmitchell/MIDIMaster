@@ -122,8 +122,9 @@ pub(super) fn handle_aux_or_unmatched(
                             .active_profile
                             .lock()
                             .map_err(|_| "Lock poisoned".to_string())?;
-                        if let Some(active_profile) = guard.as_mut() {
-                            if let Some(stored) = active_profile
+                        if let Some(active_profile) = guard.as_ref() {
+                            let mut updated_profile = active_profile.clone();
+                            if let Some(stored) = updated_profile
                                 .bindings
                                 .iter_mut()
                                 .find(|b| b.id == owner.id)
@@ -142,10 +143,11 @@ pub(super) fn handle_aux_or_unmatched(
                             if updated_targets.is_some() {
                                 state
                                     .profile_store
-                                    .save_profile(active_profile.clone())
+                                    .save_profile(updated_profile.clone())
                                     .map_err(|err| err.to_string())?;
-                                state.sync_feedback_values(active_profile);
-                                state.send_idle_button_light_feedback_values(active_profile);
+                                *guard = Some(updated_profile.clone());
+                                state.sync_feedback_values(&updated_profile);
+                                state.send_idle_button_light_feedback_values(&updated_profile);
                             }
                         }
                         if let Some(updated_targets) = updated_targets {
