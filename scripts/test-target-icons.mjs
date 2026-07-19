@@ -49,6 +49,8 @@ globalThis.document = {
   createElement: (tagName) => new FakeElement(tagName),
   createElementNS: (_namespace, tagName) => new FakeElement(tagName),
 };
+globalThis.iconDataForApplicationName = () => null;
+globalThis.iconDataForSession = () => null;
 
 const icons = {
   master: "master-icon",
@@ -70,6 +72,53 @@ const feature = createTargetsFeature({
 const master = feature.createTargetIcon({ label: "Master", icon_data: icons.master });
 assert.equal(master.tagName, "svg");
 assert.equal(master.classList.contains("target-icon--master"), true);
+
+const brightness = feature.createTargetIcon({
+  label: "Monitor Brightness",
+  icon_kind: "monitor-brightness",
+  kind: "monitor-brightness",
+});
+assert.equal(brightness.tagName, "svg");
+assert.equal(brightness.classList.contains("target-icon--monitor-brightness"), true);
+
+const faderOptions = feature.buildTargetOptions("MonitorBrightness", false);
+assert.equal(faderOptions.options.filter((option) => option.kind === "monitor-brightness-root").length, 1);
+assert.equal(faderOptions.options.some((option) => option.kind === "monitor-brightness"), false);
+assert.equal(faderOptions.selectedKind, "monitor-brightness");
+const buttonOptions = feature.buildTargetOptions("Master", true);
+assert.equal(buttonOptions.options.some((option) => option.kind === "monitor-brightness-root"), false);
+
+const monitorFeature = createTargetsFeature({
+  invoke: async (command) => command === "list_monitors" ? [
+    { stable_id: "DISPLAY\\ACR073A\\1", name: "XZ322QU", is_primary: true },
+    { stable_id: "DISPLAY\\SAM7058\\2", name: "LC32G7xT", is_primary: false },
+  ] : null,
+});
+await new Promise((resolve) => setTimeout(resolve, 0));
+const individualOptions = monitorFeature.buildTargetOptions({
+  MonitorBrightness: {
+    monitor_id: "DISPLAY\\SAM7058\\2",
+    display_name: "LC32G7xT",
+  },
+}, false);
+assert.equal(individualOptions.options.filter((option) => option.kind === "monitor-brightness-root").length, 1);
+assert.equal(individualOptions.selectedValue, "monitor-brightness:DISPLAY\\SAM7058\\2");
+const monitorOptions = monitorFeature.buildMonitorBrightnessOptions();
+assert.equal(monitorOptions.length, 3);
+assert.deepEqual(
+  monitorOptions.find((option) => option.value === individualOptions.selectedValue).target,
+  {
+    MonitorBrightness: {
+      monitor_id: "DISPLAY\\SAM7058\\2",
+      display_name: "LC32G7xT",
+    },
+  },
+);
+assert.deepEqual(
+  monitorOptions.find((option) => option.value === "monitor-brightness:DISPLAY\\ACR073A\\1").title_tags,
+  ["settings.primaryBadge"],
+  "the primary monitor should render MAIN directly instead of collapsing multiple tags to +1",
+);
 
 const hotkey = feature.createTargetIcon({ label: "Hotkey", icon_data: hotkeyIconData });
 assert.equal(hotkey.tagName, "svg");

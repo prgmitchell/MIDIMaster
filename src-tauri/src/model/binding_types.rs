@@ -468,6 +468,12 @@ pub enum AssignMode {
 pub enum BindingTarget {
     Master,
     Focus,
+    MonitorBrightness {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        monitor_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        display_name: Option<String>,
+    },
     Session {
         session_id: String,
     },
@@ -533,6 +539,10 @@ impl PartialEq for BindingTarget {
             (BindingTarget::Device { device_id: a }, BindingTarget::Device { device_id: b }) => {
                 a == b
             }
+            (
+                BindingTarget::MonitorBrightness { monitor_id: a, .. },
+                BindingTarget::MonitorBrightness { monitor_id: b, .. },
+            ) => a == b,
             (BindingTarget::Profile { name: a }, BindingTarget::Profile { name: b }) => a == b,
             (
                 BindingTarget::Integration {
@@ -572,6 +582,10 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
         return match s {
             "Master" => Ok(BindingTarget::Master),
             "Focus" => Ok(BindingTarget::Focus),
+            "MonitorBrightness" => Ok(BindingTarget::MonitorBrightness {
+                monitor_id: None,
+                display_name: None,
+            }),
             "MediaControl" => Ok(BindingTarget::MediaControl),
             "CaptureControl" => Ok(BindingTarget::CaptureControl),
             "Hotkey" => Ok(BindingTarget::Hotkey),
@@ -620,6 +634,24 @@ fn binding_target_from_value(v: serde_json::Value) -> Result<BindingTarget, Stri
         // Core targets
         "Master" => Ok(BindingTarget::Master),
         "Focus" => Ok(BindingTarget::Focus),
+        "MonitorBrightness" => {
+            let monitor_id = val
+                .get("monitor_id")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let display_name = val
+                .get("display_name")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            Ok(BindingTarget::MonitorBrightness {
+                monitor_id,
+                display_name,
+            })
+        }
         "Session" => {
             let session_id = val
                 .get("session_id")
@@ -1100,6 +1132,7 @@ impl Binding {
             BindingTarget::Unset => false,
             BindingTarget::Master
             | BindingTarget::Focus
+            | BindingTarget::MonitorBrightness { .. }
             | BindingTarget::MediaControl
             | BindingTarget::CaptureControl
             | BindingTarget::Macro

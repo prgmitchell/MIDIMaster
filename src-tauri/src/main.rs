@@ -15,6 +15,7 @@ mod feedback;
 mod midi;
 mod midi_event_queue;
 mod model;
+mod monitor_brightness;
 mod monitors;
 mod osd_window;
 mod plugin_api;

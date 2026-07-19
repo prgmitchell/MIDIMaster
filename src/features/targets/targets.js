@@ -34,6 +34,8 @@ export function createTargetsFeature({
   let activeTargetPanelBack = null;
   let activeTargetPanelIntegrationId = null;
   let activeTargetPanelRefresh = null;
+  let brightnessMonitors = [];
+  let brightnessMonitorRequest = null;
   const HOTKEY_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2' y='4' width='16' height='12' rx='3' fill='%231a2446' stroke='%2398a6cc' stroke-width='1.2'/><rect x='4' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='7' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='10' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='13' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='5.2' y='10.6' width='9.6' height='2.2' rx='0.8' fill='%23c7d2f3'/></svg>";
   const OPEN_APPLICATION_TARGET_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='3.6' width='15.6' height='12.8' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6.2 7.3h4.9M6.2 10h7.6M6.2 12.7h5.7' stroke='%23c7d2f3' stroke-width='1.3' stroke-linecap='round'/><path d='M12.3 5.2l2.9 2.9-2.9 2.9' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const AUTOHOTKEY_SCRIPT_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 2.8h7.1L16 6.7v10.5H5V2.8z' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M12.1 2.8v4h3.9' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M7.3 12.6l1.9-4.2 1.9 4.2M8 11.1h2.4M12.6 9.1v3.5' stroke='%238fd5ff' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/></svg>";
@@ -49,6 +51,7 @@ export function createTargetsFeature({
   const SYSTEM_TARGET_ICON_MARKUP = Object.freeze({
     master: "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M5 4h2v10H5zM11 4h2v10h-2z'/>",
     focus: "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><circle class='target-icon-glyph target-icon-glyph--stroke' cx='9' cy='9' r='5.5' stroke-width='2'/><circle class='target-icon-glyph target-icon-glyph--fill' cx='9' cy='9' r='1.5'/>",
+    "monitor-brightness": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><circle class='target-icon-glyph target-icon-glyph--stroke' cx='9' cy='9' r='3' stroke-width='1.5'/><path class='target-icon-glyph target-icon-glyph--stroke' d='M9 2.5v2M9 13.5v2M2.5 9h2M13.5 9h2M4.4 4.4l1.4 1.4M12.2 12.2l1.4 1.4M13.6 4.4l-1.4 1.4M5.8 12.2l-1.4 1.4' stroke-width='1.3' stroke-linecap='round'/>",
     "media-play-pause": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M4.5 4.2l4.4 4.8-4.4 4.8z'/><rect class='target-icon-glyph target-icon-glyph--fill' x='10.5' y='4.3' width='1.8' height='9.4' rx='.4'/><rect class='target-icon-glyph target-icon-glyph--fill' x='13.1' y='4.3' width='1.8' height='9.4' rx='.4'/>",
     "media-next": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M4 4l5 5-5 5zM9 4l5 5-5 5z'/><rect class='target-icon-glyph target-icon-glyph--fill' x='14' y='4' width='1.5' height='10'/>",
     "media-previous": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M14 4L9 9l5 5zM9 4L4 9l5 5z'/><rect class='target-icon-glyph target-icon-glyph--fill' x='2.5' y='4' width='1.5' height='10'/>",
@@ -57,6 +60,56 @@ export function createTargetsFeature({
     "playback-device": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><path class='target-icon-glyph target-icon-glyph--fill' d='M3.3 7.4v3.2h2.4l3.1 2.7V4.7L5.7 7.4z'/><path class='target-icon-glyph target-icon-glyph--stroke' d='M11.4 6.5c1.4 1.4 1.4 3.6 0 5M13.5 4.9c2.3 2.3 2.3 5.9 0 8.2' stroke-width='1.35' stroke-linecap='round'/>",
     "recording-device": "<rect class='target-icon-backdrop' width='18' height='18' rx='4'/><rect class='target-icon-glyph target-icon-glyph--stroke' x='6.2' y='3.2' width='5.6' height='8.1' rx='2.8' stroke-width='1.35'/><path class='target-icon-glyph target-icon-glyph--stroke' d='M4.7 8.8c0 3 1.7 4.7 4.3 4.7s4.3-1.7 4.3-4.7M9 13.5v2M6.7 15.5h4.6' stroke-width='1.35' stroke-linecap='round'/>",
   });
+
+  async function refreshBrightnessMonitors() {
+    if (!callInvoke) return brightnessMonitors;
+    if (brightnessMonitorRequest) return brightnessMonitorRequest;
+    brightnessMonitorRequest = (async () => {
+      try {
+        const monitors = await callInvoke("list_monitors");
+        brightnessMonitors = (Array.isArray(monitors) ? monitors : [])
+          .map((monitor) => ({
+            id: String(monitor?.stable_id || monitor?.stableId || "").trim(),
+            name: String(monitor?.name || "").trim(),
+            isPrimary: Boolean(monitor?.is_primary ?? monitor?.isPrimary),
+          }))
+          .filter((monitor) => monitor.id);
+      } catch {
+        // Keep the last successful list so saved targets remain usable offline.
+      } finally {
+        brightnessMonitorRequest = null;
+      }
+      return brightnessMonitors;
+    })();
+    return brightnessMonitorRequest;
+  }
+
+  function buildMonitorBrightnessOptions() {
+    return [
+      {
+        value: "monitor-brightness",
+        label: t("targets.allMonitors"),
+        icon_kind: "monitor-brightness",
+        kind: "monitor-brightness",
+        target: { MonitorBrightness: {} },
+      },
+      ...brightnessMonitors.map((monitor) => ({
+        value: `monitor-brightness:${monitor.id}`,
+        label: monitor.name || t("settings.monitor"),
+        icon_kind: "monitor-brightness",
+        kind: "monitor-brightness",
+        title_tags: monitor.isPrimary ? [t("settings.primaryBadge")] : [],
+        target: {
+          MonitorBrightness: {
+            monitor_id: monitor.id,
+            display_name: monitor.name || null,
+          },
+        },
+      })),
+    ];
+  }
+
+  void refreshBrightnessMonitors();
 
   function normalizeOpenApplication(raw) {
     if (!raw || typeof raw !== "object") return null;
@@ -292,7 +345,7 @@ export function createTargetsFeature({
     if (!option || option.kind === "divider") return null;
     if (option.category) return option.category;
     if (option.integrationId || option.integration_id) return "integrations";
-    if (option.kind === "master" || option.kind === "focus") return "builtIn";
+    if (option.kind === "master" || option.kind === "focus" || option.kind === "monitor-brightness" || option.kind === "monitor-brightness-root") return "builtIn";
     if (option.kind === "media-control" || option.kind === "capture-control" || option.kind === "macro-target" || option.kind === "soundboard-target" || option.kind === "hotkey-target" || option.kind === "open-application-target" || option.kind === "autohotkey-script-target" || option.kind === "profile-switch-root" || option.kind === "profile-target" || option.kind === "action-root" || option.kind === "capture-action") return "utilities";
     if (option.kind === "integration-root" || option.kind === "integration-target" || option.kind === "integration-nav") return "integrations";
     if (option.kind === "session") return "applications";
@@ -311,6 +364,7 @@ export function createTargetsFeature({
     if (option?.description) return String(option.description);
     if (option?.kind === "master") return t("targets.description.master");
     if (option?.kind === "focus") return t("targets.description.focus");
+    if (option?.kind === "monitor-brightness" || option?.kind === "monitor-brightness-root") return t("targets.description.monitorBrightness");
     if (option?.kind === "media-control") return t("targets.description.mediaControl");
     if (option?.kind === "capture-control") return t("targets.description.captureControls");
     if (option?.kind === "macro-target") return t("targets.description.macro");
@@ -546,13 +600,17 @@ export function createTargetsFeature({
 
       item.appendChild(copy);
 
-      if (option.kind === "integration-root" || option.kind === "integration-nav" || option.kind === "action-root") {
+      if (option.kind === "integration-root" || option.kind === "integration-nav" || option.kind === "action-root" || option.kind === "monitor-brightness-root") {
         const navMeta = document.createElement("span");
         navMeta.className = "target-card-nav-meta";
 
         const badge = document.createElement("span");
         badge.className = "target-card-kind-badge";
-        badge.textContent = option.kind === "action-root" ? t("targets.category.actions") : t("targets.integration");
+        badge.textContent = option.kind === "action-root"
+          ? t("targets.category.actions")
+          : option.kind === "monitor-brightness-root"
+            ? t("targets.category.devices")
+            : t("targets.integration");
         navMeta.appendChild(badge);
 
         const arrow = document.createElement("span");
@@ -720,6 +778,10 @@ export function createTargetsFeature({
       : null;
     const selectedDeviceId = currentTarget?.Device?.device_id || currentTarget?.device?.device_id;
     const selectedProfileName = currentTarget?.Profile?.name || currentTarget?.profile?.name;
+    const selectedBrightness = currentTarget?.MonitorBrightness || currentTarget?.monitorBrightness;
+    const selectedBrightnessId = (selectedBrightness && typeof selectedBrightness === "object")
+      ? String(selectedBrightness.monitor_id ?? selectedBrightness.monitorId ?? "").trim()
+      : "";
 
     const isUnset = currentTarget == null || currentTarget === "" || currentTarget === "Unset";
     let selectedKind = "placeholder";
@@ -730,6 +792,7 @@ export function createTargetsFeature({
       else if (currentTarget?.Profile || currentTarget?.profile) selectedKind = "profile-target";
       else if (currentTarget === "Master" || currentTarget?.Master != null) selectedKind = "master";
       else if (currentTarget === "Focus" || currentTarget?.Focus != null) selectedKind = "focus";
+      else if (currentTarget === "MonitorBrightness" || currentTarget?.MonitorBrightness != null || currentTarget?.monitorBrightness != null) selectedKind = "monitor-brightness";
       else if (currentTarget === "MediaControl") selectedKind = "media-control";
       else if (currentTarget === "CaptureControl") selectedKind = "capture-control";
       else if (currentTarget === "Macro") selectedKind = "macro-target";
@@ -744,6 +807,7 @@ export function createTargetsFeature({
     else if (selectedKind === "session") selectedValue = selectedAppKey || selectedSessionKey || "";
     else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
     else if (selectedKind === "profile-target") selectedValue = selectedProfileName || "";
+    else if (selectedKind === "monitor-brightness") selectedValue = selectedBrightnessId ? `monitor-brightness:${selectedBrightnessId}` : "monitor-brightness";
     else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "macro-target" || selectedKind === "soundboard-target" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
     else if (selectedKind === "placeholder") selectedValue = "placeholder";
 
@@ -761,6 +825,15 @@ export function createTargetsFeature({
         kind: "focus",
       },
     ];
+
+    if (!isButton) {
+      options.push({
+        value: "monitor-brightness-root",
+        label: t("targets.monitorBrightness"),
+        icon_kind: "monitor-brightness",
+        kind: "monitor-brightness-root",
+      });
+    }
 
     if (isButton) {
       options.push({
@@ -1027,6 +1100,12 @@ export function createTargetsFeature({
       if (!target) return "";
       if (target === "Master" || target?.Master != null) return "master";
       if (target === "Focus" || target?.Focus != null) return "focus";
+      if (target === "MonitorBrightness") return "monitor-brightness";
+      if (target?.MonitorBrightness != null || target?.monitorBrightness != null) {
+        const brightness = target.MonitorBrightness || target.monitorBrightness;
+        const monitorId = brightness?.monitor_id ?? brightness?.monitorId;
+        return monitorId ? `monitor-brightness:${monitorId}` : "monitor-brightness";
+      }
       if (target === "MediaControl") return "media-control";
       if (target === "CaptureControl") return "capture-control";
       if (target === "Macro") return "macro-target";
@@ -1243,6 +1322,18 @@ export function createTargetsFeature({
       if (target === "Focus" || target?.Focus != null) {
         return { value: "focus", label: t("targets.focus"), icon_data: focusIconData, kind: "focus" };
       }
+      if (target === "MonitorBrightness" || target?.MonitorBrightness != null || target?.monitorBrightness != null) {
+        const brightness = target?.MonitorBrightness || target?.monitorBrightness;
+        const monitorId = brightness?.monitor_id ?? brightness?.monitorId;
+        const displayName = brightness?.display_name ?? brightness?.displayName;
+        return {
+          value: monitorId ? `monitor-brightness:${monitorId}` : "monitor-brightness",
+          label: displayName || t("targets.monitorBrightness"),
+          icon_kind: "monitor-brightness",
+          kind: "monitor-brightness",
+          target: typeof brightness === "object" ? target : null,
+        };
+      }
       if (target === "MediaControl") {
         return { value: "media-control", label: t("targets.mediaControls"), icon_data: mediaPlayPauseIconData, kind: "media-control" };
       }
@@ -1421,6 +1512,9 @@ export function createTargetsFeature({
       }
       if (option.kind === "focus") {
         return "Focus";
+      }
+      if (option.kind === "monitor-brightness") {
+        return "MonitorBrightness";
       }
       if (option.kind === "media-control") {
         return "MediaControl";
@@ -1917,9 +2011,10 @@ export function createTargetsFeature({
       selectOption(targetOption, actionOption, emit);
     };
 
-    const openTargetPicker = (event = null) => {
+    const openTargetPicker = async (event = null) => {
       event?.stopPropagation?.();
       d.targetPanel?.classList.toggle("target-panel--over-config", overConfigModal);
+      if (!isBindingButton) await refreshBrightnessMonitors();
       const { options: rawPickerOptions } = buildTargetOptions(selectedTargets[0] || currentTarget, isBindingButton);
       const options = filterPickerOptions(rawPickerOptions);
 
@@ -2235,6 +2330,25 @@ export function createTargetsFeature({
         );
       };
 
+      const showMonitorBrightnessSubmenu = () => {
+        const brightness = selectedTargets[0]?.MonitorBrightness
+          || selectedTargets[0]?.monitorBrightness;
+        const monitorId = brightness && typeof brightness === "object"
+          ? String(brightness.monitor_id ?? brightness.monitorId ?? "").trim()
+          : "";
+        openTargetPanel(
+          buildMonitorBrightnessOptions(),
+          monitorId ? `monitor-brightness:${monitorId}` : "monitor-brightness",
+          "monitor-brightness",
+          (option) => {
+            selectOption(option);
+            return true;
+          },
+          t("targets.monitorBrightness"),
+          { onBack: openRootTargetPanel },
+        );
+      };
+
       const openRootTargetPanel = () => {
         openTargetPanel(
           options,
@@ -2267,6 +2381,11 @@ export function createTargetsFeature({
 
             if (targetOption.kind === "profile-switch-root") {
               showProfileSubmenu().catch(() => { });
+              return false;
+            }
+
+            if (targetOption.kind === "monitor-brightness-root") {
+              showMonitorBrightnessSubmenu();
               return false;
             }
 
@@ -2593,6 +2712,7 @@ export function createTargetsFeature({
     openTargetPanel,
     closeTargetPanel,
     buildTargetOptions,
+    buildMonitorBrightnessOptions,
     buildTargetSelect,
   };
 }

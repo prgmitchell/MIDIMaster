@@ -143,6 +143,7 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
                 }
             }
             model::BindingTarget::Unset
+            | model::BindingTarget::MonitorBrightness { .. }
             | model::BindingTarget::MediaControl
             | model::BindingTarget::CaptureControl
             | model::BindingTarget::Hotkey
@@ -637,6 +638,7 @@ impl AppState {
                         }
                     }
                     model::BindingTarget::Unset => None,
+                    model::BindingTarget::MonitorBrightness { .. } => None,
                     model::BindingTarget::MediaControl => None,
                     model::BindingTarget::CaptureControl => None,
                     model::BindingTarget::Hotkey => None,
@@ -705,6 +707,7 @@ impl AppState {
                         }
                     }
                     model::BindingTarget::Unset => None,
+                    model::BindingTarget::MonitorBrightness { .. } => None,
                     model::BindingTarget::MediaControl => None,
                     model::BindingTarget::CaptureControl => None,
                     model::BindingTarget::Hotkey => None,

@@ -543,6 +543,7 @@ pub(crate) fn apply_midi_event(
                         }
                     }
                 }
+                model::BindingTarget::MonitorBrightness { .. } => {}
                 model::BindingTarget::Session { session_id } => {
                     if let Err(err) = state.audio.set_session_mute(session_id, muted) {
                         run_logger::error(
@@ -853,6 +854,19 @@ pub(crate) fn apply_midi_event(
             }
             model::BindingTarget::Focus => {
                 if state.apply_focus_volume_with_retry(&binding.id, volume) {
+                    any_applied = true;
+                }
+            }
+            model::BindingTarget::MonitorBrightness { monitor_id, .. } => {
+                if let Err(err) =
+                    crate::monitor_brightness::set_monitor_brightness(monitor_id.as_deref(), volume)
+                {
+                    run_logger::error(
+                        "bindings",
+                        "set_monitor_brightness_failed",
+                        &format!("binding_id={} error={}", binding.id, err),
+                    );
+                } else {
                     any_applied = true;
                 }
             }

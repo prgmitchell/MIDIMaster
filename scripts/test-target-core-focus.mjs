@@ -58,6 +58,23 @@ function testFocusValueTracksFocusChangesWithoutSessionListChanges() {
   assert.equal(targetCore.getMuteForTarget("Focus"), false);
 }
 
+function testMonitorBrightnessTargetsUsePerMonitorIdentity() {
+  const target = {
+    MonitorBrightness: {
+      monitor_id: "DISPLAY\\SAM7058\\2",
+      display_name: "LC32G7xT",
+    },
+  };
+
+  assert.equal(targetCore.resolveTargetKey(target), "monitor-brightness:DISPLAY\\SAM7058\\2");
+  assert.deepEqual(targetCore.resolveOsdTarget(target), {
+    label: "Monitor Brightness: LC32G7xT",
+    icon_data: null,
+    icon_kind: "monitor-brightness",
+  });
+  assert.equal(targetCore.resolveTargetKey("MonitorBrightness"), "::monitor-brightness::");
+}
+
 function testNormalizeSessionKeyPrefersApplicationKey() {
   assert.equal(
     targetCore.normalizeSessionKey({
@@ -256,6 +273,7 @@ async function testFocusRefreshUpdatesTargetDisplaysWithoutSessionListChanges() 
 
 testFocusVolumeAndMuteResolveFromFocusedSession();
 testFocusValueTracksFocusChangesWithoutSessionListChanges();
+testMonitorBrightnessTargetsUsePerMonitorIdentity();
 testNormalizeSessionKeyPrefersApplicationKey();
 testNormalizeSessionKeyAvoidsPidOnlyFallback();
 testNormalizeSessionKeyAvoidsWebView2Fallback();

@@ -166,6 +166,9 @@ export function createTargetCore({
           icon_data: currentFocusSession?.icon_data ?? focusIconData,
         };
       }
+      if (target === "MonitorBrightness") {
+        return { label: "Monitor Brightness", icon_data: null, icon_kind: "monitor-brightness" };
+      }
       if (target === "MediaControl") {
         return { label: "Media Controls", icon_data: mediaPlayPauseIconData || null };
       }
@@ -204,6 +207,15 @@ export function createTargetCore({
       return {
         label: focusName ? `Focused: ${focusName}` : "Focused App",
         icon_data: currentFocusSession?.icon_data ?? focusIconData,
+      };
+    }
+    const brightness = target.MonitorBrightness || target.monitorBrightness || (targetType === "MonitorBrightness" ? target : null);
+    if (brightness) {
+      const displayName = String(brightness.display_name || brightness.displayName || "").trim();
+      return {
+        label: displayName ? `Monitor Brightness: ${displayName}` : "Monitor Brightness",
+        icon_data: null,
+        icon_kind: "monitor-brightness",
       };
     }
 
@@ -300,6 +312,12 @@ export function createTargetCore({
     if (!target) return null;
     if (target === "Master" || target.Master !== undefined) return "::master::";
     if (target === "Focus" || target.Focus !== undefined) return "::focus::";
+    if (target === "MonitorBrightness") return "::monitor-brightness::";
+    const brightness = target.MonitorBrightness || target.monitorBrightness;
+    if (brightness) {
+      const monitorId = brightness.monitor_id || brightness.monitorId;
+      return monitorId ? `monitor-brightness:${monitorId}` : "::monitor-brightness::";
+    }
     if (target === "MediaControl") return "::media-control::";
     if (target === "CaptureControl") return "::capture-control::";
     if (target === "Macro") return "::macro::";
@@ -404,7 +422,7 @@ export function createTargetCore({
     if (target === "Focus" || target?.Focus != null) {
       return currentFocusSession?.volume ?? null;
     }
-    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
+    if (target === "MonitorBrightness" || target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
       return null;
     }
 

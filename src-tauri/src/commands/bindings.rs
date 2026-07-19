@@ -158,6 +158,22 @@ fn apply_binding_action_internal(
                     any_applied = true;
                 }
             }
+            (
+                model::BindingAction::Volume,
+                model::BindingTarget::MonitorBrightness { monitor_id, .. },
+            ) => {
+                if let Err(err) =
+                    crate::monitor_brightness::set_monitor_brightness(monitor_id.as_deref(), value)
+                {
+                    run_logger::warn(
+                        "bindings_cmd",
+                        "apply_action_monitor_brightness_failed",
+                        &format!("binding_id={} error={}", binding.id, err),
+                    );
+                } else {
+                    any_applied = true;
+                }
+            }
             (model::BindingAction::Volume, model::BindingTarget::Session { session_id }) => {
                 if let Err(err) = state.audio.set_session_volume(session_id, value) {
                     run_logger::warn(

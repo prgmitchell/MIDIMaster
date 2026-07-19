@@ -58,6 +58,38 @@ fn deserialize_targets_shape_unchanged() {
 }
 
 #[test]
+fn monitor_brightness_target_round_trips() {
+    let target: BindingTarget = serde_json::from_value(serde_json::json!("MonitorBrightness"))
+        .expect("monitor brightness target should deserialize");
+
+    assert_eq!(
+        target,
+        BindingTarget::MonitorBrightness {
+            monitor_id: None,
+            display_name: None,
+        }
+    );
+    assert_eq!(
+        serde_json::to_value(target).expect("monitor brightness target should serialize"),
+        serde_json::json!({ "MonitorBrightness": {} })
+    );
+}
+
+#[test]
+fn individual_monitor_brightness_target_round_trips() {
+    let target = BindingTarget::MonitorBrightness {
+        monitor_id: Some("DISPLAY\\ACR073A\\123".to_string()),
+        display_name: Some("XZ322QU".to_string()),
+    };
+
+    let serialized = serde_json::to_value(&target).expect("target should serialize");
+    let restored: BindingTarget =
+        serde_json::from_value(serialized).expect("target should deserialize");
+
+    assert_eq!(restored, target);
+}
+
+#[test]
 fn profile_switch_binding_round_trips_target_and_action() {
     let mut json = binding_base_json();
     let object = json.as_object_mut().unwrap();
