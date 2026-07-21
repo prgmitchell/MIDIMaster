@@ -146,9 +146,9 @@ pub fn ensure_builtin_plugin(
     let _ = fs::create_dir_all(&plugin_dir);
 
     let manifest_path = plugin_dir.join("manifest.json");
-    let _ = fs::write(&manifest_path, manifest);
+    let _ = write_if_changed(&manifest_path, manifest.as_bytes());
     let entry_path = plugin_dir.join("plugin.mjs");
-    let _ = fs::write(&entry_path, entry);
+    let _ = write_if_changed(&entry_path, entry.as_bytes());
 
     for (rel, bytes) in assets {
         if rel.is_empty() {
@@ -158,8 +158,18 @@ pub fn ensure_builtin_plugin(
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        let _ = fs::write(path, bytes);
+        let _ = write_if_changed(&path, bytes);
     }
+}
+
+/// Writes bundled content only when it differs from the installed copy. This keeps
+/// normal launches from changing plugin mtimes and generating avoidable disk I/O.
+fn write_if_changed(path: &Path, contents: &[u8]) -> std::io::Result<bool> {
+    if fs::read(path).is_ok_and(|existing| existing == contents) {
+        return Ok(false);
+    }
+    fs::write(path, contents)?;
+    Ok(true)
 }
 
 #[tauri::command]
@@ -418,6 +428,10 @@ pub fn plugin_http_post_json(
     body: serde_json::Value,
     timeout_ms: Option<u64>,
 ) -> Result<PluginHttpResponse, String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Err("Network disabled by the local performance audit".to_string());
+    }
     let url = validate_plugin_http_url(&url)?;
     let timeout = plugin_http_timeout(timeout_ms)?;
     let body_text = serde_json::to_string(&body).map_err(|e| e.to_string())?;
@@ -488,6 +502,10 @@ fn hue_agent(timeout_ms: u64) -> ureq::Agent {
 
 #[tauri::command]
 pub fn hue_discover_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<String>, String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Ok(Vec::new());
+    }
     fn is_hue_oui(mac: &str) -> bool {
         let norm = mac.trim().to_ascii_lowercase().replace('-', ":");
         // Known Signify/Philips Hue OUI prefixes.
@@ -662,6 +680,10 @@ pub fn hue_pair_bridge(
     bridge_ip: String,
     devicetype: Option<String>,
 ) -> Result<serde_json::Value, String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Err("Network disabled by the local performance audit".to_string());
+    }
     let bridge = validate_hue_bridge_addr(&bridge_ip)?;
     let dtype_raw = devicetype.unwrap_or_else(|| "midimaster#desktop".to_string());
     let dtype = if dtype_raw.trim().is_empty() {
@@ -685,6 +707,10 @@ pub fn hue_api_get(
     username: String,
     path: String,
 ) -> Result<serde_json::Value, String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Err("Network disabled by the local performance audit".to_string());
+    }
     let bridge = validate_hue_bridge_addr(&bridge_ip)?;
     let user = validate_hue_username(&username)?;
     let p = validate_hue_path(&path)?;
@@ -701,6 +727,10 @@ pub fn hue_api_put(
     path: String,
     body: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Err("Network disabled by the local performance audit".to_string());
+    }
     let bridge = validate_hue_bridge_addr(&bridge_ip)?;
     let user = validate_hue_username(&username)?;
     let p = validate_hue_path(&path)?;
@@ -982,5 +1012,37 @@ mod tests {
         assert!(plugin_file_path(root, "..\\bad", "plugin.mjs").is_err());
         assert!(plugin_file_path(root, "good-plugin", "..\\secret.txt").is_err());
         assert!(plugin_file_path(root, "good-plugin", "nested\\asset.png").is_ok());
+    }
+
+    #[test]
+    fn bundled_plugin_sync_preserves_identical_file_mtime() {
+        let dir = std::env::temp_dir().join(format!(
+            "midimaster-builtin-plugin-sync-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&dir).expect("test dir");
+        let path = dir.join("plugin.mjs");
+        assert!(write_if_changed(&path, b"export default {}").expect("initial write"));
+        let first = std::fs::metadata(&path)
+            .expect("metadata")
+            .modified()
+            .expect("mtime");
+
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        assert!(!write_if_changed(&path, b"export default {}").expect("unchanged write"));
+        let second = std::fs::metadata(&path)
+            .expect("metadata")
+            .modified()
+            .expect("mtime");
+
+        assert_eq!(first, second);
+        assert!(
+            write_if_changed(&path, b"export default { changed: true }").expect("changed write")
+        );
+        assert_eq!(
+            std::fs::read(&path).expect("updated file"),
+            b"export default { changed: true }"
+        );
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

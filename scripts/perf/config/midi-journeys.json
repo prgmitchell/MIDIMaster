@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "commands": {
+    "reset": "perf_audit_reset",
+    "inject": "perf_audit_inject_midi",
+    "snapshot": "perf_audit_snapshot",
+    "invoke_keys": ["messageCount", "ratePerSecond", "controlCount", "messageKind"]
+  },
+  "limits": {
+    "message_count": [1, 1000000],
+    "rate_per_second": [1, 10000],
+    "control_count": [1, 16],
+    "message_kinds": ["continuous", "button", "action"]
+  },
+  "duration_seconds": 10,
+  "rates_per_second": [125, 500, 1000],
+  "control_counts": [1, 16],
+  "message_kinds": ["continuous", "button", "action"],
+  "policies": {
+    "continuous": "intermediate values may coalesce; latest value must converge",
+    "button": "ordered and lossless",
+    "action": "ordered and lossless"
+  }
+}

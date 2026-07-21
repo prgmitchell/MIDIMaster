@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" class="update-notification-document">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MIDIMaster Update</title>
+  <link rel="stylesheet" href="update_notification.css" />
+</head>
+<body class="update-notification-body dark-mode" data-theme="dark">
+  <main class="update-card" data-tauri-drag-region role="dialog" aria-labelledby="update-title">
+    <button id="close-button" class="window-close" type="button" aria-label="Close" title="Close">x</button>
+    <div class="update-icon" aria-hidden="true" data-tauri-drag-region>
+      <svg viewBox="0 0 24 24" focusable="false"><path d="M12 4v10" /><path d="M8 10l4 4 4-4" /><path d="M5 19h14" /></svg>
+    </div>
+    <section class="update-copy" data-tauri-drag-region>
+      <h1 id="update-title" data-tauri-drag-region>Update Available</h1>
+      <p id="update-message" data-tauri-drag-region>A new MIDIMaster update is available.</p>
+      <p id="update-status" class="update-status" data-tauri-drag-region>Ready to download and install.</p>
+    </section>
+    <div class="update-actions">
+      <button id="skip-button" type="button" class="secondary">Skip Update</button>
+      <button id="install-button" type="button" class="primary">Download and Install</button>
+    </div>
+  </main>
+  <script type="module" src="update_entry.js"></script>
+</body>
+</html>

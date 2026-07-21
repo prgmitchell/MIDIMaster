@@ -186,13 +186,13 @@ pub fn update_osd_settings(
     updated.scale = next_scale;
 
     if let Some(profile) = profile_guard.as_ref() {
-        let mut updated_profile = profile.clone();
+        let mut updated_profile = profile.profile().clone();
         updated_profile.osd_settings = updated.clone();
         state
             .profile_store
             .save_profile(updated_profile.clone())
             .map_err(|err| err.to_string())?;
-        *profile_guard = Some(updated_profile);
+        *profile_guard = Some(AppState::profile_snapshot(updated_profile));
     }
     *settings = updated.clone();
     drop(settings);
@@ -269,7 +269,7 @@ where
     let mut updated_settings = settings.clone();
     update(&mut updated_settings);
     let updated_profile = active_profile.as_ref().map(|profile| {
-        let mut profile = profile.clone();
+        let mut profile = profile.profile().clone();
         profile.midi_device_preference = MidiDevicePreference {
             input_device_id: updated_settings.midi_input_device_id.clone(),
             output_device_id: updated_settings.midi_output_device_id.clone(),
@@ -299,7 +299,7 @@ where
     }
 
     *settings = updated_settings;
-    *active_profile = updated_profile;
+    *active_profile = updated_profile.map(AppState::profile_snapshot);
     Ok(())
 }
 

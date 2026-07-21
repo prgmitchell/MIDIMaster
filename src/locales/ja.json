@@ -567,6 +567,7 @@
   "midi.noRoutes": "MIDI ルートの設定はありません.",
   "midi.noAvailableRoute": "利用可能な入力/出力ルートは追加できません.",
   "midi.noActiveDevice": "活性なし",
+  "midi.loadingDevices": "デバイスを読み込み中…",
   "midi.duplicateInputRoute": "各MIDI入力は一度だけ表示されます.",
   "midi.sharedOutput": "シェアリング",
   "midi.disabled": "バリアフリー",

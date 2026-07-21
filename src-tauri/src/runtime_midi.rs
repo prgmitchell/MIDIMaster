@@ -1,8 +1,5 @@
 use crate::binding_actions::{self, IntegrationBatchTrigger, IntegrationTrigger};
-use crate::bindings::{
-    apply_midi_event as apply_binding_midi_event, find_binding_with_options, BindingKey,
-    BindingState,
-};
+use crate::bindings::{apply_midi_event as apply_binding_midi_event, BindingKey, BindingState};
 use crate::feedback::{self, FeedbackControlKey, FeedbackSendOptions};
 use crate::model::{self, MidiEvent};
 use crate::run_logger;
@@ -320,14 +317,14 @@ pub(crate) fn apply_midi_event(
         .lock()
         .map(|midi| midi.active_route_count() <= 1)
         .unwrap_or(true);
-    let binding = match find_binding_with_options(&profile, &key, allow_stale_device_fallback) {
-        Some(binding) => binding.clone(),
+    let binding = match profile.find_binding(&key, allow_stale_device_fallback) {
+        Some(binding) => binding,
         None => {
             aux_controls::handle_aux_or_unmatched(state, app, &profile, &key, &event)?;
             return Ok(());
         }
     };
-    let targets = binding.normalized_targets();
+    let targets = binding.normalized_targets_ref();
     if targets.is_empty() {
         run_logger::warn(
             "bindings",
@@ -336,10 +333,10 @@ pub(crate) fn apply_midi_event(
         );
         return Ok(());
     }
-    if !state.binding_has_available_target(&binding) {
-        if binding_is_button(&binding) {
+    if !state.binding_has_available_target(binding) {
+        if binding_is_button(binding) {
             state.set_binding_action_value(&key, 0.0);
-            send_immediate_button_light_feedback(state, &binding, 0.0, "integration_unavailable");
+            send_immediate_button_light_feedback(state, binding, 0.0, "integration_unavailable");
         }
         run_logger::debug(
             "bindings",
@@ -381,7 +378,7 @@ pub(crate) fn apply_midi_event(
             relative_seen_high_negative: false,
             relative_seen_low_negative_hint: false,
         });
-        apply_binding_midi_event(&binding, &event, state)
+        apply_binding_midi_event(binding, &event, state)
     };
 
     let volume = match volume {
@@ -389,14 +386,14 @@ pub(crate) fn apply_midi_event(
         None => return Ok(()),
     };
 
-    if binding_is_button(&binding)
+    if binding_is_button(binding)
         && targets
             .iter()
             .all(|target| matches!(target, model::BindingTarget::Unset))
     {
         let feedback_value = if event.value > 0 { 1.0 } else { 0.0 };
         state.set_binding_action_value(&key, feedback_value);
-        send_immediate_button_light_feedback(state, &binding, feedback_value, "unassigned_button");
+        send_immediate_button_light_feedback(state, binding, feedback_value, "unassigned_button");
         run_logger::debug(
             "bindings",
             "unassigned_button_activity_feedback",
@@ -405,13 +402,13 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
 
-    actions::trigger_supplemental_soundboard(state, app, &binding, &targets, &event);
+    actions::trigger_supplemental_soundboard(state, app, binding, targets, &event);
 
     let has_macro_target = targets
         .iter()
         .any(|target| matches!(target, model::BindingTarget::Macro));
     if has_macro_target {
-        if !binding_is_button(&binding) {
+        if !binding_is_button(binding) {
             run_logger::warn(
                 "bindings",
                 "macro_non_button_ignored",
@@ -422,7 +419,7 @@ pub(crate) fn apply_midi_event(
 
         let input_active = event.value > 0;
         if matches!(binding.action, model::BindingAction::Macro) {
-            emit_macro_button_feedback(state, app, &binding, &key, input_active);
+            emit_macro_button_feedback(state, app, binding, &key, input_active);
         }
         if input_active {
             crate::commands::bindings::spawn_macro_binding(app.clone(), binding.id.clone(), false);
@@ -446,7 +443,7 @@ pub(crate) fn apply_midi_event(
         }
     }
 
-    if actions::handle_special_action(state, app, &binding, &targets, &event)? {
+    if actions::handle_special_action(state, app, binding, targets, &event)? {
         return Ok(());
     }
 
@@ -487,7 +484,7 @@ pub(crate) fn apply_midi_event(
             return Ok(());
         }
 
-        let current_muted = state.current_binding_toggle_state(&targets, &key);
+        let current_muted = state.current_binding_toggle_state(targets, &key);
         let previous_input_active = if binding.mute_behavior == model::MuteBehavior::SetFromValue {
             state
                 .last_mute_input_active
@@ -631,10 +628,10 @@ pub(crate) fn apply_midi_event(
         }
 
         let feedback_value = state
-            .button_light_feedback_value(&binding, Some(event.value > 0), Some(muted))
+            .button_light_feedback_value(binding, Some(event.value > 0), Some(muted))
             .unwrap_or(if muted { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if muted { 1.0 } else { 0.0 });
-        send_immediate_button_light_feedback(state, &binding, feedback_value, "toggle_mute");
+        send_immediate_button_light_feedback(state, binding, feedback_value, "toggle_mute");
 
         let settings_enabled = state
             .osd_settings
@@ -642,7 +639,7 @@ pub(crate) fn apply_midi_event(
             .map(|settings| settings.enabled)
             .unwrap_or(true);
 
-        for target in &targets {
+        for target in targets {
             let focus_session = if matches!(target, model::BindingTarget::Focus) {
                 state.audio.focused_session().ok().flatten()
             } else {
@@ -758,12 +755,12 @@ pub(crate) fn apply_midi_event(
         }
 
         let feedback_value = state
-            .button_light_feedback_value(&binding, Some(event.value > 0), Some(next_enabled))
+            .button_light_feedback_value(binding, Some(event.value > 0), Some(next_enabled))
             .unwrap_or(if next_enabled { 1.0 } else { 0.0 });
         state.set_binding_action_value(&key, if next_enabled { 1.0 } else { 0.0 });
         send_immediate_button_light_feedback(
             state,
-            &binding,
+            binding,
             feedback_value,
             "stateful_integration_toggle",
         );
@@ -773,15 +770,15 @@ pub(crate) fn apply_midi_event(
     if binding_actions::action_is_momentary_integration_action(&binding.action) {
         if event.value == 0 {
             let feedback_value = state
-                .button_light_feedback_value(&binding, Some(false), None)
+                .button_light_feedback_value(binding, Some(false), None)
                 .unwrap_or(0.0);
             send_immediate_button_light_feedback(
                 state,
-                &binding,
+                binding,
                 feedback_value,
                 "momentary_integration_release",
             );
-            update_activity_button_light_hold_feedback(state, &binding, key.clone(), false);
+            update_activity_button_light_hold_feedback(state, binding, key.clone(), false);
             return Ok(());
         }
 
@@ -822,15 +819,15 @@ pub(crate) fn apply_midi_event(
         }
 
         let feedback_value = state
-            .button_light_feedback_value(&binding, Some(true), None)
+            .button_light_feedback_value(binding, Some(true), None)
             .unwrap_or(1.0);
         send_immediate_button_light_feedback(
             state,
-            &binding,
+            binding,
             feedback_value,
             "momentary_integration_press",
         );
-        update_activity_button_light_hold_feedback(state, &binding, key.clone(), true);
+        update_activity_button_light_hold_feedback(state, binding, key.clone(), true);
         return Ok(());
     }
 
@@ -915,7 +912,7 @@ pub(crate) fn apply_midi_event(
                 data,
             } => {
                 let integration_button_kind = if binding.action == model::BindingAction::Volume
-                    && binding_is_button(&binding)
+                    && binding_is_button(binding)
                 {
                     binding_actions::integration_volume_button_action_kind(
                         integration_id,
@@ -928,7 +925,7 @@ pub(crate) fn apply_midi_event(
                 let button_event = if integration_button_kind.is_some() {
                     integration_button_feedback_owned = true;
                     let resolved_event = *button_event_for_event.get_or_insert_with(|| {
-                        resolve_integration_button_event(state, &key, &binding, &event)
+                        resolve_integration_button_event(state, &key, binding, &event)
                     });
                     if resolved_event.is_none() {
                         skipped_button_integration_event = true;
@@ -1007,16 +1004,16 @@ pub(crate) fn apply_midi_event(
     }
 
     let button_light_feedback_value =
-        state.button_light_feedback_value(&binding, Some(event.value > 0), None);
+        state.button_light_feedback_value(binding, Some(event.value > 0), None);
     let primary_feedback_value = button_light_feedback_value.unwrap_or(volume);
 
     let input_active = event.value > 0;
     if !integration_button_feedback_owned && !input_active {
-        update_activity_button_light_hold_feedback(state, &binding, key.clone(), false);
+        update_activity_button_light_hold_feedback(state, binding, key.clone(), false);
     }
 
     if !integration_button_feedback_owned && button_light_feedback_value.is_none() {
-        let output_key = feedback::binding_feedback_control_key(&binding).to_binding_key();
+        let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
         if let Ok(mut feedback) = state.feedback_values.lock() {
             feedback.insert(key.clone(), primary_feedback_value);
             if output_key != key {
@@ -1033,22 +1030,22 @@ pub(crate) fn apply_midi_event(
         if button_light_feedback_value.is_some() {
             send_immediate_button_light_feedback(
                 state,
-                &binding,
+                binding,
                 primary_feedback_value,
                 "button_volume",
             );
-        } else if binding_is_button(&binding) {
+        } else if binding_is_button(binding) {
             send_immediate_button_light_feedback(
                 state,
-                &binding,
+                binding,
                 primary_feedback_value,
                 "button_volume_default",
             );
         } else if let Ok(mut midi) = state.midi.lock() {
-            let _ = midi.send_binding_feedback(&binding, primary_feedback_value);
+            let _ = midi.send_binding_feedback(binding, primary_feedback_value);
         }
         if input_active {
-            update_activity_button_light_hold_feedback(state, &binding, key.clone(), true);
+            update_activity_button_light_hold_feedback(state, binding, key.clone(), true);
         }
     }
 
@@ -1057,7 +1054,7 @@ pub(crate) fn apply_midi_event(
         .lock()
         .map(|settings| settings.enabled)
         .unwrap_or(true);
-    for target in &targets {
+    for target in targets {
         let focus_session = if matches!(target, model::BindingTarget::Focus) {
             state.audio.focused_session().ok().flatten()
         } else {

@@ -5,12 +5,28 @@ use crate::{
     model::{Profile, ProfileSummary},
 };
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::SystemTime;
 
 type Result<T> = anyhow::Result<T>;
 
 #[derive(Clone)]
 pub struct ProfileStore {
     storage: DurableJsonStore,
+    storage_path: PathBuf,
+    cache: Arc<Mutex<Option<CachedProfiles>>>,
+}
+
+#[derive(Clone)]
+struct CachedProfiles {
+    profiles: Vec<Profile>,
+    fingerprint: Option<StorageFingerprint>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct StorageFingerprint {
+    len: u64,
+    modified: Option<SystemTime>,
 }
 
 impl ProfileStore {
@@ -25,50 +41,103 @@ impl ProfileStore {
     ) -> Self {
         let path = config_dir.join("profiles.json");
         Self {
-            storage: DurableJsonStore::new(path, "profiles", recovery_notices),
+            storage: DurableJsonStore::new(path.clone(), "profiles", recovery_notices),
+            storage_path: path,
+            cache: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn list_profiles(&self) -> Result<Vec<ProfileSummary>> {
-        let profiles = self.load_all()?;
-        Ok(profiles
-            .into_iter()
-            .map(|profile| ProfileSummary { name: profile.name })
+        let cache = self.cache()?;
+        let cache = cache.as_ref().expect("profile cache initialized");
+        Ok(cache
+            .profiles
+            .iter()
+            .map(|profile| ProfileSummary {
+                name: profile.name.clone(),
+            })
             .collect())
     }
 
     pub fn load_profile(&self, name: &str) -> Result<Option<Profile>> {
-        let profiles = self.load_all()?;
-        Ok(profiles.into_iter().find(|profile| profile.name == name))
+        let cache = self.cache()?;
+        let cache = cache.as_ref().expect("profile cache initialized");
+        Ok(cache
+            .profiles
+            .iter()
+            .find(|profile| profile.name == name)
+            .cloned())
     }
 
-    pub fn save_profile(&self, profile: Profile) -> Result<()> {
-        self.storage.update::<Vec<Profile>, _, _>(|profiles| {
-            if let Some(existing) = profiles
-                .iter_mut()
-                .find(|existing| existing.name == profile.name)
-            {
-                *existing = profile;
-            } else {
-                profiles.push(profile);
-            }
-            normalize_profiles(profiles);
-        })
+    pub fn save_profile(&self, mut profile: Profile) -> Result<()> {
+        profile.strip_derived_integration_icons();
+        let mut cache = self.cache()?;
+        let cache = cache.as_mut().expect("profile cache initialized");
+        let mut candidate = cache.profiles.clone();
+        if let Some(existing) = candidate
+            .iter_mut()
+            .find(|existing| existing.name == profile.name)
+        {
+            *existing = profile;
+        } else {
+            candidate.push(profile);
+        }
+        self.commit_candidate(cache, candidate)
     }
 
     pub fn delete_profile(&self, name: &str) -> Result<()> {
-        self.storage.update::<Vec<Profile>, _, _>(|profiles| {
-            profiles.retain(|profile| profile.name != name);
-            normalize_profiles(profiles);
-        })
+        let mut cache = self.cache()?;
+        let cache = cache.as_mut().expect("profile cache initialized");
+        let mut candidate = cache.profiles.clone();
+        candidate.retain(|profile| profile.name != name);
+        self.commit_candidate(cache, candidate)
     }
 
     pub fn clear_all(&self) -> Result<()> {
-        self.storage.clear()
+        let mut cache = self
+            .cache
+            .lock()
+            .map_err(|_| anyhow::anyhow!("profiles cache lock poisoned"))?;
+        self.storage.clear()?;
+        *cache = Some(CachedProfiles {
+            profiles: Vec::new(),
+            fingerprint: storage_fingerprint(&self.storage_path),
+        });
+        Ok(())
     }
 
-    fn load_all(&self) -> Result<Vec<Profile>> {
+    fn cache(&self) -> Result<MutexGuard<'_, Option<CachedProfiles>>> {
+        let mut cache = self
+            .cache
+            .lock()
+            .map_err(|_| anyhow::anyhow!("profiles cache lock poisoned"))?;
+        let current_fingerprint = storage_fingerprint(&self.storage_path);
+        let cache_is_current = cache
+            .as_ref()
+            .is_some_and(|cache| cache.fingerprint == current_fingerprint);
+        if !cache_is_current {
+            *cache = Some(CachedProfiles {
+                profiles: self.load_all_uncached()?,
+                fingerprint: storage_fingerprint(&self.storage_path),
+            });
+        }
+        Ok(cache)
+    }
+
+    fn commit_candidate(&self, cache: &mut CachedProfiles, candidate: Vec<Profile>) -> Result<()> {
+        let mut persisted = candidate.clone();
+        normalize_profiles(&mut persisted);
+        self.storage.save(&persisted)?;
+        cache.profiles = candidate;
+        cache.fingerprint = storage_fingerprint(&self.storage_path);
+        Ok(())
+    }
+
+    fn load_all_uncached(&self) -> Result<Vec<Profile>> {
         let mut profiles: Vec<Profile> = self.storage.load_or_default()?;
+        for profile in &mut profiles {
+            profile.strip_derived_integration_icons();
+        }
         for profile in &mut profiles {
             profile.restore_from_storage();
         }
@@ -81,6 +150,14 @@ impl ProfileStore {
     }
 }
 
+fn storage_fingerprint(path: &std::path::Path) -> Option<StorageFingerprint> {
+    let metadata = std::fs::metadata(path).ok()?;
+    Some(StorageFingerprint {
+        len: metadata.len(),
+        modified: metadata.modified().ok(),
+    })
+}
+
 fn normalize_profiles(profiles: &mut [Profile]) {
     for profile in profiles {
         profile.normalize_for_storage();
@@ -91,7 +168,7 @@ fn normalize_profiles(profiles: &mut [Profile]) {
 mod tests {
     use super::ProfileStore;
     use crate::durable_json_store::new_recovery_notices;
-    use crate::model::{AssignMode, Binding, Profile};
+    use crate::model::{AssignMode, Binding, BindingTarget, Profile};
     use std::collections::BTreeSet;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -225,6 +302,54 @@ mod tests {
     }
 
     #[test]
+    fn legacy_integration_icons_compact_only_after_successful_save() {
+        let dir = test_dir("integration-icon-compaction");
+        std::fs::create_dir_all(&dir).expect("create dir");
+        let mut legacy = profile_with_clear_assign_mode("legacy-icons");
+        let target = BindingTarget::Integration {
+            integration_id: "obs".to_string(),
+            kind: "scene".to_string(),
+            data: serde_json::json!({
+                "scene_name": "Camera",
+                "label": "Camera",
+                "icon_data": "data:image/png;base64,very-large-derived-icon",
+                "iconData": "legacy-camel-case-icon"
+            }),
+        };
+        legacy.bindings[0].target = target.clone();
+        legacy.bindings[0].targets = vec![target];
+        std::fs::write(
+            dir.join("profiles.json"),
+            serde_json::to_vec_pretty(&vec![legacy]).expect("legacy json"),
+        )
+        .expect("legacy profile");
+        let store = ProfileStore::new(dir.clone());
+
+        let loaded = store
+            .load_profile("legacy-icons")
+            .expect("load profile")
+            .expect("legacy profile");
+        let BindingTarget::Integration { data, .. } = &loaded.bindings[0].targets[0] else {
+            panic!("integration target");
+        };
+        assert_eq!(data["scene_name"], "Camera");
+        assert_eq!(data["label"], "Camera");
+        assert!(data.get("icon_data").is_none());
+        assert!(data.get("iconData").is_none());
+
+        let unchanged = std::fs::read_to_string(dir.join("profiles.json")).expect("legacy json");
+        assert!(unchanged.contains("very-large-derived-icon"));
+        assert!(unchanged.contains("legacy-camel-case-icon"));
+
+        store.save_profile(loaded).expect("compact legacy profile");
+        let compacted = std::fs::read_to_string(dir.join("profiles.json")).expect("compacted");
+        assert!(!compacted.contains("very-large-derived-icon"));
+        assert!(!compacted.contains("legacy-camel-case-icon"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn load_profile_falls_back_to_backup_when_primary_is_corrupt() {
         let dir = test_dir("fallback");
         let store = ProfileStore::new(dir.clone());
@@ -291,6 +416,23 @@ mod tests {
         let backup = std::fs::read_to_string(dir.join("profiles.json.bak")).expect("backup");
         let backup_profiles: Vec<Profile> = serde_json::from_str(&backup).expect("backup json");
         assert!(backup_profiles.is_empty());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn failed_durable_save_does_not_publish_cache_candidate() {
+        let dir = test_dir("cache-commit-order");
+        let store = ProfileStore::new(dir.clone());
+        store.save_profile(profile("stable")).expect("save stable");
+        store.set_failure_point(crate::durable_json_store::FailurePoint::BeforePrimaryReplace);
+
+        assert!(store.save_profile(profile("not-committed")).is_err());
+        assert!(store
+            .load_profile("not-committed")
+            .expect("read cache")
+            .is_none());
+        assert!(store.load_profile("stable").expect("read stable").is_some());
 
         let _ = std::fs::remove_dir_all(dir);
     }

@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "entries": [
+    { "name": "main", "html": "src/index.html", "allowed_modules": ["main.js", "app_entry.js"], "forbidden_modules": ["osd_entry.js", "update_entry.js"] },
+    { "name": "osd", "html": "src/osd.html", "allowed_modules": ["osd_entry.js"], "forbidden_modules": ["main.js", "app_entry.js", "update_entry.js"] },
+    { "name": "update", "html": "src/update.html", "allowed_modules": ["update_entry.js"], "forbidden_modules": ["main.js", "app_entry.js", "osd_entry.js"] }
+  ],
+  "initial_images": {
+    "html": "src/index.html",
+    "maximum_total_bytes": 358400,
+    "maximum_single_bytes": 204800,
+    "maximum_eager_theme_logos": 1
+  },
+  "maximum_frontend_file_bytes": 2097152
+}

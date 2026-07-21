@@ -12,6 +12,14 @@ Thumbs.db
 # Node
 node_modules/
 
+# Local performance audit data (may contain machine/process metadata)
+perf-results/
+scripts/perf/fixtures/generated/
+scripts/perf/.work/
+*.etl
+*.heapsnapshot
+*.devtools.json
+
 # Rust
 target/
 

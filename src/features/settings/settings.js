@@ -1622,7 +1622,7 @@ export function createSettingsFeature({
     });
   }
 
-  async function loadAppSettings() {
+  async function loadAppSettings({ applyLocale = true } = {}) {
     try {
       const settings = await invoke("get_app_settings");
       if (settings) {
@@ -1631,13 +1631,17 @@ export function createSettingsFeature({
           setAppSettings(next);
         }
         setAppearanceState(next.appearance);
-        await i18n?.setLocale?.(next.language).catch((error) => {
-          console.error("Failed to apply language setting", error);
-        });
-        applyTranslations();
+        if (applyLocale) {
+          await i18n?.setLocale?.(next.language).catch((error) => {
+            console.error("Failed to apply language setting", error);
+          });
+          applyTranslations();
+        }
       }
+      return settings || null;
     } catch (error) {
       console.error("Failed to load app settings", error);
+      return null;
     }
   }
 

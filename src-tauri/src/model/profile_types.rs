@@ -235,8 +235,16 @@ pub struct Profile {
 }
 
 impl Profile {
-    pub fn normalize_for_storage(&mut self) -> bool {
+    pub(crate) fn strip_derived_integration_icons(&mut self) -> bool {
         let mut changed = false;
+        for binding in &mut self.bindings {
+            changed |= binding.strip_derived_integration_icons();
+        }
+        changed
+    }
+
+    pub fn normalize_for_storage(&mut self) -> bool {
+        let mut changed = self.strip_derived_integration_icons();
         let mut clear_assign_binding_ids = self
             .plugin_settings
             .get(CLEAR_ASSIGN_MODES_COMPAT_KEY)
@@ -282,18 +290,18 @@ impl Profile {
     }
 
     pub fn restore_from_storage(&mut self) -> bool {
+        let mut changed = self.strip_derived_integration_icons();
         let Some(compat_value) = self.plugin_settings.remove(CLEAR_ASSIGN_MODES_COMPAT_KEY) else {
-            return false;
+            return changed;
         };
         let Some(clear_assign_binding_ids) =
             clear_assign_binding_ids_from_compat_value(&compat_value)
         else {
             self.plugin_settings
                 .insert(CLEAR_ASSIGN_MODES_COMPAT_KEY.to_string(), compat_value);
-            return false;
+            return changed;
         };
 
-        let mut changed = false;
         for binding in &mut self.bindings {
             if clear_assign_binding_ids.contains(&binding.id)
                 && !matches!(binding.assign_mode, super::AssignMode::Replace)

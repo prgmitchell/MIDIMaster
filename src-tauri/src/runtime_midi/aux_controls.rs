@@ -137,7 +137,7 @@ pub(super) fn handle_aux_or_unmatched(
                     .active_profile
                     .lock()
                     .ok()
-                    .and_then(|profile| profile.as_ref().cloned())
+                    .and_then(|profile| profile.as_ref().map(|snapshot| snapshot.profile().clone()))
                     .and_then(|profile| {
                         profile
                             .bindings
@@ -231,7 +231,7 @@ pub(super) fn handle_aux_or_unmatched(
                 .lock()
                 .map_err(|_| "Lock poisoned".to_string())?;
             if let Some(active_profile) = guard.as_ref() {
-                let mut updated_profile = active_profile.clone();
+                let mut updated_profile = active_profile.profile().clone();
                 if let Some(stored) = updated_profile
                     .bindings
                     .iter_mut()
@@ -246,7 +246,7 @@ pub(super) fn handle_aux_or_unmatched(
                         .profile_store
                         .save_profile(updated_profile.clone())
                         .map_err(|err| err.to_string())?;
-                    *guard = Some(updated_profile.clone());
+                    *guard = Some(AppState::profile_snapshot(updated_profile.clone()));
                     state.sync_feedback_values(&updated_profile);
                     state.send_idle_button_light_feedback_values(&updated_profile);
                 }

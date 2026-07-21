@@ -44,6 +44,25 @@ pub(crate) struct MidiEventQueue {
     next_sequence: u64,
     coalesced_since_log: u64,
     dropped_since_log: u64,
+    #[cfg(feature = "perf-audit")]
+    audit_enqueued: u64,
+    #[cfg(feature = "perf-audit")]
+    audit_drained: u64,
+    #[cfg(feature = "perf-audit")]
+    audit_coalesced: u64,
+    #[cfg(feature = "perf-audit")]
+    audit_dropped: u64,
+}
+
+#[cfg(feature = "perf-audit")]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+pub(crate) struct MidiEventQueueAuditSnapshot {
+    pub(crate) pending_continuous: usize,
+    pub(crate) pending_preserved: usize,
+    pub(crate) enqueued: u64,
+    pub(crate) drained: u64,
+    pub(crate) coalesced: u64,
+    pub(crate) dropped: u64,
 }
 
 impl Default for MidiEventQueue {
@@ -62,6 +81,14 @@ impl MidiEventQueue {
             next_sequence: 0,
             coalesced_since_log: 0,
             dropped_since_log: 0,
+            #[cfg(feature = "perf-audit")]
+            audit_enqueued: 0,
+            #[cfg(feature = "perf-audit")]
+            audit_drained: 0,
+            #[cfg(feature = "perf-audit")]
+            audit_coalesced: 0,
+            #[cfg(feature = "perf-audit")]
+            audit_dropped: 0,
         }
     }
 
@@ -75,9 +102,17 @@ impl MidiEventQueue {
     }
 
     pub(crate) fn enqueue(&mut self, event: MidiEvent) {
+        #[cfg(feature = "perf-audit")]
+        {
+            self.audit_enqueued = self.audit_enqueued.saturating_add(1);
+        }
         if should_preserve_event(&event) {
             if self.preserved.len() >= self.max_preserved_events {
                 self.dropped_since_log += 1;
+                #[cfg(feature = "perf-audit")]
+                {
+                    self.audit_dropped = self.audit_dropped.saturating_add(1);
+                }
                 return;
             }
             let queued = self.queued_event(event);
@@ -88,12 +123,20 @@ impl MidiEventQueue {
         let key = MidiEventKey::from(&event);
         if self.pending_latest.contains_key(&key) {
             self.coalesced_since_log += 1;
+            #[cfg(feature = "perf-audit")]
+            {
+                self.audit_coalesced = self.audit_coalesced.saturating_add(1);
+            }
             let queued = self.queued_event(event);
             self.pending_latest.insert(key, queued);
             return;
         }
         if self.pending_latest.len() >= self.max_pending_keys {
             self.dropped_since_log += 1;
+            #[cfg(feature = "perf-audit")]
+            {
+                self.audit_dropped = self.audit_dropped.saturating_add(1);
+            }
             return;
         }
         let queued = self.queued_event(event);
@@ -105,7 +148,12 @@ impl MidiEventQueue {
         events.extend(self.preserved.drain(..));
         events.extend(self.pending_latest.drain().map(|(_, event)| event));
         events.sort_by_key(|event| event.sequence);
-        events.into_iter().map(|event| event.event).collect()
+        let events: Vec<MidiEvent> = events.into_iter().map(|event| event.event).collect();
+        #[cfg(feature = "perf-audit")]
+        {
+            self.audit_drained = self.audit_drained.saturating_add(events.len() as u64);
+        }
+        events
     }
 
     pub(crate) fn take_stats(&mut self) -> MidiEventQueueStats {
@@ -116,6 +164,30 @@ impl MidiEventQueue {
         self.coalesced_since_log = 0;
         self.dropped_since_log = 0;
         stats
+    }
+
+    #[cfg(feature = "perf-audit")]
+    pub(crate) fn audit_snapshot(&self) -> MidiEventQueueAuditSnapshot {
+        MidiEventQueueAuditSnapshot {
+            pending_continuous: self.pending_latest.len(),
+            pending_preserved: self.preserved.len(),
+            enqueued: self.audit_enqueued,
+            drained: self.audit_drained,
+            coalesced: self.audit_coalesced,
+            dropped: self.audit_dropped,
+        }
+    }
+
+    #[cfg(feature = "perf-audit")]
+    pub(crate) fn audit_reset(&mut self) {
+        self.pending_latest.clear();
+        self.preserved.clear();
+        self.coalesced_since_log = 0;
+        self.dropped_since_log = 0;
+        self.audit_enqueued = 0;
+        self.audit_drained = 0;
+        self.audit_coalesced = 0;
+        self.audit_dropped = 0;
     }
 }
 

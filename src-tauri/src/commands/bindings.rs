@@ -133,7 +133,7 @@ fn apply_binding_action_internal(
     source: Option<&str>,
     source_sequence: Option<u64>,
 ) -> Result<bool, String> {
-    let targets = binding.normalized_targets();
+    let targets = binding.normalized_targets_ref();
     if targets.is_empty() {
         return Ok(false);
     }
@@ -768,14 +768,17 @@ pub(crate) fn add_binding_to_active_profile(
             .active_profile
             .lock()
             .map_err(|_| "Lock poisoned".to_string())?;
-        let mut profile = profile_guard.clone().unwrap_or(model::Profile {
-            name: "Default".to_string(),
-            bindings: Vec::new(),
-            osd_settings: model::OsdSettings::default(),
-            plugin_settings: std::collections::HashMap::new(),
-            midi_device_preference: model::MidiDevicePreference::default(),
-            midi_device_preference_set: false,
-        });
+        let mut profile = profile_guard
+            .as_ref()
+            .map(|snapshot| snapshot.profile().clone())
+            .unwrap_or(model::Profile {
+                name: "Default".to_string(),
+                bindings: Vec::new(),
+                osd_settings: model::OsdSettings::default(),
+                plugin_settings: std::collections::HashMap::new(),
+                midi_device_preference: model::MidiDevicePreference::default(),
+                midi_device_preference_set: false,
+            });
         let previous_bindings = profile.bindings.clone();
         let mut removed_bindings = Vec::new();
         profile.bindings.retain(|existing| {
@@ -794,7 +797,7 @@ pub(crate) fn add_binding_to_active_profile(
             .profile_store
             .save_profile(profile.clone())
             .map_err(|err| err.to_string())?;
-        *profile_guard = Some(profile.clone());
+        *profile_guard = Some(AppState::profile_snapshot(profile.clone()));
         (profile, stale_feedback_bindings, previous_bindings)
     };
     for binding in stale_feedback_bindings {
@@ -830,7 +833,7 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
             .map_err(|_| "Lock poisoned".to_string())?;
 
         if let Some(profile) = profile_guard.as_ref() {
-            let mut updated = profile.clone();
+            let mut updated = profile.profile().clone();
             updated
                 .bindings
                 .retain(|existing| existing.id != binding.id);
@@ -838,7 +841,7 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
                 .profile_store
                 .save_profile(updated.clone())
                 .map_err(|err| err.to_string())?;
-            *profile_guard = Some(updated.clone());
+            *profile_guard = Some(AppState::profile_snapshot(updated.clone()));
             Some(updated)
         } else {
             None
@@ -916,7 +919,7 @@ pub fn update_midi_feedback(
             .bindings
             .iter()
             .filter(|binding| {
-                let binding_targets = binding.normalized_targets();
+                let binding_targets = binding.normalized_targets_ref();
                 if let Some(ref id) = binding_id {
                     binding.id == *id
                 } else if let Some(ref act) = action {
@@ -1016,8 +1019,8 @@ pub fn set_binding_feedback(
         Some(b) => b.clone(),
         None => return Ok(()),
     };
-    let primary_target = binding.primary_target();
-    let affected_targets = binding.normalized_targets();
+    let primary_target = binding.primary_target_ref();
+    let affected_targets = binding.normalized_targets_ref();
     let effective_action = action.clone().unwrap_or_else(|| binding.action.clone());
     let action_matches_binding = action.is_none() || effective_action == binding.action;
     let input_active = input_value.map(|value| value > 0.0);
@@ -1080,7 +1083,7 @@ pub fn set_binding_feedback(
         }
 
         for candidate in &profile_bindings {
-            let candidate_targets = candidate.normalized_targets();
+            let candidate_targets = candidate.normalized_targets_ref();
             let is_affected = candidate_targets
                 .iter()
                 .any(|t| affected_targets.iter().any(|affected| affected == t));
@@ -1263,7 +1266,7 @@ pub async fn apply_binding_action(
     };
 
     let effective_action = action.unwrap_or_else(|| binding.action.clone());
-    let targets = binding.normalized_targets();
+    let targets = binding.normalized_targets_ref();
     if value > 0.0 && binding.is_button_binding() {
         if !matches!(effective_action, model::BindingAction::Macro)
             && targets

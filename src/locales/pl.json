@@ -567,6 +567,7 @@
   "midi.noRoutes": "Brak skonfigurowanych tras MIDI.",
   "midi.noAvailableRoute": "Brak dostępnej trasy wejścia / wyjścia do dodania.",
   "midi.noActiveDevice": "Brak aktywności",
+  "midi.loadingDevices": "Ładowanie urządzeń…",
   "midi.duplicateInputRoute": "Każde wejście MIDI może pojawić się tylko raz.",
   "midi.sharedOutput": "Wspólne",
   "midi.disabled": "Wyłączone",

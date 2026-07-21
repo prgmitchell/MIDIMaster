@@ -1,4 +1,6 @@
-use crate::model::{Binding, FaderCurve, MidiEvent, MidiMode, Profile, RelativeFormat};
+#[cfg(test)]
+use crate::model::Profile;
+use crate::model::{Binding, FaderCurve, MidiEvent, MidiMode, RelativeFormat};
 use std::time::{Duration, Instant};
 
 const RELATIVE_STEP: f32 = 0.02;
@@ -43,6 +45,7 @@ impl BindingKey {
     }
 }
 
+#[cfg(test)]
 pub fn find_binding_with_options<'a>(
     profile: &'a Profile,
     key: &BindingKey,

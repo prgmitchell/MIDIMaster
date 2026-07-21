@@ -8,6 +8,7 @@ use crate::feedback;
 use crate::midi::MidiManager;
 use crate::midi_event_queue::MidiEventQueue;
 use crate::model::{self, LearnedControl, MidiEvent, OsdSettings, Profile};
+use crate::profile_snapshot::ProfileSnapshot;
 use crate::profile_store::ProfileStore;
 use crate::run_logger;
 use crate::runtime_helpers::LearnCandidate;
@@ -82,7 +83,7 @@ pub(crate) struct AppState {
     pub(crate) midi_event_queue: Arc<Mutex<MidiEventQueue>>,
     pub(crate) profile_store: ProfileStore,
     pub(crate) app_settings_store: AppSettingsStore,
-    pub(crate) active_profile: Mutex<Option<Profile>>,
+    pub(crate) active_profile: Mutex<Option<Arc<ProfileSnapshot>>>,
     pub(crate) binding_state: Arc<Mutex<HashMap<BindingKey, BindingState>>>,
     pub(crate) feedback_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
     pub(crate) binding_action_values: Arc<Mutex<HashMap<BindingKey, f32>>>,
@@ -160,6 +161,10 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
 }
 
 impl AppState {
+    pub(crate) fn profile_snapshot(profile: Profile) -> Arc<ProfileSnapshot> {
+        Arc::new(ProfileSnapshot::new(profile))
+    }
+
     pub(crate) fn set_integration_connection_state(
         &self,
         integration_id: &str,
@@ -187,15 +192,14 @@ impl AppState {
     }
 
     pub(crate) fn binding_has_available_target(&self, binding: &model::Binding) -> bool {
-        let targets = binding
-            .normalized_targets()
-            .into_iter()
-            .filter(|target| !matches!(target, model::BindingTarget::Unset))
-            .collect::<Vec<_>>();
-        targets.is_empty()
-            || targets
-                .iter()
-                .any(|target| self.binding_target_is_available(target))
+        let targets = binding.normalized_targets_ref();
+        !targets
+            .iter()
+            .any(|target| !matches!(target, model::BindingTarget::Unset))
+            || targets.iter().any(|target| {
+                !matches!(target, model::BindingTarget::Unset)
+                    && self.binding_target_is_available(target)
+            })
     }
 
     pub(crate) fn button_light_feedback_value(
@@ -569,7 +573,7 @@ impl AppState {
             let idle_feedback_value =
                 self.button_light_feedback_value(binding, Some(input_active), cached_state_active);
 
-            let primary_target = binding.primary_target();
+            let primary_target = binding.primary_target_ref();
             if matches!(
                 binding.action,
                 model::BindingAction::MediaPlayPause
@@ -595,7 +599,7 @@ impl AppState {
 
             let mut current_target_muted: Option<bool> = None;
             let value = if binding.action == model::BindingAction::ToggleMute {
-                match &primary_target {
+                match primary_target {
                     model::BindingTarget::Master => sessions
                         .iter()
                         .find(|session| session.is_master)
@@ -650,7 +654,7 @@ impl AppState {
                     model::BindingTarget::Integration { .. } => None,
                 }
             } else {
-                match &primary_target {
+                match primary_target {
                     model::BindingTarget::Master => sessions
                         .iter()
                         .find(|session| session.is_master)

@@ -53,7 +53,7 @@ fn focused_sessions_match(left: &Option<SessionInfo>, right: &Option<SessionInfo
 fn profile_has_focus_target(profile: &crate::model::Profile) -> bool {
     profile.bindings.iter().any(|binding| {
         binding
-            .normalized_targets()
+            .normalized_targets_ref()
             .iter()
             .any(|target| matches!(target, BindingTarget::Focus))
     })
@@ -118,12 +118,37 @@ pub(crate) fn spawn_midi_event_queue_loop(app_handle: AppHandle) {
             log_queue_stats(stats);
 
             for event in events {
+                #[cfg(feature = "perf-audit")]
+                let enqueued_at = crate::perf_audit::take_midi_enqueue(&event);
+                #[cfg(feature = "perf-audit")]
+                if let Some(at) = enqueued_at {
+                    let _ = app_handle.emit(
+                        "perf_audit_midi_dispatch",
+                        serde_json::json!({
+                            "device_id": event.device_id.clone(),
+                            "channel": event.channel,
+                            "controller": event.controller,
+                            "msg_type": event.msg_type.clone(),
+                            "enqueue_to_dispatch_us": at.elapsed().as_micros().min(u64::MAX as u128) as u64,
+                        }),
+                    );
+                }
                 let _ = app_handle.emit("midi_event", &event);
+                #[cfg(feature = "perf-audit")]
+                let action_started = Instant::now();
                 if let Err(err) = state.apply_midi_event(&app_handle, event) {
                     run_logger::error(
                         "midi_queue",
                         "event_apply_failed",
                         &format!("error={}", err),
+                    );
+                }
+                #[cfg(feature = "perf-audit")]
+                {
+                    let completed = Instant::now();
+                    crate::perf_audit::record_native_action(
+                        completed.duration_since(action_started),
+                        enqueued_at.map(|at| completed.duration_since(at)),
                     );
                 }
             }
@@ -334,7 +359,11 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                 .active_profile
                 .lock()
                 .ok()
-                .and_then(|profile| profile.as_ref().map(profile_has_focus_target))
+                .and_then(|profile| {
+                    profile
+                        .as_ref()
+                        .map(|snapshot| profile_has_focus_target(snapshot))
+                })
                 .unwrap_or(false);
 
             let next_sleep = if learn_active {

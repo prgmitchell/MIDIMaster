@@ -1,4 +1,21 @@
 import { createPluginHost } from "../plugin_host.js";
+import { createPluginDisplayMetadataCache } from "./plugin_display_metadata.js";
+
+export function mergePersistentIntegrationDisplayMetadata(dataValue, description = null) {
+  const data = (dataValue && typeof dataValue === "object") ? dataValue : {};
+  let nextLabel = typeof data.label === "string" ? data.label : "";
+  for (const suffix of [" (Unavailable)", " (Connecting...)", " (Disconnected)"]) {
+    if (nextLabel.endsWith(suffix)) nextLabel = nextLabel.slice(0, -suffix.length);
+  }
+  if (!nextLabel.trim() && typeof description?.label === "string") {
+    nextLabel = description.label.trim();
+  }
+
+  if (nextLabel === (typeof data.label === "string" ? data.label : "")) {
+    return data;
+  }
+  return { ...data, label: nextLabel };
+}
 
 export function createPluginRuntime({
   invoke,
@@ -24,6 +41,7 @@ export function createPluginRuntime({
   let pluginHost = null;
   let pluginHostStarted = false;
   let bindingsInvalidationSuppressed = false;
+  const displayMetadata = createPluginDisplayMetadataCache({ invoke });
 
   function getPluginHost() {
     return pluginHost;
@@ -33,7 +51,30 @@ export function createPluginRuntime({
     pluginHost = next;
     if (!next) {
       pluginHostStarted = false;
+      displayMetadata.invalidate();
     }
+  }
+
+  function preloadPluginManifests() {
+    return displayMetadata.loadManifests();
+  }
+
+  async function preloadBindingDisplayMetadata() {
+    const integrationIds = new Set();
+    const bindings = getBindings();
+    for (const binding of Array.isArray(bindings) ? bindings : []) {
+      for (const target of getBindingTargets(binding)) {
+        const integration = target?.Integration || target?.integration;
+        if (integration?.integration_id) {
+          integrationIds.add(String(integration.integration_id));
+        }
+      }
+    }
+    await displayMetadata.warmIntegrationIcons(integrationIds);
+  }
+
+  function getIntegrationDisplayMetadata(integrationId) {
+    return displayMetadata.getIntegrationDisplayMetadata(integrationId);
   }
 
   async function startPluginHostIfNeeded(options = {}) {
@@ -67,7 +108,11 @@ export function createPluginRuntime({
       } catch { }
 
       if (!pluginHostStarted) {
-        await pluginHost.loadInstalledPlugins().catch(() => { });
+        let manifests = null;
+        try {
+          manifests = await preloadPluginManifests();
+        } catch { }
+        await pluginHost.loadInstalledPlugins(manifests).catch(() => { });
         await pluginHost.start().catch(() => { });
         pluginHostStarted = true;
       }
@@ -133,44 +178,20 @@ export function createPluginRuntime({
         if (!integ || typeof integ !== "object" || !integ.integration_id) return t;
         const data = (integ.data && typeof integ.data === "object") ? integ.data : {};
 
-        if (typeof data.label === "string") {
-          const suffixes = [" (Unavailable)", " (Connecting...)", " (Disconnected)"];
-          let nextLabel = data.label;
-          for (const s of suffixes) {
-            if (nextLabel.endsWith(s)) nextLabel = nextLabel.slice(0, -s.length);
-          }
-          if (nextLabel !== data.label) {
-            updatedAny = true;
-            return {
-              Integration: {
-                integration_id: String(integ.integration_id),
-                kind: String(integ.kind || ""),
-                data: { ...data, label: nextLabel },
-              },
-            };
-          }
-        }
-
         const hasLabel = typeof data.label === "string" && data.label.trim().length > 0;
-        const hasIcon = typeof data.icon_data === "string" && data.icon_data.trim().length > 0;
-        if (hasLabel && hasIcon) return t;
-
         let desc = null;
-        try {
-          const handler = pluginHost?.getIntegration?.(integ.integration_id);
-          if (handler && typeof handler.describeTarget === "function") {
-            desc = handler.describeTarget({ Integration: integ });
+        if (!hasLabel) {
+          try {
+            const handler = pluginHost?.getIntegration?.(integ.integration_id);
+            if (handler && typeof handler.describeTarget === "function") {
+              desc = handler.describeTarget({ Integration: integ });
+            }
+          } catch {
+            desc = null;
           }
-        } catch {
-          desc = null;
         }
-
-        if (!desc || typeof desc !== "object") return t;
-        const next = { ...data };
-        if (!hasLabel && typeof desc.label === "string" && desc.label.trim()) next.label = desc.label;
-        if (!hasIcon && typeof desc.icon_data === "string" && desc.icon_data.trim()) next.icon_data = desc.icon_data;
-
-        if (next.label !== data.label || next.icon_data !== data.icon_data) {
+        const next = mergePersistentIntegrationDisplayMetadata(data, desc);
+        if (next !== data) {
           updatedAny = true;
           return {
             Integration: {
@@ -303,5 +324,8 @@ export function createPluginRuntime({
     extractIntegrationTarget,
     updateProfilePluginSettings,
     hydrateIntegrationDisplayMetadata,
+    preloadPluginManifests,
+    preloadBindingDisplayMetadata,
+    getIntegrationDisplayMetadata,
   };
 }

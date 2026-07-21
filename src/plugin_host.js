@@ -186,8 +186,10 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
     };
   }
 
-  async function loadInstalledPlugins() {
-    const manifests = await invoke("list_plugins");
+  async function loadInstalledPlugins(preloadedManifests = null) {
+    const manifests = Array.isArray(preloadedManifests)
+      ? preloadedManifests
+      : await invoke("list_plugins");
     if (!Array.isArray(manifests)) {
       return [];
     }

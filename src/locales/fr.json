@@ -567,6 +567,7 @@
   "midi.noRoutes": "Aucune route MIDI configurée.",
   "midi.noAvailableRoute": "Aucune route d'entrée/sortie disponible à ajouter.",
   "midi.noActiveDevice": "Aucune activité",
+  "midi.loadingDevices": "Chargement des périphériques…",
   "midi.duplicateInputRoute": "Chaque entrée MIDI ne peut apparaître qu'une seule fois.",
   "midi.sharedOutput": "Partage",
   "midi.disabled": "Handicapés",

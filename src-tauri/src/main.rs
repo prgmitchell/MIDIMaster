@@ -18,7 +18,10 @@ mod model;
 mod monitor_brightness;
 mod monitors;
 mod osd_window;
+#[cfg(feature = "perf-audit")]
+mod perf_audit;
 mod plugin_api;
+mod profile_snapshot;
 mod profile_store;
 mod run_logger;
 mod runtime_helpers;
@@ -69,6 +72,32 @@ use audio::windows::WindowsAudioBackend;
 
 #[cfg(not(target_os = "windows"))]
 use audio::unsupported::UnsupportedAudioBackend;
+
+#[cfg(feature = "perf-audit")]
+fn log_startup_milestone(
+    milestone: &str,
+    phase_started: std::time::Instant,
+    setup_started: std::time::Instant,
+) {
+    let run_id = std::env::var("MIDIMASTER_PERF_RUN_ID").unwrap_or_else(|_| "manual".to_string());
+    let scenario = std::env::var("MIDIMASTER_PERF_SCENARIO_ID")
+        .or_else(|_| std::env::var("MIDIMASTER_PERF_SCENARIO"))
+        .unwrap_or_else(|_| "startup".to_string());
+    let variant =
+        std::env::var("MIDIMASTER_PERF_VARIANT").unwrap_or_else(|_| "current".to_string());
+    run_logger::info(
+        "perf_audit",
+        milestone,
+        &format!(
+            "schema_version=1 run_id={} scenario_id={} variant={} duration_us={} setup_duration_us={}",
+            run_id,
+            scenario,
+            variant,
+            phase_started.elapsed().as_micros(),
+            setup_started.elapsed().as_micros()
+        ),
+    );
+}
 
 fn shutdown_lights(state: &AppState) {
     state.soundboard.stop_all();
@@ -170,10 +199,19 @@ fn main() {
                 .build(),
         )
         .setup(|app| {
+            #[cfg(feature = "perf-audit")]
+            let setup_started = std::time::Instant::now();
+            #[cfg(feature = "perf-audit")]
+            let mut phase_started = setup_started;
             let config_dir = app_data_root_dir(app.handle())
                 .map_err(|_| "Unable to resolve config directory".to_string())?;
             if let Err(err) = run_logger::init(&config_dir) {
                 eprintln!("[midimaster-log-init-failed] {}", err);
+            }
+            #[cfg(feature = "perf-audit")]
+            {
+                log_startup_milestone("logger_initialized", phase_started, setup_started);
+                phase_started = std::time::Instant::now();
             }
             run_logger::info(
                 "app",
@@ -182,6 +220,11 @@ fn main() {
             );
 
             builtin_plugins::ensure_builtin_plugins(app.handle());
+            #[cfg(feature = "perf-audit")]
+            {
+                log_startup_milestone("builtin_plugins_synchronized", phase_started, setup_started);
+                phase_started = std::time::Instant::now();
+            }
             let recovery_notices = new_recovery_notices();
             let profile_store =
                 ProfileStore::with_recovery_notices(config_dir.clone(), recovery_notices.clone());
@@ -191,6 +234,11 @@ fn main() {
                 .load()
                 .map_err(|err| format!("Unable to load app settings: {err}"))?;
             migrate_startup_registration_if_needed(&app_settings_store, &mut app_settings);
+            #[cfg(feature = "perf-audit")]
+            {
+                log_startup_milestone("settings_loaded", phase_started, setup_started);
+                phase_started = std::time::Instant::now();
+            }
             run_logger::info(
                 "app",
                 "settings_loaded",
@@ -244,37 +292,28 @@ fn main() {
                 storage_recovery_notices: recovery_notices,
             });
 
-            let osd_window =
-                WebviewWindowBuilder::new(app, "osd", WebviewUrl::App("index.html?osd=1".into()))
-                    .title("MIDIMaster OSD")
-                    .decorations(false)
-                    .transparent(true)
-                    .always_on_top(true)
-                    .skip_taskbar(true)
-                    .resizable(false)
-                    .focused(false)
-                    .shadow(false)
-                    .inner_size(320.0, 120.0)
-                    .build()?;
+            #[cfg(feature = "perf-audit")]
+            let osd_url = "osd.html?perf-audit=1";
+            #[cfg(not(feature = "perf-audit"))]
+            let osd_url = "osd.html";
+            let osd_window = WebviewWindowBuilder::new(app, "osd", WebviewUrl::App(osd_url.into()))
+                .title("MIDIMaster OSD")
+                .decorations(false)
+                .transparent(true)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .focused(false)
+                .shadow(false)
+                .inner_size(320.0, 120.0)
+                .build()?;
             let _ = osd_window.set_ignore_cursor_events(true);
             let _ = osd_window.hide();
-
-            let update_window = WebviewWindowBuilder::new(
-                app,
-                "update",
-                WebviewUrl::App("index.html?update=1".into()),
-            )
-            .title("MIDIMaster Update")
-            .inner_size(420.0, 230.0)
-            .min_inner_size(420.0, 230.0)
-            .resizable(false)
-            .maximizable(false)
-            .always_on_top(true)
-            .focused(false)
-            .decorations(false)
-            .visible(false)
-            .build()?;
-            let _ = update_window.hide();
+            #[cfg(feature = "perf-audit")]
+            {
+                log_startup_milestone("osd_window_created", phase_started, setup_started);
+                phase_started = std::time::Instant::now();
+            }
 
             if let Ok(settings) = app.state::<AppState>().osd_settings.lock() {
                 AppState::apply_osd_settings(app.handle(), &settings);
@@ -408,6 +447,9 @@ fn main() {
             background_tasks::spawn_midi_event_queue_loop(app.handle().clone());
             background_tasks::spawn_feedback_refresh_loop(app.handle().clone());
 
+            #[cfg(feature = "perf-audit")]
+            log_startup_milestone("rust_setup_complete", phase_started, setup_started);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -512,6 +554,14 @@ fn main() {
             start_update_notification_window_drag,
             check_for_updates,
             download_and_install_update,
+            #[cfg(feature = "perf-audit")]
+            perf_audit::perf_audit_snapshot,
+            #[cfg(feature = "perf-audit")]
+            perf_audit::perf_audit_reset,
+            #[cfg(feature = "perf-audit")]
+            perf_audit::perf_audit_inject_midi,
+            #[cfg(feature = "perf-audit")]
+            perf_audit::perf_audit_record_result,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1233,7 +1283,8 @@ mod tests {
             .profile_store
             .save_profile(original.clone())
             .expect("initial profile");
-        *state.active_profile.lock().expect("active profile") = Some(original);
+        *state.active_profile.lock().expect("active profile") =
+            Some(AppState::profile_snapshot(original));
         state
             .profile_store
             .set_failure_point(crate::durable_json_store::FailurePoint::BeforePrimaryReplace);

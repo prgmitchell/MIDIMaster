@@ -145,6 +145,10 @@ pub async fn ws_open(
     headers: Option<HashMap<String, String>>,
     connect_timeout_ms: Option<u64>,
 ) -> Result<u64, String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Err("Network disabled by the local performance audit".to_string());
+    }
     hub.open(
         app,
         url,

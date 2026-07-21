@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://midimaster.app/schemas/perf-result-v1.json",
+  "title": "MIDIMaster local performance result",
+  "type": "object",
+  "required": ["schema_version", "run_id", "scenario_id", "variant", "timestamp", "kind", "metric", "value", "unit"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "variant": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "kind": { "enum": ["milestone", "operation", "resource", "counter"] },
+    "metric": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "value": { "type": "number" },
+    "unit": { "enum": ["ms", "bytes", "percent", "count", "bytes_per_second"] },
+    "commit": { "type": ["string", "null"] },
+    "build": { "type": ["string", "null"] },
+    "dimensions": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean", "null"] } },
+    "hardware": {
+      "type": "object",
+      "properties": {
+        "os": { "type": "string" },
+        "cpu_logical_count": { "type": "integer", "minimum": 1 },
+        "memory_bytes": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

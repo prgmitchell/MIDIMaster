@@ -189,6 +189,10 @@ fn is_https(url: &str) -> bool {
 }
 
 fn download_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Err("Network disabled by the local performance audit".to_string());
+    }
     if !is_https(url) {
         return Err("Only https:// URLs are allowed".to_string());
     }

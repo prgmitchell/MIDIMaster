@@ -35,7 +35,7 @@ midiSource = midiSource
     /import \{\s*buildPersistedMidiRoutes,[\s\S]*?\} from "\.\/device_preferences\.js";/,
     `import { buildPersistedMidiRoutes, createMidiRouteDraftController, findConnectedAliveDevice, findPreferredDevice, hasDuplicateInputRoute, normalizeMidiPreference, normalizeMidiRoute, normalizeMidiRoutes, orderMidiRoutesByPreference, resolvePreferredMidiDevicePair, resolvePreferredMidiDeviceRoutes, sharedOutputCounts, stripUnavailableSuffix, unavailableDeviceLabel } from ${JSON.stringify(preferenceUrl)};`,
   );
-const { createMidiFeature } = await import(dataModule(midiSource));
+const { createMidiFeature, resolveMidiDeviceStatusPresentation } = await import(dataModule(midiSource));
 globalThis.document = { hidden: false, addEventListener() {} };
 globalThis.window = { addEventListener() {} };
 
@@ -114,6 +114,23 @@ const translations = {
 const t = (key, params = {}) => Object.entries(params).reduce(
   (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
   translations[key] || key,
+);
+
+assert.deepEqual(
+  resolveMidiDeviceStatusPresentation({
+    routes: [],
+    kind: "input",
+    loading: true,
+    translate: (key) => key === "midi.loadingDevices" ? "Loading devices…" : key,
+  }),
+  {
+    activeRoutes: [],
+    isLoading: true,
+    label: "Loading devices…",
+    additionalDevices: [],
+    title: "Loading devices…",
+  },
+  "the top-bar device boxes should not claim that nothing is active before startup finishes",
 );
 
 const feature = createMidiFeature({

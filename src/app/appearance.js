@@ -861,6 +861,14 @@ export function applyAppearanceToDocument(appearance, options = {}) {
   root.dataset.animations = resolved.animations ? "on" : "off";
   root.dataset.backgroundEffects = resolved.backgroundEffects ? "on" : "off";
   root.classList.toggle("dark-mode", resolved.scheme !== "light");
+  root.querySelectorAll?.("[data-theme-logo]").forEach((image) => {
+    const nextSource = resolved.scheme === "light"
+      ? image.dataset.lightSrc
+      : image.dataset.darkSrc;
+    if (nextSource && image.getAttribute("src") !== nextSource) {
+      image.setAttribute("src", nextSource);
+    }
+  });
   Object.entries(resolved.tokens).forEach(([key, value]) => {
     const cssVar = TOKEN_TO_VAR[key];
     if (cssVar) root.style.setProperty(cssVar, value);

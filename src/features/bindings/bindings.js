@@ -71,6 +71,8 @@ import {
   normalizeCurvePresetPoints,
   normalizeFaderCurvePresets,
 } from "./fader_curve_presets.js";
+import { createBindingDomIndex } from "../../app/binding_dom_index.js";
+import { captureElementScroll, restoreElementScroll } from "../../app/scroll_position.js";
 
 const CUSTOM_CURVE_VIEWBOX_SIZE = 120;
 const CUSTOM_CURVE_PADDING = 10;
@@ -115,6 +117,7 @@ export function createBindingsFeature({
   showChoices,
   showConfirm,
   showAlert,
+  onBindingsRendered,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createBindingsFeature: invoke is required");
@@ -207,6 +210,32 @@ export function createBindingsFeature({
   let bindingsScrollbarWidth = 0;
   let bindingsLayoutSyncQueued = false;
   let pendingRevealBindingId = null;
+  const renderedBindings = createBindingDomIndex();
+  const bindingObjectIdentities = new WeakMap();
+  let nextBindingObjectIdentity = 1;
+
+  function bindingObjectIdentity(binding) {
+    if (!binding || typeof binding !== "object") return 0;
+    let identity = bindingObjectIdentities.get(binding);
+    if (!identity) {
+      identity = nextBindingObjectIdentity++;
+      bindingObjectIdentities.set(binding, identity);
+    }
+    return identity;
+  }
+
+  function bindingRenderKey(binding, index, visibleIndex, searchQuery, typeFilter) {
+    return [
+      bindingObjectIdentity(binding),
+      index,
+      visibleIndex,
+      searchQuery,
+      typeFilter,
+      String(document.documentElement?.lang || ""),
+      String(getEditingId() || ""),
+      bindingSnapshotKey(binding),
+    ].join("|");
+  }
 
   function normalizeBindingTypeFilter(value) {
     const normalized = String(value || "all").toLowerCase();
@@ -382,8 +411,7 @@ export function createBindingsFeature({
   function findRenderedBindingItem(bindingId) {
     const targetId = String(bindingId || "");
     if (!targetId || !d.bindingsContainer) return null;
-    return Array.from(d.bindingsContainer.querySelectorAll(".binding-item"))
-      .find((item) => String(item.dataset?.bindingId || "") === targetId) || null;
+    return renderedBindings.get(targetId)?.item || null;
   }
 
   function flushQueuedBindingReveal() {
@@ -512,13 +540,14 @@ export function createBindingsFeature({
 
   function setButtonVisualState(bindingId, active) {
     if (bindingId == null) return false;
-    const selector = `[data-binding-id="${CSS.escape(String(bindingId))}"]`;
+    const item = renderedBindings.get(bindingId)?.item;
+    if (!item) return false;
     let updated = false;
-    document.querySelectorAll(`.binding-momentary-value${selector}`).forEach((fill) => {
+    item.querySelectorAll(".binding-momentary-value").forEach((fill) => {
       fill.classList.toggle("is-active", Boolean(active));
       updated = true;
     });
-    document.querySelectorAll(`.binding-toggle-value${selector}`).forEach((toggle) => {
+    item.querySelectorAll(".binding-toggle-value").forEach((toggle) => {
       toggle.classList.toggle("on", Boolean(active));
       updated = true;
     });
@@ -1072,17 +1101,10 @@ export function createBindingsFeature({
   function updateBindingValues() {
     updateBindingTargetDisplays();
 
-    const sliders = document.querySelectorAll(".binding-volume-slider");
-    sliders.forEach((slider) => {
+    renderedBindings.values().forEach(({ slider, target }) => {
+      if (!slider) return;
       const lastMidiUpdate = Number(slider.dataset.lastMidiUpdate || 0);
       if (Date.now() - lastMidiUpdate < 1000) return;
-
-      let target = null;
-      try {
-        target = JSON.parse(slider.dataset.targetJson);
-      } catch {
-        return;
-      }
 
       const bindingId = slider.dataset.bindingId;
       const resolved = resolveRenderedBindingVolume(bindingId, target);
@@ -1097,15 +1119,8 @@ export function createBindingsFeature({
       }
     });
 
-    const buttons = document.querySelectorAll(".binding-mute-button");
-    buttons.forEach((btn) => {
-      let target = null;
-      try {
-        target = JSON.parse(btn.dataset.targetJson);
-      } catch {
-        return;
-      }
-
+    renderedBindings.values().forEach(({ muteButton: btn, target }) => {
+      if (!btn) return;
       const muted = Boolean(getMuted(target));
       const currentlyMuted = btn.classList.contains("muted");
       const bindingId = btn.dataset.bindingId;
@@ -1119,8 +1134,8 @@ export function createBindingsFeature({
   }
 
   function updateBindingTargetDisplays() {
-    document.querySelectorAll(".binding-target-dropdown").forEach((targetDropdown) => {
-      if (typeof targetDropdown.refreshTargetDisplay === "function") {
+    renderedBindings.values().forEach(({ targetDropdown }) => {
+      if (typeof targetDropdown?.refreshTargetDisplay === "function") {
         targetDropdown.refreshTargetDisplay();
       }
     });
@@ -5092,6 +5107,10 @@ export function createBindingsFeature({
       return;
     }
 
+    // Keyed rows are temporarily moved into a fragment below. That can shrink
+    // the live scroll container enough for WebView2 to clamp scrollTop to zero.
+    const scrollPosition = captureElementScroll(d.bindingsContainer);
+
     const editingIdAtRenderStart = getEditingId();
     const activeEl = document.activeElement;
     const activeIsNameInput = Boolean(activeEl && activeEl.classList?.contains("binding-name-input"));
@@ -5105,7 +5124,15 @@ export function createBindingsFeature({
     const selectionEnd = shouldRestoreEditingFocus ? activeEl.selectionEnd : null;
 
     const bindings = getB();
-    d.bindingsContainer.innerHTML = "";
+    const previousRendered = new Map();
+    d.bindingsContainer.querySelectorAll(".binding-item[data-binding-id]").forEach((item) => {
+      const bindingId = String(item.dataset?.bindingId || "");
+      if (bindingId) {
+        previousRendered.set(bindingId, renderedBindings.get(bindingId) || { item });
+      }
+    });
+    const nextContent = document.createDocumentFragment();
+    renderedBindings.clear();
     const searchQuery = getSearchQuery();
     const typeFilter = getBindingTypeFilter();
     const visibleBindingIds = [];
@@ -5115,8 +5142,10 @@ export function createBindingsFeature({
       const empty = document.createElement("div");
       empty.className = "bindings-empty";
       empty.textContent = t("bindings.noBindings");
-      d.bindingsContainer.appendChild(empty);
+      d.bindingsContainer.replaceChildren(empty);
+      restoreElementScroll(d.bindingsContainer, scrollPosition);
       queueBindingsScrollLayoutSync();
+      onBindingsRendered?.();
       return;
     }
 
@@ -5137,8 +5166,25 @@ export function createBindingsFeature({
         const bindingId = String(binding.id || "");
         visibleBindingIds.push(bindingId);
         renderedCount += 1;
+        const renderKey = bindingRenderKey(
+          binding,
+          index,
+          visibleIndex,
+          searchQuery,
+          typeFilter,
+        );
+        const previous = previousRendered.get(bindingId);
+        if (previous?.item?.__bindingRenderKey === renderKey) {
+          previous.item.dataset.index = String(index);
+          previous.item.dataset.visibleIndex = String(visibleIndex);
+          previous.targetDropdown?.refreshTargetDisplay?.();
+          renderedBindings.register(bindingId, previous);
+          nextContent.appendChild(previous.item);
+          return;
+        }
         const item = document.createElement("div");
         item.className = "list-item binding-item";
+        item.__bindingRenderKey = renderKey;
 
         const row = document.createElement("div");
         row.className = "binding-row";
@@ -5146,6 +5192,7 @@ export function createBindingsFeature({
         item.dataset.index = index;
         item.dataset.visibleIndex = String(visibleIndex);
         item.dataset.bindingId = bindingId;
+        renderedBindings.register(bindingId, { item });
 
         const fallbackName = fallbackNameFor(binding, index);
         const isEditing = binding.id === getEditingId();
@@ -5573,6 +5620,7 @@ export function createBindingsFeature({
               setMuteButtonState(muteButton, newMuted);
               muteButton.dataset.targetJson = JSON.stringify(primaryTarget);
             }
+            renderedBindings.register(binding.id, { target: primaryTarget });
           }
 
           await invoke("add_binding", { binding });
@@ -5635,6 +5683,12 @@ export function createBindingsFeature({
         setMuteButtonState(muteButton, isMuted);
         muteButton.dataset.targetJson = JSON.stringify(primaryTarget);
         muteButton.dataset.bindingId = binding.id;
+        renderedBindings.register(binding.id, {
+          slider: volumeSlider,
+          muteButton,
+          targetDropdown: targetSelect,
+          target: primaryTarget,
+        });
 
         if (isButton) {
           muteButton.classList.add("visually-hidden");
@@ -5872,7 +5926,7 @@ export function createBindingsFeature({
         row.appendChild(valueGroup);
         row.appendChild(actions);
         item.appendChild(row);
-        d.bindingsContainer.appendChild(item);
+        nextContent.appendChild(item);
 
         if (nameInput && shouldRestoreEditingFocus && String(binding.id) === String(editingIdAtRenderStart)) {
           focusBindingNameInput(nameInput, binding.id);
@@ -5916,7 +5970,7 @@ export function createBindingsFeature({
         };
         errorItem.appendChild(delBtn);
 
-        d.bindingsContainer.appendChild(errorItem);
+        nextContent.appendChild(errorItem);
       }
     });
 
@@ -5926,11 +5980,15 @@ export function createBindingsFeature({
       empty.textContent = searchQuery
         ? t("bindings.noSearchResults")
         : (typeFilter === "all" ? t("bindings.noSearchResults") : t("bindings.noFilterResults"));
-      d.bindingsContainer.appendChild(empty);
+      nextContent.appendChild(empty);
     }
+
+    d.bindingsContainer.replaceChildren(nextContent);
+    restoreElementScroll(d.bindingsContainer, scrollPosition);
 
     queueBindingsScrollLayoutSync();
     flushQueuedBindingReveal();
+    onBindingsRendered?.();
   }
 
   function startBindingDrag(item, dragInfo, event) {
@@ -6533,6 +6591,8 @@ export function createBindingsFeature({
     setMuteButtonState,
     syncButtonVisualState,
     setButtonVisualState,
+    getRenderedBindingRefs: (bindingId) => renderedBindings.get(bindingId),
+    getRenderedBindingEntries: () => renderedBindings.values(),
     queueBindingReveal,
     openBindingTargetPicker,
     beginBindingEdit,

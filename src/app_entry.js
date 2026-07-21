@@ -4,7 +4,6 @@ import { createProfilesFeature } from "./features/profiles/profiles.js";
 import { createBindingsFeature } from "./features/bindings/bindings.js";
 import { normalizeFaderCurvePresets } from "./features/bindings/fader_curve_presets.js";
 import { createTargetsFeature } from "./features/targets/targets.js";
-import { createOsdFeature } from "./features/osd/osd.js";
 import { createMidiFeature } from "./features/midi/midi.js";
 import {
   applyCustomFaderCurve,
@@ -51,6 +50,8 @@ import {
 } from "./app/render_batching.js";
 import { createDomRefs } from "./app/dom_refs.js";
 import { createAppShell } from "./app/app_shell.js";
+import { performanceAudit } from "./app/performance_audit_api.js";
+import { createBindingLookupIndex } from "./app/binding_lookup_index.js";
 import {
   applyTranslations,
   initI18n,
@@ -58,7 +59,6 @@ import {
   supportedLocales,
   t,
 } from "./app/i18n.js";
-import { setupUpdateNotificationWindow } from "./update_notification.js";
 
 const startupLogger = window.__MIDIMASTER_DIAG__;
 
@@ -77,18 +77,24 @@ function diagnosticError(event, error) {
 const tauriBridge = createTauriBridge();
 const { invoke, listen } = tauriBridge;
 
+function recordPerformanceResult(metric, value, kind = "operation", dimensions = {}) {
+  if (!performanceAudit.enabled || !Number.isFinite(Number(value))) return Promise.resolve(false);
+  return invoke("perf_audit_record_result", {
+    metric,
+    value: Number(value),
+    unit: "ms",
+    kind,
+    dimensions,
+  }).catch(() => false);
+}
+
 let pluginRuntime = null;
 
 let settingsFeature = null;
 let profilesFeature = null;
 let bindingsFeature = null;
 let targetsFeature = null;
-let osdFeature = null;
 let midiFeature = null;
-const OSD_SESSION_REFRESH_MIN_MS = 5000;
-const OSD_IDLE_SESSION_REFRESH_MS = 15000;
-let lastOsdDataRefreshAt = 0;
-let osdDataRefreshInFlight = null;
 let profileSwitchInFlight = false;
 
 // Keep the app feeling native by disabling the default browser context menu.
@@ -98,6 +104,10 @@ document.addEventListener("contextmenu", (event) => {
 
 function getPluginHost() {
   return pluginRuntime?.getPluginHost?.() || null;
+}
+
+function getIntegrationDisplayMetadata(integrationId) {
+  return pluginRuntime?.getIntegrationDisplayMetadata?.(integrationId) || null;
 }
 
 async function startPluginHostIfNeeded(options) {
@@ -312,6 +322,7 @@ let focusedSession = null;
 let playbackDevices = [];
 let recordingDevices = [];
 let bindings = [];
+let bindingLookupIndex = createBindingLookupIndex();
 let profilePluginSettings = {};
 let activeProfileName = "";
 let activeProfileMidiPreference = {
@@ -328,10 +339,6 @@ const mediaPlayPauseIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w
 const mediaNextTrackIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><path d='M4 4l5 5-5 5zM9 4l5 5-5 5z' fill='white'/><rect x='14' y='4' width='1.5' height='10' fill='white'/></svg>";
 const mediaPrevTrackIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><path d='M14 4L9 9l5 5zM9 4L4 9l5 5z' fill='white'/><rect x='2.5' y='4' width='1.5' height='10' fill='white'/></svg>";
 const mediaStopIconData = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><rect width='18' height='18' rx='4' fill='%232b2d42'/><rect x='5' y='5' width='8' height='8' rx='1.2' fill='white'/></svg>";
-const osdDebugAlways = false;
-const startupSearchParams = new URLSearchParams(window.location.search);
-const isOsdWindow = startupSearchParams.has("osd");
-const isUpdateWindow = startupSearchParams.has("update");
 const themeStorageKey = "uiTheme";
 const appearanceStorageKey = "midimasterAppearance";
 const sidebarCollapsedStorageKey = "sidebarCollapsed";
@@ -382,18 +389,8 @@ function setInlineMuteButtonState(button, muted) {
 
 function findInlineMuteButton(bindingId) {
   if (bindingId == null) return null;
-  return Array.from(document.querySelectorAll(".binding-mute-button"))
-    .find((btn) => btn.dataset.bindingId === String(bindingId)) || null;
-}
-
-function loadStoredTheme() {
-  try {
-    const stored = localStorage.getItem(themeStorageKey);
-    if (stored === "light" || stored === "dark") return stored;
-  } catch {
-    // ignore storage failures
-  }
-  return "dark";
+  return bindingsFeature?.getRenderedBindingRefs?.(bindingId)?.muteButton
+    || document.querySelector(`.binding-mute-button[data-binding-id="${CSS.escape(String(bindingId))}"]`);
 }
 
 function loadStoredAppearance() {
@@ -475,9 +472,9 @@ function midiDeviceLabelForBindingDevice(deviceId) {
 async function clearSavedMidiDeviceIds() {
 }
 
-async function hydrateClientPreferences() {
+async function hydrateClientPreferences(loadedSettings = null) {
   try {
-    const settings = await invoke("get_app_settings");
+    const settings = loadedSettings || await invoke("get_app_settings");
     if (!settings || typeof settings !== "object") {
       return;
     }
@@ -603,6 +600,7 @@ const targetCore = createTargetCore({
   getPlaybackDevices: () => playbackDevices,
   getRecordingDevices: () => recordingDevices,
   getPluginHost,
+  getIntegrationDisplayMetadata,
   getIntegrationTargetState: getIntegrationStateForTarget,
 });
 
@@ -629,55 +627,6 @@ const defaultOsdSettings = {
 };
 
 // Integration connectivity is plugin-owned.
-
-if (isOsdWindow) {
-  document.body.classList.add("osd-only");
-}
-
-function renderUpdateNotificationWindow() {
-  diagnosticInfo("update_window_render_start", window.location.search);
-  const updateTheme = loadStoredTheme();
-  document.title = "MIDIMaster Update";
-  document.documentElement.classList.add("update-notification-document");
-  document.documentElement.style.colorScheme = updateTheme;
-  if (!document.querySelector('link[href="update_notification.css"]')) {
-    const style = document.createElement("link");
-    style.rel = "stylesheet";
-    style.href = "update_notification.css";
-    document.head.appendChild(style);
-  }
-  document.body.className = updateTheme === "dark"
-    ? "update-notification-body dark-mode"
-    : "update-notification-body";
-  document.body.dataset.theme = updateTheme;
-  document.body.innerHTML = `
-    <main class="update-card" data-tauri-drag-region role="dialog" aria-labelledby="update-title">
-      <button id="close-button" class="window-close" type="button" aria-label="Close" title="Close">x</button>
-      <div class="update-icon" aria-hidden="true" data-tauri-drag-region>
-        <svg viewBox="0 0 24 24" focusable="false">
-          <path d="M12 4v10" />
-          <path d="M8 10l4 4 4-4" />
-          <path d="M5 19h14" />
-        </svg>
-      </div>
-      <section class="update-copy" data-tauri-drag-region>
-        <h1 id="update-title" data-tauri-drag-region>Update Available</h1>
-        <p id="update-message" data-tauri-drag-region>A new MIDIMaster update is available.</p>
-        <p id="update-status" class="update-status" data-tauri-drag-region>Ready to download and install.</p>
-      </section>
-      <div class="update-actions">
-        <button id="skip-button" type="button" class="secondary">Skip Update</button>
-        <button id="install-button" type="button" class="primary">Download and Install</button>
-      </div>
-    </main>
-  `;
-  setupUpdateNotificationWindow({
-    params: startupSearchParams,
-    invoke,
-    listen,
-  });
-  diagnosticInfo("update_window_render_done");
-}
 
 function applyOsdAppearanceAttributes(settings = {}) {
   const style = String(settings.style || defaultOsdSettings.style).trim() || defaultOsdSettings.style;
@@ -762,10 +711,8 @@ const {
   switchAppPage,
 } = appShellRuntime;
 
-if (!isOsdWindow && !isUpdateWindow) {
-  applyAppearanceToDocument(loadStoredAppearance(), { matchMediaSource: window });
-  applySidebarCollapsed(true);
-}
+applyAppearanceToDocument(loadStoredAppearance(), { matchMediaSource: window });
+applySidebarCollapsed(true);
 
 function startSessionRefresh() {
   midiFeature?.startSessionRefresh?.();
@@ -817,17 +764,20 @@ function flashBindingTrigger(bindingId, options = {}) {
     }
     bindingTriggerFlashTimes[bindingId] = now;
   }
-  const selector = `.binding-item[data-binding-id="${CSS.escape(String(bindingId))}"]`;
-  document.querySelectorAll(selector).forEach((el) => {
+  const item = bindingsFeature?.getRenderedBindingRefs?.(bindingId)?.item
+    || document.querySelector(`.binding-item[data-binding-id="${CSS.escape(String(bindingId))}"]`);
+  if (item) {
+    const el = item;
     el.classList.add("triggered");
     clearTimeout(el._triggerTimer);
     el._triggerTimer = setTimeout(() => el.classList.remove("triggered"), 300);
-  });
+  }
 }
 
 function findBindingSlider(bindingId) {
   if (!bindingId) return null;
-  return document.querySelector(`.binding-volume-slider[data-binding-id="${CSS.escape(String(bindingId))}"]`);
+  return bindingsFeature?.getRenderedBindingRefs?.(bindingId)?.slider
+    || document.querySelector(`.binding-volume-slider[data-binding-id="${CSS.escape(String(bindingId))}"]`);
 }
 
 function bindingIsButtonLike(binding, payload = null) {
@@ -860,6 +810,24 @@ function getMidiUiBatcher() {
 
 function queueMidiUiEvent(payload) {
   getMidiUiBatcher().queue(payload);
+}
+
+function queuePerfMidiDispatch(payload) {
+  const key = midiPayloadControlKey(payload);
+  if (!key) return;
+  const pending = perfMidiDispatches.get(key) || [];
+  pending.push(payload);
+  if (pending.length > 2_048) pending.splice(0, pending.length - 2_048);
+  perfMidiDispatches.set(key, pending);
+}
+
+function takePerfMidiDispatch(payload) {
+  const key = midiPayloadControlKey(payload);
+  const pending = key ? perfMidiDispatches.get(key) : null;
+  if (!pending?.length) return null;
+  const next = pending.shift();
+  if (pending.length === 0) perfMidiDispatches.delete(key);
+  return next;
 }
 
 function flushMidiUiEvents(events) {
@@ -931,27 +899,6 @@ async function refreshSessions(options = {}) {
   return sessionRefresher.refreshSessions(options);
 }
 
-async function refreshOsdDataIfStale(force = false) {
-  if (!isOsdWindow) return;
-  const now = Date.now();
-  if (!force && now - lastOsdDataRefreshAt < OSD_SESSION_REFRESH_MIN_MS) {
-    return;
-  }
-  if (osdDataRefreshInFlight) {
-    return osdDataRefreshInFlight;
-  }
-
-  osdDataRefreshInFlight = refreshSessions({ force })
-    .then((result) => {
-      lastOsdDataRefreshAt = Date.now();
-      return result;
-    })
-    .finally(() => {
-      osdDataRefreshInFlight = null;
-    });
-  return osdDataRefreshInFlight;
-}
-
 async function refreshProfiles(preferredName = "") {
   if (profilesFeature && typeof profilesFeature.refreshProfiles === "function") {
     return profilesFeature.refreshProfiles(preferredName);
@@ -969,6 +916,7 @@ const bindingTriggerFlashTimes = {};
 const liveMidiValuesByControl = new Map();
 let midiUiBatcher = null;
 let volumeUpdateBatcher = null;
+const perfMidiDispatches = new Map();
 
 function midiControlSignature(deviceId, control) {
   if (!control) return "";
@@ -1050,7 +998,7 @@ function bindSystemAppearanceListener() {
 pluginRuntime = createPluginRuntime({
   invoke,
   listen,
-  isOsdWindow,
+  isOsdWindow: false,
   getActiveProfileName: () => activeProfileName,
   setActiveProfileName: (next) => { activeProfileName = next; },
   getProfilePluginSettings: () => profilePluginSettings,
@@ -1155,7 +1103,10 @@ profilesFeature = createProfilesFeature({
   getProfilePluginSettings: () => profilePluginSettings,
   setProfilePluginSettings: (next) => { profilePluginSettings = next; },
   getBindings: () => bindings,
-  setBindings: (next) => { bindings = next; },
+  setBindings: (next) => {
+    bindings = next;
+    rebuildBindingLookupIndex();
+  },
   normalizeBinding,
   bindingFallbackName,
   renderBindings,
@@ -1216,18 +1167,6 @@ diagnosticInfo("targets_factory_ok");
 diagnosticInfo("targets_bind_start");
 targetsFeature.bindUi();
 diagnosticInfo("targets_bind_ok");
-
-diagnosticInfo("osd_factory_start");
-osdFeature = createOsdFeature({
-  osdElement: osd,
-  isOsdWindow,
-  osdDebugAlways,
-  getOsdSettings: () => osdSettings,
-  resolveOsdTarget,
-  createTargetIcon,
-  resolveTargetKey,
-});
-diagnosticInfo("osd_factory_ok");
 
 diagnosticInfo("bindings_factory_start");
 bindingsFeature = createBindingsFeature({
@@ -1395,6 +1334,7 @@ bindingsFeature = createBindingsFeature({
   showAlert: (title, message = "") => showAlert(title, message),
   showChoices: (options = {}) => alertsController?.showChoices?.(options) || Promise.resolve("close"),
   showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
+  onBindingsRendered: rebuildBindingLookupIndex,
 });
 diagnosticInfo("bindings_factory_ok");
 
@@ -1504,6 +1444,10 @@ function renderBindings() {
   bindingsFeature?.renderBindings?.();
 }
 
+function rebuildBindingLookupIndex() {
+  bindingLookupIndex = createBindingLookupIndex(bindings);
+}
+
 function requestBindingsRerender(reason = "") {
   if (bindingsFeature?.requestSafeRerender) {
     bindingsFeature.requestSafeRerender(reason);
@@ -1556,31 +1500,9 @@ function findBindingForEvent(payload) {
   if (!payload || !bindings.length) {
     return null;
   }
-  const msgType = normalizeMidiMessageType(payload.msg_type || payload.msgType);
-  const channel = Number(payload.channel);
-  const controller = Number(payload.controller);
-  const exact = bindings.find((binding) =>
-    binding.device_id === payload.device_id
-    && Number(binding.control?.channel) === channel
-    && Number(binding.control?.controller) === controller
-    && normalizeMidiMessageType(binding.control?.msg_type || binding.control?.msgType) === msgType,
-  );
-  if (exact) {
-    return exact;
-  }
-
-  if (knownMidiRouteCount() > 1) {
-    return null;
-  }
-
-  // Back-compat fallback for stale saved device IDs.
-  // Match by channel/controller only when this is unambiguous.
-  const fallback = bindings.filter((binding) =>
-    Number(binding.control?.channel) === channel
-    && Number(binding.control?.controller) === controller
-    && normalizeMidiMessageType(binding.control?.msg_type || binding.control?.msgType) === msgType,
-  );
-  return fallback.length === 1 ? fallback[0] : null;
+  return bindingLookupIndex.find(payload, {
+    allowLegacyFallback: knownMidiRouteCount() <= 1,
+  });
 }
 
 function resolveOsdVolume(binding, payload) {
@@ -1726,13 +1648,18 @@ function queueVolumeUpdatePayload(payload) {
 }
 
 function volumeSliderEntries() {
+  const indexed = bindingsFeature?.getRenderedBindingEntries?.();
+  if (Array.isArray(indexed)) {
+    return indexed.filter((entry) => entry.slider).map(({ slider, target }) => ({
+      slider,
+      bindingId: String(slider.dataset.bindingId || ""),
+      target,
+      lastMidiUpdate: Number(slider.dataset.lastMidiUpdate || 0),
+    }));
+  }
   return Array.from(document.querySelectorAll(".binding-volume-slider")).map((slider) => {
     let target = null;
-    try {
-      target = JSON.parse(slider.dataset.targetJson || "null");
-    } catch {
-      target = null;
-    }
+    try { target = JSON.parse(slider.dataset.targetJson || "null"); } catch { target = null; }
     return {
       slider,
       bindingId: String(slider.dataset.bindingId || ""),
@@ -1744,12 +1671,6 @@ function volumeSliderEntries() {
 
 function flushVolumeUpdatePayloads(payloads) {
   if (!Array.isArray(payloads) || payloads.length === 0) return;
-  if (isOsdWindow) {
-    refreshOsdDataIfStale().catch((error) => {
-      diagnosticError("osd_event_refresh_sessions_failed", error);
-    });
-  }
-
   const now = Date.now();
   const sliderEntries = volumeSliderEntries();
   const slidersByBinding = new Map();
@@ -1832,20 +1753,20 @@ function applyVolumeUpdatePayload(payload, context) {
 }
 
 function showVolumeOsd(target, volume, focusSession, options = null) {
-  osdFeature?.showVolumeOsd?.(target, volume, focusSession, options);
+  void target;
+  void volume;
+  void focusSession;
+  void options;
 }
 
 function showMuteOsd(target, muted, focusSession) {
-  osdFeature?.showMuteOsd?.(target, muted, focusSession);
+  void target;
+  void muted;
+  void focusSession;
 }
 
 function hideVolumeOsd() {
-  osdFeature?.hideVolumeOsd?.();
 }
-
-window.__OSD_UPDATE__ = (payload) => {
-  osdFeature?.handleOsdUpdate?.(payload);
-};
 
 function closeTargetPanel() {
   targetsFeature?.closeTargetPanel?.();
@@ -1934,9 +1855,9 @@ function persistAppSettings() {
   }
 }
 
-async function loadAppSettings() {
+async function loadAppSettings(options) {
   if (settingsFeature && typeof settingsFeature.loadAppSettings === "function") {
-    return settingsFeature.loadAppSettings();
+    return settingsFeature.loadAppSettings(options);
   }
 }
 
@@ -2361,8 +2282,25 @@ document.addEventListener("pointercancel", () => {
 
 
 async function setupListeners() {
+  if (performanceAudit.enabled) {
+    await listen("perf_audit_midi_dispatch", (event) => {
+      const payload = typeof event.payload === "string"
+        ? (() => {
+          try {
+            return JSON.parse(event.payload);
+          } catch {
+            return null;
+          }
+        })()
+        : event.payload;
+      if (payload && typeof payload === "object") {
+        queuePerfMidiDispatch(payload);
+      }
+    });
+  }
+
   await listen("profile_switch_requested", async (event) => {
-    if (isOsdWindow || profileSwitchInFlight) return;
+    if (profileSwitchInFlight) return;
     let payload = event.payload;
     if (typeof payload === "string") {
       try {
@@ -2411,9 +2349,7 @@ async function setupListeners() {
     };
     document.body.setAttribute("data-anchor", osdSettings.anchor || "top-right");
     applyOsdAppearanceAttributes(osdSettings);
-    if (!osdSettings.enabled && isOsdWindow) {
-      hideVolumeOsd();
-    }
+    if (!osdSettings.enabled) hideVolumeOsd();
   });
 
   await listen("bindings_migrated", (event) => {
@@ -2598,7 +2534,23 @@ async function setupListeners() {
     if (!payload || typeof payload !== "object") {
       return;
     }
+    const perfDispatch = performanceAudit.enabled ? takePerfMidiDispatch(payload) : null;
+    const rendererReceivedAt = performanceAudit.enabled ? performanceAudit.now() : 0;
     queueMidiUiEvent(payload);
+    if (perfDispatch && typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        const nativeDurationMs = Number(perfDispatch.enqueue_to_dispatch_us || 0) / 1000;
+        const rendererDurationMs = performanceAudit.now() - rendererReceivedAt;
+        performanceAudit.recordDuration(
+          "midi-visible-update",
+          nativeDurationMs + rendererDurationMs,
+          {
+            controller: Number(payload.controller),
+            msgType: String(payload.msg_type || payload.msgType || "ControlChange"),
+          },
+        );
+      });
+    }
   });
 
   await listen("midi_connection_status", (event) => {
@@ -2659,9 +2611,6 @@ async function setupListeners() {
   });
 
   await listen("mute_update", (event) => {
-    if (!osdSettings.enabled && isOsdWindow) {
-      return;
-    }
     let payload = event.payload;
     if (typeof payload === "string") {
       try {
@@ -2671,11 +2620,6 @@ async function setupListeners() {
       }
     }
     if (!payload) return;
-    if (isOsdWindow) {
-      refreshOsdDataIfStale().catch((error) => {
-        diagnosticError("osd_event_refresh_sessions_failed", error);
-      });
-    }
     updateIntegrationStateFromEventPayload(payload);
     if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
       updateFocusedSessionState(payload.focus_session);
@@ -2693,14 +2637,17 @@ async function setupListeners() {
 
     // Update inline mute buttons.
     // Prefer exact binding-id match first; fall back to target match for mirrored bindings.
-    const buttons = document.querySelectorAll(".binding-mute-button");
-    buttons.forEach((btn) => {
+    const indexedButtons = bindingsFeature?.getRenderedBindingEntries?.();
+    const buttons = Array.isArray(indexedButtons)
+      ? indexedButtons.filter((entry) => entry.muteButton)
+      : Array.from(document.querySelectorAll(".binding-mute-button")).map((muteButton) => ({ muteButton, target: null }));
+    buttons.forEach(({ muteButton: btn, target: indexedTarget }) => {
       let shouldUpdate = false;
       if (payload.binding_id != null && btn.dataset.bindingId === String(payload.binding_id)) {
         shouldUpdate = true;
       } else {
         try {
-          const buttonTarget = JSON.parse(btn.dataset.targetJson || "null");
+          const buttonTarget = indexedTarget ?? JSON.parse(btn.dataset.targetJson || "null");
           shouldUpdate = targetsMatch(buttonTarget, payload.target);
         } catch {
           shouldUpdate = false;
@@ -2716,9 +2663,6 @@ async function setupListeners() {
   });
 
   await listen("volume_update", (event) => {
-    if (!osdSettings.enabled && isOsdWindow) {
-      return;
-    }
     let payload = event.payload ?? {};
     if (typeof payload === "string") {
       try {
@@ -2766,7 +2710,7 @@ async function loadStartupProfile(preferredName) {
   const startupProfileOptions = {
     applyOsd: false,
     persistActiveProfile: false,
-    render: true,
+    render: false,
     startPlugins: false,
     syncMidi: false,
   };
@@ -2786,7 +2730,6 @@ async function loadStartupProfile(preferredName) {
 
   try {
     bindings = [];
-    renderBindings();
   } catch (error) {
     diagnosticError("startup_empty_bindings_render_failed", error);
   }
@@ -2845,55 +2788,86 @@ async function startMainApp() {
     midiStatus.textContent = t("bindings.selectDevicesSentence");
   }
   const startupProfileName = getStartupProfileName();
+  const pluginManifestsPromise = pluginRuntime?.preloadPluginManifests?.().catch(() => []);
   await refreshProfiles(startupProfileName);
   await loadStartupProfile(startupProfileName);
+  await pluginManifestsPromise;
+  await pluginRuntime?.preloadBindingDisplayMetadata?.().catch(() => { });
+  renderBindings();
+  performanceAudit.mark("bindings-usable", {
+    bindingCount: Array.isArray(bindings) ? bindings.length : 0,
+    profile: activeProfileName || startupProfileName,
+  });
+  const bindingsUsable = performanceAudit.measure(
+    "bootstrap-to-bindings-usable",
+    "bootstrap-start",
+    "bindings-usable",
+  );
+  recordPerformanceResult(
+    "startup.bindings_usable",
+    bindingsUsable?.durationMs,
+    "milestone",
+    { window: "main", binding_count: Array.isArray(bindings) ? bindings.length : 0 },
+  );
   applyCurrentOsdAppearance();
   if (activeProfileName) {
     invoke("set_active_profile_preference", { profileName: activeProfileName }).catch(() => { });
   }
 
-  const deviceData = await loadMidiDevices();
-  await loadMonitorOptions();
-  await loadOsdSettings();
+  const pluginStartPromise = startPluginHostIfNeeded({ suppressInitialBindingsInvalidation: true })
+    .then((result) => {
+      if (result?.metadataChanged) {
+        requestBindingsRerender("plugin_metadata_hydrated");
+      }
+      const pluginsReady = performanceAudit.mark("plugins-ready", { started: Boolean(result?.started) });
+      recordPerformanceResult("startup.plugins_ready", pluginsReady?.startTimeMs, "milestone", { window: "main" });
+      return result;
+    })
+    .catch((error) => {
+      console.error("startPluginHostIfNeeded failed", error);
+      diagnosticError("start_plugin_host_failed", error);
+      const pluginsReady = performanceAudit.mark("plugins-ready", { error: String(error?.message || error) });
+      recordPerformanceResult("startup.plugins_ready", pluginsReady?.startTimeMs, "milestone", { window: "main", error: true });
+      return null;
+    });
+  const [deviceData] = await Promise.all([
+    loadMidiDevices(),
+    loadMonitorOptions(),
+    loadOsdSettings(),
+  ]);
   applyCurrentOsdAppearance();
-
-  try {
-    const pluginStartResult = await startPluginHostIfNeeded({ suppressInitialBindingsInvalidation: true });
-    if (pluginStartResult?.metadataChanged) {
-      requestBindingsRerender("plugin_metadata_hydrated");
-    }
-  } catch (error) {
-    console.error("startPluginHostIfNeeded failed", error);
-    diagnosticError("start_plugin_host_failed", error);
-  }
-
-  await refreshProfiles(activeProfileName || "Default");
 
   const profileHasMidiPreference = hasProfileMidiPreference(activeProfileMidiPreference);
   let usedLegacyFallback = false;
 
-  if (profileHasMidiPreference) {
-    await midiFeature?.syncToProfileDevice?.(activeProfileMidiPreference);
-  } else {
-    usedLegacyFallback = true;
-    await attemptAutoConnect(deviceData);
+  try {
+    if (profileHasMidiPreference) {
+      await midiFeature?.syncToProfileDevice?.(activeProfileMidiPreference);
+    } else {
+      usedLegacyFallback = true;
+      await attemptAutoConnect(deviceData);
+    }
+  } finally {
+    midiFeature?.completeInitialDeviceLoad?.();
   }
 
   if (usedLegacyFallback && savedDevice && midiStatus) {
     midiStatus.textContent = t("midi.selectAvailableReconnect");
   }
+  const midiReady = performanceAudit.mark("midi-ready", { connectedRouteCount: activeMidiRouteCount });
+  recordPerformanceResult("startup.midi_ready", midiReady?.startTimeMs, "milestone", {
+    window: "main",
+    connected_route_count: activeMidiRouteCount,
+  });
+  await pluginStartPromise;
   await showStorageRecoveryNotices();
   queueMidiDeviceInventorySubmit("startup");
 }
 
 async function init() {
+  performanceAudit.mark("app-init-start");
   if (!bindTauriApi()) {
     scheduleRetry(() => init(), 200);
-    return;
-  }
-  if (isUpdateWindow) {
-    diagnosticInfo("update_window_start");
-    renderUpdateNotificationWindow();
     return;
   }
   diagnosticInfo("setup_listeners_start");
@@ -2901,34 +2875,8 @@ async function init() {
     diagnosticError("setup_listeners_failed", error);
   });
   diagnosticInfo("setup_listeners_done");
-  if (isOsdWindow) {
-    await initI18n("en").catch(() => {});
-    await loadOsdSettings();
-    document.body.setAttribute("data-anchor", osdSettings.anchor || "top-right");
-    await refreshOsdDataIfStale(true).catch((error) => {
-      diagnosticError("osd_refresh_sessions_failed", error);
-    });
-    setInterval(() => {
-      refreshOsdDataIfStale(true).catch((error) => {
-        diagnosticError("osd_interval_refresh_sessions_failed", error);
-      });
-    }, OSD_IDLE_SESSION_REFRESH_MS);
-    if (osdDebugAlways) {
-      showVolumeOsd("Master", 0.5);
-    }
-    return;
-  }
-
-  // Warm plugin list early so the Connections->Plugins UI can render instantly.
-  pluginsTabs.preloadInstalledPlugins().catch((error) => {
-    diagnosticError("preload_installed_plugins_failed", error);
-  });
-  pluginsTabs.preloadStoreCatalog().catch((error) => {
-    diagnosticError("preload_store_catalog_failed", error);
-  });
-
   diagnosticInfo("load_app_settings_start");
-  await loadAppSettings();
+  const loadedSettings = await loadAppSettings({ applyLocale: false });
   diagnosticInfo("load_app_settings_done");
   await initI18n(appSettings.language || "en").catch((error) => {
     diagnosticError("i18n_init_failed", error);
@@ -2937,7 +2885,7 @@ async function init() {
   applyGlobalAppearance(appSettings.appearance || loadStoredAppearance());
   bindSystemAppearanceListener();
   diagnosticInfo("hydrate_client_preferences_start");
-  await hydrateClientPreferences();
+  await hydrateClientPreferences(loadedSettings);
   diagnosticInfo("hydrate_client_preferences_done");
   mainScreen?.classList?.remove?.("hidden");
   diagnosticInfo("start_main_app_start");
@@ -2981,6 +2929,8 @@ async function init() {
       diagnosticError("auto_update_check_failed", error);
     });
   }
+  const backgroundReady = performanceAudit.mark("background-init-complete");
+  recordPerformanceResult("startup.background_complete", backgroundReady?.startTimeMs, "milestone", { window: "main" });
 }
 
 export async function startMidimasterApp() {

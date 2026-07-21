@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "driver": "tauri-driver",
+  "windows": {
+    "main": { "entry": "index.html", "ready_marker": "bindings-usable" },
+    "osd": { "entry": "osd.html", "ready_marker": "osd-ready" },
+    "update": { "entry": "update.html", "creation": "on-demand", "ready_marker": "update-ready" }
+  },
+  "journeys": [
+    { "id": "initial-render", "steps": [{ "action": "wait-marker", "name": "bindings-usable" }], "measure": "startup.bindings_usable" },
+    { "id": "search-filter", "steps": [{ "action": "fill", "selector": "#binding-search", "value": "Performance binding 499" }, { "action": "next-frame" }], "measure": "interaction.search" },
+    { "id": "configure-binding", "steps": [{ "action": "click", "selector": "[data-binding-id='perf-binding-0'] .binding-actions .binding-action:not(.delete)" }, { "action": "wait-visible", "selector": "#binding-config-panel" }, { "action": "click", "selector": "#binding-config-cancel" }], "measure": "interaction.configure" },
+    { "id": "edit-save", "steps": [{ "action": "click", "selector": "[data-binding-id='perf-binding-0'] .binding-actions .binding-action:not(.delete)" }, { "action": "wait-visible", "selector": "#binding-config-panel" }, { "action": "fill", "selector": "#binding-config-name", "value": "Performance binding edited" }, { "action": "click", "selector": "#binding-config-save" }, { "action": "wait-hidden", "selector": "#binding-config-panel" }], "measure": "storage.profile_save" },
+    { "id": "reorder", "steps": [{ "action": "drag", "selector": "[data-binding-id='perf-binding-0'] .binding-drag", "destination": "[data-binding-id='perf-binding-4'] .binding-drag" }, { "action": "next-frame" }], "measure": "interaction.reorder" },
+    { "id": "density", "steps": [{ "action": "click", "selector": "#binding-density-toggle [data-density='compact']" }, { "action": "wait-attribute", "selector": "#main-screen", "name": "data-bindings-density", "value": "compact" }, { "action": "next-frame" }], "measure": "interaction.density" },
+    { "id": "profile-switch", "steps": [{ "action": "click", "selector": "#profile-toggle" }, { "action": "click", "selector": "#profile-list [data-profile-name='Performance 2']" }, { "action": "wait-text", "selector": "#profile-current", "value": "Performance 2" }, { "action": "next-frame" }], "measure": "interaction.profile_switch" },
+    { "id": "plugins-navigation-first", "steps": [{ "action": "click", "selector": "[data-page='plugins']" }, { "action": "next-frame" }], "measure": "interaction.plugins_navigation_first" },
+    { "id": "plugins-navigation-repeat", "steps": [{ "action": "click", "selector": "[data-page='bindings']" }, { "action": "click", "selector": "[data-page='plugins']" }, { "action": "next-frame" }], "measure": "interaction.plugins_navigation_repeat" },
+    { "id": "settings-navigation-first", "steps": [{ "action": "click", "selector": "[data-page='settings']" }, { "action": "next-frame" }], "measure": "interaction.settings_navigation_first" },
+    { "id": "settings-navigation-repeat", "steps": [{ "action": "click", "selector": "[data-page='bindings']" }, { "action": "click", "selector": "[data-page='settings']" }, { "action": "next-frame" }], "measure": "interaction.settings_navigation_repeat" }
+  ],
+  "notes": "Selectors are a versioned automation contract. Run only against disposable fixtures through Invoke-WdioJourney.ps1. @wdio/tauri-service manages the matching Edge driver; tauri-driver can be preinstalled or installed on the first run with -AutoInstallDriver."
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "startup": {
+    "binding_counts": [0, 50, 250, 500],
+    "profile_counts": [1, 10],
+    "profile_shapes": ["light", "0.6mb", "5mb"],
+    "plugin_modes": ["zero", "one", "all"],
+    "clean_samples": 15,
+    "warm_samples": 30,
+    "true_cold_machine_samples": 5
+  },
+  "interaction": {
+    "journeys": ["initial-render", "search-filter", "configure-binding", "edit-save", "reorder", "density", "profile-switch", "plugins-navigation", "settings-navigation"],
+    "audio_session_counts": [1, 16, 64]
+  },
+  "midi": {
+    "messages_per_second": [125, 500, 1000],
+    "control_counts": [1, 16],
+    "continuous_policy": "latest-value",
+    "button_policy": "ordered-lossless"
+  },
+  "background": {
+    "scenarios": ["disconnected", "midi-connected", "visible", "tray-hidden", "focus-target", "plugin-connected", "plugin-disconnected"],
+    "idle_minutes": 10,
+    "endurance_hours": 2
+  }
+}

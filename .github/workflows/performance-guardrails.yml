@@ -1,0 +1,43 @@
+name: Performance guardrails
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-guards:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test performance tooling
+        run: node --test scripts/perf/tests/*.test.mjs
+
+      - name: Test frontend performance invariants
+        run: node scripts/test-frontend-performance.mjs
+
+      - name: Enforce static startup budgets
+        run: node scripts/perf/check-static-budgets.mjs
+
+      - name: Generate representative fixtures
+        shell: pwsh
+        run: |
+          $fixtureRoot = Join-Path $env:RUNNER_TEMP "midimaster-perf-fixtures"
+          node scripts/perf/generate-fixtures.mjs --output $fixtureRoot --bindings "0,50,500" --profiles "1,10" --shapes "light,0.6mb" --plugins "zero,all"
+          if ($LASTEXITCODE -ne 0) { throw "Fixture generation failed." }
+
+      - name: Explain timing policy
+        run: Write-Host "Installed-app timing is intentionally local/advisory; CI enforces deterministic tests and size/entry budgets only."

@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "absolute": [
+    { "name": "cold startup bindings usable", "scenario": "startup-cold-*", "metric": "startup.bindings_usable", "statistic": "p95", "maximum": 3000, "unit": "ms" },
+    { "name": "warm startup bindings usable", "scenario": "startup-warm-*", "metric": "startup.bindings_usable", "statistic": "p95", "maximum": 1500, "unit": "ms" },
+    { "name": "OSD first trigger", "scenario": "osd-*", "metric": "osd.first_trigger", "statistic": "p95", "maximum": 50, "unit": "ms" },
+    { "name": "common interaction", "scenario": "interaction-*", "metric": "interaction.input_to_paint", "statistic": "p95", "maximum": 50, "unit": "ms" },
+    { "name": "500-binding search", "scenario": "interaction-search-500", "metric": "interaction.search", "statistic": "p95", "maximum": 100, "unit": "ms" },
+    { "name": "250-binding profile switch", "scenario": "interaction-profile-switch-250", "metric": "interaction.profile_switch", "statistic": "p95", "maximum": 250, "unit": "ms" },
+    { "name": "durable profile save", "scenario": "interaction-save-0.6mb", "metric": "storage.profile_save", "statistic": "p95", "maximum": 100, "unit": "ms" },
+    { "name": "normal interaction long task", "scenario": "interaction-*", "metric": "renderer.long_task", "statistic": "maximum", "maximum": 50, "unit": "ms" },
+    { "name": "MIDI native action", "scenario": "midi-*", "metric": "midi.native_action_p95", "statistic": "p95", "maximum": 16, "unit": "ms" },
+    { "name": "MIDI native action tail", "scenario": "midi-*", "metric": "midi.native_action_p99", "statistic": "p95", "maximum": 30, "unit": "ms" },
+    { "name": "MIDI visible update", "scenario": "midi-*", "metric": "midi.visible_update", "statistic": "p95", "maximum": 33, "unit": "ms" },
+    { "name": "MIDI latest values converge", "scenario": "midi-continuous-*", "metric": "midi.latest_value_mismatches", "statistic": "maximum", "maximum": 0, "unit": "count" },
+    { "name": "button events remain lossless", "scenario": "midi-button-*", "metric": "midi.button_events_dropped", "statistic": "maximum", "maximum": 0, "unit": "count" },
+    { "name": "idle CPU", "scenario": "idle-*", "metric": "process.cpu", "statistic": "median", "maximum": 1, "unit": "percent" }
+  ],
+  "compound": [
+    {
+      "name": "endurance memory growth",
+      "scenario": "endurance-*",
+      "statistic": "maximum",
+      "failure_when": "all_exceeded",
+      "checks": [
+        { "metric": "endurance.memory_growth_bytes", "maximum": 10485760, "unit": "bytes" },
+        { "metric": "endurance.memory_growth_percent", "maximum": 5, "unit": "percent" }
+      ]
+    }
+  ],
+  "regression": [
+    { "name": "startup median", "scenario": "startup-*", "metric": "startup.*", "statistic": "median", "relative_percent": 10, "absolute": 100, "unit": "ms" },
+    { "name": "startup p95", "scenario": "startup-*", "metric": "startup.*", "statistic": "p95", "relative_percent": 15, "absolute": 200, "unit": "ms" },
+    { "name": "interaction median", "scenario": "interaction-*", "metric": "interaction.*", "statistic": "median", "relative_percent": 10, "absolute": 8, "unit": "ms" },
+    { "name": "interaction p95", "scenario": "interaction-*", "metric": "interaction.*", "statistic": "p95", "relative_percent": 15, "absolute": 16, "unit": "ms" },
+    { "name": "memory", "scenario": "*", "metric": "process.working_set", "statistic": "median", "relative_percent": 10, "absolute": 26214400, "unit": "bytes" },
+    { "name": "idle CPU", "scenario": "idle-*", "metric": "process.cpu", "statistic": "median", "relative_percent": 20, "absolute": 0.5, "unit": "percent" }
+  ]
+}

@@ -567,6 +567,7 @@
   "midi.noRoutes": "Nenhuma rota MIDI configurada.",
   "midi.noAvailableRoute": "Nenhuma rota de entrada/saída disponível para adicionar.",
   "midi.noActiveDevice": "Nenhum ativo",
+  "midi.loadingDevices": "Carregando dispositivos…",
   "midi.duplicateInputRoute": "Cada entrada MIDI só pode aparecer uma vez.",
   "midi.sharedOutput": "Compartilhado",
   "midi.disabled": "Deficiente",

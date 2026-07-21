@@ -338,6 +338,40 @@ function testDuplicateCustomNamesGetNumbered() {
   assert.equal(nextTheme.id, "custom-theme-2");
 }
 
+function testApplyingAppearanceSwitchesSingleThemeLogoSource() {
+  const attributes = new Map();
+  const logo = {
+    dataset: { darkSrc: "assets/MIDIMaster.png", lightSrc: "assets/MIDIMaster-light.png" },
+    getAttribute: (name) => attributes.get(name) ?? null,
+    setAttribute: (name, value) => attributes.set(name, String(value)),
+  };
+  const root = {
+    dataset: {},
+    classList: { toggle() {} },
+    style: { setProperty() {} },
+    querySelectorAll: (selector) => selector === "[data-theme-logo]" ? [logo] : [],
+  };
+  const previousDocument = globalThis.document;
+  const previousStorage = globalThis.localStorage;
+  globalThis.document = { documentElement: { style: { setProperty() {} } } };
+  globalThis.localStorage = { setItem() {} };
+  try {
+    appearance.applyAppearanceToDocument(
+      { ...appearance.defaultAppearanceSettings(), activeThemeId: "light" },
+      { root, matchMediaSource: { matchMedia: () => ({ matches: false }) } },
+    );
+    assert.equal(attributes.get("src"), "assets/MIDIMaster-light.png");
+    appearance.applyAppearanceToDocument(
+      { ...appearance.defaultAppearanceSettings(), activeThemeId: "dark" },
+      { root, matchMediaSource: { matchMedia: () => ({ matches: true }) } },
+    );
+    assert.equal(attributes.get("src"), "assets/MIDIMaster.png");
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.localStorage = previousStorage;
+  }
+}
+
 testAppearanceDefaultsIncludePolishControls();
 testSystemPresetResolvesDarkFromOs();
 testSystemPresetResolvesLightFromOs();
@@ -357,5 +391,6 @@ testBackgroundGlowPatchEnablesAboveZero();
 testSurfaceContrastIsClampedAndChangesSurfaceTokens();
 testInvalidColorFallsBack();
 testDuplicateCustomNamesGetNumbered();
+testApplyingAppearanceSwitchesSingleThemeLogoSource();
 
 console.log("Appearance tests passed");

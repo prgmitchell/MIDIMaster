@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "MIDIMaster",
+        "url": "index.html?perf-audit=1&perf-scenario=installed-release",
+        "width": 1480,
+        "height": 820,
+        "minWidth": 1280,
+        "minHeight": 820,
+        "visible": false
+      }
+    ]
+  }
+}

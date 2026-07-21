@@ -84,11 +84,13 @@ fn show_update_notification_window(
             query.push_str(&encode_query_component(current_version.trim()));
         }
     }
+    #[cfg(feature = "perf-audit")]
+    query.push_str("&perf-audit=1");
 
     let window = WebviewWindowBuilder::new(
         app,
         "update",
-        WebviewUrl::App(format!("index.html?{query}").into()),
+        WebviewUrl::App(format!("update.html?{query}").into()),
     )
     .title("MIDIMaster Update")
     .inner_size(420.0, 230.0)
@@ -168,6 +170,27 @@ pub fn start_update_notification_window_drag(app: AppHandle) -> Result<(), Strin
 #[tauri::command]
 pub async fn check_for_updates(app: AppHandle) -> Result<UpdateInfo, String> {
     let current_version = app.package_info().version.to_string();
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        emit_status(
+            &app,
+            UpdateStatusEvent {
+                phase: "offline".to_string(),
+                message: Some("Network disabled by the local performance audit.".to_string()),
+                current_version: Some(current_version.clone()),
+                version: None,
+                downloaded: None,
+                content_length: None,
+            },
+        );
+        return Ok(UpdateInfo {
+            available: false,
+            current_version,
+            version: None,
+            body: None,
+            date: None,
+        });
+    }
     emit_status(
         &app,
         UpdateStatusEvent {
@@ -235,6 +258,10 @@ pub async fn check_for_updates(app: AppHandle) -> Result<UpdateInfo, String> {
 
 #[tauri::command]
 pub async fn download_and_install_update(app: AppHandle) -> Result<(), String> {
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::network_is_offline() {
+        return Err("Network disabled by the local performance audit".to_string());
+    }
     let updater = match app.updater_builder().build() {
         Ok(updater) => updater,
         Err(err) => {
@@ -321,5 +348,6 @@ pub async fn download_and_install_update(app: AppHandle) -> Result<(), String> {
         },
     );
 
+    crate::run_logger::flush_pending_repeats();
     app.restart();
 }

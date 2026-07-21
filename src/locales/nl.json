@@ -567,6 +567,7 @@
   "midi.noRoutes": "Geen MIDI-routes geconfigureerd.",
   "midi.noAvailableRoute": "Geen beschikbare input/output route om toe te voegen.",
   "midi.noActiveDevice": "Geen actief",
+  "midi.loadingDevices": "Apparaten laden…",
   "midi.duplicateInputRoute": "Elke MIDI-invoer kan maar één keer verschijnen.",
   "midi.sharedOutput": "Delen",
   "midi.disabled": "Uitgeschakeld",

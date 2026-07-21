@@ -7,6 +7,12 @@ license = "MIT"
 repository = "https://github.com/prgmitchell/MIDIMaster"
 description = "Bind MIDI controls to system audio, devices, and plugin integrations"
 
+[features]
+default = []
+# Enables local-only benchmark hooks and isolated app-data overrides. Release
+# bundles are built without this feature.
+perf-audit = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -61,8 +67,24 @@ rodio = { version = "0.22.2", default-features = false, features = ["playback", 
 libloading = "0.8"
 winreg = "0.55"
 
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "performance"
+harness = false
+required-features = ["perf-audit"]
+
 [profile.release]
 panic = "abort"
 codegen-units = 1
 lto = true
 opt-level = "z"
+
+# Release-equivalent profiling build with symbols for WPR/WPA, Visual Studio,
+# and native flame graph capture. It intentionally keeps the shipping
+# optimization level so traces remain representative.
+[profile.profiling]
+inherits = "release"
+debug = 2
+strip = false

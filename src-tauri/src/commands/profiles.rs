@@ -98,7 +98,7 @@ fn set_active_profile_state(
             .as_ref()
             .map(|profile| profile.bindings.clone())
             .unwrap_or_default();
-        *active_profile = Some(profile.clone());
+        *active_profile = Some(AppState::profile_snapshot(profile.clone()));
         previous_bindings
     };
 
@@ -187,14 +187,11 @@ pub fn delete_profile(state: State<AppState>, name: String) -> Result<(), String
 
 #[tauri::command]
 pub fn get_active_profile(state: State<AppState>) -> Result<Option<Profile>, String> {
-    let mut active = state
+    let active = state
         .active_profile
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
-    if let Some(profile) = active.as_mut() {
-        normalize_profile_bindings(profile);
-    }
-    Ok(active.clone())
+    Ok(active.as_ref().map(|snapshot| snapshot.profile().clone()))
 }
 
 #[tauri::command]

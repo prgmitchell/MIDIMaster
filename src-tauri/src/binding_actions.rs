@@ -186,7 +186,7 @@ pub fn momentary_integration_button_input_value(
     }
 
     if binding
-        .normalized_targets()
+        .normalized_targets_ref()
         .iter()
         .any(target_is_momentary_integration_action)
     {
@@ -280,7 +280,7 @@ fn is_press_only_button_action(action: &model::BindingAction) -> bool {
 }
 
 pub fn request_profile_switch(app: &AppHandle, binding: &Binding, log_target: &str) {
-    let profile_name = binding.normalized_targets().into_iter().find_map(|target| {
+    let profile_name = binding.normalized_targets_ref().iter().find_map(|target| {
         if let BindingTarget::Profile { name } = target {
             let trimmed = name.trim();
             if !trimmed.is_empty() {
@@ -403,7 +403,7 @@ pub fn run_autohotkey_script_action(app: &AppHandle, binding: &Binding, log_targ
 }
 
 pub fn binding_focus_target_name(binding: &Binding) -> Option<String> {
-    binding.normalized_targets().into_iter().find_map(|target| {
+    binding.normalized_targets_ref().iter().find_map(|target| {
         if let BindingTarget::Application { name, .. } = target {
             let trimmed = name.trim();
             if !trimmed.is_empty() {
@@ -564,7 +564,7 @@ pub fn apply_special_button_action(
         }
         model::BindingAction::FullScreenshot => {
             if !binding
-                .normalized_targets()
+                .normalized_targets_ref()
                 .iter()
                 .any(|target| matches!(target, BindingTarget::CaptureControl))
             {
@@ -575,7 +575,7 @@ pub fn apply_special_button_action(
         }
         model::BindingAction::SnipScreenshot => {
             if !binding
-                .normalized_targets()
+                .normalized_targets_ref()
                 .iter()
                 .any(|target| matches!(target, BindingTarget::CaptureControl))
             {
@@ -586,7 +586,7 @@ pub fn apply_special_button_action(
         }
         model::BindingAction::ToggleScreenRecording => {
             if !binding
-                .normalized_targets()
+                .normalized_targets_ref()
                 .iter()
                 .any(|target| matches!(target, BindingTarget::CaptureControl))
             {

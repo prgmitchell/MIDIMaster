@@ -7,7 +7,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager};
 
 pub(crate) fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
-    apply_osd_settings_if_needed(app, settings, true);
+    apply_osd_settings_if_needed(app, settings, false);
 }
 
 pub(crate) fn osd_settings_update_payload(settings: &OsdSettings) -> serde_json::Value {
@@ -218,7 +218,7 @@ pub(crate) fn emit_osd_update(
     if !was_visible {
         let _ = osd_window.show();
     }
-    apply_osd_settings_if_needed(app, &settings, !was_visible);
+    apply_osd_settings_if_needed(app, &settings, false);
 
     let mut osd_payload = payload.clone();
     if let Some(map) = osd_payload.as_object_mut() {

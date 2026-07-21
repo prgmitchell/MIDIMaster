@@ -1,5 +1,9 @@
 import { parseLabelParts, tagVariant } from "../ui/label_tags.js";
 
+export function isExplicitOsdPayload(payload, isOsdWindow) {
+  return !isOsdWindow || payload?.osd_enabled === true;
+}
+
 export function createOsdFeature({
   osdElement,
   isOsdWindow,
@@ -8,16 +12,25 @@ export function createOsdFeature({
   resolveOsdTarget,
   createTargetIcon,
   resolveTargetKey,
+  onFirstRender,
 }) {
   const osd = osdElement || null;
   const getSettings = (typeof getOsdSettings === "function") ? getOsdSettings : (() => ({ enabled: true }));
   const resolveDisplay = (typeof resolveOsdTarget === "function") ? resolveOsdTarget : (() => null);
   const iconFor = (typeof createTargetIcon === "function") ? createTargetIcon : (() => document.createElement("span"));
   const keyForTarget = (typeof resolveTargetKey === "function") ? resolveTargetKey : (() => null);
+  const notifyFirstRender = (typeof onFirstRender === "function") ? onFirstRender : (() => {});
 
   const activeOsdCards = new Map();
   const pendingVolumeUpdates = new Map();
   let volumeRenderQueued = false;
+  let firstRenderNotified = false;
+
+  function notifyRendered() {
+    if (firstRenderNotified) return;
+    firstRenderNotified = true;
+    notifyFirstRender();
+  }
 
   function scheduleVolumeRender() {
     if (volumeRenderQueued) return;
@@ -162,6 +175,7 @@ export function createOsdFeature({
       activeOsdCards.set(key, item);
       refs.card.offsetHeight;
       refs.card.classList.add("visible");
+      notifyRendered();
     }
 
     const displayLabel = displayLabelForTarget(display, target);
@@ -237,6 +251,7 @@ export function createOsdFeature({
       activeOsdCards.set(key, item);
       refs.card.offsetHeight;
       refs.card.classList.add("visible");
+      notifyRendered();
     }
 
     item.displaySignature = null;
@@ -274,11 +289,10 @@ export function createOsdFeature({
       }
     }
     if (typeof payload !== "object") return;
+    if (!isExplicitOsdPayload(payload, isOsdWindow)) return;
 
     const settings = getSettings() || {};
-    if (!settings.enabled && isOsdWindow && payload.osd_enabled !== true) {
-      return;
-    }
+    if (!settings.enabled) return;
 
     if (payload.action === "toggle_mute") {
       showMuteOsd(payload.target, payload.muted, payload.focus_session);

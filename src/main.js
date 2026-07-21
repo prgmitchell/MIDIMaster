@@ -1,3 +1,8 @@
+import { initializePerformanceAudit, performanceAudit } from "./app/performance_audit_api.js";
+import { hydrateThemeLogo } from "./app/theme_logo.js";
+
+hydrateThemeLogo();
+
 const STORAGE_KEY = "midimaster.pendingFrontendLogs";
 const pendingLogs = [];
 let flushInFlight = false;
@@ -114,26 +119,29 @@ window.addEventListener("unhandledrejection", (event) => {
   logFrontend("error", "frontend", "unhandled_rejection", serializeError(event.reason));
 });
 
-function onWindowLoaded() {
-  if (document.readyState === "complete") {
+function onDocumentReady() {
+  if (document.readyState !== "loading") {
     return Promise.resolve();
   }
   return new Promise((resolve) => {
-    window.addEventListener("load", resolve, { once: true });
+    document.addEventListener("DOMContentLoaded", resolve, { once: true });
   });
 }
 
 async function boot() {
+  await initializePerformanceAudit();
+  performanceAudit.mark("bootstrap-start", { readyState: document.readyState });
   logFrontend("info", "frontend", "boot_start", `ready_state=${document.readyState}`);
   if (window.__TAURI__?.core?.invoke) {
     logFrontend("info", "frontend", "tauri_api_seen", "phase=boot");
   }
-  await onWindowLoaded();
-  await flushLogs();
+  await onDocumentReady();
+  performanceAudit.mark("dom-ready");
   logFrontend("info", "frontend", "dynamic_import_start", "module=app_entry.js");
   let appModule;
   try {
     appModule = await import("./app_entry.js");
+    performanceAudit.mark("app-module-loaded");
     logFrontend("info", "frontend", "dynamic_import_ok", "module=app_entry.js");
   } catch (error) {
     logFrontend("error", "frontend", "dynamic_import_failed", serializeError(error));

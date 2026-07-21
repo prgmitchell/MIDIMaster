@@ -160,7 +160,3 @@ export function setupUpdateNotificationWindow({
   applyStoredTheme();
   renderUpdateCopy();
 }
-
-if (document.getElementById("install-button") && document.getElementById("update-message")) {
-  setupUpdateNotificationWindow();
-}

@@ -1,10 +1,23 @@
+import { performanceAudit } from "./performance_audit_api.js";
+
 export function createTauriBridge() {
   let coreApi = null;
   let eventApi = null;
 
   const invoke = async (...args) => {
     if (coreApi?.invoke) {
-      return coreApi.invoke(...args);
+      if (!performanceAudit.enabled) {
+        return coreApi.invoke(...args);
+      }
+      const startedAt = performanceAudit.now();
+      try {
+        const result = await coreApi.invoke(...args);
+        performanceAudit.recordIpc(args[0], startedAt, true);
+        return result;
+      } catch (error) {
+        performanceAudit.recordIpc(args[0], startedAt, false, error);
+        throw error;
+      }
     }
     throw new Error("Tauri API missing");
   };

@@ -873,6 +873,47 @@ pub struct Binding {
 }
 
 impl Binding {
+    pub(crate) fn strip_derived_integration_icons(&mut self) -> bool {
+        fn strip_target(target: &mut BindingTarget) -> bool {
+            let BindingTarget::Integration { data, .. } = target else {
+                return false;
+            };
+            let Some(data) = data.as_object_mut() else {
+                return false;
+            };
+            let snake = data.remove("icon_data").is_some();
+            let camel = data.remove("iconData").is_some();
+            snake || camel
+        }
+
+        fn strip_macro_step(step: &mut MacroStep) -> bool {
+            let mut changed = false;
+            match step {
+                MacroStep::Action(action) => {
+                    for target in &mut action.targets {
+                        changed |= strip_target(target);
+                    }
+                }
+                MacroStep::Parallel { steps } => {
+                    for target in steps.iter_mut().flat_map(|step| step.targets.iter_mut()) {
+                        changed |= strip_target(target);
+                    }
+                }
+                MacroStep::Wait { .. } => {}
+            }
+            changed
+        }
+
+        let mut changed = strip_target(&mut self.target);
+        for target in &mut self.targets {
+            changed |= strip_target(target);
+        }
+        for step in &mut self.macro_steps {
+            changed |= strip_macro_step(step);
+        }
+        changed
+    }
+
     pub fn normalize_button_light_serialization(&mut self) -> bool {
         let before_mode = self.button_light_mode.clone();
         let before_behavior = self.button_light_behavior.clone();
@@ -928,7 +969,7 @@ impl Binding {
             return None;
         }
 
-        let targets = self.normalized_targets();
+        let targets = self.normalized_targets_ref();
         if !targets
             .iter()
             .any(|target| !matches!(target, BindingTarget::Unset))
@@ -936,12 +977,11 @@ impl Binding {
             return Some(0.0);
         }
 
-        let available_targets = targets
-            .into_iter()
-            .filter(target_is_available)
-            .collect::<Vec<_>>();
         Some(
-            if self.has_complete_mapped_button_light_target(&available_targets) {
+            if self.has_complete_mapped_button_light_target_with_availability(
+                targets,
+                &target_is_available,
+            ) {
                 1.0
             } else {
                 0.0
@@ -983,7 +1023,7 @@ impl Binding {
             return Some(value);
         }
 
-        let targets = self.normalized_targets();
+        let targets = self.normalized_targets_ref();
         if !targets
             .iter()
             .any(|target| !matches!(target, BindingTarget::Unset))
@@ -1004,11 +1044,24 @@ impl Binding {
         Some(if active { 1.0 } else { 0.0 })
     }
 
+    #[allow(dead_code)]
     pub fn has_complete_mapped_button_light_target(&self, targets: &[BindingTarget]) -> bool {
+        self.has_complete_mapped_button_light_target_with_availability(targets, &|_| true)
+    }
+
+    fn has_complete_mapped_button_light_target_with_availability(
+        &self,
+        targets: &[BindingTarget],
+        target_is_available: &impl Fn(&BindingTarget) -> bool,
+    ) -> bool {
+        macro_rules! available_targets {
+            () => {
+                targets.iter().filter(|target| target_is_available(target))
+            };
+        }
         match self.action {
             BindingAction::OpenApplication => {
-                targets
-                    .iter()
+                available_targets!()
                     .any(|target| matches!(target, BindingTarget::OpenApplication))
                     && self
                         .open_application
@@ -1017,8 +1070,7 @@ impl Binding {
                         .unwrap_or(false)
             }
             BindingAction::Hotkey => {
-                targets
-                    .iter()
+                available_targets!()
                     .any(|target| matches!(target, BindingTarget::Hotkey))
                     && self
                         .hotkey
@@ -1027,8 +1079,7 @@ impl Binding {
                         .unwrap_or(false)
             }
             BindingAction::RunAutoHotkeyScript => {
-                targets
-                    .iter()
+                available_targets!()
                     .any(|target| matches!(target, BindingTarget::AutoHotkeyScript))
                     && self
                         .autohotkey_script
@@ -1037,14 +1088,12 @@ impl Binding {
                         .unwrap_or(false)
             }
             BindingAction::Macro => {
-                targets
-                    .iter()
+                available_targets!()
                     .any(|target| matches!(target, BindingTarget::Macro))
                     && !normalize_macro_steps(&self.macro_steps).is_empty()
             }
             BindingAction::Soundboard => {
-                targets
-                    .iter()
+                available_targets!()
                     .any(|target| matches!(target, BindingTarget::Soundboard))
                     && self
                         .soundboard
@@ -1055,10 +1104,9 @@ impl Binding {
             BindingAction::MediaPlayPause
             | BindingAction::MediaNextTrack
             | BindingAction::MediaPrevTrack
-            | BindingAction::MediaStop => targets
-                .iter()
+            | BindingAction::MediaStop => available_targets!()
                 .any(|target| matches!(target, BindingTarget::MediaControl)),
-            BindingAction::FocusWindow => targets.iter().any(|target| {
+            BindingAction::FocusWindow => available_targets!().any(|target| {
                 matches!(
                     target,
                     BindingTarget::Application { name, .. } if !name.trim().is_empty()
@@ -1066,24 +1114,21 @@ impl Binding {
             }),
             BindingAction::FullScreenshot
             | BindingAction::SnipScreenshot
-            | BindingAction::ToggleScreenRecording => targets
-                .iter()
+            | BindingAction::ToggleScreenRecording => available_targets!()
                 .any(|target| matches!(target, BindingTarget::CaptureControl)),
-            BindingAction::SetDefaultDevice => targets.iter().any(|target| {
+            BindingAction::SetDefaultDevice => available_targets!().any(|target| {
                 matches!(
                     target,
                     BindingTarget::Device { device_id } if !device_id.trim().is_empty()
                 )
             }),
-            BindingAction::SwitchProfile => targets.iter().any(|target| {
+            BindingAction::SwitchProfile => available_targets!().any(|target| {
                 matches!(target, BindingTarget::Profile { name } if !name.trim().is_empty())
             }),
-            BindingAction::SetMainOutputDevice => targets
-                .iter()
+            BindingAction::SetMainOutputDevice => available_targets!()
                 .any(Self::target_is_complete_for_mapped_light),
             BindingAction::Volume | BindingAction::ToggleMute | BindingAction::ToggleEffect => {
-                targets
-                    .iter()
+                available_targets!()
                     .any(Self::target_is_complete_for_mapped_light)
             }
         }
@@ -1094,7 +1139,7 @@ impl Binding {
             self.action,
             BindingAction::ToggleMute | BindingAction::ToggleEffect
         ) || self
-            .normalized_targets()
+            .normalized_targets_ref()
             .iter()
             .any(Self::target_uses_stateful_toggle_feedback)
     }
@@ -1161,11 +1206,28 @@ impl Binding {
         }
     }
 
+    /// Returns the effective targets without cloning their integration metadata.
+    pub fn normalized_targets_ref(&self) -> &[BindingTarget] {
+        if !self.targets.is_empty() {
+            &self.targets
+        } else if self.target != BindingTarget::Unset {
+            std::slice::from_ref(&self.target)
+        } else {
+            &[]
+        }
+    }
+
     pub fn primary_target(&self) -> BindingTarget {
         self.normalized_targets()
             .into_iter()
             .next()
             .unwrap_or(BindingTarget::Unset)
+    }
+
+    pub fn primary_target_ref(&self) -> &BindingTarget {
+        self.normalized_targets_ref()
+            .first()
+            .unwrap_or(&self.target)
     }
 
     pub fn ensure_targets(&mut self) {

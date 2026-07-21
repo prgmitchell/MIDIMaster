@@ -62,6 +62,22 @@ pub enum MidiDeviceInventorySubmissionDecision {
     Skip { reason: &'static str },
 }
 
+pub fn midi_device_inventory_preflight(
+    settings: &AppSettings,
+) -> Option<MidiDeviceInventorySubmissionDecision> {
+    if settings.midi_device_inventory_consent != MidiDeviceInventoryConsent::Enabled {
+        return Some(MidiDeviceInventorySubmissionDecision::Skip {
+            reason: "consent_not_enabled",
+        });
+    }
+    if settings.midi_device_inventory_notice_version != MIDI_DEVICE_INVENTORY_NOTICE_VERSION {
+        return Some(MidiDeviceInventorySubmissionDecision::Skip {
+            reason: "notice_not_accepted",
+        });
+    }
+    None
+}
+
 pub fn build_midi_device_inventory_payload(
     app_version: String,
     inputs: &[DeviceInfo],
@@ -95,15 +111,8 @@ pub fn midi_device_inventory_submission_decision(
     settings: &AppSettings,
     payload: &MidiDeviceInventoryPayload,
 ) -> Result<MidiDeviceInventorySubmissionDecision, String> {
-    if settings.midi_device_inventory_consent != MidiDeviceInventoryConsent::Enabled {
-        return Ok(MidiDeviceInventorySubmissionDecision::Skip {
-            reason: "consent_not_enabled",
-        });
-    }
-    if settings.midi_device_inventory_notice_version != MIDI_DEVICE_INVENTORY_NOTICE_VERSION {
-        return Ok(MidiDeviceInventorySubmissionDecision::Skip {
-            reason: "notice_not_accepted",
-        });
+    if let Some(decision) = midi_device_inventory_preflight(settings) {
+        return Ok(decision);
     }
     let hash = midi_device_inventory_payload_hash(payload)?;
     if settings
@@ -271,6 +280,22 @@ mod tests {
             MidiDeviceInventorySubmissionDecision::Skip {
                 reason: "consent_not_enabled"
             }
+        );
+    }
+
+    #[test]
+    fn preflight_rejects_disabled_consent_without_a_payload() {
+        let settings = AppSettings {
+            midi_device_inventory_consent: MidiDeviceInventoryConsent::Disabled,
+            midi_device_inventory_notice_version: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+            ..AppSettings::default()
+        };
+
+        assert_eq!(
+            midi_device_inventory_preflight(&settings),
+            Some(MidiDeviceInventorySubmissionDecision::Skip {
+                reason: "consent_not_enabled"
+            })
         );
     }
 

@@ -122,7 +122,7 @@ pub fn assign_button_feedback(binding: &Binding) -> Option<(FeedbackControlKey, 
         return None;
     }
     let has_real_targets = binding
-        .normalized_targets()
+        .normalized_targets_ref()
         .iter()
         .any(|target| !matches!(target, model::BindingTarget::Unset));
     Some((assign_control, if has_real_targets { 1.0 } else { 0.0 }))
@@ -363,8 +363,8 @@ pub fn send_feedback_to_binding(
 }
 
 pub fn targets_overlap(a: &Binding, b: &Binding) -> bool {
-    let a_targets = a.normalized_targets();
-    let b_targets = b.normalized_targets();
+    let a_targets = a.normalized_targets_ref();
+    let b_targets = b.normalized_targets_ref();
     a_targets
         .iter()
         .any(|target| b_targets.iter().any(|other| other == target))

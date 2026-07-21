@@ -180,21 +180,14 @@ body.dark-mode {
 }
 
 .app-logo--dark,
-.app-logo--light {
+.app-logo--light,
+.app-logo--theme {
   filter: var(--app-logo-filter, hue-rotate(0deg) saturate(100%) brightness(100%)) drop-shadow(0 0 8px var(--app-logo-glow));
   transition: filter var(--motion-normal) ease;
 }
 
 .app-logo--light {
   display: none;
-}
-
-body[data-theme="light"] .app-logo--dark {
-  display: none;
-}
-
-body[data-theme="light"] .app-logo--light {
-  display: block;
 }
 
 .app-name {
@@ -458,6 +451,10 @@ input::placeholder {
 }
 
 .midi-device-status.device-empty {
+  color: var(--text-muted);
+}
+
+.midi-device-status.device-loading {
   color: var(--text-muted);
 }
 

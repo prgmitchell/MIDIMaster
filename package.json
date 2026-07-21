@@ -1,0 +1,28 @@
+{
+  "name": "midimaster-development-tools",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "perf:fixtures": "node scripts/perf/generate-fixtures.mjs",
+    "perf:report": "node scripts/perf/generate-report.mjs",
+    "perf:check": "node scripts/perf/evaluate-thresholds.mjs",
+    "perf:midi": "node scripts/perf/run-midi-cdp.mjs",
+    "perf:webdriver": "wdio run scripts/perf/webdriver/wdio.perf.conf.mjs",
+    "perf:guard": "node scripts/perf/check-static-budgets.mjs",
+    "perf:test": "node --test scripts/perf/tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@wdio/cli": "9.29.1",
+    "@wdio/local-runner": "9.29.1",
+    "@wdio/mocha-framework": "9.29.1",
+    "@wdio/spec-reporter": "9.29.1",
+    "@wdio/tauri-service": "1.2.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "serialize-javascript": "7.0.5"
+  }
+}

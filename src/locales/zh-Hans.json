@@ -567,6 +567,7 @@
   "midi.noRoutes": "没有配置 MIDI 路由 .",
   "midi.noAvailableRoute": "无可用的输入/输出路径可添加 .",
   "midi.noActiveDevice": "无活动",
+  "midi.loadingDevices": "正在加载设备…",
   "midi.duplicateInputRoute": "每个MIDI输入只能出现一次.",
   "midi.sharedOutput": "共享",
   "midi.disabled": "已禁用",

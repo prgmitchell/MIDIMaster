@@ -97,18 +97,6 @@ impl DurableJsonStore {
         self.write_locked(value)
     }
 
-    pub(crate) fn update<T, R, F>(&self, update: F) -> Result<R>
-    where
-        T: Clone + Default + DeserializeOwned + Serialize,
-        F: FnOnce(&mut T) -> R,
-    {
-        let _guard = self.lock()?;
-        let mut value = self.load_or_default_locked()?;
-        let result = update(&mut value);
-        self.write_locked(&value)?;
-        Ok(result)
-    }
-
     pub(crate) fn clear(&self) -> Result<()> {
         let _guard = self.lock()?;
         for path in [

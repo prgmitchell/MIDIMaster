@@ -134,6 +134,7 @@ export function createTargetCore({
   getRecordingDevices,
   getFocusedSession,
   getPluginHost,
+  getIntegrationDisplayMetadata,
   getIntegrationTargetState,
 }) {
   const getSess = (typeof getSessions === "function") ? getSessions : (() => []);
@@ -141,6 +142,9 @@ export function createTargetCore({
   const getRecording = (typeof getRecordingDevices === "function") ? getRecordingDevices : (() => []);
   const getFocus = (typeof getFocusedSession === "function") ? getFocusedSession : (() => null);
   const getHost = (typeof getPluginHost === "function") ? getPluginHost : (() => null);
+  const getIntegrationMetadata = (typeof getIntegrationDisplayMetadata === "function")
+    ? getIntegrationDisplayMetadata
+    : (() => null);
   const getIntegrationState = (typeof getIntegrationTargetState === "function")
     ? getIntegrationTargetState
     : (() => null);
@@ -295,8 +299,9 @@ export function createTargetCore({
       }
 
       const data = integration.data || {};
-      const label = data.label || data.display_label || null;
-      const icon_data = data.icon_data || null;
+      const metadata = getIntegrationMetadata(integration.integration_id);
+      const label = data.label || data.display_label || metadata?.label || null;
+      const icon_data = data.icon_data || metadata?.icon_data || null;
       if (label || icon_data) {
         return { label: label || "Integration", icon_data: icon_data || null };
       }

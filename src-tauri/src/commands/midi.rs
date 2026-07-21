@@ -111,6 +111,8 @@ fn midi_event_callback(
 ) -> Arc<dyn Fn(crate::model::MidiEvent) + Send + Sync + 'static> {
     Arc::new(move |event| {
         let state = app_handle.state::<AppState>();
+        #[cfg(feature = "perf-audit")]
+        crate::perf_audit::record_midi_enqueue(&event);
         let enqueue_result = state.midi_event_queue.lock();
         match enqueue_result {
             Ok(mut queue) => {
@@ -626,7 +628,7 @@ pub fn start_midi_device_routes(
             .map_err(|_| "Lock poisoned".to_string())?;
 
         if let Some(profile) = profile_guard.as_ref() {
-            let mut updated = profile.clone();
+            let mut updated = profile.profile().clone();
             let migrations;
             (migrated_count, migrations) =
                 migrate_profile_route_inputs(&mut updated, &requested_connected_routes);
@@ -636,7 +638,7 @@ pub fn start_midi_device_routes(
                     .profile_store
                     .save_profile(updated.clone())
                     .map_err(|err| err.to_string())?;
-                *profile_guard = Some(updated.clone());
+                *profile_guard = Some(AppState::profile_snapshot(updated.clone()));
                 profile_for_sync = Some((updated, migrations));
             }
         }

@@ -21,6 +21,44 @@ import {
   unavailableDeviceLabel,
 } from "./device_preferences.js";
 
+function routeDeviceLabel(route, kind) {
+  if (!route) return "";
+  if (kind === "input") {
+    return route.inputDeviceName || route.inputDeviceId || "";
+  }
+  return route.outputDeviceName || route.outputDeviceId || "";
+}
+
+export function resolveMidiDeviceStatusPresentation({
+  routes,
+  kind,
+  loading = false,
+  translate = (key) => key,
+} = {}) {
+  const activeRoutes = (Array.isArray(routes) ? routes : [])
+    .filter((route) => route?.enabled !== false);
+  const first = activeRoutes[0] || null;
+  const isLoading = Boolean(loading && !first);
+  const label = isLoading
+    ? translate("midi.loadingDevices")
+    : (first ? routeDeviceLabel(first, kind) : translate("midi.noActiveDevice"));
+  const additionalDevices = activeRoutes
+    .slice(1)
+    .map((route) => routeDeviceLabel(route, kind))
+    .filter(Boolean);
+  return {
+    activeRoutes,
+    isLoading,
+    label,
+    additionalDevices,
+    title: isLoading
+      ? translate("midi.loadingDevices")
+      : (activeRoutes.length > 0
+        ? activeRoutes.map((route) => routeDeviceLabel(route, kind)).filter(Boolean).join(", ")
+        : translate("midi.noActiveDevice")),
+  };
+}
+
 export function createMidiFeature({
   invoke,
   dom,
@@ -82,6 +120,7 @@ export function createMidiFeature({
   let routesButtonEl = null;
   let routesPopoverEl = null;
   let deviceDocClickBound = false;
+  let initialDeviceLoadPending = true;
 
   function setConnectedState(inputId, outputId, inputName = "", outputName = "") {
     setConnectedRoutes(inputId && outputId ? [{
@@ -480,24 +519,16 @@ export function createMidiFeature({
     syncRoutesButtonLabel();
   }
 
-  function routeDeviceLabel(route, kind) {
-    if (!route) return "";
-    if (kind === "input") {
-      return route.inputDeviceName || route.inputDeviceId || "";
-    }
-    return route.outputDeviceName || route.outputDeviceId || "";
-  }
-
   function renderDeviceStatus(root, displayEl, kind) {
     if (!root || !displayEl) return;
-    const activeRoutes = connectedRoutes.filter((route) => route.enabled !== false);
-    const first = activeRoutes[0] || null;
-    const extraCount = Math.max(0, activeRoutes.length - 1);
-    const label = first ? routeDeviceLabel(first, kind) : t("midi.noActiveDevice");
-    const additionalDevices = activeRoutes
-      .slice(1)
-      .map((route) => routeDeviceLabel(route, kind))
-      .filter(Boolean);
+    const presentation = resolveMidiDeviceStatusPresentation({
+      routes: connectedRoutes,
+      kind,
+      loading: initialDeviceLoadPending,
+      translate: t,
+    });
+    const extraCount = Math.max(0, presentation.activeRoutes.length - 1);
+    const additionalDevices = presentation.additionalDevices;
     const additionalDeviceList = additionalDevices.join(", ");
     const badges = extraCount > 0 ? [{
       text: `+${extraCount}`,
@@ -506,17 +537,15 @@ export function createMidiFeature({
       ariaLabel: additionalDeviceList,
     }] : [];
     renderLabelWithBadges(displayEl, {
-      text: label,
+      text: presentation.label,
       badges,
       truncate: true,
     });
-    const title = activeRoutes.length > 0
-      ? activeRoutes.map((route) => routeDeviceLabel(route, kind)).filter(Boolean).join(", ")
-      : t("midi.noActiveDevice");
-    root.title = title;
-    root.classList.toggle("device-connected", activeRoutes.length > 0);
-    root.classList.toggle("device-unavailable", activeRoutes.length === 0);
-    root.classList.toggle("device-empty", activeRoutes.length === 0);
+    root.title = presentation.title;
+    root.classList.toggle("device-loading", presentation.isLoading);
+    root.classList.toggle("device-connected", presentation.activeRoutes.length > 0);
+    root.classList.toggle("device-unavailable", !presentation.isLoading && presentation.activeRoutes.length === 0);
+    root.classList.toggle("device-empty", !presentation.isLoading && presentation.activeRoutes.length === 0);
   }
 
   function renderDeviceDropdowns() {
@@ -2048,6 +2077,12 @@ export function createMidiFeature({
     });
   }
 
+  function completeInitialDeviceLoad() {
+    if (!initialDeviceLoadPending) return;
+    initialDeviceLoadPending = false;
+    renderDeviceDropdowns();
+  }
+
   return {
     bindUi,
     refreshMidiDevices,
@@ -2062,6 +2097,7 @@ export function createMidiFeature({
     connectSelected,
     disconnect,
     syncToProfileDevice,
+    completeInitialDeviceLoad,
     getDesiredMidiPreference,
     checkAvailabilityNow: checkAvailabilityLoop,
   };
