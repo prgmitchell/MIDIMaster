@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const bindingModelSource = await readFile(new URL("../src/core/binding_model.js", import.meta.url), "utf8");
-const bindingModelUrl = `data:text/javascript;base64,${Buffer.from(bindingModelSource).toString("base64")}`;
+const bindingModelUrl = new URL("../src/core/binding_model.js", import.meta.url).href;
 
 const helperRawSource = await readFile(new URL("../src/features/bindings/fader_curve_presets.js", import.meta.url), "utf8");
 const helperSource = helperRawSource.replace(

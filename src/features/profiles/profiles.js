@@ -1,4 +1,8 @@
 import { closeAllDropdowns } from "../ui/dropdown_badges.js";
+import {
+  buildPersistedMidiPreference as buildPersistedMidiDevicePreference,
+  normalizeMidiPreference as toClientMidiDevicePreference,
+} from "../../core/midi_preferences.js";
 
 export function createProfilesFeature({
   invoke,
@@ -80,103 +84,6 @@ export function createProfilesFeature({
       opacity: Number(current.opacity ?? defaults.opacity ?? 0.96),
       scale: Number(current.scale ?? defaults.scale ?? 1),
     };
-  }
-
-  function buildPersistedMidiDevicePreference(source) {
-    const current = (source && typeof source === "object") ? source : {};
-    const routes = normalizeProfileRoutes(current);
-    const first = routes[0] || {};
-    const inputDeviceId = String(first.inputDeviceId || current.inputDeviceId || current.input_device_id || "").trim();
-    const outputDeviceId = String(first.outputDeviceId || current.outputDeviceId || current.output_device_id || "").trim();
-    const inputDeviceName = String(first.inputDeviceName || current.inputDeviceName || current.input_device_name || "").trim();
-    const outputDeviceName = String(first.outputDeviceName || current.outputDeviceName || current.output_device_name || "").trim();
-
-    return {
-      input_device_id: inputDeviceId || null,
-      output_device_id: outputDeviceId || null,
-      input_device_name: inputDeviceName || null,
-      output_device_name: outputDeviceName || null,
-      routes: routes.map((route) => ({
-        input_device_id: route.inputDeviceId,
-        output_device_id: route.outputDeviceId,
-        input_device_name: route.inputDeviceName || null,
-        output_device_name: route.outputDeviceName || null,
-        enabled: route.enabled !== false,
-      })),
-    };
-  }
-
-  function toClientMidiDevicePreference(source) {
-    const persisted = buildPersistedMidiDevicePreference(source);
-    const current = (source && typeof source === "object") ? source : {};
-    const routes = normalizeProfileRoutes(persisted);
-    return {
-      inputDeviceId: persisted.input_device_id || "",
-      outputDeviceId: persisted.output_device_id || "",
-      inputDeviceName: persisted.input_device_name || "",
-      outputDeviceName: persisted.output_device_name || "",
-      routes,
-      configured: Boolean(
-        current.configured
-        ?? current.midiDevicePreferenceSet
-        ?? current.midi_device_preference_set
-        ?? current.midi_device_preference_configured
-        ?? (routes.length > 0)
-      ),
-    };
-  }
-
-  function normalizeProfileRoute(source) {
-    const current = (source && typeof source === "object") ? source : {};
-    const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
-    const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
-    if (!inputDeviceId || !outputDeviceId) return null;
-    return {
-      inputDeviceId,
-      outputDeviceId,
-      inputDeviceName: String(current.inputDeviceName || current.input_device_name || "").trim(),
-      outputDeviceName: String(current.outputDeviceName || current.output_device_name || "").trim(),
-      enabled: current.enabled !== false,
-    };
-  }
-
-  function normalizeProfileRoutes(source) {
-    const current = (source && typeof source === "object") ? source : {};
-    const rawRoutes = Array.isArray(current.routes)
-      ? current.routes
-      : (Array.isArray(current.midi_device_routes) ? current.midi_device_routes : []);
-    const routes = [];
-    rawRoutes.forEach((raw) => {
-      const route = normalizeProfileRoute(raw);
-      if (!route || routes.some((existing) => sameProfileInputRouteIdentity(existing, route))) return;
-      routes.push(route);
-    });
-    if (routes.length === 0) {
-      const legacy = normalizeProfileRoute({
-        inputDeviceId: current.inputDeviceId || current.input_device_id,
-        outputDeviceId: current.outputDeviceId || current.output_device_id,
-        inputDeviceName: current.inputDeviceName || current.input_device_name,
-        outputDeviceName: current.outputDeviceName || current.output_device_name,
-        enabled: true,
-      });
-      if (legacy) routes.push(legacy);
-    }
-    return routes;
-  }
-
-  function sameProfileInputRouteIdentity(left, right) {
-    const leftInputId = String(left?.inputDeviceId || left?.input_device_id || "").trim();
-    const rightInputId = String(right?.inputDeviceId || right?.input_device_id || "").trim();
-    if (!leftInputId || leftInputId !== rightInputId) return false;
-
-    const leftName = stripUnavailableSuffix(left?.inputDeviceName || left?.input_device_name || "");
-    const rightName = stripUnavailableSuffix(right?.inputDeviceName || right?.input_device_name || "");
-    return !(leftName && rightName && leftName !== rightName);
-  }
-
-  function stripUnavailableSuffix(label) {
-    const raw = String(label || "").trim();
-    return raw.endsWith(" (Unavailable)") ? raw.slice(0, -" (Unavailable)".length) : raw;
   }
 
   function setProfileSelection(name) {

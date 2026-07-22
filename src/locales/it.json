@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "Fare doppio clic per rinominare",
   "bindings.unset": "Un set",
   "bindings.loading": "Caricamento dei binding...",
-  "bindings.noBindings": "Ancora nessun legame. Utilizzare il pulsante qui sotto per aggiungere uno.",
+  "bindings.noBindings": "Ancora nessun legame. Selezionare Aggiungi Binding sopra per crearne uno.",
   "bindings.noSearchResults": "Nessun legame corrisponde alla tua ricerca.",
   "bindings.noFilterResults": "Nessuna associazione corrisponde a questo filtro.",
   "bindings.bindingFallback": "Binding {number}",

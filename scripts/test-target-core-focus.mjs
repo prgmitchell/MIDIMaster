@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-
-const targetCoreSource = await readFile(new URL("../src/core/target_core.js", import.meta.url), "utf8");
-const targetCoreModuleUrl = `data:text/javascript;base64,${Buffer.from(targetCoreSource).toString("base64")}`;
-const { createTargetCore, SYSTEM_SOUNDS_ICON_DATA, iconDataForSession } = await import(targetCoreModuleUrl);
+import { createTargetCore, SYSTEM_SOUNDS_ICON_DATA, iconDataForSession } from "../src/core/target_core.js";
 
 const sessionRefreshSource = await readFile(new URL("../src/app/session_refresh.js", import.meta.url), "utf8");
 const sessionRefreshModuleUrl = `data:text/javascript;base64,${Buffer.from(sessionRefreshSource).toString("base64")}`;

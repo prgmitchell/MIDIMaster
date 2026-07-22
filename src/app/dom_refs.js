@@ -1,7 +1,19 @@
+function selectRefs(refs, { prefixes = [], keys = [] }) {
+  const namedKeys = new Set(keys);
+  return Object.fromEntries(
+    Object.entries(refs).filter(([key]) => (
+      namedKeys.has(key) || prefixes.some((prefix) => key.startsWith(prefix))
+    )),
+  );
+}
+
 export function createDomRefs() {
   const midiSelect = document.getElementById("midi-device");
   const midiOutputSelect = document.getElementById("midi-output-device");
   const midiStatus = document.getElementById("midi-status");
+  const refreshMidiButton = document.getElementById("refresh-midi");
+  const learnBindingButton = document.getElementById("learn-binding");
+  const bindingAddFooterButton = document.getElementById("binding-add-footer-button");
   const sessionsContainer = document.getElementById("sessions");
   const profileDropdown = document.getElementById("profiles-dropdown");
   const profileToggle = document.getElementById("profile-toggle");
@@ -221,10 +233,13 @@ export function createDomRefs() {
   const alertCancel = document.getElementById("alert-cancel");
   const alertOk = document.getElementById("alert-ok");
 
-  return {
+  const all = {
     midiSelect,
     midiOutputSelect,
     midiStatus,
+    refreshMidiButton,
+    learnBindingButton,
+    bindingAddFooterButton,
     sessionsContainer,
     profileDropdown,
     profileToggle,
@@ -411,5 +426,44 @@ export function createDomRefs() {
     alertSecondary,
     alertCancel,
     alertOk,
+  };
+
+  return {
+    shell: selectRefs(all, {
+      prefixes: ["app", "sidebar"],
+      keys: ["mainScreen", "sessionsContainer", "osd"],
+    }),
+    bindings: selectRefs(all, {
+      prefixes: ["binding", "learn"],
+      keys: ["mainScreen"],
+    }),
+    targets: selectRefs(all, { prefixes: ["target"] }),
+    midi: selectRefs(all, {
+      prefixes: ["midi", "learn"],
+      keys: ["mainScreen", "refreshMidiButton", "bindingAddFooterButton"],
+    }),
+    profiles: selectRefs(all, { prefixes: ["profile"] }),
+    settings: selectRefs(all, {
+      prefixes: ["settings", "osd"],
+      keys: [
+        "settingsButton",
+        "topbarUpdateButton",
+        "startWithWindowsSelect",
+        "startInTraySelect",
+        "minimizeToTraySelect",
+        "exitToTraySelect",
+        "languageSelect",
+        "autoCheckUpdatesButton",
+        "midiDeviceInventoryConsentToggle",
+        "openLogsFolderButton",
+        "resetAppDataButton",
+        "checkForUpdatesButton",
+        "updateCurrentVersion",
+        "updateLatestVersion",
+        "sidebarAppVersion",
+      ],
+    }),
+    connections: selectRefs(all, { prefixes: ["connections"] }),
+    alerts: selectRefs(all, { prefixes: ["alert"] }),
   };
 }

@@ -116,6 +116,12 @@ struct FeedbackSyncNeeds {
     recording_devices: bool,
 }
 
+#[derive(Default)]
+struct TargetSnapshot {
+    value: Option<f32>,
+    muted: Option<bool>,
+}
+
 fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
     let mut needs = FeedbackSyncNeeds::default();
 
@@ -127,40 +133,123 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
             continue;
         }
 
-        match binding.primary_target() {
-            model::BindingTarget::Master
-            | model::BindingTarget::Session { .. }
-            | model::BindingTarget::Application { .. } => {
+        match binding.primary_target().feedback_source() {
+            model::BindingTargetFeedbackSource::Sessions => {
                 needs.sessions = true;
             }
-            model::BindingTarget::Focus => {
+            model::BindingTargetFeedbackSource::FocusedSession => {
                 needs.focused_session = true;
             }
-            model::BindingTarget::Device { device_id } => {
+            model::BindingTargetFeedbackSource::Device => {
+                let model::BindingTarget::Device { device_id } = binding.primary_target() else {
+                    continue;
+                };
                 let (kind, _) = parse_device_target(&device_id);
                 match kind {
                     DeviceTargetKind::Playback => needs.playback_devices = true,
                     DeviceTargetKind::Recording => needs.recording_devices = true,
                 }
             }
-            model::BindingTarget::Unset
-            | model::BindingTarget::MonitorBrightness { .. }
-            | model::BindingTarget::MediaControl
-            | model::BindingTarget::CaptureControl
-            | model::BindingTarget::Hotkey
-            | model::BindingTarget::OpenApplication
-            | model::BindingTarget::AutoHotkeyScript
-            | model::BindingTarget::Profile { .. }
-            | model::BindingTarget::Macro
-            | model::BindingTarget::Soundboard
-            | model::BindingTarget::Integration { .. } => {}
+            model::BindingTargetFeedbackSource::None => {}
         }
     }
 
     needs
 }
 
+fn target_snapshot(
+    target: &model::BindingTarget,
+    sessions: &[model::SessionInfo],
+    focused_session: Option<&model::SessionInfo>,
+    playback_devices: &[model::PlaybackDeviceInfo],
+    recording_devices: &[model::PlaybackDeviceInfo],
+) -> TargetSnapshot {
+    if target.feedback_source() == model::BindingTargetFeedbackSource::None {
+        return TargetSnapshot::default();
+    }
+
+    let from_session = |session: Option<&model::SessionInfo>| TargetSnapshot {
+        value: session.map(|item| item.volume),
+        muted: session.map(|item| item.is_muted),
+    };
+    let from_device = |device: Option<&model::PlaybackDeviceInfo>| TargetSnapshot {
+        value: device.map(|item| item.volume),
+        muted: device.map(|item| item.is_muted),
+    };
+
+    match target {
+        model::BindingTarget::Master => {
+            from_session(sessions.iter().find(|session| session.is_master))
+        }
+        model::BindingTarget::Focus => from_session(focused_session),
+        model::BindingTarget::Session { session_id } => {
+            from_session(sessions.iter().find(|session| session.id == *session_id))
+        }
+        model::BindingTarget::Application { name, .. } => {
+            from_session(sessions.iter().find(|session| {
+                application_name_matches(
+                    name,
+                    ApplicationMatchInfo {
+                        process_path: session.process_path.as_deref(),
+                        process_name: session.process_name.as_deref(),
+                        display_name: Some(session.display_name.as_str()),
+                        application_key: session.application_key.as_deref(),
+                        ..Default::default()
+                    },
+                )
+            }))
+        }
+        model::BindingTarget::Device { device_id } => {
+            let (kind, raw_id) = parse_device_target(device_id);
+            match kind {
+                DeviceTargetKind::Playback => {
+                    from_device(playback_devices.iter().find(|device| device.id == raw_id))
+                }
+                DeviceTargetKind::Recording => {
+                    from_device(recording_devices.iter().find(|device| device.id == raw_id))
+                }
+            }
+        }
+        _ => TargetSnapshot::default(),
+    }
+}
+
 impl AppState {
+    pub(crate) fn new(
+        audio: Box<dyn AudioBackend>,
+        profile_store: ProfileStore,
+        app_settings_store: AppSettingsStore,
+        app_settings: AppSettings,
+        storage_recovery_notices: StorageRecoveryNotices,
+    ) -> Self {
+        Self {
+            audio,
+            midi: Arc::new(Mutex::new(MidiManager::new())),
+            midi_event_queue: Arc::new(Mutex::new(MidiEventQueue::default())),
+            profile_store,
+            app_settings_store,
+            active_profile: Mutex::new(None),
+            binding_state: Arc::new(Mutex::new(HashMap::new())),
+            feedback_values: Arc::new(Mutex::new(HashMap::new())),
+            binding_action_values: Arc::new(Mutex::new(HashMap::new())),
+            integration_connection_states: Mutex::new(HashMap::new()),
+            activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
+            running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            soundboard: Arc::new(SoundboardService::default()),
+            last_mute_input_active: Mutex::new(HashMap::new()),
+            focus_volume_failure_logs: Mutex::new(HashMap::new()),
+            mute_transition_until: Mutex::new(HashMap::new()),
+            last_target_mute_state: Mutex::new(HashMap::new()),
+            learn_pending: Mutex::new(false),
+            learn_candidate: Mutex::new(None),
+            learned_control: Mutex::new(None),
+            osd_last_update: Mutex::new(None),
+            osd_settings: Mutex::new(OsdSettings::default()),
+            app_settings: Mutex::new(app_settings),
+            storage_recovery_notices,
+        }
+    }
+
     pub(crate) fn profile_snapshot(profile: Profile) -> Arc<ProfileSnapshot> {
         Arc::new(ProfileSnapshot::new(profile))
     }
@@ -597,131 +686,18 @@ impl AppState {
                 continue;
             }
 
-            let mut current_target_muted: Option<bool> = None;
+            let snapshot = target_snapshot(
+                primary_target,
+                &sessions,
+                focused_session.as_ref(),
+                &playback_devices,
+                &recording_devices,
+            );
+            let current_target_muted = snapshot.muted;
             let value = if binding.action == model::BindingAction::ToggleMute {
-                match primary_target {
-                    model::BindingTarget::Master => sessions
-                        .iter()
-                        .find(|session| session.is_master)
-                        .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
-                    model::BindingTarget::Focus => {
-                        focused_session
-                            .as_ref()
-                            .map(|session| if session.is_muted { 1.0 } else { 0.0 })
-                    }
-                    model::BindingTarget::Session { session_id } => sessions
-                        .iter()
-                        .find(|session| session.id == *session_id)
-                        .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
-                    model::BindingTarget::Application { name, .. } => sessions
-                        .iter()
-                        .find(|session| {
-                            application_name_matches(
-                                name,
-                                ApplicationMatchInfo {
-                                    process_path: session.process_path.as_deref(),
-                                    process_name: session.process_name.as_deref(),
-                                    display_name: Some(session.display_name.as_str()),
-                                    application_key: session.application_key.as_deref(),
-                                    ..Default::default()
-                                },
-                            )
-                        })
-                        .map(|session| if session.is_muted { 1.0 } else { 0.0 }),
-                    model::BindingTarget::Device { device_id } => {
-                        let (kind, raw_id) = parse_device_target(device_id);
-                        match kind {
-                            DeviceTargetKind::Playback => playback_devices
-                                .iter()
-                                .find(|device| device.id == raw_id)
-                                .map(|device| if device.is_muted { 1.0 } else { 0.0 }),
-                            DeviceTargetKind::Recording => recording_devices
-                                .iter()
-                                .find(|device| device.id == raw_id)
-                                .map(|device| if device.is_muted { 1.0 } else { 0.0 }),
-                        }
-                    }
-                    model::BindingTarget::Unset => None,
-                    model::BindingTarget::MonitorBrightness { .. } => None,
-                    model::BindingTarget::MediaControl => None,
-                    model::BindingTarget::CaptureControl => None,
-                    model::BindingTarget::Hotkey => None,
-                    model::BindingTarget::OpenApplication => None,
-                    model::BindingTarget::AutoHotkeyScript => None,
-                    model::BindingTarget::Profile { .. } => None,
-                    model::BindingTarget::Macro => None,
-                    model::BindingTarget::Soundboard => None,
-                    model::BindingTarget::Integration { .. } => None,
-                }
+                snapshot.muted.map(|muted| if muted { 1.0 } else { 0.0 })
             } else {
-                match primary_target {
-                    model::BindingTarget::Master => sessions
-                        .iter()
-                        .find(|session| session.is_master)
-                        .map(|session| {
-                            current_target_muted = Some(session.is_muted);
-                            session.volume
-                        }),
-                    model::BindingTarget::Focus => focused_session.as_ref().map(|session| {
-                        current_target_muted = Some(session.is_muted);
-                        session.volume
-                    }),
-                    model::BindingTarget::Session { session_id } => sessions
-                        .iter()
-                        .find(|session| session.id == *session_id)
-                        .map(|session| {
-                            current_target_muted = Some(session.is_muted);
-                            session.volume
-                        }),
-                    model::BindingTarget::Application { name, .. } => sessions
-                        .iter()
-                        .find(|session| {
-                            application_name_matches(
-                                name,
-                                ApplicationMatchInfo {
-                                    process_path: session.process_path.as_deref(),
-                                    process_name: session.process_name.as_deref(),
-                                    display_name: Some(session.display_name.as_str()),
-                                    application_key: session.application_key.as_deref(),
-                                    ..Default::default()
-                                },
-                            )
-                        })
-                        .map(|session| {
-                            current_target_muted = Some(session.is_muted);
-                            session.volume
-                        }),
-                    model::BindingTarget::Device { device_id } => {
-                        let (kind, raw_id) = parse_device_target(device_id);
-                        match kind {
-                            DeviceTargetKind::Playback => playback_devices
-                                .iter()
-                                .find(|device| device.id == raw_id)
-                                .map(|device| {
-                                    current_target_muted = Some(device.is_muted);
-                                    device.volume
-                                }),
-                            DeviceTargetKind::Recording => recording_devices
-                                .iter()
-                                .find(|device| device.id == raw_id)
-                                .map(|device| {
-                                    current_target_muted = Some(device.is_muted);
-                                    device.volume
-                                }),
-                        }
-                    }
-                    model::BindingTarget::Unset => None,
-                    model::BindingTarget::MonitorBrightness { .. } => None,
-                    model::BindingTarget::MediaControl => None,
-                    model::BindingTarget::CaptureControl => None,
-                    model::BindingTarget::Hotkey => None,
-                    model::BindingTarget::OpenApplication => None,
-                    model::BindingTarget::AutoHotkeyScript => None,
-                    model::BindingTarget::Profile { .. } => None,
-                    model::BindingTarget::Macro => None,
-                    model::BindingTarget::Soundboard => None,
-                    model::BindingTarget::Integration { .. } => None,
-                }
+                snapshot.value
             };
 
             if let Some(mut val) = value {

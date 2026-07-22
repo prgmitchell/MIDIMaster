@@ -34,8 +34,7 @@ export function createSettingsFeature({
   setOsdSettings,
   getMonitorOptions,
   setMonitorOptions,
-  getAppSettings,
-  setAppSettings,
+  settingsStore,
   applyAppearance,
   showAlert,
   onUpdateAvailableClick,
@@ -44,7 +43,12 @@ export function createSettingsFeature({
   if (typeof invoke !== "function") {
     throw new Error("createSettingsFeature: invoke is required");
   }
+  if (!settingsStore || typeof settingsStore.get !== "function" || typeof settingsStore.update !== "function") {
+    throw new Error("createSettingsFeature: settingsStore is required");
+  }
   const d = (dom && typeof dom === "object") ? dom : {};
+  const getAppSettings = () => settingsStore.get();
+  const setAppSettings = (next) => settingsStore.update(next);
   const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   const applyTranslations = () => {
     if (i18n && typeof i18n.applyTranslations === "function") {
@@ -1559,47 +1563,12 @@ export function createSettingsFeature({
     renderUpdateUi();
   }
 
-  function normalizeBackendAppSettings(settings) {
-    return {
-      startWithWindows: Boolean(settings.start_with_windows ?? settings.startWithWindows),
-      startInTray: Boolean(settings.start_in_tray ?? settings.startInTray),
-      minimizeToTray: Boolean(settings.minimize_to_tray ?? settings.minimizeToTray),
-      exitToTray: Boolean(settings.exit_to_tray ?? settings.exitToTray),
-      compactBindings: Boolean(settings.compact_bindings ?? settings.compactBindings),
-      autoCheckUpdates: Boolean(settings.auto_check_updates ?? settings.autoCheckUpdates ?? true),
-      language: normalizeLanguage(settings.language ?? settings.languageCode ?? "en"),
-      midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(
-        settings.midi_device_inventory_consent ?? settings.midiDeviceInventoryConsent,
-      ),
-      midiDeviceInventoryNoticeVersion: Number(
-        settings.midi_device_inventory_notice_version
-        ?? settings.midiDeviceInventoryNoticeVersion
-        ?? 0,
-      ),
-      appearance: settings.appearance && typeof settings.appearance === "object"
-        ? normalizeAppearanceSettings(settings.appearance)
-        : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme),
-    };
-  }
-
   function persistAppSettings({ previousSettings = null } = {}) {
-    const s = (typeof getAppSettings === "function") ? (getAppSettings() || {}) : {};
-    return invoke("update_app_settings", {
-      startWithWindows: Boolean(s.startWithWindows),
-      startInTray: Boolean(s.startInTray),
-      minimizeToTray: Boolean(s.minimizeToTray),
-      exitToTray: Boolean(s.exitToTray),
-      autoCheckUpdates: s.autoCheckUpdates !== false,
-      language: normalizeLanguage(s.language),
-    }).then((updated) => {
-      if (updated && typeof updated === "object") {
-        syncAppSettingsUI(normalizeBackendAppSettings(updated));
-      }
+    return settingsStore.persist({ previousSettings }).then((updated) => {
+      syncAppSettingsUI(updated);
     }).catch((error) => {
       console.error("Failed to update app settings", error);
-      if (previousSettings && typeof previousSettings === "object") {
-        syncAppSettingsUI(previousSettings);
-      }
+      syncAppSettingsUI(settingsStore.get());
       showSettingsAlert?.(
         t("dialogs.actionFailedTitle"),
         String(error || t("dialogs.actionFailedMessage")),
@@ -1624,12 +1593,9 @@ export function createSettingsFeature({
 
   async function loadAppSettings({ applyLocale = true } = {}) {
     try {
-      const settings = await invoke("get_app_settings");
+      const settings = await settingsStore.load();
       if (settings) {
-        const next = normalizeBackendAppSettings(settings);
-        if (typeof setAppSettings === "function") {
-          setAppSettings(next);
-        }
+        const next = settingsStore.get();
         setAppearanceState(next.appearance);
         if (applyLocale) {
           await i18n?.setLocale?.(next.language).catch((error) => {

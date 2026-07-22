@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "Haga doble clic para cambiar el nombre",
   "bindings.unset": "Unset",
   "bindings.loading": "Cargando bindings...",
-  "bindings.noBindings": "Aún no hay vinculantes. Utilice el botón de abajo para añadir uno.",
+  "bindings.noBindings": "Aún no hay vinculantes. Seleccione Añadir Vinculación arriba para crear uno.",
   "bindings.noSearchResults": "No hay enlaces que coincidan con su búsqueda.",
   "bindings.noFilterResults": "No hay enlaces que coincidan con este filtro.",
   "bindings.bindingFallback": "Binding {number}",

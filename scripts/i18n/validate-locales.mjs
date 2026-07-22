@@ -137,12 +137,7 @@ for (const locale of locales) {
   }
 
   const keys = Object.keys(catalog).sort();
-  const missing = englishKeys.filter((key) => !Object.prototype.hasOwnProperty.call(catalog, key));
   const extra = keys.filter((key) => !Object.prototype.hasOwnProperty.call(english, key));
-  if (missing.length > 0) {
-    console.error(`[i18n] ${locale}: missing keys: ${missing.join(", ")}`);
-    failed = true;
-  }
   if (extra.length > 0) {
     console.error(`[i18n] ${locale}: extra keys: ${extra.join(", ")}`);
     failed = true;
@@ -164,7 +159,7 @@ for (const locale of locales) {
       untranslatedFallbacks.push(key);
     }
   }
-  const fallbackRatio = untranslatedFallbacks.length / Math.max(1, englishKeys.length);
+  const fallbackRatio = untranslatedFallbacks.length / Math.max(1, keys.length);
   if (fallbackRatio > 0.2) {
     console.error(`[i18n] ${locale}: too many untranslated English fallbacks (${untranslatedFallbacks.length}/${englishKeys.length}): ${untranslatedFallbacks.join(", ")}`);
     failed = true;

@@ -10,45 +10,48 @@ import {
 import {
   applyCurveToNormalized,
   assignModeTooltip,
-  buildHotkeyMappingFromEvent,
   buttonModeValue,
-  buttonVisualBehavior,
   cloneBindingDraft,
   curveDisplayName,
   curveEditorPoints,
   curveHelpText,
   customCurvePoints,
-  effectiveButtonLightMode,
   effectiveIsButton,
   ensureAuxShape,
   ensureBindingShape,
-  getPrimaryTarget,
-  getTargets,
   isAutoHotkeyScriptTarget,
   isHotkeyTarget,
   isMacroTarget,
   isOpenApplicationTarget,
   isSoundboardTarget,
-  MACRO_MAX_PARALLEL_STEPS,
-  MACRO_MAX_TOP_LEVEL_STEPS,
-  MACRO_MAX_WAIT_MS,
   modeTooltip,
   muteBehaviorLabel,
   muteBehaviorTooltip,
-  normalizeButtonLightBehavior,
   normalizeControlKind,
   normalizeCustomCurve,
+  normalizeMuteBehavior,
+} from "./shape_helpers.js";
+import {
+  MACRO_MAX_PARALLEL_STEPS,
+  MACRO_MAX_TOP_LEVEL_STEPS,
+  MACRO_MAX_WAIT_MS,
+  buildHotkeyMappingFromEvent,
+  buttonVisualBehavior,
+  effectiveButtonLightMode,
+  getBindingTargets as getTargets,
+  getPrimaryBindingTarget as getPrimaryTarget,
+  mappedButtonLightFeedbackValue,
+  normalizeButtonLightBehavior,
   normalizeFaderCurve,
   normalizeMacroActionState,
   normalizeMacroActionStep,
   normalizeMacroSteps,
-  normalizeMuteBehavior,
   normalizeRelativeFormat,
   normalizeSoundboardMapping,
   presetCurvePoints,
   resolveButtonVisualActive,
-  setTargets,
-} from "./shape_helpers.js";
+  setBindingTargets as setTargets,
+} from "../../core/binding_model.js";
 import {
   clampSoundboardTrim,
   drawSoundboardWaveform,
@@ -455,14 +458,14 @@ export function createBindingsFeature({
     }
   }
 
-  function openBindingTargetPicker(bindingId) {
+  async function openBindingTargetPicker(bindingId) {
     const targetId = String(bindingId || "");
-    if (!targetId) return;
+    if (!targetId) return false;
     setEditingId(null);
     setPendingFocusId(null);
     ensureBindingVisibleForPicker(targetId);
 
-    const openRenderedPicker = () => {
+    const openRenderedPicker = async () => {
       const item = findRenderedBindingItem(targetId);
       if (!item) return false;
       const reduceMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
@@ -481,7 +484,7 @@ export function createBindingsFeature({
 
       const targetDropdown = item.querySelector(".binding-target-dropdown");
       if (typeof targetDropdown?.openTargetPicker === "function") {
-        targetDropdown.openTargetPicker();
+        await targetDropdown.openTargetPicker();
         return true;
       }
       const targetButton = targetDropdown?.querySelector?.(".target-button");
@@ -492,10 +495,12 @@ export function createBindingsFeature({
       return false;
     };
 
-    requestAnimationFrame(() => {
-      if (!openRenderedPicker()) {
-        setTimeout(openRenderedPicker, 0);
-      }
+    if (await openRenderedPicker()) return true;
+
+    return new Promise((resolve, reject) => {
+      requestAnimationFrame(() => {
+        openRenderedPicker().then(resolve, reject);
+      });
     });
   }
 
@@ -576,100 +581,6 @@ export function createBindingsFeature({
 
   function targetIsNonUnset(target) {
     return Boolean(target && target !== "Unset" && !("Unset" in Object(target)) && !("unset" in Object(target)));
-  }
-
-  function integrationFromTarget(target) {
-    return target?.Integration || target?.integration || null;
-  }
-
-  function targetIsCompleteForMappedLight(target) {
-    if (!targetIsNonUnset(target)) return false;
-    if (
-      target === "Master"
-      || target === "Focus"
-      || target === "MediaControl"
-      || target === "CaptureControl"
-      || target === "Macro"
-    ) {
-      return true;
-    }
-    const profile = target?.Profile || target?.profile;
-    if (profile) return Boolean(String(profile.name || "").trim());
-    const session = target?.Session || target?.session;
-    if (session) return Boolean(String(session.session_id || "").trim());
-    const app = target?.Application || target?.application;
-    if (app) return Boolean(String(app.name || "").trim());
-    const device = target?.Device || target?.device;
-    if (device) return Boolean(String(device.device_id || "").trim());
-    const integration = integrationFromTarget(target);
-    if (integration) {
-      return Boolean(String(integration.integration_id || "").trim())
-        && Boolean(String(integration.kind || "").trim());
-    }
-    return false;
-  }
-
-  function mappedButtonLightTargetComplete(binding) {
-    const targets = getTargets(binding);
-    const action = String(binding?.action || "");
-    if (action === "OpenApplication") {
-      return targets.some(isOpenApplicationTarget)
-        && Boolean(String(normalizeOpenApplicationMapping(binding?.open_application)?.path || "").trim());
-    }
-    if (action === "RunAutoHotkeyScript") {
-      return targets.some(isAutoHotkeyScriptTarget)
-        && Boolean(String(normalizeAutoHotkeyScriptMapping(binding?.autohotkey_script)?.path || "").trim());
-    }
-    if (action === "Hotkey") {
-      return targets.some(isHotkeyTarget)
-        && Boolean(normalizeHotkeyMapping(binding?.hotkey)?.keys?.length);
-    }
-    if (action === "Macro") {
-      return targets.some(isMacroTarget)
-        && normalizeMacroSteps(binding?.macro_steps).length > 0;
-    }
-    if (
-      action === "MediaPlayPause"
-      || action === "MediaNextTrack"
-      || action === "MediaPrevTrack"
-      || action === "MediaStop"
-    ) {
-      return targets.some((target) => target === "MediaControl");
-    }
-    if (action === "FocusWindow") {
-      return targets.some((target) => {
-        const app = target?.Application || target?.application;
-        return Boolean(String(app?.name || "").trim());
-      });
-    }
-    if (
-      action === "FullScreenshot"
-      || action === "SnipScreenshot"
-      || action === "ToggleScreenRecording"
-    ) {
-      return targets.some((target) => target === "CaptureControl");
-    }
-    if (action === "SetDefaultDevice") {
-      return targets.some((target) => Boolean(String((target?.Device || target?.device)?.device_id || "").trim()));
-    }
-    if (action === "SwitchProfile") {
-      return targets.some((target) => Boolean(String((target?.Profile || target?.profile)?.name || "").trim()));
-    }
-    return targets.some(targetIsCompleteForMappedLight);
-  }
-
-  function mappedButtonLightFeedbackValue(binding) {
-    if (
-      !effectiveIsButton(binding)
-      || effectiveButtonLightMode(binding) !== "MappedWhenAssigned"
-    ) {
-      return null;
-    }
-    const targets = getTargets(binding);
-    if (!targets.some(targetIsNonUnset)) {
-      return 0;
-    }
-    return mappedButtonLightTargetComplete(binding) ? 1 : 0;
   }
 
   function buttonLightLabel(binding) {
@@ -1152,6 +1063,7 @@ export function createBindingsFeature({
   let configDraft = null;
   let configMacroPageOpen = false;
   let configSoundboardPageOpen = false;
+  let configInitialPersistence = null;
   let configRemoveEmptySoundboardTargetOnCancel = false;
   let soundboardAnalysis = null;
   let soundboardAnalysisError = "";
@@ -4545,6 +4457,10 @@ export function createBindingsFeature({
   }
 
   async function closeConfigModal({ commit = false } = {}) {
+    if (configInitialPersistence) {
+      await configInitialPersistence;
+      configInitialPersistence = null;
+    }
     const emptySoundboardBindingToClean = !commit
       && configRemoveEmptySoundboardTargetOnCancel
       && !normalizeSoundboardMapping(configDraft?.soundboard)
@@ -4597,6 +4513,7 @@ export function createBindingsFeature({
     configBindingId = null;
     configMacroPageOpen = false;
     configSoundboardPageOpen = false;
+    configInitialPersistence = null;
     configRemoveEmptySoundboardTargetOnCancel = false;
     configMacroSelectedPath = null;
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.add("hidden");
@@ -4989,6 +4906,7 @@ export function createBindingsFeature({
     configSoundboardPageOpen = Boolean(
       options.soundboardPage && (configDraft?.action === "Soundboard" || getTargets(configDraft).some(isSoundboardTarget)),
     );
+    configInitialPersistence = options.initialPersistence || null;
     configRemoveEmptySoundboardTargetOnCancel = Boolean(
       options.removeEmptySoundboardTargetOnCancel
       && configSoundboardPageOpen
@@ -5006,6 +4924,10 @@ export function createBindingsFeature({
 
   async function saveConfigModal() {
     if (transferPrompt) return;
+    if (configInitialPersistence) {
+      await configInitialPersistence;
+      configInitialPersistence = null;
+    }
     const original = getBindingById(configBindingId);
     const draft = getConfigBinding();
     if (!original || !draft) return;
@@ -5623,17 +5545,22 @@ export function createBindingsFeature({
             renderedBindings.register(binding.id, { target: primaryTarget });
           }
 
-          await invoke("add_binding", { binding });
-          renderBindings();
-          finishBindingUiMutation("target change");
+          const initialPersistence = invoke("add_binding", { binding });
           if (isButton && hasMacroTarget && !previousHadMacroTarget) {
-            openConfigModal(binding.id, { macroPage: true });
+            openConfigModal(binding.id, {
+              macroPage: true,
+              initialPersistence,
+            });
           } else if (isButton && hasSoundboardTarget && !previousHadSoundboardTarget) {
             openConfigModal(binding.id, {
               soundboardPage: true,
               removeEmptySoundboardTargetOnCancel: true,
+              initialPersistence,
             });
           }
+          await initialPersistence;
+          renderBindings();
+          finishBindingUiMutation("target change");
         });
 
         const volumeSlider = document.createElement("input");

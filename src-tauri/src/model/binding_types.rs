@@ -515,6 +515,52 @@ pub enum BindingTarget {
     Unset,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BindingTargetFeedbackSource {
+    Sessions,
+    FocusedSession,
+    Device,
+    None,
+}
+
+impl BindingTarget {
+    pub fn feedback_source(&self) -> BindingTargetFeedbackSource {
+        match self {
+            Self::Master | Self::Session { .. } | Self::Application { .. } => {
+                BindingTargetFeedbackSource::Sessions
+            }
+            Self::Focus => BindingTargetFeedbackSource::FocusedSession,
+            Self::Device { .. } => BindingTargetFeedbackSource::Device,
+            _ => BindingTargetFeedbackSource::None,
+        }
+    }
+
+    pub fn supports_volume(&self) -> bool {
+        matches!(
+            self,
+            Self::Master
+                | Self::Focus
+                | Self::MonitorBrightness { .. }
+                | Self::Session { .. }
+                | Self::Application { .. }
+                | Self::Device { .. }
+                | Self::Integration { .. }
+        )
+    }
+
+    pub fn supports_mute(&self) -> bool {
+        matches!(
+            self,
+            Self::Master
+                | Self::Focus
+                | Self::Session { .. }
+                | Self::Application { .. }
+                | Self::Device { .. }
+                | Self::Integration { .. }
+        )
+    }
+}
+
 impl PartialEq for BindingTarget {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {

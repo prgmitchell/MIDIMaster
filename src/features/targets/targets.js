@@ -1,5 +1,11 @@
 import { closeOpenDropdowns, renderLabelFromRawWithTags } from "../ui/dropdown_badges.js";
 import { iconDataForApplicationName, iconDataForSession } from "../../core/target_core.js";
+import {
+  MEDIA_ACTIONS,
+  actionDefinition,
+  pickerMetadataForTarget,
+  targetFromPickerKind,
+} from "../../core/target_model.js";
 
 export function createTargetsFeature({
   invoke,
@@ -227,6 +233,16 @@ export function createTargetsFeature({
     if (action === "MediaPrevTrack") return mediaPrevTrackIconData;
     if (action === "MediaStop") return mediaStopIconData;
     return mediaPlayPauseIconData;
+  }
+
+  function mediaActionOptions() {
+    return MEDIA_ACTIONS.map((action) => ({
+      label: t(actionDefinition(action).labelKey),
+      value: action,
+      kind: "action",
+      icon_data: mediaIconForAction(action),
+      role: actionDefinition(action).role,
+    }));
   }
 
   function closeTargetMenus(except = null) {
@@ -1225,28 +1241,14 @@ export function createTargetsFeature({
           if (match?.label) return match.label;
         }
       }
-      if (action === "MediaPlayPause") return t("targets.action.mediaPlayPause");
-      if (action === "MediaNextTrack") return t("targets.action.mediaNextTrack");
-      if (action === "MediaPrevTrack") return t("targets.action.mediaPrevTrack");
-      if (action === "MediaStop") return t("targets.action.mediaStop");
-      if (action === "FocusWindow") return t("targets.action.focusWindow");
-      if (action === "FullScreenshot") return t("targets.action.fullScreenshot");
-      if (action === "SnipScreenshot") return t("targets.action.snipScreenshot");
-      if (action === "ToggleScreenRecording") return t("targets.action.toggleScreenRecording");
-      if (action === "Macro") return "Macro";
-      if (action === "Soundboard") return t("soundboard.title");
-      if (action === "Hotkey") return t("targets.hotkey");
-      if (action === "RunAutoHotkeyScript") return t("targets.autoHotkeyScript");
-      if (action === "SwitchProfile") return t("targets.switchProfile");
-      if (action === "ToggleMute") return t("targets.action.toggleMute");
-      if (action === "SetDefaultDevice") return t("targets.action.setDefault");
-      if (action === "OpenApplication") return t("targets.openApplication");
       if (action === "Volume" && isBindingButton) {
         const targetKind = String(integ?.kind || "").toLowerCase();
         if (targetKind === "action" || targetKind === "scene") return "";
         if (includeValueAction && !integ) return t("targets.action.setValue");
         return t("targets.action.trigger");
       }
+      const definition = actionDefinition(action);
+      if (definition?.labelKey) return t(definition.labelKey);
       return action;
     };
 
@@ -1316,41 +1318,28 @@ export function createTargetsFeature({
     const optionForTarget = (target) => {
       if (!target || target === "Unset") return null;
       const displayOption = cachedDisplayForTarget(target);
-      if (target === "Master" || target?.Master != null) {
-        return { value: "master", label: t("targets.master"), icon_data: masterIconData, kind: "master" };
-      }
-      if (target === "Focus" || target?.Focus != null) {
-        return { value: "focus", label: t("targets.focus"), icon_data: focusIconData, kind: "focus" };
-      }
-      if (target === "MonitorBrightness" || target?.MonitorBrightness != null || target?.monitorBrightness != null) {
-        const brightness = target?.MonitorBrightness || target?.monitorBrightness;
-        const monitorId = brightness?.monitor_id ?? brightness?.monitorId;
-        const displayName = brightness?.display_name ?? brightness?.displayName;
-        return {
-          value: monitorId ? `monitor-brightness:${monitorId}` : "monitor-brightness",
-          label: displayName || t("targets.monitorBrightness"),
-          icon_kind: "monitor-brightness",
-          kind: "monitor-brightness",
-          target: typeof brightness === "object" ? target : null,
+      const builtIn = pickerMetadataForTarget(target);
+      if (builtIn) {
+        const iconData = {
+          master: masterIconData,
+          focus: focusIconData,
+          "media-play-pause": mediaPlayPauseIconData,
+          capture: CAPTURE_ICON_DATA,
+          macro: MACRO_ICON_DATA,
+          soundboard: SOUNDBOARD_ICON_DATA,
+          hotkey: HOTKEY_ICON_DATA,
+          "open-application": OPEN_APPLICATION_TARGET_ICON_DATA,
+          "autohotkey-script": AUTOHOTKEY_SCRIPT_ICON_DATA,
+        }[builtIn.iconKind] || null;
+        const option = {
+          value: builtIn.value,
+          label: builtIn.label || t(builtIn.labelKey),
+          icon_data: iconData,
+          kind: builtIn.kind,
         };
-      }
-      if (target === "MediaControl") {
-        return { value: "media-control", label: t("targets.mediaControls"), icon_data: mediaPlayPauseIconData, kind: "media-control" };
-      }
-      if (target === "CaptureControl") {
-        return { value: "capture-control", label: t("targets.captureControls"), icon_data: CAPTURE_ICON_DATA, kind: "capture-control" };
-      }
-      if (target === "Soundboard") {
-        return { value: "soundboard-target", label: t("soundboard.title"), icon_data: SOUNDBOARD_ICON_DATA, kind: "soundboard-target" };
-      }
-      if (target === "Hotkey") {
-        return { value: "hotkey-target", label: t("targets.hotkey"), icon_data: HOTKEY_ICON_DATA, kind: "hotkey-target" };
-      }
-      if (target === "OpenApplication") {
-        return { value: "open-application-target", label: t("targets.openApplication"), icon_data: OPEN_APPLICATION_TARGET_ICON_DATA, kind: "open-application-target" };
-      }
-      if (target === "AutoHotkeyScript") {
-        return { value: "autohotkey-script-target", label: t("targets.autoHotkeyScript"), icon_data: AUTOHOTKEY_SCRIPT_ICON_DATA, kind: "autohotkey-script-target" };
+        if (!iconData && builtIn.iconKind) option.icon_kind = builtIn.iconKind;
+        if (builtIn.kind === "monitor-brightness" && typeof target === "object") option.target = target;
+        return option;
       }
       const profile = target?.Profile || target?.profile;
       if (profile?.name) {
@@ -1507,38 +1496,10 @@ export function createTargetsFeature({
         }
         return t;
       }
-      if (option.kind === "master") {
-        return "Master";
-      }
-      if (option.kind === "focus") {
-        return "Focus";
-      }
-      if (option.kind === "monitor-brightness") {
-        return "MonitorBrightness";
-      }
-      if (option.kind === "media-control") {
-        return "MediaControl";
-      }
-      if (option.kind === "capture-control") {
-        return "CaptureControl";
-      }
+      const builtInTarget = targetFromPickerKind(option.kind);
+      if (builtInTarget) return builtInTarget;
       if (option.kind === "capture-action") {
         return "CaptureControl";
-      }
-      if (option.kind === "macro-target") {
-        return "Macro";
-      }
-      if (option.kind === "soundboard-target") {
-        return "Soundboard";
-      }
-      if (option.kind === "hotkey-target") {
-        return "Hotkey";
-      }
-      if (option.kind === "open-application-target") {
-        return "OpenApplication";
-      }
-      if (option.kind === "autohotkey-script-target") {
-        return "AutoHotkeyScript";
       }
       if (option.kind === "device") {
         return { Device: { device_id: option.value } };
@@ -1769,12 +1730,7 @@ export function createTargetsFeature({
         return captureActionOptions();
       }
       if (targetOption.kind === "media-control") {
-        return [
-          { label: t("targets.action.mediaPlayPause"), value: "MediaPlayPause", kind: "action", icon_data: mediaPlayPauseIconData, role: "command" },
-          { label: t("targets.action.mediaNextTrack"), value: "MediaNextTrack", kind: "action", icon_data: mediaNextTrackIconData, role: "command" },
-          { label: t("targets.action.mediaPrevTrack"), value: "MediaPrevTrack", kind: "action", icon_data: mediaPrevTrackIconData, role: "command" },
-          { label: t("targets.action.mediaStop"), value: "MediaStop", kind: "action", icon_data: mediaStopIconData, role: "command" },
-        ];
+        return mediaActionOptions();
       }
       if (
         targetOption.kind === "master"
@@ -2112,12 +2068,7 @@ export function createTargetsFeature({
 
       const buildButtonActionOptions = async (targetOption) => {
         if (targetOption?.kind === "media-control") {
-          return [
-            { label: t("targets.action.mediaPlayPause"), value: "MediaPlayPause", kind: "action", icon_data: mediaPlayPauseIconData, role: "command" },
-            { label: t("targets.action.mediaNextTrack"), value: "MediaNextTrack", kind: "action", icon_data: mediaNextTrackIconData, role: "command" },
-            { label: t("targets.action.mediaPrevTrack"), value: "MediaPrevTrack", kind: "action", icon_data: mediaPrevTrackIconData, role: "command" },
-            { label: t("targets.action.mediaStop"), value: "MediaStop", kind: "action", icon_data: mediaStopIconData, role: "command" },
-          ];
+          return mediaActionOptions();
         }
         if (
           targetOption?.kind === "master"

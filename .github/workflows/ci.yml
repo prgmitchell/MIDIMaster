@@ -31,7 +31,7 @@ jobs:
       - name: Validate locale catalogs
         run: node scripts/i18n/validate-locales.mjs
 
-      - name: Ensure locale catalogs are current
+      - name: Check locale translations are synchronized
         run: node scripts/i18n/translate-locales.mjs --dry-run --fail-on-pending
 
       - name: Scan unlocalized frontend strings
@@ -44,59 +44,8 @@ jobs:
             node --check $file.FullName
           }
 
-      - name: Test frontend binding model
-        run: node scripts/test-binding-model.mjs
-
-      - name: Test frontend binding configuration wiring
-        run: node scripts/test-binding-config-ui-wiring.mjs
-
-      - name: Test Soundboard editor constraints
-        run: node scripts/test-soundboard-editor.mjs
-
-      - name: Test Soundboard UI wiring
-        run: node scripts/test-soundboard-ui-wiring.mjs
-
-      - name: Test frontend binding density
-        run: node scripts/test-binding-density.mjs
-
-      - name: Test frontend fader curve presets
-        run: node scripts/test-fader-curve-presets.mjs
-
-      - name: Test frontend binding value sync
-        run: node scripts/test-binding-value-sync.mjs
-
-      - name: Test frontend render batching
-        run: node scripts/test-render-batching.mjs
-
-      - name: Test frontend session refresh
-        run: node scripts/test-session-refresh.mjs
-
-      - name: Test Plugin Store frontend behavior
-        run: node scripts/test-plugin-store.mjs
-
-      - name: Test frontend MIDI device inventory consent
-        run: node scripts/test-midi-device-inventory-consent.mjs
-
-      - name: Test frontend MIDI route resolution
-        run: node scripts/test-midi-hotplug.mjs
-
-      - name: Test frontend MIDI route lifecycle
-        run: node scripts/test-midi-feature.mjs
-
-      - name: Test frontend focus target core
-        run: node scripts/test-target-core-focus.mjs
-
-      - name: Test frontend target icons
-        run: node scripts/test-target-icons.mjs
-
-      - name: Test frontend appearance settings
-        run: node scripts/test-appearance.mjs
-
-      - name: Test bundled Hue plugin
-        run: node scripts/test-hue-plugin.mjs
-
-      - name: Test bundled OBS plugin
-        run: node scripts/test-obs-plugin.mjs
+      - name: Test frontend
+        run: npm.cmd test
 
       - name: Format (rustfmt)
         working-directory: src-tauri

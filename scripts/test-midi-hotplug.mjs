@@ -1,12 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-
-const source = await readFile(new URL("../src/features/midi/device_preferences.js", import.meta.url), "utf8");
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const midiPreferences = await import(moduleUrl);
-const appPreferencesSource = await readFile(new URL("../src/app/preferences.js", import.meta.url), "utf8");
-const appPreferencesModuleUrl = `data:text/javascript;base64,${Buffer.from(appPreferencesSource).toString("base64")}`;
-const appPreferences = await import(appPreferencesModuleUrl);
+import * as midiPreferences from "../src/features/midi/device_preferences.js";
 
 const platformPreference = {
   inputDeviceId: "midi:0",
@@ -373,7 +366,7 @@ function testUsbReenumerationRediscoverRoutesBySavedName() {
 }
 
 function testStartupPreferencesKeepUnavailableRowsWhenIdsAreReused() {
-  const normalized = appPreferences.normalizeProfileMidiRoutes({
+  const normalized = midiPreferences.normalizeMidiRoutes({
     routes: [
       {
         inputDeviceId: "midi:0",

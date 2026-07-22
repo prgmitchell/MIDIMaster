@@ -1,47 +1,16 @@
 import {
   applyCustomFaderCurve,
   applyFaderCurve,
-  buildHotkeyMappingFromEvent,
-  buttonVisualBehavior as coreButtonVisualBehavior,
-  effectiveButtonLightMode as coreEffectiveButtonLightMode,
   getBindingTargets,
-  getPrimaryBindingTarget,
-  MACRO_MAX_PARALLEL_STEPS,
-  MACRO_MAX_TOP_LEVEL_STEPS,
-  MACRO_MAX_WAIT_MS,
-  normalizeButtonLightMode as normalizeCoreButtonLightMode,
-  normalizeButtonLightBehavior as normalizeCoreButtonLightBehavior,
-  normalizeButtonLightFields as normalizeCoreButtonLightFields,
+  normalizeButtonLightFields,
   normalizeCustomCurvePoints,
-  normalizeFaderCurve as normalizeCoreFaderCurve,
-  normalizeMacroActionState,
-  normalizeMacroActionStep,
-  normalizeMacroDraftStep,
+  normalizeFaderCurve,
   normalizeMacroDraftSteps,
-  normalizeMacroStep,
   normalizeMacroSteps,
-  normalizeHotkeyKeyFromEvent,
-  normalizeRelativeFormat as normalizeCoreRelativeFormat,
+  normalizeRelativeFormat,
   normalizeSoundboardMapping,
-  presetCurvePoints as corePresetCurvePoints,
-  resolveButtonVisualActive as coreResolveButtonVisualActive,
   setBindingTargets,
 } from "../../core/binding_model.js";
-
-export {
-  MACRO_MAX_PARALLEL_STEPS,
-  MACRO_MAX_TOP_LEVEL_STEPS,
-  MACRO_MAX_WAIT_MS,
-  buildHotkeyMappingFromEvent,
-  normalizeMacroActionState,
-  normalizeMacroActionStep,
-  normalizeMacroDraftStep,
-  normalizeMacroDraftSteps,
-  normalizeMacroStep,
-  normalizeMacroSteps,
-  normalizeHotkeyKeyFromEvent,
-  normalizeSoundboardMapping,
-};
 
 export function normalizeControlKind(raw) {
   const value = String(raw || "Auto");
@@ -51,32 +20,8 @@ export function normalizeControlKind(raw) {
   return "Auto";
 }
 
-export function normalizeRelativeFormat(raw) {
-  return normalizeCoreRelativeFormat(raw);
-}
-
 export function normalizeMuteBehavior(raw) {
   return raw === "SetFromValue" ? "SetFromValue" : "ToggleOnPress";
-}
-
-export function normalizeButtonLightMode(raw) {
-  return normalizeCoreButtonLightMode(raw);
-}
-
-export function normalizeButtonLightBehavior(raw) {
-  return normalizeCoreButtonLightBehavior(raw);
-}
-
-export function effectiveButtonLightMode(binding) {
-  return coreEffectiveButtonLightMode(binding);
-}
-
-export function buttonVisualBehavior(binding) {
-  return coreButtonVisualBehavior(binding);
-}
-
-export function resolveButtonVisualActive(binding, options = {}) {
-  return coreResolveButtonVisualActive(binding, options);
 }
 
 export function muteBehaviorLabel(raw) {
@@ -115,20 +60,12 @@ export function assignModeTooltip(raw) {
   return "Add: assigning a focused app appends it to the current target list.";
 }
 
-export function normalizeFaderCurve(raw) {
-  return normalizeCoreFaderCurve(raw);
-}
-
 export function defaultCustomCurve() {
   return [
     { x: 0, y: 0 },
     { x: 0.5, y: 0.5 },
     { x: 1, y: 1 },
   ];
-}
-
-export function presetCurvePoints(curve) {
-  return corePresetCurvePoints(curve);
 }
 
 export function normalizeCustomCurve(points) {
@@ -197,7 +134,7 @@ export function ensureBindingShape(binding) {
   binding.fader_curve = normalizeFaderCurve(binding.fader_curve);
   binding.custom_curve = customCurvePoints(binding);
   binding.mute_behavior = normalizeMuteBehavior(binding.mute_behavior);
-  normalizeCoreButtonLightFields(binding);
+  normalizeButtonLightFields(binding);
   delete binding.toggle_mute_light_mode;
   if (binding.mute_control && typeof binding.mute_control === "object") {
     binding.mute_control.mute_behavior = normalizeMuteBehavior(binding.mute_control.mute_behavior);
@@ -277,18 +214,6 @@ export function isMacroTarget(target) {
 
 export function isSoundboardTarget(target) {
   return target === "Soundboard";
-}
-
-export function getTargets(binding) {
-  return getBindingTargets(binding);
-}
-
-export function setTargets(binding, targets) {
-  setBindingTargets(binding, targets);
-}
-
-export function getPrimaryTarget(binding) {
-  return getPrimaryBindingTarget(binding);
 }
 
 export function ensureAuxShape(binding) {

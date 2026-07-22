@@ -5,11 +5,7 @@ function dataModule(source) {
   return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
 }
 
-const preferenceSource = await readFile(
-  new URL("../src/features/midi/device_preferences.js", import.meta.url),
-  "utf8",
-);
-const preferenceUrl = dataModule(preferenceSource);
+const preferenceUrl = new URL("../src/features/midi/device_preferences.js", import.meta.url).href;
 const midiPreferences = await import(preferenceUrl);
 const uiStubUrl = dataModule(`
 export function closeOpenDropdowns() {}

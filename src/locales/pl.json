@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "Kliknij dwukrotnie, aby zmienić nazwę",
   "bindings.unset": "Rozłącz",
   "bindings.loading": "Wczytywanie powiązań...",
-  "bindings.noBindings": "Nie ma jeszcze powiązań. Aby dodać jeden przycisk, należy użyć poniższego przycisku.",
+  "bindings.noBindings": "Nie ma jeszcze powiązań. Wybierz Add Blinding powyżej, aby utworzyć jeden.",
   "bindings.noSearchResults": "Żadne powiązania nie pasują do twoich poszukiwań.",
   "bindings.noFilterResults": "Żadne powiązania nie pasują do tego filtra.",
   "bindings.bindingFallback": "Wiążące {number}",

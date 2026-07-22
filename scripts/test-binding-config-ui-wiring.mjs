@@ -42,8 +42,8 @@ for (const [elementId, refName] of [...indicatorControls, ...feedbackOutputContr
   assert.match(files.html, new RegExp(`id="${elementId}"`), `${elementId} should exist in index.html`);
   assert.match(files.domRefs, new RegExp(`const ${refName} = document\\.getElementById\\("${elementId}"\\)`), `${refName} should be read from the DOM`);
   assert.match(files.domRefs, new RegExp(`\\b${refName},`), `${refName} should be returned from createDomRefs`);
-  assert.match(files.appEntry, new RegExp(`\\b${refName},`), `${refName} should be passed into createBindingsFeature`);
 }
+assert.match(files.appEntry, /createBindingsFeature\(\{[\s\S]*?dom: dom\.bindings,/, "bindings should receive its DOM namespace directly");
 
 assert.match(files.html, /id="binding-config-assign-mode-clear"[^>]*data-mode="Clear"[^>]*data-i18n="common\.clear"/, "Clear assign mode should appear as a localized menu option");
 assert.match(files.bindings, /binding\?\.assign_mode === "Clear" \? "Clear" : "Add"/, "assign badge should preserve Clear mode");

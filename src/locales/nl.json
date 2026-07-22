@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "Dubbelklik om te hernoemen",
   "bindings.unset": "Niet ingesteld",
   "bindings.loading": "Bindingen laden...",
-  "bindings.noBindings": "Nog geen bindingen. Gebruik de knop hieronder om er een toe te voegen.",
+  "bindings.noBindings": "Nog geen bindingen. Selecteer Binding toevoegen hierboven om er een te maken.",
   "bindings.noSearchResults": "Geen bindingen die overeenkomen met uw zoekopdracht.",
   "bindings.noFilterResults": "Geen bindingen komen overeen met dit filter.",
   "bindings.bindingFallback": "{number} binden",

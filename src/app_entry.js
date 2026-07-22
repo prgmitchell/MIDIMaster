@@ -19,15 +19,18 @@ import {
   presetCurvePoints,
   setBindingTargets,
 } from "./core/binding_model.js";
-import { createTargetCore } from "./core/target_core.js";
+import {
+  createTargetCore,
+  integrationTargetKey as canonicalIntegrationTargetKey,
+} from "./core/target_core.js";
 import { createConnectionsPanelController } from "./app/connections_panel.js";
 import { createAlertsController } from "./app/alerts.js";
 import { createTauriBridge, scheduleRetry } from "./app/bootstrap.js";
 import {
-  hasProfileMidiPreference,
-  normalizeProfileMidiPreference,
-  normalizeProfileMidiRoutes,
-} from "./app/preferences.js";
+  hasMidiPreference,
+  normalizeMidiPreference,
+  normalizeMidiRoutes,
+} from "./core/midi_preferences.js";
 import {
   appearanceFromLegacyTheme,
   applyAppearanceToDocument,
@@ -37,7 +40,6 @@ import {
 import {
   MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
   canSubmitMidiDeviceInventory,
-  normalizeMidiDeviceInventoryConsent,
   normalizeMidiDeviceInventorySettings,
   shouldPromptMidiDeviceInventoryConsent,
 } from "./app/midi_device_inventory.js";
@@ -50,6 +52,7 @@ import {
 } from "./app/render_batching.js";
 import { createDomRefs } from "./app/dom_refs.js";
 import { createAppShell } from "./app/app_shell.js";
+import { createSettingsStore } from "./app/settings_store.js";
 import { performanceAudit } from "./app/performance_audit_api.js";
 import { createBindingLookupIndex } from "./app/binding_lookup_index.js";
 import {
@@ -121,149 +124,9 @@ function extractIntegrationTarget(target) {
 async function triggerIntegration(binding, action, value) {
   return pluginRuntime?.triggerIntegration?.(binding, action, value) || false;
 }
+const dom = createDomRefs();
 const {
-  midiSelect,
-  midiOutputSelect,
   midiStatus,
-  sessionsContainer,
-  profileDropdown,
-  profileToggle,
-  profileCurrent,
-  profileList,
-  profilePageList,
-  profilePageCreateInput,
-  profilePageCreateButton,
-  profilePageImportButton,
-  profilePageExportCurrentButton,
-  bindingsContainer,
-  bindingTypeFilter,
-  bindingSearchInput,
-  bindingDensityToggle,
-  mainScreen,
-  appShell,
-  sidebarNav,
-  sidebarCollapseToggle,
-  appPages,
-  appNavItems,
-  targetPanel,
-  targetPanelList,
-  targetPanelTitle,
-  targetPanelClose,
-  targetPanelBack,
-  bindingConfigPanel,
-  bindingConfigBack,
-  bindingConfigTitle,
-  bindingConfigClose,
-  bindingConfigCancel,
-  bindingConfigSave,
-  bindingConfigName,
-  bindingConfigButtonLightSection,
-  bindingConfigButtonLightSelectRow,
-  bindingConfigButtonLightSelect,
-  bindingConfigIndicatorCustom,
-  bindingConfigIndicatorMsgType,
-  bindingConfigIndicatorChannel,
-  bindingConfigIndicatorController,
-  bindingConfigIndicatorLearn,
-  bindingConfigIndicatorClear,
-  bindingConfigButtonLearnSection,
-  bindingConfigButtonLearnButton,
-  bindingConfigButtonLearnIndicator,
-  bindingConfigButtonLearnStatus,
-  bindingConfigMacroSummarySection,
-  bindingConfigMacroSummary,
-  bindingConfigMacroEdit,
-  bindingConfigMacroSection,
-  bindingConfigMacroList,
-  bindingConfigMacroAddAction,
-  bindingConfigMacroAddWait,
-  bindingConfigMacroAddParallel,
-  bindingConfigSoundboardSummarySection,
-  bindingConfigSoundboardSummary,
-  bindingConfigSoundboardEdit,
-  bindingConfigSoundboardSection,
-  bindingConfigSoundboardFile,
-  bindingConfigSoundboardStatus,
-  bindingConfigSoundboardReplace,
-  bindingConfigSoundboardPreview,
-  bindingConfigSoundboardPlaybackTime,
-  bindingConfigSoundboardWaveform,
-  bindingConfigSoundboardStart,
-  bindingConfigSoundboardEnd,
-  bindingConfigSoundboardStartTime,
-  bindingConfigSoundboardEndTime,
-  bindingConfigSoundboardSelectionTime,
-  bindingConfigSoundboardVolume,
-  bindingConfigSoundboardVolumeValue,
-  bindingConfigSoundboardSpeed,
-  bindingConfigSoundboardSpeedValue,
-  bindingConfigSoundboardOutput,
-  bindingConfigCurveSection,
-  bindingConfigFeedbackOutputSection,
-  bindingConfigFeedbackOutputCustom,
-  bindingConfigFeedbackMsgType,
-  bindingConfigFeedbackChannel,
-  bindingConfigFeedbackController,
-  bindingConfigFeedbackLearn,
-  bindingConfigFeedbackClear,
-  bindingConfigMuteSection,
-  bindingConfigAssignSection,
-  bindingConfigMuteLabel,
-  bindingConfigMuteLearn,
-  bindingConfigMuteClear,
-  bindingConfigMuteModeRoot,
-  bindingConfigMuteModeButton,
-  bindingConfigMuteModeMenu,
-  bindingConfigMuteModeToggle,
-  bindingConfigMuteModeValue,
-  bindingConfigAssignLabel,
-  bindingConfigAssignLearn,
-  bindingConfigAssignClear,
-  bindingConfigAssignModeRoot,
-  bindingConfigAssignModeButton,
-  bindingConfigAssignModeMenu,
-  bindingConfigAssignModeAdd,
-  bindingConfigAssignModeReplace,
-  bindingConfigAssignModeClear,
-  bindingConfigCurveCards,
-  bindingConfigCurveHelp,
-  bindingConfigCurvePresetRoot,
-  bindingConfigCurvePresetButton,
-  bindingConfigCurvePresetMenu,
-  bindingConfigCurvePresetSearch,
-  bindingConfigCurvePresetList,
-  bindingConfigCurvePresetSave,
-  bindingConfigCurvePresetForm,
-  bindingConfigCurvePresetFormTitle,
-  bindingConfigCurvePresetName,
-  bindingConfigCurvePresetFormSave,
-  bindingConfigCurvePresetFormCancel,
-  bindingConfigCustomEditor,
-  bindingConfigCustomSurface,
-  bindingConfigCustomReset,
-  bindingConfigAssignHelp,
-  bindingConfigPreviewLearnShell,
-  bindingConfigPreviewLearnButton,
-  bindingConfigPreviewLearnIndicator,
-  bindingConfigPreviewLearnStatus,
-  bindingConfigPreviewTargetIcon,
-  bindingConfigPreviewTargetLabel,
-  bindingConfigPreviewTargetTags,
-  bindingConfigPreviewFill,
-  bindingConfigPreviewThumb,
-  bindingConfigPreviewButton,
-  bindingConfigPreviewButtonFace,
-  bindingConfigPreviewButtonLabel,
-  bindingConfigPreviewValue,
-  bindingConfigPreviewStatus,
-  bindingConfigPreviewMainMidi,
-  bindingConfigPreviewMuteRow,
-  bindingConfigPreviewMute,
-  bindingConfigPreviewAssignRow,
-  bindingConfigPreviewAssign,
-  bindingConfigPreviewCurveRow,
-  bindingConfigPreviewCurve,
-  bindingConfigPreviewMidiValue,
   learnPanel,
   learnPanelTitle,
   learnPanelMessage,
@@ -272,38 +135,20 @@ const {
   learnPanelCancel,
   learnPanelConfirm,
   learnPanelClose,
-  settingsButton,
-  topbarUpdateButton,
-  settingsPanel,
-  settingsPanelClose,
-  connectionsButton,
-  connectionsPanel,
-  connectionsPanelClose,
-  connectionsSidebar,
-  connectionsContent,
-  osdEnabledToggle,
-  osdMonitorSelect,
-  osdStyleSelect,
-  osdTransparencyInput,
-  osdTransparencyValue,
-  osdScaleInput,
-  osdScaleValue,
-  osdPositionPicker,
-  startWithWindowsSelect,
-  startInTraySelect,
-  minimizeToTraySelect,
-  exitToTraySelect,
-  languageSelect,
-  autoCheckUpdatesButton,
-  midiDeviceInventoryConsentToggle,
-  openLogsFolderButton,
-  resetAppDataButton,
-  checkForUpdatesButton,
-  settingsUpdateStatus,
-  updateCurrentVersion,
-  updateLatestVersion,
-  sidebarAppVersion,
+} = dom.midi;
+const {
+  sessionsContainer,
+  mainScreen,
+  appShell,
+  sidebarNav,
+  sidebarCollapseToggle,
+  appPages,
+  appNavItems,
   osd,
+} = dom.shell;
+const { connectionsPanel } = dom.connections;
+const { resetAppDataButton } = dom.settings;
+const {
   alertOverlay,
   alertTitle,
   alertMessage,
@@ -311,7 +156,7 @@ const {
   alertSecondary,
   alertCancel,
   alertOk,
-} = createDomRefs();
+} = dom.alerts;
 
 function bindTauriApi() {
   return tauriBridge.bind();
@@ -479,27 +324,8 @@ async function hydrateClientPreferences(loadedSettings = null) {
       return;
     }
 
-    const savedAppearance = settings.appearance && typeof settings.appearance === "object"
-      ? normalizeAppearanceSettings(settings.appearance)
-      : appearanceFromLegacyTheme(settings.ui_theme ?? settings.uiTheme);
-    appSettings = {
-      ...appSettings,
-      appearance: savedAppearance,
-      compactBindings: Boolean(settings.compact_bindings ?? settings.compactBindings),
-      midiDeviceInventoryConsent: normalizeMidiDeviceInventoryConsent(
-        settings.midi_device_inventory_consent ?? settings.midiDeviceInventoryConsent,
-      ),
-      midiDeviceInventoryNoticeVersion: Number(
-        settings.midi_device_inventory_notice_version
-        ?? settings.midiDeviceInventoryNoticeVersion
-        ?? 0,
-      ),
-      faderCurvePresets: normalizeFaderCurvePresets(
-        settings.fader_curve_presets ?? settings.faderCurvePresets,
-      ),
-    };
-    bindingsFeature?.setCompactBindings?.(appSettings.compactBindings);
-    applyAppearanceToDocument(savedAppearance, { matchMediaSource: window });
+    const hydratedSettings = settingsStore.hydrate(settings);
+    applyAppearanceToDocument(hydratedSettings.appearance, { matchMediaSource: window });
 
     const savedInputId = settings.midi_input_device_id ?? settings.midiInputDeviceId ?? "";
     const savedOutputId = settings.midi_output_device_id ?? settings.midiOutputDeviceId ?? "";
@@ -509,7 +335,7 @@ async function hydrateClientPreferences(loadedSettings = null) {
     persistedMidiOutputId = savedOutputId || "";
     persistedMidiInputName = savedInputName || "";
     persistedMidiOutputName = savedOutputName || "";
-    persistedMidiRoutes = normalizeProfileMidiRoutes(settings);
+    persistedMidiRoutes = normalizeMidiRoutes(settings);
     const savedActiveProfileName = settings.active_profile_name ?? settings.activeProfileName ?? "";
     persistedActiveProfileName = String(savedActiveProfileName || "").trim();
 
@@ -539,35 +365,10 @@ async function hydrateClientPreferences(loadedSettings = null) {
 
 const integrationTargetStateByKey = new Map();
 
-function stableStringifyForIntegrationState(value) {
-  if (value == null) return "null";
-  if (typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringifyForIntegrationState).join(",")}]`;
-  }
-  const keys = Object.keys(value).sort();
-  const parts = keys.map((k) => `${JSON.stringify(k)}:${stableStringifyForIntegrationState(value[k])}`);
-  return `{${parts.join(",")}}`;
-}
-
 function integrationStateKeyForTarget(target) {
   if (!target || typeof target !== "object") return "";
   const integration = target.Integration || target.integration;
-  if (!integration || !integration.integration_id) return "";
-  const id = String(integration.integration_id || "");
-  const kind = String(integration.kind || "");
-  const data = (integration.data && typeof integration.data === "object") ? { ...integration.data } : {};
-  delete data.label;
-  delete data.icon_data;
-  delete data.iconData;
-  delete data.display_label;
-  delete data.displayLabel;
-  delete data.action_label;
-  delete data.action_value;
-  delete data.action_kind;
-  delete data.button_action;
-  delete data.osd_value_text;
-  return `${id}:${kind}:${stableStringifyForIntegrationState(data)}`;
+  return canonicalIntegrationTargetKey(integration);
 }
 
 function getIntegrationStateForTarget(target) {
@@ -658,7 +459,7 @@ function showMain(inputName, outputName, options = {}) {
 }
 
 function enabledMidiRouteCount(routes = []) {
-  return normalizeProfileMidiRoutes({ routes })
+  return normalizeMidiRoutes({ routes })
     .filter((route) => route.enabled !== false)
     .length;
 }
@@ -687,7 +488,7 @@ async function preparePage(page) {
     await loadMonitorOptions();
     await loadAppSettings();
     await settingsFeature?.loadCurrentAppVersion?.();
-    syncAppSettingsUI(appSettings);
+    syncAppSettingsUI(settingsStore.get());
     settingsFeature?.ensureAutoUpdateCheck?.();
     settingsFeature?.openSettingsPanel?.();
     settingsFeature?.renderAllSettingsSelectDropdowns?.();
@@ -940,28 +741,18 @@ const osdBindingValues = new Map();
 const osdRelativeAutoFormatByBinding = new Map();
 let osdSettings = { ...defaultOsdSettings };
 let monitorOptions = [];
-let appSettings = {
-  startWithWindows: false,
-  startInTray: false,
-  minimizeToTray: false,
-  exitToTray: false,
-  autoCheckUpdates: true,
-  compactBindings: false,
-  language: "en",
-  appearance: defaultAppearanceSettings(),
-  faderCurvePresets: [],
-  midiDeviceInventoryConsent: "unknown",
-  midiDeviceInventoryNoticeVersion: 0,
-};
+const settingsStore = createSettingsStore({
+  invoke,
+  normalizeFaderCurvePresets,
+  supportedLanguages: supportedLocales.map((locale) => locale.code),
+  onChange: (settings) => bindingsFeature?.setCompactBindings?.(settings.compactBindings),
+});
 let appStarted = false;
 let storageRecoveryNoticeShown = false;
 
 function applyGlobalAppearance(nextAppearance) {
-  const appearance = normalizeAppearanceSettings(nextAppearance || appSettings.appearance);
-  appSettings = {
-    ...appSettings,
-    appearance,
-  };
+  const appearance = normalizeAppearanceSettings(nextAppearance || settingsStore.get().appearance);
+  settingsStore.update({ appearance });
   return applyAppearanceToDocument(appearance, { matchMediaSource: window });
 }
 
@@ -969,10 +760,7 @@ async function saveFaderCurvePresets(nextPresets) {
   const presets = normalizeFaderCurvePresets(nextPresets);
   const saved = await invoke("update_fader_curve_presets", { presets });
   const normalized = normalizeFaderCurvePresets(saved);
-  appSettings = {
-    ...appSettings,
-    faderCurvePresets: normalized,
-  };
+  settingsStore.update({ faderCurvePresets: normalized });
   return normalized;
 }
 
@@ -982,7 +770,7 @@ function bindSystemAppearanceListener() {
     : null;
   if (!query) return;
   const handler = () => {
-    const appearance = normalizeAppearanceSettings(appSettings.appearance || loadStoredAppearance());
+    const appearance = normalizeAppearanceSettings(settingsStore.get().appearance || loadStoredAppearance());
     if (appearance.activeThemeId === "system") {
       applyGlobalAppearance(appearance);
       settingsFeature?.syncAppearanceControls?.();
@@ -1022,33 +810,7 @@ diagnosticInfo("settings_factory_start");
 settingsFeature = createSettingsFeature({
   invoke,
   listen,
-  dom: {
-    settingsButton,
-    settingsPanel,
-    settingsPanelClose,
-    osdEnabledToggle,
-    osdMonitorSelect,
-    osdStyleSelect,
-    osdTransparencyInput,
-    osdTransparencyValue,
-    osdScaleInput,
-    osdScaleValue,
-    osdPositionPicker,
-    startWithWindowsSelect,
-    startInTraySelect,
-    minimizeToTraySelect,
-    exitToTraySelect,
-    languageSelect,
-    autoCheckUpdatesButton,
-    midiDeviceInventoryConsentToggle,
-    openLogsFolderButton,
-    checkForUpdatesButton,
-    settingsUpdateStatus,
-    updateCurrentVersion,
-    updateLatestVersion,
-    sidebarAppVersion,
-    topbarUpdateButton,
-  },
+  dom: dom.settings,
   i18n: {
     applyTranslations,
     setLocale,
@@ -1059,17 +821,7 @@ settingsFeature = createSettingsFeature({
   setOsdSettings: (next) => { osdSettings = next; },
   getMonitorOptions: () => monitorOptions,
   setMonitorOptions: (next) => { monitorOptions = next; },
-  getAppSettings: () => appSettings,
-  setAppSettings: (next) => {
-    appSettings = {
-      ...appSettings,
-      ...(next || {}),
-      faderCurvePresets: normalizeFaderCurvePresets(
-        next?.faderCurvePresets ?? next?.fader_curve_presets ?? appSettings.faderCurvePresets,
-      ),
-    };
-    bindingsFeature?.setCompactBindings?.(appSettings.compactBindings);
-  },
+  settingsStore,
   applyAppearance: applyGlobalAppearance,
   showAlert: (title, message = "") => showAlert(title, message),
   onUpdateAvailableClick: showUpdateAvailableDialog,
@@ -1086,17 +838,7 @@ diagnosticInfo("profiles_factory_start");
 profilesFeature = createProfilesFeature({
   invoke,
   i18n: { t },
-  dom: {
-    profileDropdown,
-    profileToggle,
-    profileCurrent,
-    profileList,
-    profilePageList,
-    profilePageCreateInput,
-    profilePageCreateButton,
-    profilePageImportButton,
-    profilePageExportCurrentButton,
-  },
+  dom: dom.profiles,
   defaultOsdSettings,
   getActiveProfileName: () => activeProfileName,
   setActiveProfileName: (next) => { activeProfileName = next; },
@@ -1121,10 +863,10 @@ profilesFeature = createProfilesFeature({
   ),
   getActiveProfileMidiPreference: () => activeProfileMidiPreference,
   setActiveProfileMidiPreference: (next) => {
-    activeProfileMidiPreference = normalizeProfileMidiPreference(next);
+    activeProfileMidiPreference = normalizeMidiPreference(next);
   },
   onProfileLoaded: async ({ midiDevicePreference, midiDevicePreferenceSet }) => {
-    activeProfileMidiPreference = normalizeProfileMidiPreference({
+    activeProfileMidiPreference = normalizeMidiPreference({
       ...(midiDevicePreference || {}),
       configured: Boolean(midiDevicePreferenceSet),
     });
@@ -1142,13 +884,7 @@ diagnosticInfo("targets_factory_start");
 targetsFeature = createTargetsFeature({
   invoke,
   i18n: { t },
-  dom: {
-    targetPanel,
-    targetPanelList,
-    targetPanelTitle,
-    targetPanelClose,
-    targetPanelBack,
-  },
+  dom: dom.targets,
   masterIconData,
   focusIconData,
   mediaPlayPauseIconData,
@@ -1171,135 +907,7 @@ diagnosticInfo("targets_bind_ok");
 diagnosticInfo("bindings_factory_start");
 bindingsFeature = createBindingsFeature({
   invoke,
-  dom: {
-    bindingsContainer,
-    bindingTypeFilter,
-    bindingSearchInput,
-    bindingDensityToggle,
-    mainScreen,
-    bindingConfigPanel,
-    bindingConfigBack,
-    bindingConfigTitle,
-    bindingConfigClose,
-    bindingConfigCancel,
-    bindingConfigSave,
-    bindingConfigName,
-    bindingConfigButtonLightSection,
-    bindingConfigButtonLightSelectRow,
-    bindingConfigButtonLightSelect,
-    bindingConfigIndicatorCustom,
-    bindingConfigIndicatorMsgType,
-    bindingConfigIndicatorChannel,
-    bindingConfigIndicatorController,
-    bindingConfigIndicatorLearn,
-    bindingConfigIndicatorClear,
-    bindingConfigButtonLearnSection,
-    bindingConfigButtonLearnButton,
-    bindingConfigButtonLearnIndicator,
-    bindingConfigButtonLearnStatus,
-    bindingConfigMacroSummarySection,
-    bindingConfigMacroSummary,
-    bindingConfigMacroEdit,
-    bindingConfigMacroSection,
-    bindingConfigMacroList,
-    bindingConfigMacroAddAction,
-    bindingConfigMacroAddWait,
-    bindingConfigMacroAddParallel,
-    bindingConfigSoundboardSummarySection,
-    bindingConfigSoundboardSummary,
-    bindingConfigSoundboardEdit,
-    bindingConfigSoundboardSection,
-    bindingConfigSoundboardFile,
-    bindingConfigSoundboardStatus,
-    bindingConfigSoundboardReplace,
-    bindingConfigSoundboardPreview,
-    bindingConfigSoundboardPlaybackTime,
-    bindingConfigSoundboardWaveform,
-    bindingConfigSoundboardStart,
-    bindingConfigSoundboardEnd,
-    bindingConfigSoundboardStartTime,
-    bindingConfigSoundboardEndTime,
-    bindingConfigSoundboardSelectionTime,
-    bindingConfigSoundboardVolume,
-    bindingConfigSoundboardVolumeValue,
-    bindingConfigSoundboardSpeed,
-    bindingConfigSoundboardSpeedValue,
-    bindingConfigSoundboardOutput,
-    bindingConfigCurveSection,
-    bindingConfigFeedbackOutputSection,
-    bindingConfigFeedbackOutputCustom,
-    bindingConfigFeedbackMsgType,
-    bindingConfigFeedbackChannel,
-    bindingConfigFeedbackController,
-    bindingConfigFeedbackLearn,
-    bindingConfigFeedbackClear,
-    bindingConfigMuteSection,
-    bindingConfigAssignSection,
-    bindingConfigMuteLabel,
-    bindingConfigMuteLearn,
-    bindingConfigMuteClear,
-    bindingConfigMuteModeRoot,
-    bindingConfigMuteModeButton,
-    bindingConfigMuteModeMenu,
-    bindingConfigMuteModeToggle,
-    bindingConfigMuteModeValue,
-    bindingConfigAssignLabel,
-    bindingConfigAssignLearn,
-    bindingConfigAssignClear,
-    bindingConfigAssignModeRoot,
-    bindingConfigAssignModeButton,
-    bindingConfigAssignModeMenu,
-    bindingConfigAssignModeAdd,
-    bindingConfigAssignModeReplace,
-    bindingConfigAssignModeClear,
-    bindingConfigCurveCards,
-    bindingConfigCurveHelp,
-    bindingConfigCurvePresetRoot,
-    bindingConfigCurvePresetButton,
-    bindingConfigCurvePresetMenu,
-    bindingConfigCurvePresetSearch,
-    bindingConfigCurvePresetList,
-    bindingConfigCurvePresetSave,
-    bindingConfigCurvePresetForm,
-    bindingConfigCurvePresetFormTitle,
-    bindingConfigCurvePresetName,
-    bindingConfigCurvePresetFormSave,
-    bindingConfigCurvePresetFormCancel,
-    bindingConfigCustomEditor,
-    bindingConfigCustomSurface,
-    bindingConfigCustomReset,
-    bindingConfigAssignHelp,
-    bindingConfigPreviewLearnShell,
-    bindingConfigPreviewLearnButton,
-    bindingConfigPreviewLearnIndicator,
-    bindingConfigPreviewLearnStatus,
-    bindingConfigPreviewTargetIcon,
-    bindingConfigPreviewTargetLabel,
-    bindingConfigPreviewTargetTags,
-    bindingConfigPreviewFill,
-    bindingConfigPreviewThumb,
-    bindingConfigPreviewButton,
-    bindingConfigPreviewButtonFace,
-    bindingConfigPreviewButtonLabel,
-    bindingConfigPreviewValue,
-    bindingConfigPreviewStatus,
-    bindingConfigPreviewMainMidi,
-    bindingConfigPreviewMuteRow,
-    bindingConfigPreviewMute,
-    bindingConfigPreviewAssignRow,
-    bindingConfigPreviewAssign,
-    bindingConfigPreviewCurveRow,
-    bindingConfigPreviewCurve,
-    bindingConfigPreviewMidiValue,
-    learnPanel,
-    learnPanelTitle,
-    learnPanelMessage,
-    learnPanelSpinner,
-    learnPanelActions,
-    learnPanelCancel,
-    learnPanelConfirm,
-    learnPanelClose,
-  },
+  dom: dom.bindings,
   getPlaybackDevices: () => playbackDevices,
   getRecordingDevices: () => recordingDevices,
   getBindings: () => bindings,
@@ -1316,7 +924,7 @@ bindingsFeature = createBindingsFeature({
   showVolumeOsd,
   showMuteOsd,
   saveBindingsForProfile,
-  getFaderCurvePresets: () => appSettings.faderCurvePresets || [],
+  getFaderCurvePresets: () => settingsStore.get().faderCurvePresets || [],
   saveFaderCurvePresets,
   getPluginHost,
   getEditingBindingId: () => editingBindingId,
@@ -1341,23 +949,7 @@ diagnosticInfo("bindings_factory_ok");
 diagnosticInfo("midi_factory_start");
 midiFeature = createMidiFeature({
   invoke,
-  dom: {
-    midiSelect,
-    midiOutputSelect,
-    midiStatus,
-    mainScreen,
-    learnPanel,
-    learnPanelTitle,
-    learnPanelMessage,
-    learnPanelSpinner,
-    learnPanelActions,
-    learnPanelCancel,
-    learnPanelConfirm,
-    learnPanelClose,
-    refreshMidiButton: document.getElementById("refresh-midi"),
-    learnBindingButton: document.getElementById("learn-binding"),
-    bindingAddFooterButton: document.getElementById("binding-add-footer-button"),
-  },
+  dom: dom.midi,
   i18n: { t },
   showMain,
   refreshSessions,
@@ -1396,13 +988,13 @@ midiFeature = createMidiFeature({
       const binding = createBindingFromLearn(learned);
       bindings.push(binding);
       await invoke("add_binding", { binding });
-      hideCreateLearnPanel();
       editingBindingId = null;
       pendingFocusBindingId = null;
       renderBindings();
       syncPluginHostBindings();
       scheduleBindingsSave("add binding learn");
-      bindingsFeature?.openBindingTargetPicker?.(binding.id);
+      await bindingsFeature?.openBindingTargetPicker?.(binding.id);
+      hideCreateLearnPanel();
     } catch (error) {
       hideCreateLearnPanel();
       showAlert(t("bindings.createFailedTitle"), String(error));
@@ -1421,7 +1013,7 @@ midiFeature = createMidiFeature({
     queueMidiDeviceInventorySubmit("device_inventory_changed");
   },
   onProfileDeviceSelected: async (nextPreference) => {
-    const normalized = normalizeProfileMidiPreference(nextPreference);
+    const normalized = normalizeMidiPreference(nextPreference);
     activeProfileMidiPreference = normalized;
     await profilesFeature?.updateProfileMidiPreference?.(normalized);
     queueMidiDeviceInventorySubmit("midi_routes_changed");
@@ -1802,11 +1394,7 @@ const pluginsTabs = createPluginsTabs({
 
 connectionsController = createConnectionsPanelController({
   dom: {
-    connectionsPanel,
-    connectionsPanelClose,
-    connectionsButton,
-    connectionsSidebar,
-    connectionsContent,
+    ...dom.connections,
     closeConnectionsPanel,
   },
   pluginsTabs: {
@@ -1973,11 +1561,10 @@ let midiDeviceInventorySubmitQueued = false;
 
 function applyMidiDeviceInventorySettings(settings = {}) {
   const normalized = normalizeMidiDeviceInventorySettings(settings);
-  appSettings = {
-    ...appSettings,
+  settingsStore.update({
     midiDeviceInventoryConsent: normalized.consent,
     midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
-  };
+  });
   settingsFeature?.syncAppSettingsUI?.({
     midiDeviceInventoryConsent: normalized.consent,
     midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
@@ -1997,7 +1584,7 @@ async function updateMidiDeviceInventoryConsent(consent) {
 }
 
 async function maybePromptMidiDeviceInventoryConsent() {
-  if (!shouldPromptMidiDeviceInventoryConsent(appSettings)) {
+  if (!shouldPromptMidiDeviceInventoryConsent(settingsStore.get())) {
     return;
   }
   const choice = await showChoices({
@@ -2026,7 +1613,7 @@ async function maybePromptMidiDeviceInventoryConsent() {
 }
 
 function queueMidiDeviceInventorySubmit(reason = "unknown") {
-  if (!canSubmitMidiDeviceInventory(appSettings)) {
+  if (!canSubmitMidiDeviceInventory(settingsStore.get())) {
     return;
   }
   midiDeviceInventorySubmitQueued = true;
@@ -2046,7 +1633,7 @@ async function flushMidiDeviceInventorySubmit(reason = "unknown") {
     return;
   }
   midiDeviceInventorySubmitQueued = false;
-  if (!canSubmitMidiDeviceInventory(appSettings)) {
+  if (!canSubmitMidiDeviceInventory(settingsStore.get())) {
     return;
   }
   midiDeviceInventorySubmitInFlight = true;
@@ -2564,7 +2151,7 @@ async function setupListeners() {
       })()
       : event.payload;
     if (!payload || typeof payload !== "object" || !midiStatus) return;
-    const routes = normalizeProfileMidiRoutes({ routes: payload.routes || [] });
+    const routes = normalizeMidiRoutes({ routes: payload.routes || [] });
     const routeCount = Number(payload.routeCount ?? payload.route_count ?? routes.length);
     if (Number.isFinite(routeCount)) {
       activeMidiRouteCount = Math.max(0, routeCount);
@@ -2837,7 +2424,7 @@ async function startMainApp() {
   ]);
   applyCurrentOsdAppearance();
 
-  const profileHasMidiPreference = hasProfileMidiPreference(activeProfileMidiPreference);
+  const profileHasMidiPreference = hasMidiPreference(activeProfileMidiPreference);
   let usedLegacyFallback = false;
 
   try {
@@ -2878,11 +2465,11 @@ async function init() {
   diagnosticInfo("load_app_settings_start");
   const loadedSettings = await loadAppSettings({ applyLocale: false });
   diagnosticInfo("load_app_settings_done");
-  await initI18n(appSettings.language || "en").catch((error) => {
+  await initI18n(settingsStore.get().language || "en").catch((error) => {
     diagnosticError("i18n_init_failed", error);
   });
   applyTranslations();
-  applyGlobalAppearance(appSettings.appearance || loadStoredAppearance());
+  applyGlobalAppearance(settingsStore.get().appearance || loadStoredAppearance());
   bindSystemAppearanceListener();
   diagnosticInfo("hydrate_client_preferences_start");
   await hydrateClientPreferences(loadedSettings);
@@ -2908,7 +2495,7 @@ async function init() {
   } catch {
     // ignore storage failures
   }
-  if (appSettings.autoCheckUpdates !== false) {
+  if (settingsStore.get().autoCheckUpdates !== false) {
     settingsFeature?.checkForUpdates?.({ silent: true }).then((info) => {
       if (!info || !info.available) return;
       if (storageRecoveryNoticeShown) return;

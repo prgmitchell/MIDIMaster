@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "ダブルクリックして名前を変更",
   "bindings.unset": "アンセット",
   "bindings.loading": "バインディングを読み込み中...",
-  "bindings.noBindings": "結合はまだありません。 下のボタンで追加してください.",
+  "bindings.noBindings": "結合はまだありません。 上記バイディングを追加して作成します.",
   "bindings.noSearchResults": "結合は検索に一致しません.",
   "bindings.noFilterResults": "このフィルターに一致するバインディングはありません。",
   "bindings.bindingFallback": "結合 {number}",

@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "双击重命名",
   "bindings.unset": "未设置",
   "bindings.loading": "正在加载绑定...",
-  "bindings.noBindings": "还没有装订 使用下面的按钮添加一个 .",
+  "bindings.noBindings": "还没有装订 选择上面添加绑定来创建 .",
   "bindings.noSearchResults": "没有匹配搜索的绑定值 .",
   "bindings.noFilterResults": "没有绑定与此筛选器匹配。",
   "bindings.bindingFallback": "装订 {number}",

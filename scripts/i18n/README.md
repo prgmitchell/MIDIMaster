@@ -6,10 +6,9 @@ It translates missing English fallback strings and strings whose English source 
 
 ## LibreTranslate
 
-Use this command after any UI text change. It starts LibreTranslate if needed,
-translates pending strings, validates every catalog, checks that every used key
-exists in English, verifies there is no pending translation work, and scans for
-hardcoded frontend text:
+Use this command for a batched translation update. It starts LibreTranslate if
+needed, translates pending strings, validates every catalog, checks that every
+used key exists in English, and scans for hardcoded frontend text:
 
 ```powershell
 .\scripts\i18n\sync-locales.ps1
@@ -58,5 +57,7 @@ Set `ARGOS_PYTHON` if the desired Python executable is not `python`.
 - `--fail-on-pending`: exits non-zero during `--dry-run` if any catalog needs translation.
 - `--skip-readiness-check`: skips the LibreTranslate `/languages` check.
 
-CI runs validation, pending-translation detection, and hardcoded-string scanning,
-so new user-facing text cannot merge unless the locale catalogs are current.
+English is the required source catalog. Run the synchronization command after
+every English catalog change. CI rejects pending translations, unknown keys,
+and placeholder mismatches, and scans for hardcoded frontend text. Runtime
+English fallback remains a safety net for incomplete external catalogs.

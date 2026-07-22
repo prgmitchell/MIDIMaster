@@ -3,6 +3,8 @@ use crate::run_logger;
 use crate::runtime_helpers::{
     focus_window_by_process_name, open_path_with_shell_association, send_hotkey, send_media_key,
 };
+use crate::AppState;
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 use tauri::{AppHandle, Emitter};
@@ -161,6 +163,238 @@ pub fn finalize_grouped_integration_targets(grouped_targets: &mut [serde_json::V
             );
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ActionExecutionOutcome {
+    pub applied_targets: usize,
+    pub value: Option<f32>,
+    pub muted: Option<bool>,
+}
+
+impl ActionExecutionOutcome {
+    pub fn applied(self) -> bool {
+        self.applied_targets > 0
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ActionExecutionContext<'a> {
+    pub source: Option<&'a str>,
+    pub source_sequence: Option<u64>,
+    pub log_target: &'a str,
+}
+
+impl<'a> ActionExecutionContext<'a> {
+    pub const fn local(log_target: &'a str) -> Self {
+        Self {
+            source: None,
+            source_sequence: None,
+            log_target,
+        }
+    }
+}
+
+pub fn execute_local_target_action(
+    state: &AppState,
+    binding_id: &str,
+    action: &model::BindingAction,
+    target: &BindingTarget,
+    value: f32,
+    log_target: &str,
+) -> bool {
+    if matches!(action, model::BindingAction::Volume) && !target.supports_volume()
+        || matches!(action, model::BindingAction::ToggleMute) && !target.supports_mute()
+    {
+        return false;
+    }
+    let value = value.clamp(0.0, 1.0);
+    let muted = value > 0.5;
+    let result = match (action, target) {
+        (model::BindingAction::Volume, BindingTarget::Master) => state
+            .audio
+            .set_master_volume(value)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::Volume, BindingTarget::Focus) => {
+            if state.apply_focus_volume_with_retry(binding_id, value) {
+                Ok(())
+            } else {
+                return false;
+            }
+        }
+        (model::BindingAction::Volume, BindingTarget::MonitorBrightness { monitor_id, .. }) => {
+            crate::monitor_brightness::set_monitor_brightness(monitor_id.as_deref(), value)
+        }
+        (model::BindingAction::Volume, BindingTarget::Session { session_id }) => state
+            .audio
+            .set_session_volume(session_id, value)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::Volume, BindingTarget::Application { name, .. }) => state
+            .audio
+            .set_application_volume(name, value)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::Volume, BindingTarget::Device { device_id }) => state
+            .audio
+            .set_device_volume(device_id, value)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::ToggleMute, BindingTarget::Master) => state
+            .audio
+            .set_master_mute(muted)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::ToggleMute, BindingTarget::Focus) => {
+            if state.audio.focused_session().ok().flatten().is_none() {
+                return false;
+            }
+            state
+                .audio
+                .set_focused_session_mute(muted)
+                .map_err(|err| err.to_string())
+        }
+        (model::BindingAction::ToggleMute, BindingTarget::Session { session_id }) => state
+            .audio
+            .set_session_mute(session_id, muted)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::ToggleMute, BindingTarget::Application { name, .. }) => state
+            .audio
+            .set_application_mute(name, muted)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::ToggleMute, BindingTarget::Device { device_id }) => state
+            .audio
+            .set_device_mute(device_id, muted)
+            .map_err(|err| err.to_string()),
+        (model::BindingAction::SetDefaultDevice, BindingTarget::Device { device_id }) => state
+            .audio
+            .set_default_device(device_id)
+            .map_err(|err| err.to_string()),
+        _ => return false,
+    };
+
+    match result {
+        Ok(()) => true,
+        Err(err) => {
+            run_logger::warn(
+                log_target,
+                "target_action_failed",
+                &format!(
+                    "binding_id={} action={:?} target={:?} error={}",
+                    binding_id, action, target, err
+                ),
+            );
+            false
+        }
+    }
+}
+
+pub fn execute_target_action(
+    app: &AppHandle,
+    state: &AppState,
+    binding: &Binding,
+    action: &model::BindingAction,
+    value: f32,
+    context: ActionExecutionContext<'_>,
+) -> Result<ActionExecutionOutcome, String> {
+    let ActionExecutionContext {
+        source,
+        source_sequence,
+        log_target,
+    } = context;
+    let targets = binding.normalized_targets_ref();
+    if targets.is_empty() {
+        return Ok(ActionExecutionOutcome::default());
+    }
+
+    let value = value.clamp(0.0, 1.0);
+    let muted = value > 0.5;
+    let mut outcome = ActionExecutionOutcome {
+        value: matches!(action, model::BindingAction::Volume).then_some(value),
+        muted: matches!(action, model::BindingAction::ToggleMute).then_some(muted),
+        ..Default::default()
+    };
+    let mut integration_volume_batches: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
+
+    for (target_index, target) in targets.iter().enumerate() {
+        if matches!(action, model::BindingAction::Volume) {
+            if let BindingTarget::Integration {
+                integration_id,
+                kind,
+                data,
+            } = target
+            {
+                let group_index = integration_volume_batches
+                    .get(integration_id)
+                    .map(Vec::len)
+                    .unwrap_or(0);
+                integration_volume_batches
+                    .entry(integration_id.clone())
+                    .or_default()
+                    .push(serde_json::json!({
+                        "target": {
+                            "integration_id": integration_id,
+                            "kind": kind,
+                            "data": data,
+                        },
+                        "target_index": group_index,
+                        "target_count": 0,
+                        "is_primary_target": target_index == 0,
+                        "original_target_index": target_index,
+                        "binding_target_count": targets.len(),
+                    }));
+                outcome.applied_targets += 1;
+                continue;
+            }
+        }
+
+        if let BindingTarget::Integration {
+            integration_id,
+            kind,
+            data,
+        } = target
+        {
+            if action_is_stateful_integration_toggle(action)
+                || action_is_momentary_integration_action(action)
+            {
+                emit_integration_binding_triggered(
+                    app,
+                    IntegrationTrigger {
+                        binding_id: &binding.id,
+                        action,
+                        value,
+                        target_index,
+                        target_count: targets.len(),
+                        integration_id,
+                        kind,
+                        data,
+                        source,
+                        source_sequence,
+                    },
+                );
+                outcome.applied_targets += 1;
+            }
+            continue;
+        }
+
+        if execute_local_target_action(state, &binding.id, action, target, value, log_target) {
+            outcome.applied_targets += 1;
+        }
+    }
+
+    for (integration_id, mut grouped_targets) in integration_volume_batches {
+        finalize_grouped_integration_targets(&mut grouped_targets);
+        emit_integration_binding_triggered_batch(
+            app,
+            IntegrationBatchTrigger {
+                binding_id: &binding.id,
+                action,
+                value,
+                integration_id: &integration_id,
+                targets: grouped_targets,
+                source,
+                source_sequence,
+            },
+        );
+    }
+
+    Ok(outcome)
 }
 
 pub fn add_momentary_integration_input_value(

@@ -1,3 +1,5 @@
+import { MEDIA_ACTIONS, isTargetAssigned, isTargetComplete } from "./target_model.js";
+
 export const MACRO_MAX_TOP_LEVEL_STEPS = 25;
 export const MACRO_MAX_PARALLEL_STEPS = 8;
 export const MACRO_MAX_WAIT_MS = 60000;
@@ -107,43 +109,6 @@ function integrationFromTarget(target) {
   return target?.Integration || target?.integration || null;
 }
 
-function targetIsAssigned(target) {
-  return Boolean(
-    target
-    && target !== "Unset"
-    && !("Unset" in Object(target))
-    && !("unset" in Object(target))
-  );
-}
-
-function targetIsCompleteForMappedLight(target) {
-  if (!targetIsAssigned(target)) return false;
-  if (
-    target === "Master"
-    || target === "Focus"
-    || target === "MediaControl"
-    || target === "CaptureControl"
-    || target === "Macro"
-    || target === "Soundboard"
-  ) {
-    return true;
-  }
-  const profile = target?.Profile || target?.profile;
-  if (profile) return Boolean(String(profile.name || "").trim());
-  const session = target?.Session || target?.session;
-  if (session) return Boolean(String(session.session_id || "").trim());
-  const app = target?.Application || target?.application;
-  if (app) return Boolean(String(app.name || "").trim());
-  const device = target?.Device || target?.device;
-  if (device) return Boolean(String(device.device_id || "").trim());
-  const integration = integrationFromTarget(target);
-  if (integration) {
-    return Boolean(String(integration.integration_id || "").trim())
-      && Boolean(String(integration.kind || "").trim());
-  }
-  return false;
-}
-
 function isMacroTarget(target) {
   return target === "Macro";
 }
@@ -171,12 +136,7 @@ function mappedButtonLightTargetComplete(binding) {
     return targets.some(isMacroTarget)
       && normalizeMacroSteps(binding?.macro_steps).length > 0;
   }
-  if (
-    action === "MediaPlayPause"
-    || action === "MediaNextTrack"
-    || action === "MediaPrevTrack"
-    || action === "MediaStop"
-  ) {
+  if (MEDIA_ACTIONS.includes(action)) {
     return targets.some((target) => target === "MediaControl");
   }
   if (action === "FocusWindow") {
@@ -202,13 +162,23 @@ function mappedButtonLightTargetComplete(binding) {
   if (action === "SwitchProfile") {
     return targets.some((target) => Boolean(String((target?.Profile || target?.profile)?.name || "").trim()));
   }
-  return targets.some(targetIsCompleteForMappedLight);
+  return targets.some(isTargetComplete);
 }
 
 function mappedButtonLightVisualActive(binding) {
   const targets = getBindingTargets(binding);
-  if (!targets.some(targetIsAssigned)) return false;
+  if (!targets.some(isTargetAssigned)) return false;
   return mappedButtonLightTargetComplete(binding);
+}
+
+export function mappedButtonLightFeedbackValue(binding) {
+  if (
+    !bindingLooksLikeButton(binding)
+    || effectiveButtonLightMode(binding) !== "MappedWhenAssigned"
+  ) {
+    return null;
+  }
+  return mappedButtonLightVisualActive(binding) ? 1 : 0;
 }
 
 function integrationVisualBehavior(integration) {
@@ -233,7 +203,7 @@ export function buttonVisualBehavior(binding) {
 
   const action = String(binding?.action || "");
   const targets = getBindingTargets(binding);
-  if (!targets.some(targetIsAssigned)) return "momentary";
+  if (!targets.some(isTargetAssigned)) return "momentary";
   if (action === "Macro") return "momentary";
   if (action === "ToggleMute" || action === "ToggleEffect") return "stateful";
 
@@ -453,7 +423,7 @@ function normalizeMacroActionText(raw) {
 function normalizeMacroTargets(rawTargets) {
   const targets = Array.isArray(rawTargets) ? rawTargets : [];
   return targets
-    .filter((target) => targetIsAssigned(target) && !isMacroTarget(target) && !isSoundboardTarget(target))
+    .filter((target) => isTargetAssigned(target) && !isMacroTarget(target) && !isSoundboardTarget(target))
     .slice(0, 8);
 }
 

@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createTargetsFeature } from "../src/features/targets/targets.js";
 
 const source = await readFile(new URL("../src/features/targets/targets.js", import.meta.url), "utf8");
 const hotkeyIconMatch = source.match(/const HOTKEY_ICON_DATA = ("[^"]+");/);
 assert.ok(hotkeyIconMatch, "the built-in hotkey icon should be defined");
 const hotkeyIconData = JSON.parse(hotkeyIconMatch[1]);
-const moduleSource = source.replace(/^import .*;\r?\n/gm, "");
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(moduleSource).toString("base64")}`;
-const { createTargetsFeature } = await import(moduleUrl);
 
 class FakeClassList {
   constructor() {
@@ -49,9 +47,6 @@ globalThis.document = {
   createElement: (tagName) => new FakeElement(tagName),
   createElementNS: (_namespace, tagName) => new FakeElement(tagName),
 };
-globalThis.iconDataForApplicationName = () => null;
-globalThis.iconDataForSession = () => null;
-
 const icons = {
   master: "master-icon",
   focus: "focus-icon",

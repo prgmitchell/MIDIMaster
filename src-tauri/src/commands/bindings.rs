@@ -1,9 +1,9 @@
-use crate::binding_actions::{self, IntegrationBatchTrigger, IntegrationTrigger};
+use crate::binding_actions;
 use crate::feedback::{self, FeedbackControlKey, FeedbackSendOptions};
 use crate::run_logger;
 use crate::{bindings::BindingKey, model, model::Binding, AppState};
 use futures_util::future::join_all;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -124,279 +124,6 @@ fn clear_binding_feedback_output(state: &AppState, binding: &Binding) {
     }
 }
 
-fn apply_binding_action_internal(
-    app: &AppHandle,
-    state: &AppState,
-    binding: &Binding,
-    action: model::BindingAction,
-    value: f32,
-    source: Option<&str>,
-    source_sequence: Option<u64>,
-) -> Result<bool, String> {
-    let targets = binding.normalized_targets_ref();
-    if targets.is_empty() {
-        return Ok(false);
-    }
-
-    let mut any_applied = false;
-    let mut integration_volume_batches: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
-    for (target_index, target) in targets.iter().enumerate() {
-        match (&action, target) {
-            (model::BindingAction::Volume, model::BindingTarget::Master) => {
-                if let Err(err) = state.audio.set_master_volume(value) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_volume_master_failed",
-                        &format!("binding_id={} error={}", binding.id, err),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (model::BindingAction::Volume, model::BindingTarget::Focus) => {
-                if state.apply_focus_volume_with_retry(&binding.id, value) {
-                    any_applied = true;
-                }
-            }
-            (
-                model::BindingAction::Volume,
-                model::BindingTarget::MonitorBrightness { monitor_id, .. },
-            ) => {
-                if let Err(err) =
-                    crate::monitor_brightness::set_monitor_brightness(monitor_id.as_deref(), value)
-                {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_monitor_brightness_failed",
-                        &format!("binding_id={} error={}", binding.id, err),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (model::BindingAction::Volume, model::BindingTarget::Session { session_id }) => {
-                if let Err(err) = state.audio.set_session_volume(session_id, value) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_volume_session_failed",
-                        &format!(
-                            "binding_id={} session_id={} error={}",
-                            binding.id, session_id, err
-                        ),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (model::BindingAction::Volume, model::BindingTarget::Application { name, .. }) => {
-                if let Err(err) = state.audio.set_application_volume(name, value) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_volume_application_failed",
-                        &format!("binding_id={} app={} error={}", binding.id, name, err),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (model::BindingAction::Volume, model::BindingTarget::Device { device_id }) => {
-                if let Err(err) = state.audio.set_device_volume(device_id, value) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_volume_device_failed",
-                        &format!(
-                            "binding_id={} device_id={} error={}",
-                            binding.id, device_id, err
-                        ),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (
-                model::BindingAction::Volume,
-                model::BindingTarget::Integration {
-                    integration_id,
-                    kind,
-                    data,
-                },
-            ) => {
-                let group_index = integration_volume_batches
-                    .get(integration_id)
-                    .map(|items| items.len())
-                    .unwrap_or(0);
-                integration_volume_batches
-                    .entry(integration_id.clone())
-                    .or_default()
-                    .push(serde_json::json!({
-                      "target": {
-                        "integration_id": integration_id,
-                        "kind": kind,
-                        "data": data,
-                      },
-                      "target_index": group_index,
-                      "target_count": 0,
-                      "is_primary_target": target_index == 0,
-                      "original_target_index": target_index,
-                      "binding_target_count": targets.len(),
-                    }));
-                any_applied = true;
-            }
-            (model::BindingAction::ToggleMute, model::BindingTarget::Master) => {
-                if let Err(err) = state.audio.set_master_mute(value > 0.5) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_mute_master_failed",
-                        &format!("binding_id={} error={}", binding.id, err),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (model::BindingAction::ToggleMute, model::BindingTarget::Focus) => {
-                if state.audio.focused_session().ok().flatten().is_some() {
-                    if let Err(err) = state.audio.set_focused_session_mute(value > 0.5) {
-                        run_logger::warn(
-                            "bindings_cmd",
-                            "apply_action_mute_focus_failed",
-                            &format!("binding_id={} error={}", binding.id, err),
-                        );
-                    } else {
-                        any_applied = true;
-                    }
-                }
-            }
-            (model::BindingAction::ToggleMute, model::BindingTarget::Session { session_id }) => {
-                if let Err(err) = state.audio.set_session_mute(session_id, value > 0.5) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_mute_session_failed",
-                        &format!(
-                            "binding_id={} session_id={} error={}",
-                            binding.id, session_id, err
-                        ),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (model::BindingAction::ToggleMute, model::BindingTarget::Application { name, .. }) => {
-                if let Err(err) = state.audio.set_application_mute(name, value > 0.5) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_mute_application_failed",
-                        &format!("binding_id={} app={} error={}", binding.id, name, err),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (model::BindingAction::ToggleMute, model::BindingTarget::Device { device_id }) => {
-                if let Err(err) = state.audio.set_device_mute(device_id, value > 0.5) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_mute_device_failed",
-                        &format!(
-                            "binding_id={} device_id={} error={}",
-                            binding.id, device_id, err
-                        ),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            (
-                action,
-                model::BindingTarget::Integration {
-                    integration_id,
-                    kind,
-                    data,
-                },
-            ) if binding_actions::action_is_stateful_integration_toggle(action) => {
-                binding_actions::emit_integration_binding_triggered(
-                    app,
-                    IntegrationTrigger {
-                        binding_id: &binding.id,
-                        action,
-                        value,
-                        target_index,
-                        target_count: targets.len(),
-                        integration_id,
-                        kind,
-                        data,
-                        source,
-                        source_sequence,
-                    },
-                );
-                any_applied = true;
-            }
-            (
-                action,
-                model::BindingTarget::Integration {
-                    integration_id,
-                    kind,
-                    data,
-                },
-            ) if binding_actions::action_is_momentary_integration_action(action) => {
-                binding_actions::emit_integration_binding_triggered(
-                    app,
-                    IntegrationTrigger {
-                        binding_id: &binding.id,
-                        action,
-                        value,
-                        target_index,
-                        target_count: targets.len(),
-                        integration_id,
-                        kind,
-                        data,
-                        source,
-                        source_sequence,
-                    },
-                );
-                any_applied = true;
-            }
-            (
-                model::BindingAction::SetDefaultDevice,
-                model::BindingTarget::Device { device_id },
-            ) => {
-                if let Err(err) = state.audio.set_default_device(device_id) {
-                    run_logger::warn(
-                        "bindings_cmd",
-                        "apply_action_set_default_device_failed",
-                        &format!(
-                            "binding_id={} device_id={} error={}",
-                            binding.id, device_id, err
-                        ),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    if !integration_volume_batches.is_empty() {
-        for (integration_id, mut grouped_targets) in integration_volume_batches {
-            binding_actions::finalize_grouped_integration_targets(&mut grouped_targets);
-            binding_actions::emit_integration_binding_triggered_batch(
-                app,
-                IntegrationBatchTrigger {
-                    binding_id: &binding.id,
-                    action: &action,
-                    value,
-                    integration_id: &integration_id,
-                    targets: grouped_targets,
-                    source,
-                    source_sequence,
-                },
-            );
-        }
-    }
-
-    Ok(any_applied)
-}
-
 fn action_can_run_from_command(action: &model::BindingAction) -> bool {
     matches!(
         action,
@@ -502,7 +229,19 @@ fn apply_action_binding_without_feedback(
         return Ok(true);
     }
 
-    apply_binding_action_internal(app, state, binding, action, value, source, source_sequence)
+    binding_actions::execute_target_action(
+        app,
+        state,
+        binding,
+        &action,
+        value,
+        binding_actions::ActionExecutionContext {
+            source,
+            source_sequence,
+            log_target: "bindings_cmd",
+        },
+    )
+    .map(|outcome| outcome.applied())
 }
 
 fn macro_action_config_error(binding: &Binding) -> Option<String> {
@@ -1383,16 +1122,19 @@ pub async fn apply_binding_action(
         );
     }
 
-    let any_applied = apply_binding_action_internal(
+    let outcome = binding_actions::execute_target_action(
         &app,
         &state,
         &binding,
-        effective_action.clone(),
+        &effective_action,
         value,
-        source.as_deref(),
-        source_sequence,
+        binding_actions::ActionExecutionContext {
+            source: source.as_deref(),
+            source_sequence,
+            log_target: "bindings_cmd",
+        },
     )?;
-    if !any_applied {
+    if !outcome.applied() {
         run_logger::warn(
             "bindings_cmd",
             "apply_binding_action_no_target_applied",

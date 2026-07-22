@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-
-const source = await readFile(new URL("../src/core/binding_model.js", import.meta.url), "utf8");
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const bindingModel = await import(moduleUrl);
-const targetCoreSource = await readFile(new URL("../src/core/target_core.js", import.meta.url), "utf8");
-const targetCoreUrl = `data:text/javascript;base64,${Buffer.from(targetCoreSource).toString("base64")}`;
-const { createTargetCore } = await import(targetCoreUrl);
+import * as bindingModel from "../src/core/binding_model.js";
+import { createTargetCore } from "../src/core/target_core.js";
 const targetCore = createTargetCore({
   masterIconData: null,
   focusIconData: null,
@@ -177,6 +171,18 @@ function testMappedLightRequiresCompleteTarget() {
 
   assert.equal(bindingModel.resolveButtonVisualActive(incomplete, { inputValue: 1 }), false);
   assert.equal(bindingModel.resolveButtonVisualActive(complete, { inputValue: 0 }), true);
+}
+
+function testMappedLightAcceptsConfiguredSoundboard() {
+  const binding = buttonBinding({
+    action: "Soundboard",
+    target: "Soundboard",
+    targets: ["Soundboard"],
+    button_light_mode: "MappedWhenAssigned",
+    soundboard: { path: "C:\\sounds\\intro.mp3" },
+  });
+
+  assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 0 }), true);
 }
 
 function testProfileSwitchTargetIsCompleteAndMomentary() {
@@ -896,6 +902,7 @@ testProgramChangeButtonBindingIsButton();
 testMomentaryButtonFollowsInputValue();
 testMappedLightControlsButtonVisualState();
 testMappedLightRequiresCompleteTarget();
+testMappedLightAcceptsConfiguredSoundboard();
 testProfileSwitchTargetIsCompleteAndMomentary();
 testHotkeyMappingUsesPhysicalKeysForShiftedSymbols();
 testHotkeyMappingKeepsLetterShortcuts();

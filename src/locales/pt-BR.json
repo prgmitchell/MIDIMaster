@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "Clique duas vezes para renomear",
   "bindings.unset": "Desativar",
   "bindings.loading": "Carregando bindings...",
-  "bindings.noBindings": "Sem amarras ainda. Use o botão abaixo para adicionar um.",
+  "bindings.noBindings": "Sem amarras ainda. Selecione Adicionar ligação acima para criar um.",
   "bindings.noSearchResults": "Nenhuma ligação corresponde à sua busca.",
   "bindings.noFilterResults": "Nenhuma ligação corresponde a este filtro.",
   "bindings.bindingFallback": "Ligando {number}",

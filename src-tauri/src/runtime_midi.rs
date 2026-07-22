@@ -512,109 +512,16 @@ pub(crate) fn apply_midi_event(
                 inputs.insert(key.clone(), event.value > 0);
             }
         }
-        let mut any_applied = false;
+        let outcome = binding_actions::execute_target_action(
+            app,
+            state,
+            binding,
+            &model::BindingAction::ToggleMute,
+            if muted { 1.0 } else { 0.0 },
+            binding_actions::ActionExecutionContext::local("bindings"),
+        )?;
 
-        for (target_index, target) in targets.iter().enumerate() {
-            match target {
-                model::BindingTarget::Master => {
-                    if let Err(err) = state.audio.set_master_mute(muted) {
-                        run_logger::error(
-                            "bindings",
-                            "toggle_mute_master_failed",
-                            &format!("binding_id={} error={}", binding.id, err),
-                        );
-                    } else {
-                        any_applied = true;
-                    }
-                }
-                model::BindingTarget::Focus => {
-                    if let Some(_focused) = state.audio.focused_session().ok().flatten() {
-                        if let Err(err) = state.audio.set_focused_session_mute(muted) {
-                            run_logger::error(
-                                "bindings",
-                                "toggle_mute_focus_failed",
-                                &format!("binding_id={} error={}", binding.id, err),
-                            );
-                        } else {
-                            any_applied = true;
-                        }
-                    }
-                }
-                model::BindingTarget::MonitorBrightness { .. } => {}
-                model::BindingTarget::Session { session_id } => {
-                    if let Err(err) = state.audio.set_session_mute(session_id, muted) {
-                        run_logger::error(
-                            "bindings",
-                            "toggle_mute_session_failed",
-                            &format!(
-                                "binding_id={} session_id={} error={}",
-                                binding.id, session_id, err
-                            ),
-                        );
-                    } else {
-                        any_applied = true;
-                    }
-                }
-                model::BindingTarget::Application { name, .. } => {
-                    if let Err(err) = state.audio.set_application_mute(name, muted) {
-                        run_logger::error(
-                            "bindings",
-                            "toggle_mute_application_failed",
-                            &format!("binding_id={} app={} error={}", binding.id, name, err),
-                        );
-                    } else {
-                        any_applied = true;
-                    }
-                }
-                model::BindingTarget::Device { device_id } => {
-                    if let Err(err) = state.audio.set_device_mute(device_id, muted) {
-                        run_logger::error(
-                            "bindings",
-                            "toggle_mute_device_failed",
-                            &format!(
-                                "binding_id={} device_id={} error={}",
-                                binding.id, device_id, err
-                            ),
-                        );
-                    } else {
-                        any_applied = true;
-                    }
-                }
-                model::BindingTarget::Integration {
-                    integration_id,
-                    kind,
-                    data,
-                } => {
-                    binding_actions::emit_integration_binding_triggered(
-                        app,
-                        IntegrationTrigger {
-                            binding_id: &binding.id,
-                            action: &binding.action,
-                            value: if muted { 1.0 } else { 0.0 },
-                            target_index,
-                            target_count: targets.len(),
-                            integration_id,
-                            kind,
-                            data,
-                            source: None,
-                            source_sequence: None,
-                        },
-                    );
-                    any_applied = true;
-                }
-                model::BindingTarget::Unset
-                | model::BindingTarget::MediaControl
-                | model::BindingTarget::CaptureControl
-                | model::BindingTarget::Hotkey
-                | model::BindingTarget::OpenApplication
-                | model::BindingTarget::AutoHotkeyScript
-                | model::BindingTarget::Profile { .. }
-                | model::BindingTarget::Macro
-                | model::BindingTarget::Soundboard => {}
-            }
-        }
-
-        if !any_applied {
+        if !outcome.applied() {
             run_logger::warn(
                 "bindings",
                 "toggle_mute_no_target_applied",
@@ -837,137 +744,62 @@ pub(crate) fn apply_midi_event(
     let mut skipped_button_integration_event = false;
     let mut integration_button_feedback_owned = false;
     for (target_index, target) in targets.iter().enumerate() {
-        match target {
-            model::BindingTarget::Master => {
-                if let Err(err) = state.audio.set_master_volume(volume) {
-                    run_logger::error(
-                        "bindings",
-                        "set_master_volume_failed",
-                        &format!("binding_id={} error={}", binding.id, err),
-                    );
-                } else {
-                    any_applied = true;
+        if let model::BindingTarget::Integration {
+            integration_id,
+            kind,
+            data,
+        } = target
+        {
+            let integration_button_kind = if binding_is_button(binding) {
+                binding_actions::integration_volume_button_action_kind(integration_id, kind, data)
+            } else {
+                None
+            };
+            let button_event = if integration_button_kind.is_some() {
+                integration_button_feedback_owned = true;
+                let resolved_event = *button_event_for_event.get_or_insert_with(|| {
+                    resolve_integration_button_event(state, &key, binding, &event)
+                });
+                if resolved_event.is_none() {
+                    skipped_button_integration_event = true;
+                    continue;
                 }
-            }
-            model::BindingTarget::Focus => {
-                if state.apply_focus_volume_with_retry(&binding.id, volume) {
-                    any_applied = true;
-                }
-            }
-            model::BindingTarget::MonitorBrightness { monitor_id, .. } => {
-                if let Err(err) =
-                    crate::monitor_brightness::set_monitor_brightness(monitor_id.as_deref(), volume)
-                {
-                    run_logger::error(
-                        "bindings",
-                        "set_monitor_brightness_failed",
-                        &format!("binding_id={} error={}", binding.id, err),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            model::BindingTarget::Session { session_id } => {
-                if let Err(err) = state.audio.set_session_volume(session_id, volume) {
-                    run_logger::error(
-                        "bindings",
-                        "set_session_volume_failed",
-                        &format!(
-                            "binding_id={} session_id={} error={}",
-                            binding.id, session_id, err
-                        ),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            model::BindingTarget::Application { name, .. } => {
-                if let Err(err) = state.audio.set_application_volume(name, volume) {
-                    run_logger::error(
-                        "bindings",
-                        "set_application_volume_failed",
-                        &format!("binding_id={} app={} error={}", binding.id, name, err),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            model::BindingTarget::Device { device_id } => {
-                if let Err(err) = state.audio.set_device_volume(device_id, volume) {
-                    run_logger::error(
-                        "bindings",
-                        "set_device_volume_failed",
-                        &format!(
-                            "binding_id={} device_id={} error={}",
-                            binding.id, device_id, err
-                        ),
-                    );
-                } else {
-                    any_applied = true;
-                }
-            }
-            model::BindingTarget::Integration {
-                integration_id,
-                kind,
-                data,
-            } => {
-                let integration_button_kind = if binding.action == model::BindingAction::Volume
-                    && binding_is_button(binding)
-                {
-                    binding_actions::integration_volume_button_action_kind(
-                        integration_id,
-                        kind,
-                        data,
-                    )
-                } else {
-                    None
-                };
-                let button_event = if integration_button_kind.is_some() {
-                    integration_button_feedback_owned = true;
-                    let resolved_event = *button_event_for_event.get_or_insert_with(|| {
-                        resolve_integration_button_event(state, &key, binding, &event)
-                    });
-                    if resolved_event.is_none() {
-                        skipped_button_integration_event = true;
-                        continue;
-                    }
-                    resolved_event
-                } else {
-                    None
-                };
-                let group_index = integration_volume_batches
-                    .get(integration_id)
-                    .map(|items| items.len())
-                    .unwrap_or(0);
-                integration_volume_batches
-                    .entry(integration_id.clone())
-                    .or_default()
-                    .push(serde_json::json!({
-                      "target": {
-                        "integration_id": integration_id,
-                        "kind": kind,
-                        "data": data,
-                      },
-                      "button_event": button_event,
-                      "button_action_kind": integration_button_kind.map(|kind| kind.as_str()),
-                      "button_input_active": event.value > 0,
-                      "target_index": group_index,
-                      "target_count": 0,
-                      "is_primary_target": target_index == 0,
-                      "original_target_index": target_index,
-                      "binding_target_count": targets.len(),
-                    }));
-                any_applied = true;
-            }
-            model::BindingTarget::Unset
-            | model::BindingTarget::MediaControl
-            | model::BindingTarget::CaptureControl
-            | model::BindingTarget::Hotkey
-            | model::BindingTarget::OpenApplication
-            | model::BindingTarget::AutoHotkeyScript
-            | model::BindingTarget::Profile { .. }
-            | model::BindingTarget::Macro
-            | model::BindingTarget::Soundboard => {}
+                resolved_event
+            } else {
+                None
+            };
+            let group_index = integration_volume_batches
+                .get(integration_id)
+                .map(Vec::len)
+                .unwrap_or(0);
+            integration_volume_batches
+                .entry(integration_id.clone())
+                .or_default()
+                .push(serde_json::json!({
+                  "target": {
+                    "integration_id": integration_id,
+                    "kind": kind,
+                    "data": data,
+                  },
+                  "button_event": button_event,
+                  "button_action_kind": integration_button_kind.map(|kind| kind.as_str()),
+                  "button_input_active": event.value > 0,
+                  "target_index": group_index,
+                  "target_count": 0,
+                  "is_primary_target": target_index == 0,
+                  "original_target_index": target_index,
+                  "binding_target_count": targets.len(),
+                }));
+            any_applied = true;
+        } else if binding_actions::execute_local_target_action(
+            state,
+            &binding.id,
+            &model::BindingAction::Volume,
+            target,
+            volume,
+            "bindings",
+        ) {
+            any_applied = true;
         }
     }
 

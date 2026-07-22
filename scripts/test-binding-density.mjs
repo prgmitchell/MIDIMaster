@@ -5,7 +5,6 @@ import { createBindingsFeature } from "../src/features/bindings/bindings.js";
 const htmlSource = await readFile(new URL("../src/index.html", import.meta.url), "utf8");
 const cssSource = await readFile(new URL("../src/styles/bindings/table.css", import.meta.url), "utf8");
 const profileCssSource = await readFile(new URL("../src/styles/profiles.css", import.meta.url), "utf8");
-const appEntrySource = await readFile(new URL("../src/app_entry.js", import.meta.url), "utf8");
 
 function densityMarkup() {
   const match = htmlSource.match(/<div id="binding-density-toggle"[\s\S]*?<\/div>/);
@@ -79,8 +78,6 @@ assert.match(cssSource, /\.binding-row\s*\{[\s\S]*?transition: min-height var\(-
 assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition-duration: 0ms;/);
 assert.match(profileCssSource, /\.bindings-toolbar\s*\{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\) auto auto;/);
 assert.match(profileCssSource, /\.binding-add-button\s*\{\s*grid-column: 3;[\s\S]*?\.binding-density-toggle\s*\{\s*grid-column: 4;/);
-assert.match(appEntrySource, /compactBindings: Boolean\(settings\.compact_bindings \?\? settings\.compactBindings\)/);
-
 {
   const calls = [];
   const { feature, mainScreen, comfortableButton, compactButton } = createHarness(async (command, args) => {

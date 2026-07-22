@@ -95,7 +95,7 @@
   "bindings.doubleClickRename": "Doppelklicken zum Umbenennen",
   "bindings.unset": "Unmenge",
   "bindings.loading": "Bindings werden geladen...",
-  "bindings.noBindings": "Noch keine Bindungen. Verwenden Sie die Schaltfläche unten, um eine hinzuzufügen.",
+  "bindings.noBindings": "Noch keine Bindungen. Wählen Sie Binden oben hinzufügen, um eine zu erstellen.",
   "bindings.noSearchResults": "Keine Bindungen passen zu Ihrer Suche.",
   "bindings.noFilterResults": "Keine Bindungen entsprechen diesem Filter.",
   "bindings.bindingFallback": "Bindung {number}",

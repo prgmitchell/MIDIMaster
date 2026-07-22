@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "npm run test:frontend",
+    "test:frontend": "node scripts/run-frontend-tests.mjs",
     "perf:fixtures": "node scripts/perf/generate-fixtures.mjs",
     "perf:report": "node scripts/perf/generate-report.mjs",
     "perf:check": "node scripts/perf/evaluate-thresholds.mjs",

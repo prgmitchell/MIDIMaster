@@ -72,7 +72,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -622,7 +622,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "es": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -669,7 +673,7 @@
     "bindings.reorder": "14ac200e93f72412f2188e11c51e258000e5dd126c6726329493516c661e0267",
     "bindings.mode": "5e23ec6a300dc60a79641769017e16e9bf042cbd8fd0a54586a048ab9da972ff",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -1247,7 +1251,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "de": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1333,7 +1341,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -1872,7 +1880,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "it": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -1958,7 +1970,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -2497,7 +2509,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "pt-BR": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -2583,7 +2599,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -3122,7 +3138,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "nl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3208,7 +3228,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -3747,7 +3767,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "pl": {
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
@@ -3833,7 +3857,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -4372,7 +4396,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "ja": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -4455,7 +4483,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -4997,7 +5025,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "ko": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5080,7 +5112,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -5622,7 +5654,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "zh-Hans": {
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
@@ -5705,7 +5741,7 @@
     "bindings.dragToReorder": "92417160e3b12ea4b7971b784a08c7702cc5db5784dd997c56de42a5bbf10738",
     "bindings.doubleClickRename": "2836c1fad7764204c4c62b8fb3777c169796f7878340656762bb727d20287715",
     "bindings.unset": "8d2dd4e8c7caa1acb407c161aad48d1201e93e0f6dcf54c8f19ae6fb3fd15127",
-    "bindings.noBindings": "991c632f180cc6603be8a07f324c542e370c09a57842f788a8309d9d6124888e",
+    "bindings.noBindings": "788c9516c409e5342853ad563430560d6b85eadb1bfc31314f973eddbc05c77b",
     "bindings.noSearchResults": "eae642c6afd261560983a8cb41a8cfcd081f030051a3c3b0ec0abcaf123b6365",
     "bindings.bindingFallback": "102a8fc6f97b40ba247ed2f7d44712f701cf7555af4c3d5d1ab260887912f50a",
     "bindings.notMapped": "9ea56193b0e782bb93822632eb05ebab98aac44493f081d57e7548fa5471aaa0",
@@ -6247,7 +6283,11 @@
     "storage.profilesAndSettings": "d5d37d3693506a2f00f92fd6d41e8e5a240428f3a12115587264c031e1bc3e09",
     "storage.recoveryRestoredMessage": "1c1a6df5a9938e64e504af8ab3e7d22fbacb5935a1888433860d9e1ebc3ffcc3",
     "storage.recoveryResetMessage": "acd48bb38d329ed5cc83eec1e32e9d8b08fccf858d0beae0e67973ce9cddad1b",
-    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9"
+    "storage.recoveryPreserved": "820114db804a12309ec88ec1b9571d6d7b475b716c96752fa24cb97649b96ad9",
+    "targets.monitorBrightness": "7dfd50d3403e942d51e7121be0a44783478a7d377a7d6d92caea0abfd3e65b3b",
+    "targets.allMonitors": "38a8d79081564ac2a72205c134fcfdc688d36df430fca8bd4a9c1f855b945b1b",
+    "targets.description.monitorBrightness": "1a0e82f10d369f1a74604b165be788a3b76d098586804bb7f0a22c80b99f4bd1",
+    "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

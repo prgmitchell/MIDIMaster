@@ -1,3 +1,5 @@
+import { builtInTargetKey, targetDescriptor } from "./target_model.js";
+
 export const SYSTEM_SOUNDS_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='1.5' y='1.5' width='17' height='17' rx='4' fill='%2317263d'/><path d='M4.4 8.1v3.8h2.7l3.5 3V5.1L7.1 8.1H4.4z' fill='%23d8e7ff'/><path d='M13.1 7.1a4.1 4.1 0 0 1 0 5.8M14.9 5.4a6.6 6.6 0 0 1 0 9.2' stroke='%238fd5ff' stroke-width='1.35' stroke-linecap='round'/><circle cx='15.4' cy='4.5' r='1.2' fill='%2386d6a7'/></svg>";
 
 function stableStringify(value) {
@@ -11,7 +13,7 @@ function stableStringify(value) {
   return `{${parts.join(",")}}`;
 }
 
-function integrationTargetKey(integration) {
+export function integrationTargetKey(integration) {
   if (!integration) return "";
   const id = integration.integration_id || "";
   const kind = integration.kind || "";
@@ -315,20 +317,8 @@ export function createTargetCore({
     const sessions = getSess();
 
     if (!target) return null;
-    if (target === "Master" || target.Master !== undefined) return "::master::";
-    if (target === "Focus" || target.Focus !== undefined) return "::focus::";
-    if (target === "MonitorBrightness") return "::monitor-brightness::";
-    const brightness = target.MonitorBrightness || target.monitorBrightness;
-    if (brightness) {
-      const monitorId = brightness.monitor_id || brightness.monitorId;
-      return monitorId ? `monitor-brightness:${monitorId}` : "::monitor-brightness::";
-    }
-    if (target === "MediaControl") return "::media-control::";
-    if (target === "CaptureControl") return "::capture-control::";
-    if (target === "Macro") return "::macro::";
-    if (target === "Hotkey") return "::hotkey::";
-    if (target === "OpenApplication") return "::open-application::";
-    if (target === "AutoHotkeyScript") return "::autohotkey-script::";
+    const builtInKey = builtInTargetKey(target);
+    if (builtInKey) return builtInKey;
     const profile = target.Profile || target.profile;
     if (profile?.name) return `profile:${profile.name}`;
 
@@ -420,14 +410,15 @@ export function createTargetCore({
     const currentFocusSession = getFocus();
 
     if (!target) return null;
-    if (target === "Master") {
+    if (target === "Master" || target?.Master != null) {
       const master = sessions.find((s) => s.is_master || s.id === "master");
       return master?.volume ?? null;
     }
     if (target === "Focus" || target?.Focus != null) {
       return currentFocusSession?.volume ?? null;
     }
-    if (target === "MonitorBrightness" || target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
+    const descriptor = targetDescriptor(target);
+    if ((descriptor && !descriptor.capabilities.feedback) || target?.Profile || target?.profile) {
       return null;
     }
 
@@ -481,68 +472,7 @@ export function createTargetCore({
   }
 
   function getVolumeForTarget(target) {
-    const sessions = getSess();
-    const playbackDevices = getPlayback();
-    const recordingDevices = getRecording();
-    const currentFocusSession = getFocus();
-
-    if (!target) return null;
-
-    if (target === "Master" || target?.Master != null) {
-      const session = sessions.find((s) => s.is_master);
-      return session ? session.volume : null;
-    }
-
-    if (target === "Focus" || target?.Focus != null) {
-      return currentFocusSession?.volume ?? null;
-    }
-
-    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
-      return null;
-    }
-
-    const appContainer = target.Application || target.application;
-    const appName = appContainer?.name ?? target.name;
-    if (appName) {
-      const matching = sessions.filter((item) => sessionMatchesAppName(item, appName));
-      if (matching.length === 0) return null;
-      return Math.max(...matching.map((s) => s.volume));
-    }
-
-    const sessionContainer = target.Session || target.session;
-    const sessionId = sessionContainer?.session_id ?? sessionContainer?.sessionId ?? target.session_id;
-    if (sessionId) {
-      const session = sessions.find((item) => String(item.id) === String(sessionId));
-      return session ? session.volume : null;
-    }
-
-    const deviceContainer = target.Device || target.device;
-    const deviceId = deviceContainer?.device_id ?? deviceContainer?.deviceId ?? target.device_id;
-    if (deviceId) {
-      let rawId = deviceId;
-      let kind = "playback";
-      if (typeof deviceId === "string") {
-        if (deviceId.startsWith("recording:")) {
-          rawId = deviceId.slice("recording:".length);
-          kind = "recording";
-        } else if (deviceId.startsWith("playback:")) {
-          rawId = deviceId.slice("playback:".length);
-        }
-      }
-      const deviceList = kind === "recording" ? recordingDevices : playbackDevices;
-      const device = deviceList.find((d) => d.id === rawId);
-      return device ? device.volume : null;
-    }
-
-    const integration = target.Integration || target.integration;
-    if (integration && integration.integration_id) {
-      const integrationState = getIntegrationState(target);
-      if (integrationState && typeof integrationState.volume === "number") {
-        return integrationState.volume;
-      }
-    }
-
-    return null;
+    return resolveTargetVolume(target);
   }
 
   function getMuteForTarget(target) {
@@ -562,7 +492,8 @@ export function createTargetCore({
       return Boolean(currentFocusSession?.is_muted ?? currentFocusSession?.muted ?? false);
     }
 
-    if (target === "MediaControl" || target === "CaptureControl" || target === "Macro" || target === "Hotkey" || target === "OpenApplication" || target?.Profile || target?.profile) {
+    const descriptor = targetDescriptor(target);
+    if ((descriptor && !descriptor.capabilities.mute) || target?.Profile || target?.profile) {
       return false;
     }
 

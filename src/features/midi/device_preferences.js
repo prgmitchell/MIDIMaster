@@ -1,64 +1,18 @@
-export function normalizeMidiPreference(source) {
-  const current = (source && typeof source === "object") ? source : {};
-  const routes = normalizeMidiRoutes(current);
-  const first = routes[0] || {};
-  const configured = Boolean(
-    current.configured
-    ?? current.midiDevicePreferenceSet
-    ?? current.midi_device_preference_set
-    ?? current.midi_device_preference_configured
-    ?? (routes.length > 0)
-  );
-  return {
-    inputDeviceId: String(first.inputDeviceId || current.inputDeviceId || current.input_device_id || "").trim(),
-    outputDeviceId: String(first.outputDeviceId || current.outputDeviceId || current.output_device_id || "").trim(),
-    inputDeviceName: String(first.inputDeviceName || current.inputDeviceName || current.input_device_name || "").trim(),
-    outputDeviceName: String(first.outputDeviceName || current.outputDeviceName || current.output_device_name || "").trim(),
-    routes,
-    configured,
-  };
-}
+import {
+  buildPersistedMidiRoutes,
+  normalizeMidiPreference,
+  normalizeMidiRoute,
+  normalizeMidiRoutes,
+  stripUnavailableMidiSuffix,
+} from "../../core/midi_preferences.js";
 
-export function normalizeMidiRoute(source) {
-  const current = (source && typeof source === "object") ? source : {};
-  const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
-  const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
-  if (!inputDeviceId || !outputDeviceId) return null;
-  return {
-    inputDeviceId,
-    outputDeviceId,
-    inputDeviceName: String(current.inputDeviceName || current.input_device_name || "").trim(),
-    outputDeviceName: String(current.outputDeviceName || current.output_device_name || "").trim(),
-    enabled: current.enabled !== false,
-  };
-}
-
-export function normalizeMidiRoutes(source) {
-  const current = (source && typeof source === "object") ? source : {};
-  const rawRoutes = Array.isArray(current.routes)
-    ? current.routes
-    : (Array.isArray(current.midi_device_routes) ? current.midi_device_routes : []);
-  const routes = [];
-
-  rawRoutes.forEach((raw) => {
-    const route = normalizeMidiRoute(raw);
-    if (!route || routes.some((existing) => sameInputRouteIdentity(existing, route))) return;
-    routes.push(route);
-  });
-
-  if (routes.length === 0) {
-    const legacy = normalizeMidiRoute({
-      inputDeviceId: current.inputDeviceId || current.input_device_id,
-      outputDeviceId: current.outputDeviceId || current.output_device_id,
-      inputDeviceName: current.inputDeviceName || current.input_device_name,
-      outputDeviceName: current.outputDeviceName || current.output_device_name,
-      enabled: true,
-    });
-    if (legacy) routes.push(legacy);
-  }
-
-  return routes;
-}
+export {
+  buildPersistedMidiRoutes,
+  normalizeMidiPreference,
+  normalizeMidiRoute,
+  normalizeMidiRoutes,
+  stripUnavailableMidiSuffix as stripUnavailableSuffix,
+};
 
 export function midiRoutesEqual(left, right) {
   const a = normalizeMidiRoutes({ routes: left });
@@ -83,10 +37,10 @@ export function orderMidiRoutesByPreference(routes, preferredRoutes) {
   const ordered = [];
 
   preferred.forEach((preference) => {
-    const preferredName = stripUnavailableSuffix(preference.inputDeviceName || "");
+    const preferredName = stripUnavailableMidiSuffix(preference.inputDeviceName || "");
     let matchIndex = remaining.findIndex((route) => {
       if (route.inputDeviceId !== preference.inputDeviceId) return false;
-      const routeName = stripUnavailableSuffix(route.inputDeviceName || "");
+      const routeName = stripUnavailableMidiSuffix(route.inputDeviceName || "");
       return !(preferredName && routeName && preferredName !== routeName);
     });
 
@@ -94,7 +48,7 @@ export function orderMidiRoutesByPreference(routes, preferredRoutes) {
       const nameMatches = remaining
         .map((route, index) => ({
           index,
-          name: stripUnavailableSuffix(route.inputDeviceName || ""),
+          name: stripUnavailableMidiSuffix(route.inputDeviceName || ""),
         }))
         .filter((candidate) => candidate.name === preferredName);
       if (nameMatches.length === 1) matchIndex = nameMatches[0].index;
@@ -151,30 +105,6 @@ export function createMidiRouteDraftController() {
       return result;
     },
   };
-}
-
-function sameInputRouteIdentity(left, right) {
-  const leftInputId = String(left?.inputDeviceId || left?.input_device_id || "").trim();
-  const rightInputId = String(right?.inputDeviceId || right?.input_device_id || "").trim();
-  if (!leftInputId || leftInputId !== rightInputId) return false;
-
-  const leftName = stripUnavailableSuffix(left?.inputDeviceName || left?.input_device_name || "");
-  const rightName = stripUnavailableSuffix(right?.inputDeviceName || right?.input_device_name || "");
-  return !(leftName && rightName && leftName !== rightName);
-}
-
-export function buildPersistedMidiRoutes(routes) {
-  return normalizeMidiRoutes({ routes }).map((route) => ({
-    input_device_id: route.inputDeviceId,
-    output_device_id: route.outputDeviceId,
-    input_device_name: route.inputDeviceName || null,
-    output_device_name: route.outputDeviceName || null,
-    enabled: route.enabled !== false,
-  }));
-}
-
-export function routeKey(route) {
-  return String(route?.inputDeviceId || route?.input_device_id || "").trim();
 }
 
 export function findDeviceMatch(devices, deviceId, deviceName) {
@@ -273,12 +203,12 @@ export function hasDuplicateInputRoute(routes, inputDeviceId, indexToIgnore = -1
   if (!target) return false;
   const list = Array.isArray(routes) ? routes : [];
   const targetRoute = indexToIgnore >= 0 ? list[indexToIgnore] : null;
-  const targetName = stripUnavailableSuffix(targetRoute?.inputDeviceName || targetRoute?.input_device_name || "");
+  const targetName = stripUnavailableMidiSuffix(targetRoute?.inputDeviceName || targetRoute?.input_device_name || "");
   return list.some((route, index) => {
     if (index === indexToIgnore || !route || typeof route !== "object") return false;
     const input = String(route.inputDeviceId || route.input_device_id || "").trim();
     if (input !== target) return false;
-    const routeName = stripUnavailableSuffix(route.inputDeviceName || route.input_device_name || "");
+    const routeName = stripUnavailableMidiSuffix(route.inputDeviceName || route.input_device_name || "");
     return !(targetName && routeName && targetName !== routeName);
   });
 }
@@ -342,10 +272,5 @@ export function unavailableDeviceLabel(name, id, kind) {
   const suffix = " (Unavailable)";
   const base = rawBase.endsWith(suffix) ? rawBase.slice(0, -suffix.length) : rawBase;
   return `${base} (Unavailable)`;
-}
-
-export function stripUnavailableSuffix(label) {
-  const raw = String(label || "").trim();
-  return raw.endsWith(" (Unavailable)") ? raw.slice(0, -" (Unavailable)".length) : raw;
 }
 
