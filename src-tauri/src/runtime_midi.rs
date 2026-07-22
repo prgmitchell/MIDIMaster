@@ -372,6 +372,8 @@ pub(crate) fn apply_midi_event(
         let state = states.entry(key.clone()).or_insert_with(|| BindingState {
             last_value: 0.0,
             last_update: Instant::now(),
+            last_absolute_input: None,
+            absolute_input_direction: 0,
             relative_auto_format: None,
             relative_seen_midpoint: false,
             relative_seen_sign_band: false,
@@ -980,6 +982,8 @@ mod tests {
                 BindingState {
                     last_value: 63.0 / 127.0,
                     last_update: Instant::now(),
+                    last_absolute_input: None,
+                    absolute_input_direction: 0,
                     relative_auto_format: None,
                     relative_seen_midpoint: false,
                     relative_seen_sign_band: false,

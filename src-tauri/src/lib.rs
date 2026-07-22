@@ -681,6 +681,8 @@ mod tests {
         BindingState {
             last_value,
             last_update,
+            last_absolute_input: None,
+            absolute_input_direction: 0,
             relative_auto_format: None,
             relative_seen_midpoint: false,
             relative_seen_sign_band: false,

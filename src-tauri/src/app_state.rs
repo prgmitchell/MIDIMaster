@@ -482,6 +482,8 @@ impl AppState {
                     entry.insert(BindingState {
                         last_value: normalized,
                         last_update: idle_update,
+                        last_absolute_input: None,
+                        absolute_input_direction: 0,
                         relative_auto_format: None,
                         relative_seen_midpoint: false,
                         relative_seen_sign_band: false,

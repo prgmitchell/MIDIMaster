@@ -5,6 +5,8 @@ use std::time::{Duration, Instant};
 
 const RELATIVE_STEP: f32 = 0.02;
 const MIN_CUSTOM_POINTS: usize = 2;
+const ABSOLUTE_CC_JITTER_STEP: i16 = 1;
+const ABSOLUTE_CC_MOTION_WINDOW: Duration = Duration::from_millis(120);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BindingKey {
@@ -18,6 +20,8 @@ pub struct BindingKey {
 pub struct BindingState {
     pub last_value: f32,
     pub last_update: Instant,
+    pub last_absolute_input: Option<u8>,
+    pub absolute_input_direction: i8,
     pub relative_auto_format: Option<RelativeFormat>,
     pub relative_seen_midpoint: bool,
     pub relative_seen_sign_band: bool,
@@ -101,13 +105,73 @@ pub fn apply_midi_event(
         }
     };
 
-    if binding.deadzone > 0.0 && (next_value - state.last_value).abs() < binding.deadzone {
+    if should_suppress_absolute_cc_jitter(binding, event, state, now) {
+        return None;
+    }
+
+    let value_delta = (next_value - state.last_value).abs();
+    if value_delta <= f32::EPSILON && !binding.is_button_binding() {
+        return None;
+    }
+
+    if binding.deadzone > 0.0 && value_delta < binding.deadzone {
         return None;
     }
 
     state.last_value = next_value;
     state.last_update = now;
     Some(next_value)
+}
+
+fn should_suppress_absolute_cc_jitter(
+    binding: &Binding,
+    event: &MidiEvent,
+    state: &mut BindingState,
+    now: Instant,
+) -> bool {
+    if binding.deadzone > 0.0
+        || binding.mode != MidiMode::Absolute
+        || event.msg_type != crate::model::MidiMessageType::ControlChange
+        || event.value_14.is_some()
+        || binding.is_button_binding()
+    {
+        state.last_absolute_input = None;
+        state.absolute_input_direction = 0;
+        return false;
+    }
+
+    let input = event.value;
+    let Some(previous) = state.last_absolute_input else {
+        state.last_absolute_input = Some(input);
+        state.absolute_input_direction = 0;
+        return false;
+    };
+
+    let delta = i16::from(input) - i16::from(previous);
+    if delta == 0 {
+        if now.duration_since(state.last_update) >= ABSOLUTE_CC_MOTION_WINDOW {
+            state.absolute_input_direction = 0;
+        }
+        return true;
+    }
+
+    let direction = delta.signum() as i8;
+    let adjacent = delta.abs() <= ABSOLUTE_CC_JITTER_STEP;
+    let continuing_motion = adjacent
+        && state.absolute_input_direction == direction
+        && now.duration_since(state.last_update) < ABSOLUTE_CC_MOTION_WINDOW;
+
+    if !adjacent || continuing_motion {
+        state.last_absolute_input = Some(input);
+        state.absolute_input_direction = direction;
+        return false;
+    }
+
+    // A single adjacent change after the fader has settled is indistinguishable
+    // from analog noise. Hold it until movement travels beyond the jitter band.
+    // A return to the accepted value never touches audio or the OSD.
+    state.absolute_input_direction = 0;
+    true
 }
 
 fn absolute_value(binding: &Binding, event: &MidiEvent) -> Option<f32> {
@@ -313,6 +377,8 @@ mod tests {
             last_update: Instant::now()
                 .checked_sub(Duration::from_secs(1))
                 .unwrap_or_else(Instant::now),
+            last_absolute_input: None,
+            absolute_input_direction: 0,
             relative_auto_format: None,
             relative_seen_midpoint: false,
             relative_seen_sign_band: false,
@@ -430,6 +496,51 @@ mod tests {
         let mut state = sample_state(0.0);
         let next = apply_midi_event(&binding, &sample_event(64), &mut state).expect("value");
         assert!((next - (64.0 / 127.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn absolute_cc_suppresses_idle_one_step_jitter() {
+        let binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
+        let mut state = sample_state(0.0);
+
+        assert!(apply_midi_event(&binding, &sample_event(34), &mut state).is_some());
+        assert!(apply_midi_event(&binding, &sample_event(35), &mut state).is_none());
+        assert!(apply_midi_event(&binding, &sample_event(35), &mut state).is_none());
+        assert!(apply_midi_event(&binding, &sample_event(34), &mut state).is_none());
+        assert!(apply_midi_event(&binding, &sample_event(34), &mut state).is_none());
+        assert!(apply_midi_event(&binding, &sample_event(35), &mut state).is_none());
+        assert_eq!(state.last_absolute_input, Some(34));
+    }
+
+    #[test]
+    fn absolute_cc_confirmed_motion_remains_smooth() {
+        let binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
+        let mut state = sample_state(0.0);
+
+        assert!(apply_midi_event(&binding, &sample_event(34), &mut state).is_some());
+        assert!(apply_midi_event(&binding, &sample_event(35), &mut state).is_none());
+        assert!(apply_midi_event(&binding, &sample_event(36), &mut state).is_some());
+        assert!(apply_midi_event(&binding, &sample_event(37), &mut state).is_some());
+        assert_eq!(state.last_absolute_input, Some(37));
+    }
+
+    #[test]
+    fn repeated_absolute_cc_value_is_a_no_op() {
+        let binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
+        let mut state = sample_state(0.0);
+
+        assert!(apply_midi_event(&binding, &sample_event(64), &mut state).is_some());
+        assert!(apply_midi_event(&binding, &sample_event(64), &mut state).is_none());
+    }
+
+    #[test]
+    fn repeated_button_value_is_preserved_for_press_only_controllers() {
+        let mut binding = sample_binding(MidiMode::Absolute, RelativeFormat::Auto);
+        binding.control_kind = BindingControlKind::Button;
+        let mut state = sample_state(0.0);
+
+        assert!(apply_midi_event(&binding, &sample_event(127), &mut state).is_some());
+        assert!(apply_midi_event(&binding, &sample_event(127), &mut state).is_some());
     }
 
     #[test]
