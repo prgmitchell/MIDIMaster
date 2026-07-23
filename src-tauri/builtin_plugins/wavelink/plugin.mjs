@@ -48,6 +48,97 @@ function pickFirstString(obj, keys) {
   return "";
 }
 
+function mergeNestedCollection(current, patch) {
+  if (!Array.isArray(current)) return Array.isArray(patch) ? [...patch] : current;
+  if (!Array.isArray(patch)) return current;
+
+  const next = [...current];
+  for (const entry of patch) {
+    if (!entry || typeof entry !== "object" || entry.id == null) continue;
+    const index = next.findIndex((candidate) => (
+      candidate && String(candidate.id) === String(entry.id)
+    ));
+    if (index >= 0) {
+      next[index] = { ...next[index], ...entry };
+    } else {
+      next.push(entry);
+    }
+  }
+  return next;
+}
+
+function mergeEntityPatch(collection, patch, nestedKeys = []) {
+  if (!Array.isArray(collection) || !patch || typeof patch !== "object" || patch.id == null) {
+    return null;
+  }
+  const index = collection.findIndex((entry) => (
+    entry && String(entry.id) === String(patch.id)
+  ));
+  if (index < 0) return null;
+
+  const current = collection[index];
+  const merged = { ...current, ...patch };
+  for (const key of nestedKeys) {
+    if (Array.isArray(patch[key])) {
+      merged[key] = mergeNestedCollection(current?.[key], patch[key]);
+    }
+  }
+
+  const next = [...collection];
+  next[index] = merged;
+  return next;
+}
+
+function createMuteWriteCoordinator({
+  keyForEndpoint,
+  write,
+  refresh,
+  scheduleFallback,
+}) {
+  const generationByEndpoint = new Map();
+
+  return {
+    clear() {
+      generationByEndpoint.clear();
+    },
+    async execute(endpoint, muted) {
+      const key = keyForEndpoint(endpoint);
+      const generation = (generationByEndpoint.get(key) || 0) + 1;
+      generationByEndpoint.set(key, generation);
+      const isCurrent = () => generationByEndpoint.get(key) === generation;
+
+      const response = await write(endpoint, muted);
+      if (!isCurrent()) {
+        return { acknowledged: Boolean(response?.ok), refreshed: false, stale: true };
+      }
+
+      const refreshed = await refresh(endpoint, isCurrent);
+      if (!refreshed && isCurrent()) {
+        scheduleFallback(endpoint);
+      }
+      return {
+        acknowledged: Boolean(response?.ok),
+        refreshed,
+        stale: false,
+      };
+    },
+  };
+}
+
+function disconnectedFeedbackUpdates(bindings) {
+  if (!Array.isArray(bindings)) return [];
+  const updates = [];
+  for (const binding of bindings) {
+    const target = binding?.target?.Integration || binding?.target?.integration;
+    if (!target || target.integration_id !== "wavelink") continue;
+    const action = binding?.action || "Volume";
+    if (action === "Volume" || action === "SetMainOutputDevice") {
+      updates.push({ bindingId: binding.id, action });
+    }
+  }
+  return updates;
+}
+
 const MAIN_OUTPUT_CYCLE_LABEL = "Cycle Main Output";
 
 function outputDeviceName(device) {
@@ -141,6 +232,10 @@ function createMainOutputCycleOption(outputDevices, iconDataUrl = null) {
 }
 
 export const wavelinkTestUtils = {
+  createMuteWriteCoordinator,
+  disconnectedFeedbackUpdates,
+  mergeEntityPatch,
+  mergeNestedCollection,
   outputDeviceName,
   outputDeviceId,
   outputId,
@@ -303,6 +398,8 @@ export async function activate(ctx) {
   let applicationInfo = null;
   let mixes = [];
   let channels = [];
+  let mixesRevision = 0;
+  let channelsRevision = 0;
   let outputDevicesState = { mainOutput: null, outputDevices: [] };
 
   let bindings = [];
@@ -314,7 +411,6 @@ export async function activate(ctx) {
   let channelsRefreshTimer = null;
   let mixesRefreshTimer = null;
   let postLocalWriteRefreshTimer = null;
-  let lastLocalVolumeWriteAt = 0;
   const primaryFeedbackIntentByBinding = new Map(); // binding_id -> { value, at, source, endpoint_key }
   const localVolumeIntentByEndpoint = new Map(); // endpoint_key -> { value, at, source, endpoint_key }
   const pendingAppInfoByWsId = new Map();
@@ -356,6 +452,7 @@ export async function activate(ctx) {
     lastSentVolumeByEndpoint.clear();
     primaryFeedbackIntentByBinding.clear();
     localVolumeIntentByEndpoint.clear();
+    muteWrites.clear();
     mixes = [];
     channels = [];
     outputDevicesState = { mainOutput: null, outputDevices: [] };
@@ -447,7 +544,6 @@ export async function activate(ctx) {
             101,
           );
         }
-        lastLocalVolumeWriteAt = Date.now();
         lastSentVolumeByEndpoint.set(endpointKey(endpoint), level);
         schedulePostLocalWriteRefresh();
       }
@@ -455,10 +551,12 @@ export async function activate(ctx) {
       // If send failed, force reconnect.
       wsId = null;
       connectedPort = null;
+      clearAllPendingRpc();
       mixes = [];
       channels = [];
       outputDevicesState = { mainOutput: null, outputDevices: [] };
       localVolumeIntentByEndpoint.clear();
+      muteWrites.clear();
       offlineFeedbackSent = false;
       syncOfflineFeedback().catch(() => {});
       wasConnected = false;
@@ -502,7 +600,7 @@ export async function activate(ctx) {
     channelsRefreshTimer = setTimeout(() => {
       channelsRefreshTimer = null;
       if (!wsId) return;
-      sendJsonRpc("getChannels", {}, 3).catch(() => {});
+      requestChannelsState().catch(() => {});
     }, STATE_REFRESH_DEBOUNCE_MS);
   }
 
@@ -511,7 +609,7 @@ export async function activate(ctx) {
     mixesRefreshTimer = setTimeout(() => {
       mixesRefreshTimer = null;
       if (!wsId) return;
-      sendJsonRpc("getMixes", {}, 2).catch(() => {});
+      requestMixesState().catch(() => {});
     }, STATE_REFRESH_DEBOUNCE_MS);
   }
 
@@ -564,8 +662,8 @@ export async function activate(ctx) {
   }
 
   async function syncOfflineFeedback() {
-    // If Wave Link is disconnected, drive bound controls to 0.
-    // This keeps motor faders from staying at a stale value.
+    // Park continuous/momentary controls while disconnected, but preserve the
+    // last confirmed stateful values rather than presenting "off" as fact.
     if (offlineFeedbackSent) return;
 
     const current = bindings;
@@ -574,16 +672,9 @@ export async function activate(ctx) {
       return;
     }
 
-    for (const b of current) {
-      const t = integrationFromBindingTarget(b?.target);
-      if (!t || t.integration_id !== "wavelink") continue;
-      const action = b?.action || "Volume";
+    for (const update of disconnectedFeedbackUpdates(current)) {
       try {
-        if (action === "Volume") {
-          await ctx.feedback.set(b.id, 0.0, "Volume", { silent: true });
-        } else if (action === "ToggleMute" || action === "ToggleEffect" || action === "SetMainOutputDevice") {
-          await ctx.feedback.set(b.id, 0.0, action, { silent: true });
-        }
+        await ctx.feedback.set(update.bindingId, 0.0, update.action, { silent: true });
       } catch {
         // ignore
       }
@@ -870,6 +961,40 @@ export async function activate(ctx) {
     }
   }
 
+  function applyChannelsSnapshot(payload) {
+    if (!Array.isArray(payload)) return false;
+    channels = payload;
+    channelsRevision += 1;
+    syncAllFeedback().catch(() => {});
+    return true;
+  }
+
+  function applyMixesSnapshot(payload) {
+    if (!Array.isArray(payload)) return false;
+    mixes = payload;
+    mixesRevision += 1;
+    syncAllFeedback().catch(() => {});
+    return true;
+  }
+
+  function applyChannelPatch(patch) {
+    const next = mergeEntityPatch(channels, patch, ["mixes"]);
+    if (!next) return false;
+    channels = next;
+    channelsRevision += 1;
+    syncAllFeedback().catch(() => {});
+    return true;
+  }
+
+  function applyMixPatch(patch) {
+    const next = mergeEntityPatch(mixes, patch);
+    if (!next) return false;
+    mixes = next;
+    mixesRevision += 1;
+    syncAllFeedback().catch(() => {});
+    return true;
+  }
+
   function describeFromCache(endpoint) {
     if (!endpoint) return null;
     const { identifier, mixer_id } = endpoint;
@@ -957,12 +1082,66 @@ export async function activate(ctx) {
     return wait;
   }
 
+  async function requestChannelsState(isCurrent = () => true) {
+    const revisionAtRequest = channelsRevision;
+    const response = await requestJsonRpc("getChannels");
+    if (!isCurrent() || !response?.ok) return false;
+    if (channelsRevision !== revisionAtRequest) return true;
+    return applyChannelsSnapshot(response.result?.channels ?? response.result);
+  }
+
+  async function requestMixesState(isCurrent = () => true) {
+    const revisionAtRequest = mixesRevision;
+    const response = await requestJsonRpc("getMixes");
+    if (!isCurrent() || !response?.ok) return false;
+    if (mixesRevision !== revisionAtRequest) return true;
+    return applyMixesSnapshot(response.result?.mixes ?? response.result);
+  }
+
+  async function refreshMuteEndpoint(endpoint, isCurrent) {
+    return endpoint?.identifier
+      ? requestChannelsState(isCurrent)
+      : requestMixesState(isCurrent);
+  }
+
+  async function writeMute(endpoint, muted) {
+    let method;
+    let params;
+    if (!endpoint.identifier) {
+      method = "setMix";
+      params = { id: endpoint.mixer_id, isMuted: muted };
+    } else if (!endpoint.mixer_id) {
+      method = "setChannel";
+      params = { id: endpoint.identifier, isMuted: muted };
+    } else {
+      method = "setChannel";
+      params = {
+        id: endpoint.identifier,
+        mixes: [{ id: endpoint.mixer_id, isMuted: muted }],
+      };
+    }
+    return requestJsonRpc(method, params);
+  }
+
+  const muteWrites = createMuteWriteCoordinator({
+    keyForEndpoint: endpointKey,
+    write: writeMute,
+    refresh: refreshMuteEndpoint,
+    scheduleFallback: (endpoint) => {
+      if (endpoint.identifier) scheduleChannelsRefresh();
+      else scheduleMixesRefresh();
+    },
+  });
+
   async function requestFullState() {
     if (disposed || !wsId) return;
     try {
-      await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getMixes", id: 2 }));
-      await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getChannels", id: 3 }));
+      const stateRequests = [
+        requestMixesState(),
+        requestChannelsState(),
+      ];
       await ctx.ws.send(wsId, JSON.stringify({ jsonrpc: "2.0", method: "getOutputDevices", id: 4 }));
+      await Promise.all(stateRequests);
     } catch (e) {
       // ignore
     }
@@ -1045,19 +1224,13 @@ export async function activate(ctx) {
     if (id === 2) {
       const result = json.result;
       const payload = result?.mixes ?? result;
-      if (Array.isArray(payload)) {
-        mixes = payload;
-        syncAllFeedback().catch(() => {});
-      }
+      applyMixesSnapshot(payload);
       return;
     }
     if (id === 3) {
       const result = json.result;
       const payload = result?.channels ?? result;
-      if (Array.isArray(payload)) {
-        channels = payload;
-        syncAllFeedback().catch(() => {});
-      }
+      applyChannelsSnapshot(payload);
       return;
     }
     if (id === 4) {
@@ -1074,13 +1247,21 @@ export async function activate(ctx) {
 
     // Notifications (no id)
     if (json.method) {
-      if (json.method === "channelsChanged" || json.method === "channelChanged") {
-        if (Date.now() - lastLocalVolumeWriteAt >= LOCAL_WRITE_QUIET_MS) {
+      if (json.method === "channelsChanged") {
+        if (!applyChannelsSnapshot(json.params?.channels ?? json.params)) {
+          scheduleChannelsRefresh();
+        }
+      } else if (json.method === "channelChanged") {
+        if (!applyChannelPatch(json.params?.channel ?? json.params)) {
           scheduleChannelsRefresh();
         }
       }
-      if (json.method === "mixesChanged" || json.method === "mixChanged") {
-        if (Date.now() - lastLocalVolumeWriteAt >= LOCAL_WRITE_QUIET_MS) {
+      if (json.method === "mixesChanged") {
+        if (!applyMixesSnapshot(json.params?.mixes ?? json.params)) {
+          scheduleMixesRefresh();
+        }
+      } else if (json.method === "mixChanged") {
+        if (!applyMixPatch(json.params?.mix ?? json.params)) {
           scheduleMixesRefresh();
         }
       }
@@ -1203,12 +1384,14 @@ export async function activate(ctx) {
       clearPendingAppInfo(closedId);
       wsId = null;
       connectedPort = null;
+      clearAllPendingRpc();
       connecting = false;
       pendingVolumeWrites.clear();
       mixes = [];
       channels = [];
       outputDevicesState = { mainOutput: null, outputDevices: [] };
       localVolumeIntentByEndpoint.clear();
+      muteWrites.clear();
       offlineFeedbackSent = false;
       syncOfflineFeedback().catch(() => {});
       wasConnected = false;
@@ -1279,12 +1462,14 @@ export async function activate(ctx) {
             clearPendingAppInfo(wsId);
             wsId = null;
             connectedPort = null;
+            clearAllPendingRpc();
             connecting = false;
             pendingVolumeWrites.clear();
             mixes = [];
             channels = [];
             outputDevicesState = { mainOutput: null, outputDevices: [] };
             localVolumeIntentByEndpoint.clear();
+            muteWrites.clear();
             offlineFeedbackSent = false;
             syncOfflineFeedback().catch(() => {});
             wasConnected = false;
@@ -1635,10 +1820,12 @@ export async function activate(ctx) {
         } catch {
           wsId = null;
           connectedPort = null;
+          clearAllPendingRpc();
           pendingVolumeWrites.clear();
           mixes = [];
           channels = [];
           localVolumeIntentByEndpoint.clear();
+          muteWrites.clear();
           offlineFeedbackSent = false;
           syncOfflineFeedback().catch(() => {});
           wasConnected = false;
@@ -1658,11 +1845,13 @@ export async function activate(ctx) {
         } catch {
           wsId = null;
           connectedPort = null;
+          clearAllPendingRpc();
           pendingVolumeWrites.clear();
           mixes = [];
           channels = [];
           outputDevicesState = { mainOutput: null, outputDevices: [] };
           localVolumeIntentByEndpoint.clear();
+          muteWrites.clear();
           offlineFeedbackSent = false;
           syncOfflineFeedback().catch(() => {});
           wasConnected = false;
@@ -1707,20 +1896,10 @@ export async function activate(ctx) {
           if (!wsId) {
             return;
           }
-          if (!endpoint.identifier) {
-            await sendJsonRpc("setMix", { id: endpoint.mixer_id, isMuted: muted }, 202);
-          } else if (!endpoint.mixer_id) {
-            await sendJsonRpc("setChannel", { id: endpoint.identifier, isMuted: muted }, 102);
-          } else {
-            await sendJsonRpc(
-              "setChannel",
-              { id: endpoint.identifier, mixes: [{ id: endpoint.mixer_id, isMuted: muted }] },
-              102,
-            );
-          }
+          await muteWrites.execute(endpoint, muted);
         }
 
-        if (bindingId && isPrimaryTarget && action !== "Volume") {
+        if (bindingId && isPrimaryTarget && action !== "Volume" && action !== "ToggleMute") {
           await ctx.feedback.set(
             bindingId,
             action === "ToggleMute" ? (level > 0.5 ? 1.0 : 0.0) : level,
@@ -1731,11 +1910,13 @@ export async function activate(ctx) {
         // If send failed, force reconnect.
         wsId = null;
         connectedPort = null;
+        clearAllPendingRpc();
         pendingVolumeWrites.clear();
         mixes = [];
         channels = [];
         outputDevicesState = { mainOutput: null, outputDevices: [] };
         localVolumeIntentByEndpoint.clear();
+        muteWrites.clear();
         offlineFeedbackSent = false;
         syncOfflineFeedback().catch(() => {});
         wasConnected = false;
