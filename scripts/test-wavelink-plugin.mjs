@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { wavelinkTestUtils } from "../src-tauri/builtin_plugins/wavelink/plugin.mjs";
 
 const {
@@ -7,8 +8,14 @@ const {
   outputDeviceId,
   outputDeviceName,
   outputId,
+  shouldSyncMuteFeedback,
   validOutputDevices,
 } = wavelinkTestUtils;
+
+const wavelinkPluginSource = await readFile(
+  new URL("../src-tauri/builtin_plugins/wavelink/plugin.mjs", import.meta.url),
+  "utf8",
+);
 
 const outputDevices = [
   { outputDeviceId: "speakers", outputId: "out-speakers", name: "Speakers" },
@@ -94,11 +101,30 @@ function testCycleOptionUsesSetMainOutputMomentaryAction() {
   }]);
 }
 
+function testExternalMuteNotificationsAlwaysRefreshState() {
+  assert.match(
+    wavelinkPluginSource,
+    /json\.method === "channelsChanged" \|\| json\.method === "channelChanged"\) \{\s*scheduleChannelsRefresh\(\);/u,
+  );
+  assert.match(
+    wavelinkPluginSource,
+    /json\.method === "mixesChanged" \|\| json\.method === "mixChanged"\) \{\s*scheduleMixesRefresh\(\);/u,
+  );
+}
+
+function testVolumeBindingsReceiveMuteFeedback() {
+  assert.equal(shouldSyncMuteFeedback("Volume"), true);
+  assert.equal(shouldSyncMuteFeedback("ToggleMute"), true);
+  assert.equal(shouldSyncMuteFeedback("ToggleEffect"), false);
+}
+
 testFirstDeviceCyclesToSecond();
 testLastDeviceWrapsToFirst();
 testUnknownCurrentDeviceFallsBackToFirst();
 testFewerThanTwoDevicesDoesNotExposeOrCycle();
 testSnakeCaseAndCamelCaseFieldsResolve();
 testCycleOptionUsesSetMainOutputMomentaryAction();
+testExternalMuteNotificationsAlwaysRefreshState();
+testVolumeBindingsReceiveMuteFeedback();
 
 console.log("Wave Link plugin tests passed");

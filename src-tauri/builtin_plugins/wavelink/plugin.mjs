@@ -48,6 +48,10 @@ function pickFirstString(obj, keys) {
   return "";
 }
 
+function shouldSyncMuteFeedback(action) {
+  return action === "Volume" || action === "ToggleMute";
+}
+
 const MAIN_OUTPUT_CYCLE_LABEL = "Cycle Main Output";
 
 function outputDeviceName(device) {
@@ -141,6 +145,7 @@ function createMainOutputCycleOption(outputDevices, iconDataUrl = null) {
 }
 
 export const wavelinkTestUtils = {
+  shouldSyncMuteFeedback,
   outputDeviceName,
   outputDeviceId,
   outputId,
@@ -314,7 +319,6 @@ export async function activate(ctx) {
   let channelsRefreshTimer = null;
   let mixesRefreshTimer = null;
   let postLocalWriteRefreshTimer = null;
-  let lastLocalVolumeWriteAt = 0;
   const primaryFeedbackIntentByBinding = new Map(); // binding_id -> { value, at, source, endpoint_key }
   const localVolumeIntentByEndpoint = new Map(); // endpoint_key -> { value, at, source, endpoint_key }
   const pendingAppInfoByWsId = new Map();
@@ -447,7 +451,6 @@ export async function activate(ctx) {
             101,
           );
         }
-        lastLocalVolumeWriteAt = Date.now();
         lastSentVolumeByEndpoint.set(endpointKey(endpoint), level);
         schedulePostLocalWriteRefresh();
       }
@@ -812,19 +815,20 @@ export async function activate(ctx) {
           if (value != null) {
             const intent = primaryFeedbackIntentByBinding.get(b.id);
             const endpoint = normalizeEndpoint({ Integration: t });
-            if (
+            const ignoreStaleVolume = (
               shouldIgnoreStaleLocalVolume(endpoint, value)
               || shouldIgnoreStaleFeedbackIntent(intent, endpoint, value)
-            ) {
-              // Ignore stale echo while local intent settles.
-              continue;
+            );
+            if (!ignoreStaleVolume) {
+              if (intent) {
+                primaryFeedbackIntentByBinding.delete(b.id);
+              }
+              await ctx.feedback.set(b.id, value, "Volume", { silent: true });
             }
-            if (intent) {
-              primaryFeedbackIntentByBinding.delete(b.id);
-            }
-            await ctx.feedback.set(b.id, value, "Volume", { silent: true });
           }
-        } else if (action === "ToggleMute") {
+        }
+
+        if (shouldSyncMuteFeedback(action)) {
           let muted = null;
           if (t.kind === "mix") {
             const mix = mixes.find((m) => m && String(m.id) === String(data.mixer_id));
@@ -1075,14 +1079,10 @@ export async function activate(ctx) {
     // Notifications (no id)
     if (json.method) {
       if (json.method === "channelsChanged" || json.method === "channelChanged") {
-        if (Date.now() - lastLocalVolumeWriteAt >= LOCAL_WRITE_QUIET_MS) {
-          scheduleChannelsRefresh();
-        }
+        scheduleChannelsRefresh();
       }
       if (json.method === "mixesChanged" || json.method === "mixChanged") {
-        if (Date.now() - lastLocalVolumeWriteAt >= LOCAL_WRITE_QUIET_MS) {
-          scheduleMixesRefresh();
-        }
+        scheduleMixesRefresh();
       }
       if (
         json.method === "outputDevicesChanged"
