@@ -137,7 +137,7 @@ jobs:
           Push-Location "src-tauri"
           try {
             $timer = Measure-Command {
-              cargo tauri build --bundles nsis
+              cargo tauri build --bundles nsis --config tauri.release.conf.json
             }
             Write-Host ("Tauri bundle build completed in {0:N1}s" -f $timer.TotalSeconds)
           } finally {
