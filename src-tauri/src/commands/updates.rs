@@ -67,9 +67,9 @@ fn show_update_notification_window(
 
     if let Some(window) = app.get_webview_window("update") {
         send_update_notification_payload(&window, &payload);
-        let _ = window.show();
         let _ = window.unminimize();
         let _ = window.center();
+        let _ = window.show();
         let _ = window.set_focus();
         return Ok(());
     }
@@ -98,13 +98,15 @@ fn show_update_notification_window(
     .resizable(false)
     .maximizable(false)
     .always_on_top(true)
-    .focused(true)
+    .focused(false)
+    .visible(false)
     .decorations(false)
     .build()
     .map_err(|err| format!("Unable to show update notification: {err}"))?;
 
     let _ = window.center();
     send_update_notification_payload(&window, &payload);
+    let _ = window.show();
     let _ = window.set_focus();
     Ok(())
 }
@@ -119,7 +121,9 @@ fn send_update_notification_payload(window: &WebviewWindow, payload: &UpdateNoti
 }
 
 #[tauri::command]
-pub fn show_update_notification_window_if_main_hidden(
+// WebviewWindowBuilder must run outside a synchronous command on Windows or the
+// runtime event loop can deadlock before the new WebView navigates from about:blank.
+pub async fn show_update_notification_window_if_main_hidden(
     app: AppHandle,
     current_version: Option<String>,
     latest_version: String,
