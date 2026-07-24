@@ -9,6 +9,7 @@ description = "Bind MIDI controls to system audio, devices, and plugin integrati
 
 [features]
 default = []
+custom-protocol = ["tauri/custom-protocol"]
 # Enables local-only benchmark hooks and isolated app-data overrides. Release
 # bundles are built without this feature.
 perf-audit = []

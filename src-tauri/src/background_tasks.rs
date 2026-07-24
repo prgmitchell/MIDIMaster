@@ -8,7 +8,9 @@ use crate::AppState;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
+use tauri::async_runtime::JoinHandle;
 use tauri::{AppHandle, Emitter, Manager};
+use tokio::sync::watch;
 use tokio::time::sleep;
 
 const MIDI_QUEUE_BATCH_DELAY: Duration = Duration::from_millis(4);
@@ -30,6 +32,21 @@ fn midi_event_queue_notify() -> Arc<tokio::sync::Notify> {
 
 pub(crate) fn notify_midi_event_queued() {
     midi_event_queue_notify().notify_one();
+}
+
+fn shutdown_requested(shutdown: &watch::Receiver<bool>) -> bool {
+    *shutdown.borrow()
+}
+
+async fn sleep_or_shutdown(shutdown: &mut watch::Receiver<bool>, duration: Duration) -> bool {
+    if shutdown_requested(shutdown) {
+        return true;
+    }
+
+    tokio::select! {
+        changed = shutdown.changed() => changed.is_err() || shutdown_requested(shutdown),
+        _ = sleep(duration) => false,
+    }
 }
 
 fn focused_sessions_match(left: &Option<SessionInfo>, right: &Option<SessionInfo>) -> bool {
@@ -93,10 +110,17 @@ fn should_send_feedback(
     true
 }
 
-pub(crate) fn spawn_midi_event_queue_loop(app_handle: AppHandle) {
+pub(crate) fn spawn_midi_event_queue_loop(
+    app_handle: AppHandle,
+    mut shutdown: watch::Receiver<bool>,
+) -> JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let notify = midi_event_queue_notify();
         loop {
+            if shutdown_requested(&shutdown) {
+                break;
+            }
+
             let state = app_handle.state::<AppState>();
             let (events, stats) = state
                 .midi_event_queue
@@ -109,8 +133,17 @@ pub(crate) fn spawn_midi_event_queue_loop(app_handle: AppHandle) {
                 .unwrap_or_default();
 
             if events.is_empty() && stats.coalesced == 0 && stats.dropped == 0 {
-                notify.notified().await;
-                sleep(MIDI_QUEUE_BATCH_DELAY).await;
+                tokio::select! {
+                    changed = shutdown.changed() => {
+                        if changed.is_err() || shutdown_requested(&shutdown) {
+                            break;
+                        }
+                    }
+                    _ = notify.notified() => {}
+                }
+                if sleep_or_shutdown(&mut shutdown, MIDI_QUEUE_BATCH_DELAY).await {
+                    break;
+                }
                 continue;
             }
 
@@ -152,14 +185,18 @@ pub(crate) fn spawn_midi_event_queue_loop(app_handle: AppHandle) {
                     );
                 }
             }
-            if had_events {
-                sleep(MIDI_QUEUE_BATCH_DELAY).await;
+            if had_events && sleep_or_shutdown(&mut shutdown, MIDI_QUEUE_BATCH_DELAY).await {
+                break;
             }
         }
-    });
+        run_logger::info("app", "midi_event_queue_loop_stopped", "");
+    })
 }
 
-pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
+pub(crate) fn spawn_feedback_refresh_loop(
+    app_handle: AppHandle,
+    mut shutdown: watch::Receiver<bool>,
+) -> JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let mut last_focused_session: Option<SessionInfo> = None;
         let mut last_feedback_sync = Instant::now()
@@ -178,6 +215,10 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
         let mut last_sent_feedback: HashMap<BindingKey, f32> = HashMap::new();
 
         loop {
+            if shutdown_requested(&shutdown) {
+                break;
+            }
+
             let loop_started = Instant::now();
             let state = app_handle.state::<AppState>();
 
@@ -378,7 +419,28 @@ pub(crate) fn spawn_feedback_refresh_loop(app_handle: AppHandle) {
                 IDLE_BACKGROUND_INTERVAL
             };
 
-            sleep(next_sleep).await;
+            if sleep_or_shutdown(&mut shutdown, next_sleep).await {
+                break;
+            }
         }
-    });
+        run_logger::info("app", "feedback_refresh_loop_stopped", "");
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn background_wait_wakes_immediately_for_shutdown() {
+        tauri::async_runtime::block_on(async {
+            let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+            shutdown_tx.send_replace(true);
+
+            assert!(
+                sleep_or_shutdown(&mut shutdown_rx, Duration::from_secs(10)).await,
+                "background loops must wake without waiting for their normal interval"
+            );
+        });
+    }
 }

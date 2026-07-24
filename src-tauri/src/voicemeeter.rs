@@ -620,6 +620,36 @@ impl VoicemeeterState {
             }),
         }
     }
+
+    pub(crate) fn disconnect_for_shutdown(&self) -> Result<(), String> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| "Voicemeeter bridge lock failed".to_string())?;
+        disconnect_inner(&mut inner);
+        Ok(())
+    }
+
+    pub(crate) fn try_disconnect_for_shutdown(&self) -> Result<(), String> {
+        let mut inner = self
+            .inner
+            .try_lock()
+            .map_err(|_| "Voicemeeter bridge is busy".to_string())?;
+        disconnect_inner(&mut inner);
+        Ok(())
+    }
+}
+
+fn disconnect_inner(inner: &mut BridgeInner) {
+    #[cfg(target_os = "windows")]
+    if inner.logged_in {
+        if let Some(api) = inner.api.as_ref() {
+            api.logout();
+        }
+    }
+    inner.logged_in = false;
+    inner.api = None;
+    inner.revision = inner.revision.wrapping_add(1);
 }
 
 #[cfg(target_os = "windows")]
@@ -742,20 +772,7 @@ pub fn voicemeeter_connect(
 
 #[tauri::command]
 pub fn voicemeeter_disconnect(state: tauri::State<'_, VoicemeeterState>) -> Result<(), String> {
-    let mut inner = state
-        .inner
-        .lock()
-        .map_err(|_| "Voicemeeter bridge lock failed".to_string())?;
-    #[cfg(target_os = "windows")]
-    if inner.logged_in {
-        if let Some(api) = inner.api.as_ref() {
-            api.logout();
-        }
-    }
-    inner.logged_in = false;
-    inner.api = None;
-    inner.revision = inner.revision.wrapping_add(1);
-    Ok(())
+    state.disconnect_for_shutdown()
 }
 
 #[tauri::command]

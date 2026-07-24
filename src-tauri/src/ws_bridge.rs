@@ -1,7 +1,14 @@
 use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -22,6 +29,7 @@ pub struct WsHub {
 #[derive(Default)]
 struct WsHubInner {
     next_id: std::sync::atomic::AtomicU64,
+    shutting_down: AtomicBool,
     conns: tokio::sync::Mutex<HashMap<u64, mpsc::UnboundedSender<Message>>>,
 }
 
@@ -37,6 +45,10 @@ impl WsHub {
         headers: HashMap<String, String>,
         connect_timeout_ms: u64,
     ) -> Result<u64, String> {
+        if self.inner.shutting_down.load(Ordering::Acquire) {
+            return Err("WebSocket bridge is shutting down".to_string());
+        }
+
         let parsed = Url::parse(&url).map_err(|e| e.to_string())?;
         let mut req = parsed.into_client_request().map_err(|e| e.to_string())?;
         {
@@ -65,8 +77,15 @@ impl WsHub {
         let (mut write, mut read) = ws_stream.split();
         let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
+        if self.inner.shutting_down.load(Ordering::Acquire) {
+            return Err("WebSocket bridge is shutting down".to_string());
+        }
+
         {
             let mut conns = self.inner.conns.lock().await;
+            if self.inner.shutting_down.load(Ordering::Acquire) {
+                return Err("WebSocket bridge is shutting down".to_string());
+            }
             conns.insert(id, tx);
         }
 
@@ -119,6 +138,9 @@ impl WsHub {
     }
 
     pub async fn send_text(&self, id: u64, text: String) -> Result<(), String> {
+        if self.inner.shutting_down.load(Ordering::Acquire) {
+            return Err("WebSocket bridge is shutting down".to_string());
+        }
         let conns = self.inner.conns.lock().await;
         let tx = conns
             .get(&id)
@@ -134,6 +156,47 @@ impl WsHub {
             .ok_or_else(|| "Unknown WebSocket id".to_string())?;
         tx.send(Message::Close(None))
             .map_err(|_| "WebSocket close failed".to_string())
+    }
+
+    pub(crate) fn begin_shutdown(&self) {
+        self.inner.shutting_down.store(true, Ordering::Release);
+    }
+
+    pub(crate) async fn shutdown_all(&self, grace_period: Duration) -> bool {
+        self.begin_shutdown();
+        let senders = {
+            let conns = self.inner.conns.lock().await;
+            conns.values().cloned().collect::<Vec<_>>()
+        };
+        for sender in senders {
+            let _ = sender.send(Message::Close(None));
+        }
+
+        let closed = tokio::time::timeout(grace_period, async {
+            loop {
+                if self.inner.conns.lock().await.is_empty() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .is_ok();
+
+        if !closed {
+            self.inner.conns.lock().await.clear();
+        }
+        closed
+    }
+
+    pub(crate) fn shutdown_now(&self) {
+        self.begin_shutdown();
+        if let Ok(mut conns) = self.inner.conns.try_lock() {
+            for sender in conns.values() {
+                let _ = sender.send(Message::Close(None));
+            }
+            conns.clear();
+        }
     }
 }
 
@@ -191,4 +254,23 @@ pub fn get_wavelink_ws_port() -> Result<Option<u16>, String> {
     };
 
     Ok(Some(info.port))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shutdown_all_closes_connections_and_rejects_sends() {
+        tauri::async_runtime::block_on(async {
+            let hub = WsHub::new();
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            hub.inner.conns.lock().await.insert(1, tx);
+
+            assert!(!hub.shutdown_all(Duration::from_millis(1)).await);
+            assert!(matches!(rx.recv().await, Some(Message::Close(None))));
+            assert_eq!(hub.inner.conns.lock().await.len(), 0);
+            assert!(hub.send_text(1, "ignored".to_string()).await.is_err());
+        });
+    }
 }

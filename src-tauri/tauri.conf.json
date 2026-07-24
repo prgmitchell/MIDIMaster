@@ -25,7 +25,9 @@
     }
   },
   "bundle": {
+    "active": true,
     "createUpdaterArtifacts": true,
+    "targets": ["nsis"],
     "icon": ["icons/MIDIMaster.png", "icons/icon.ico"],
     "windows": {
       "nsis": {

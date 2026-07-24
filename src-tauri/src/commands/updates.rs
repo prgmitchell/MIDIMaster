@@ -266,7 +266,15 @@ pub async fn download_and_install_update(app: AppHandle) -> Result<(), String> {
     if crate::perf_audit::network_is_offline() {
         return Err("Network disabled by the local performance audit".to_string());
     }
-    let updater = match app.updater_builder().build() {
+    let updater_exit_app = app.clone();
+    let updater = match app
+        .updater_builder()
+        .on_before_exit(move || {
+            crate::shutdown::prepare_for_updater_exit(&updater_exit_app);
+            updater_exit_app.cleanup_before_exit();
+        })
+        .build()
+    {
         Ok(updater) => updater,
         Err(err) => {
             let message = format!("Unable to initialize updater: {err}");
@@ -352,6 +360,10 @@ pub async fn download_and_install_update(app: AppHandle) -> Result<(), String> {
         },
     );
 
-    crate::run_logger::flush_pending_repeats();
-    app.restart();
+    crate::shutdown::request_shutdown(
+        app,
+        crate::shutdown::ShutdownAction::Restart,
+        "updater_restart",
+    );
+    Ok(())
 }

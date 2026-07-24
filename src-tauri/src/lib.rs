@@ -26,6 +26,7 @@ mod profile_store;
 mod run_logger;
 mod runtime_helpers;
 mod runtime_midi;
+mod shutdown;
 mod soundboard;
 mod store_api;
 mod telemetry;
@@ -46,6 +47,7 @@ use audio::AudioBackend;
 use commands::*;
 use durable_json_store::new_recovery_notices;
 use profile_store::ProfileStore;
+use shutdown::{ShutdownAction, ShutdownCoordinator};
 
 #[cfg(test)]
 use std::collections::HashMap;
@@ -98,31 +100,6 @@ fn log_startup_milestone(
             setup_started.elapsed().as_micros()
         ),
     );
-}
-
-fn shutdown_lights(state: &AppState) {
-    state.soundboard.stop_all();
-    run_logger::info("app", "shutdown_lights_start", "");
-    state.cancel_activity_button_light_holds();
-    if let Ok(profile_guard) = state.active_profile.lock() {
-        if let Some(profile) = profile_guard.as_ref() {
-            run_logger::info(
-                "app",
-                "shutdown_lights_profile",
-                &format!("binding_count={}", profile.bindings.len()),
-            );
-            if let Ok(mut midi) = state.midi.lock() {
-                for binding in &profile.bindings {
-                    if binding.is_button_binding() {
-                        let _ = midi.send_binding_light_feedback(binding, 0.0);
-                    } else {
-                        let _ = midi.send_binding_feedback(binding, 0.0);
-                    }
-                }
-            }
-        }
-    }
-    run_logger::info("app", "shutdown_lights_done", "");
 }
 
 fn migrate_startup_registration_if_needed(
@@ -265,6 +242,7 @@ pub fn run() {
             // Shared WebSocket bridge for integration plugins.
             app.manage(WsHub::new());
             app.manage(VoicemeeterState::new());
+            app.manage(ShutdownCoordinator::new());
 
             app.manage(AppState::new(
                 audio,
@@ -348,18 +326,20 @@ pub fn run() {
                             }
                         }
                         "restart" => {
-                            let state = app.state::<AppState>();
                             run_logger::info("app", "tray_restart", "restart requested from tray");
-                            shutdown_lights(&state);
-                            run_logger::flush_pending_repeats();
-                            app.restart();
+                            shutdown::request_shutdown(
+                                app.clone(),
+                                ShutdownAction::Restart,
+                                "tray_restart",
+                            );
                         }
                         "quit" => {
-                            let state = app.state::<AppState>();
                             run_logger::info("app", "tray_quit", "shutdown requested from tray");
-                            shutdown_lights(&state);
-                            run_logger::flush_pending_repeats();
-                            app.exit(0);
+                            shutdown::request_shutdown(
+                                app.clone(),
+                                ShutdownAction::Exit(0),
+                                "tray_quit",
+                            );
                         }
                         _ => {}
                     },
@@ -393,21 +373,21 @@ pub fn run() {
                             run_logger::info("app", "close_to_tray", "main window hidden to tray");
                             return;
                         }
-                        if let Some(osd_window) = app_handle.get_webview_window("osd") {
-                            let _ = osd_window.close();
-                        }
-                        let state = app_handle.state::<AppState>();
+                        api.prevent_close();
                         run_logger::info("app", "window_close", "main window close requested");
-                        shutdown_lights(&state);
-                        run_logger::flush_pending_repeats();
-                        app_handle.exit(0);
+                        shutdown::request_shutdown(
+                            app_handle.clone(),
+                            ShutdownAction::Exit(0),
+                            "window_close",
+                        );
                     }
                     tauri::WindowEvent::Destroyed => {
-                        let state = app_handle.state::<AppState>();
                         run_logger::info("app", "window_destroyed", "main window destroyed");
-                        shutdown_lights(&state);
-                        run_logger::flush_pending_repeats();
-                        app_handle.exit(0);
+                        shutdown::request_shutdown(
+                            app_handle.clone(),
+                            ShutdownAction::Exit(0),
+                            "window_destroyed",
+                        );
                     }
                     tauri::WindowEvent::Resized(_) => {
                         let minimize_to_tray = app_handle
@@ -426,8 +406,17 @@ pub fn run() {
                 });
             }
 
-            background_tasks::spawn_midi_event_queue_loop(app.handle().clone());
-            background_tasks::spawn_feedback_refresh_loop(app.handle().clone());
+            let shutdown = app.state::<ShutdownCoordinator>();
+            let midi_queue_task = background_tasks::spawn_midi_event_queue_loop(
+                app.handle().clone(),
+                shutdown.subscribe(),
+            );
+            shutdown.track_background_task(midi_queue_task);
+            let feedback_task = background_tasks::spawn_feedback_refresh_loop(
+                app.handle().clone(),
+                shutdown.subscribe(),
+            );
+            shutdown.track_background_task(feedback_task);
 
             #[cfg(feature = "perf-audit")]
             log_startup_milestone("rust_setup_complete", phase_started, setup_started);
@@ -435,8 +424,17 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(commands::command_registry!())
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            tauri::RunEvent::ExitRequested { code, api, .. } => {
+                shutdown::handle_exit_requested(app, code, &api);
+            }
+            tauri::RunEvent::Exit => {
+                shutdown::finish_unexpected_exit(app);
+            }
+            _ => {}
+        });
 }
 
 #[cfg(test)]
