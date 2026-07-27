@@ -212,6 +212,17 @@ pub fn run() {
                 .load()
                 .map_err(|err| format!("Unable to load app settings: {err}"))?;
             migrate_startup_registration_if_needed(&app_settings_store, &mut app_settings);
+            if app_settings.start_with_windows {
+                match windows_autostart::repair_windows_autostart_if_missing() {
+                    Ok(true) => run_logger::info(
+                        "app",
+                        "startup_registration_repaired",
+                        "reason=missing_shortcut",
+                    ),
+                    Ok(false) => {}
+                    Err(err) => run_logger::warn("app", "startup_registration_repair_failed", &err),
+                }
+            }
             #[cfg(feature = "perf-audit")]
             {
                 log_startup_milestone("settings_loaded", phase_started, setup_started);

@@ -177,6 +177,29 @@ pub fn set_windows_autostart(enabled: bool) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
+pub fn repair_windows_autostart_if_missing() -> Result<bool, String> {
+    let exe_path =
+        std::env::current_exe().map_err(|_| "Failed to resolve executable path".to_string())?;
+    if !install_marker_path(&exe_path)
+        .map(|path| path.is_file())
+        .unwrap_or(false)
+    {
+        return Ok(false);
+    }
+
+    let shortcut_path = startup_shortcut_path()?;
+    if shortcut_path
+        .try_exists()
+        .map_err(|err| format!("Failed to check startup shortcut: {}", err))?
+    {
+        return Ok(false);
+    }
+
+    set_windows_autostart(true)?;
+    Ok(true)
+}
+
+#[cfg(target_os = "windows")]
 fn delete_legacy_run_value() -> Result<(), String> {
     use windows::Win32::System::Registry::{
         RegCloseKey, RegDeleteValueW, RegOpenKeyExW, HKEY_CURRENT_USER, KEY_SET_VALUE,
@@ -216,4 +239,9 @@ pub fn startup_requires_installed_app(_error: &str) -> bool {
 #[cfg(not(target_os = "windows"))]
 pub fn set_windows_autostart(_enabled: bool) -> Result<(), String> {
     Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn repair_windows_autostart_if_missing() -> Result<bool, String> {
+    Ok(false)
 }
