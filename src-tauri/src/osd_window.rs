@@ -218,7 +218,7 @@ pub(crate) fn emit_osd_update(
     if !was_visible {
         let _ = osd_window.show();
     }
-    apply_osd_settings_if_needed(app, &settings, false);
+    apply_osd_settings_if_needed(app, &settings, !was_visible);
 
     let mut osd_payload = payload.clone();
     if let Some(map) = osd_payload.as_object_mut() {
