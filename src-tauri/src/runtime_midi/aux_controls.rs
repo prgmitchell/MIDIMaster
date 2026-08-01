@@ -380,6 +380,7 @@ pub(super) fn handle_aux_or_unmatched(
             .map(|settings| settings.enabled)
             .unwrap_or(true);
 
+        let binding_primary_target = targets.first().cloned();
         for target in &targets {
             let focus_session = if matches!(target, model::BindingTarget::Focus) {
                 state.audio.focused_session().ok().flatten()
@@ -391,7 +392,9 @@ pub(super) fn handle_aux_or_unmatched(
               "muted": next_muted,
               "action": "toggle_mute",
               "focus_session": focus_session,
-              "binding_id": owner.id
+              "binding_id": owner.id,
+              "binding_name": owner.name,
+              "binding_primary_target": binding_primary_target
             });
             let _ = app.emit("mute_update", payload.clone());
 

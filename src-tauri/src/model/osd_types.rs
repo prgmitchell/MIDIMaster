@@ -21,6 +21,8 @@ pub struct OsdSettings {
     #[serde(default)]
     pub monitor_id: Option<String>,
     pub anchor: String,
+    #[serde(default)]
+    pub show_binding_name: bool,
     #[serde(default = "default_osd_style")]
     pub style: String,
     #[serde(default = "default_opacity")]
@@ -37,9 +39,27 @@ impl Default for OsdSettings {
             monitor_name: None,
             monitor_id: None,
             anchor: "top-right".to_string(),
+            show_binding_name: false,
             style: default_osd_style(),
             opacity: default_opacity(),
             scale: default_scale(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::OsdSettings;
+
+    #[test]
+    fn legacy_settings_default_to_target_names() {
+        let settings: OsdSettings = serde_json::from_value(serde_json::json!({
+            "enabled": true,
+            "monitor_index": 0,
+            "anchor": "top-right"
+        }))
+        .expect("legacy OSD settings should deserialize");
+
+        assert!(!settings.show_binding_name);
     }
 }

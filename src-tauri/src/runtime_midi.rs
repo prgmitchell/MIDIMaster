@@ -548,6 +548,7 @@ pub(crate) fn apply_midi_event(
             .map(|settings| settings.enabled)
             .unwrap_or(true);
 
+        let binding_primary_target = targets.first().cloned();
         for target in targets {
             let focus_session = if matches!(target, model::BindingTarget::Focus) {
                 state.audio.focused_session().ok().flatten()
@@ -559,7 +560,9 @@ pub(crate) fn apply_midi_event(
               "muted": muted,
               "action": "toggle_mute",
               "focus_session": focus_session,
-              "binding_id": binding.id
+              "binding_id": binding.id,
+              "binding_name": binding.name,
+              "binding_primary_target": binding_primary_target
             });
             let _ = app.emit("mute_update", payload.clone());
 
@@ -888,6 +891,7 @@ pub(crate) fn apply_midi_event(
         .lock()
         .map(|settings| settings.enabled)
         .unwrap_or(true);
+    let binding_primary_target = targets.first().cloned();
     for target in targets {
         let focus_session = if matches!(target, model::BindingTarget::Focus) {
             state.audio.focused_session().ok().flatten()
@@ -898,7 +902,9 @@ pub(crate) fn apply_midi_event(
           "target": target,
           "volume": volume,
           "focus_session": focus_session,
-          "binding_id": binding.id
+          "binding_id": binding.id,
+          "binding_name": binding.name,
+          "binding_primary_target": binding_primary_target
         });
         if !integration_button_feedback_owned {
             let _ = app.emit("volume_update", payload.clone());

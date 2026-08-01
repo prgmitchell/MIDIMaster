@@ -203,6 +203,7 @@ export function createDomRefs() {
   const connectionsContent = document.getElementById("connections-content");
   const osdEnabledToggle = document.getElementById("osd-enabled");
   const osdMonitorSelect = document.getElementById("osd-monitor");
+  const osdLabelModeSelect = document.getElementById("osd-label-mode");
   const osdStyleSelect = document.getElementById("osd-style");
   const osdTransparencyInput = document.getElementById("osd-transparency");
   const osdTransparencyValue = document.getElementById("osd-transparency-value");
@@ -398,6 +399,7 @@ export function createDomRefs() {
     connectionsContent,
     osdEnabledToggle,
     osdMonitorSelect,
+    osdLabelModeSelect,
     osdStyleSelect,
     osdTransparencyInput,
     osdTransparencyValue,

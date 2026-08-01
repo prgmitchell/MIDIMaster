@@ -913,11 +913,13 @@ pub fn set_binding_feedback(
                 None
             };
             let payload = serde_json::json!({
-              "target": primary_target,
+              "target": primary_target.clone(),
               "muted": muted,
               "action": "toggle_mute",
               "focus_session": focus_session,
               "binding_id": binding.id,
+              "binding_name": binding.name,
+              "binding_primary_target": primary_target,
               "silent": silent
             });
             let _ = app.emit("mute_update", payload.clone());
@@ -932,10 +934,12 @@ pub fn set_binding_feedback(
                 None
             };
             let mut payload = serde_json::json!({
-              "target": primary_target,
+              "target": primary_target.clone(),
               "volume": value,
               "focus_session": focus_session,
               "binding_id": binding.id,
+              "binding_name": binding.name,
+              "binding_primary_target": primary_target,
               "silent": silent
             });
             binding_actions::add_momentary_integration_input_value(

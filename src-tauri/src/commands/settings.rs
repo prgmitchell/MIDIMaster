@@ -145,6 +145,7 @@ pub fn update_osd_settings(
     monitor_name: Option<String>,
     monitor_id: Option<String>,
     anchor: String,
+    show_binding_name: bool,
     style: Option<String>,
     opacity: Option<f64>,
     scale: Option<f64>,
@@ -156,12 +157,13 @@ pub fn update_osd_settings(
         "settings",
         "update_osd_settings",
         &format!(
-            "enabled={} monitor_index={} monitor_name={} monitor_id={} anchor={} style={} opacity={} scale={}",
+            "enabled={} monitor_index={} monitor_name={} monitor_id={} anchor={} show_binding_name={} style={} opacity={} scale={}",
             enabled,
             monitor_index,
             monitor_name.as_deref().unwrap_or(""),
             monitor_id.as_deref().unwrap_or(""),
             anchor,
+            show_binding_name,
             next_style,
             next_opacity,
             next_scale
@@ -181,6 +183,7 @@ pub fn update_osd_settings(
     updated.monitor_name = monitor_name;
     updated.monitor_id = monitor_id;
     updated.anchor = anchor;
+    updated.show_binding_name = show_binding_name;
     updated.style = next_style;
     updated.opacity = next_opacity;
     updated.scale = next_scale;

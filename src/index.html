@@ -385,13 +385,26 @@
                 <section class="settings-section settings-section-panel settings-osd-section" data-settings-panel="osd">
                   <div class="settings-card">
                     <div class="settings-field-row settings-field-row--monitor">
-                      <div class="settings-field-label" data-i18n="settings.monitor">Monitor</div>
+                      <div class="settings-field-label" data-i18n="settings.general">General</div>
                       <div class="settings-monitor-control">
-                        <select id="osd-monitor"></select>
-                        <label class="settings-toggle" title="Toggle on-screen display" data-i18n-title="settings.toggleOsd">
-                          <input id="osd-enabled" type="checkbox" checked />
-                          <span class="plugins-toggle-ui" aria-hidden="true"></span>
-                        </label>
+                        <div class="settings-osd-enabled-control">
+                          <span class="settings-inline-label" data-i18n="settings.enabled">Enabled</span>
+                          <label class="settings-toggle" title="Toggle on-screen display" data-i18n-title="settings.toggleOsd">
+                            <input id="osd-enabled" type="checkbox" checked />
+                            <span class="plugins-toggle-ui" aria-hidden="true"></span>
+                          </label>
+                        </div>
+                        <div class="settings-osd-monitor-select-control">
+                          <span class="settings-inline-label" data-i18n="settings.monitor">Monitor</span>
+                          <select id="osd-monitor"></select>
+                        </div>
+                        <div class="settings-osd-label-control">
+                          <span class="settings-inline-label" data-i18n="settings.osdLabel">Displayed name</span>
+                          <select id="osd-label-mode" title="Displayed name" data-i18n-title="settings.osdLabel">
+                            <option value="target" data-i18n="settings.osdLabelTarget">Target name</option>
+                            <option value="binding" data-i18n="settings.osdLabelBinding">Binding name</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
                     <div class="settings-field-row settings-field-row--appearance">

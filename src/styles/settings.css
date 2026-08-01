@@ -339,12 +339,51 @@
   border-bottom: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
 }
 
+.settings-field-row--monitor {
+  align-items: stretch;
+}
+
+.settings-osd-enabled-control {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 14px 40px;
+  align-items: start;
+  gap: 8px;
+}
+
+.settings-osd-enabled-control .settings-toggle {
+  align-self: center;
+}
+
 .settings-monitor-control {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
-  gap: 12px;
-  align-items: center;
+  grid-template-columns: 55px minmax(0, 1fr) 33.333333%;
+  gap: 0;
+  align-items: stretch;
+}
+
+.settings-osd-monitor-select-control,
+.settings-osd-label-control {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 14px 40px;
+  align-items: stretch;
+  gap: 8px;
+  padding-left: 16px;
+}
+
+.settings-osd-monitor-select-control .settings-monitor-dropdown,
+.settings-osd-label-control .settings-select-dropdown {
+  min-width: 0;
+}
+
+.settings-inline-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 750;
+  white-space: nowrap;
 }
 
 .settings-list-row {
@@ -2367,6 +2406,11 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
     grid-template-columns: 1fr;
   }
 
+  .settings-monitor-control {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
   .appearance-settings-grid {
     grid-template-columns: 1fr;
   }
@@ -2454,6 +2498,14 @@ body[data-theme] .settings-maintenance-button--danger.confirming,
   .settings-field-row {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .settings-monitor-control {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-osd-enabled-control {
+    width: min(100%, 180px);
   }
 
   .settings-list-row {

@@ -7,6 +7,7 @@ import { createOsdFeature } from "./features/osd/osd.js";
 const DEFAULT_SETTINGS = {
   enabled: true,
   anchor: "top-right",
+  showBindingName: false,
   style: "midnight",
   opacity: 0.96,
   scale: 1,
@@ -32,6 +33,7 @@ function normalizeSettings(value = {}) {
   return {
     enabled: Boolean(value.enabled ?? true),
     anchor: String(value.anchor || DEFAULT_SETTINGS.anchor),
+    showBindingName: Boolean(value.show_binding_name ?? value.showBindingName ?? false),
     style: String(value.style || DEFAULT_SETTINGS.style),
     opacity: Math.min(1, Math.max(0.35, Number(value.opacity ?? DEFAULT_SETTINGS.opacity))),
     scale: Math.min(1.5, Math.max(0.75, Number(value.scale ?? DEFAULT_SETTINGS.scale))),
@@ -175,8 +177,11 @@ async function start() {
     listen("osd_settings_update", (event) => {
       const payload = parsePayload(event?.payload);
       if (!payload || typeof payload !== "object") return;
+      const labelModeChanged = settings.showBindingName !== Boolean(
+        payload.show_binding_name ?? payload.showBindingName ?? false,
+      );
       applySettings(payload);
-      if (!settings.enabled) osd.hideVolumeOsd();
+      if (!settings.enabled || labelModeChanged) osd.hideVolumeOsd();
     }),
     listen("volume_update", handleDisplayEvent),
     listen("mute_update", handleDisplayEvent),

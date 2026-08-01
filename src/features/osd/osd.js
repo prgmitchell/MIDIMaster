@@ -72,7 +72,9 @@ export function createOsdFeature({
     host.appendChild(content);
   }
 
-  function getOsdKey(target) {
+  function getOsdKey(target, options = null) {
+    const bindingId = String(options?.bindingId || "").trim();
+    if (bindingId) return `::binding::${bindingId}`;
     const key = keyForTarget(target);
     if (key) return key;
     if (target === "Master" || target?.Master !== undefined) return "::master::";
@@ -154,10 +156,11 @@ export function createOsdFeature({
   function renderVolumeOsd(target, volume, focusSession, options = null) {
     if (!osd) return;
 
-    const display = resolveDisplay(target, focusSession);
+    const displayTarget = options?.displayTarget || target;
+    const display = resolveDisplay(displayTarget, focusSession);
     if (!display) return;
 
-    const key = getOsdKey(target);
+    const key = getOsdKey(displayTarget, options);
     let item = activeOsdCards.get(key);
     let refs;
 
@@ -178,7 +181,8 @@ export function createOsdFeature({
       notifyRendered();
     }
 
-    const displayLabel = displayLabelForTarget(display, target);
+    const displayLabel = String(options?.label || "").trim()
+      || displayLabelForTarget(display, displayTarget);
     const displaySignature = [
       displayLabel,
       String(display?.label || ""),
@@ -205,7 +209,7 @@ export function createOsdFeature({
     refs.fillDiv.style.backgroundColor = "";
     refs.valueSpan.style.fontSize = "";
 
-    const valueText = osdValueTextForTarget(target, options);
+    const valueText = osdValueTextForTarget(displayTarget, options);
     const fillSource = typeof options?.inputValue === "number"
       ? options.inputValue
       : (valueText ? 1.0 : volume);
@@ -223,17 +227,19 @@ export function createOsdFeature({
 
   function showVolumeOsd(target, volume, focusSession, options = null) {
     if (!osd) return;
-    pendingVolumeUpdates.set(getOsdKey(target), { target, volume, focusSession, options });
+    const displayTarget = options?.displayTarget || target;
+    pendingVolumeUpdates.set(getOsdKey(displayTarget, options), { target, volume, focusSession, options });
     scheduleVolumeRender();
   }
 
-  function showMuteOsd(target, muted, focusSession) {
+  function showMuteOsd(target, muted, focusSession, options = null) {
     if (!osd) return;
 
-    const display = resolveDisplay(target, focusSession);
+    const displayTarget = options?.displayTarget || target;
+    const display = resolveDisplay(displayTarget, focusSession);
     if (!display) return;
 
-    const key = getOsdKey(target);
+    const key = getOsdKey(displayTarget, options);
     let item = activeOsdCards.get(key);
     let refs;
 
@@ -255,7 +261,10 @@ export function createOsdFeature({
     }
 
     item.displaySignature = null;
-    renderLabelWithTags(refs.labelSpan, display.label);
+    renderLabelWithTags(
+      refs.labelSpan,
+      String(options?.label || "").trim() || displayLabelForTarget(display, displayTarget),
+    );
     refs.iconDiv.innerHTML = "";
     const icon = iconFor(display);
     refs.iconDiv.appendChild(icon);
@@ -294,10 +303,26 @@ export function createOsdFeature({
     const settings = getSettings() || {};
     if (!settings.enabled) return;
 
+    const bindingId = String(payload.binding_id || "").trim();
+    const bindingName = String(payload.binding_name || "").trim();
+    const useBindingName = Boolean(settings.showBindingName && bindingId && bindingName);
+    const displayTarget = useBindingName
+      ? (payload.binding_primary_target || payload.target)
+      : payload.target;
+    if (useBindingName) {
+      const eventTargetKey = keyForTarget(payload.target);
+      const primaryTargetKey = keyForTarget(displayTarget);
+      if (eventTargetKey && primaryTargetKey && eventTargetKey !== primaryTargetKey) return;
+    }
+    const options = useBindingName
+      ? { bindingId, label: bindingName, displayTarget }
+      : null;
+
     if (payload.action === "toggle_mute") {
-      showMuteOsd(payload.target, payload.muted, payload.focus_session);
+      showMuteOsd(payload.target, payload.muted, payload.focus_session, options);
     } else {
       showVolumeOsd(payload.target, payload.volume, payload.focus_session, {
+        ...(options || {}),
         inputValue: typeof payload.input_value === "number" ? payload.input_value : null,
       });
     }

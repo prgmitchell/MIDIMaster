@@ -1260,6 +1260,14 @@ export function createSettingsFeature({
     if (d.osdMonitorSelect) {
       d.osdMonitorSelect.value = String(merged.monitorIndex ?? 0);
     }
+    if (d.osdLabelModeSelect) {
+      d.osdLabelModeSelect.value = merged.showBindingName ? "binding" : "target";
+      renderSettingsSelectDropdown(d.osdLabelModeSelect);
+    }
+    const previewLabel = d.osdPositionPicker?.querySelector?.(".settings-osd-preview-label");
+    if (previewLabel) {
+      previewLabel.textContent = merged.showBindingName ? "Fader Group 1" : "MIDIMaster";
+    }
 
     syncOsdAppearanceUi(merged);
     syncOsdPositionUi(merged);
@@ -1293,6 +1301,7 @@ export function createSettingsFeature({
         monitorName: merged.monitorName || null,
         monitorId: merged.monitorId || null,
         anchor: merged.anchor,
+        showBindingName: Boolean(merged.showBindingName),
         style: appearance.style,
         opacity: appearance.opacity,
         scale: appearance.scale,
@@ -1315,6 +1324,7 @@ export function createSettingsFeature({
           monitorName: settings.monitor_name ?? settings.monitorName ?? null,
           monitorId: settings.monitor_id ?? settings.monitorId ?? null,
           anchor: normalizeOsdAnchor(settings.anchor),
+          showBindingName: Boolean(settings.show_binding_name ?? settings.showBindingName ?? false),
           style: normalizeOsdStyle(settings.style),
           opacity: clampNumber(settings.opacity, 0.35, 1, defaultOsdAppearance.opacity),
           scale: clampNumber(settings.scale, 0.75, 1.5, defaultOsdAppearance.scale),
@@ -1404,6 +1414,9 @@ export function createSettingsFeature({
   function renderAllSettingsSelectDropdowns() {
     if (d.languageSelect) {
       renderSettingsSelectDropdown(d.languageSelect);
+    }
+    if (d.osdLabelModeSelect) {
+      renderSettingsSelectDropdown(d.osdLabelModeSelect);
     }
   }
 
@@ -1904,6 +1917,12 @@ export function createSettingsFeature({
         applyOsdSettings({ monitorIndex: nextIndex, monitorName, monitorId });
         const currentMonitors = (typeof getMonitorOptions === "function") ? (getMonitorOptions() || []) : [];
         renderMonitorDropdownOptions(currentMonitors);
+      });
+    }
+
+    if (d.osdLabelModeSelect) {
+      d.osdLabelModeSelect.addEventListener("change", () => {
+        applyOsdSettings({ showBindingName: d.osdLabelModeSelect.value === "binding" });
       });
     }
 
