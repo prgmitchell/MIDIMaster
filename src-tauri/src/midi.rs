@@ -138,6 +138,9 @@ fn light_feedback_send_matches_primary(send: &BindingLightFeedbackSend, binding:
 }
 
 fn binding_light_feedback_sends(binding: &Binding, value: f32) -> Vec<BindingLightFeedbackSend> {
+    if !binding.feedback_enabled {
+        return Vec::new();
+    }
     let Some(indicator) = binding.indicator_feedback_control() else {
         return vec![primary_light_feedback_send(binding, value, true)];
     };
@@ -151,14 +154,17 @@ fn binding_light_feedback_sends(binding: &Binding, value: f32) -> Vec<BindingLig
     sends
 }
 
-fn binding_feedback_send(binding: &Binding, value: f32) -> BindingLightFeedbackSend {
+fn binding_feedback_send(binding: &Binding, value: f32) -> Option<BindingLightFeedbackSend> {
+    if !binding.feedback_enabled {
+        return None;
+    }
     if !binding.is_button_binding() {
         if let Some(output) = binding.custom_feedback_output_control() {
-            return indicator_light_feedback_send(output, value);
+            return Some(indicator_light_feedback_send(output, value));
         }
     }
 
-    primary_light_feedback_send(binding, value, true)
+    Some(primary_light_feedback_send(binding, value, true))
 }
 
 struct MidiInputRoute {
@@ -954,7 +960,9 @@ impl MidiManager {
     }
 
     pub fn send_binding_feedback(&mut self, binding: &Binding, value: f32) -> Result<()> {
-        let send = binding_feedback_send(binding, value);
+        let Some(send) = binding_feedback_send(binding, value) else {
+            return Ok(());
+        };
         let binding_context = if send.use_binding_protocol {
             Some(binding)
         } else {
@@ -2252,6 +2260,7 @@ mod tests {
             mute_behavior: MuteBehavior::ToggleOnPress,
             button_light_mode: ButtonLightMode::Activity,
             button_light_behavior: ButtonLightBehavior::FollowState,
+            feedback_enabled: true,
             indicator_control: None,
             mute_control: None,
             assign_control: None,
@@ -2698,7 +2707,8 @@ mod tests {
             mute_behavior: MuteBehavior::ToggleOnPress,
         });
 
-        let send = binding_feedback_send(&binding, 0.5);
+        let send =
+            binding_feedback_send(&binding, 0.5).expect("enabled fader should produce feedback");
         let feedback = build_feedback_message(
             send.channel,
             send.controller,
@@ -2724,7 +2734,8 @@ mod tests {
         binding.control_kind = BindingControlKind::Continuous;
         binding.control.msg_type = MidiMessageType::PitchBend;
 
-        let send = binding_feedback_send(&binding, 0.5);
+        let send =
+            binding_feedback_send(&binding, 0.5).expect("enabled fader should produce feedback");
 
         assert_eq!(send.device_id, "midi:0");
         assert_eq!(send.channel, binding.control.channel);
@@ -2732,6 +2743,29 @@ mod tests {
         assert_eq!(send.msg_type, MidiMessageType::PitchBend);
         assert_eq!(send.value, 0.5);
         assert!(send.use_binding_protocol);
+    }
+
+    #[test]
+    fn disabled_bindings_produce_no_primary_or_custom_feedback_sends() {
+        let mut fader = xtouch_mini_mc_volume_binding(21);
+        fader.feedback_enabled = false;
+        fader.indicator_control = Some(AuxiliaryControl {
+            device_id: "midi:0".to_string(),
+            channel: 4,
+            controller: 22,
+            msg_type: MidiMessageType::ControlChange,
+            control_kind: BindingControlKind::Continuous,
+            mode: MidiMode::Absolute,
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: MuteBehavior::ToggleOnPress,
+        });
+
+        assert!(binding_feedback_send(&fader, 0.5).is_none());
+
+        let mut button = fader;
+        button.control_kind = BindingControlKind::Button;
+        assert!(binding_light_feedback_sends(&button, 1.0).is_empty());
     }
 
     #[test]

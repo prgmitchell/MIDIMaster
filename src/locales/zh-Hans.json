@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "反馈产出",
   "bindings.feedbackOutputHelp": "注意, CC, 或得到淡色反馈的 Pitch 弯曲地址 .",
   "bindings.feedbackMessageType": "反馈消息类型",
+  "bindings.feedbackDisabled": "已禁用",
   "bindings.feedbackChannelLabel": "反馈通道",
   "bindings.feedbackControlLabel": "反馈控制",
   "bindings.pitchBend": "Pitch 弯曲",

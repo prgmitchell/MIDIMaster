@@ -185,6 +185,7 @@ fn serialize_binding_uses_targets_not_target() {
         mute_behavior: MuteBehavior::ToggleOnPress,
         button_light_mode: ButtonLightMode::Activity,
         button_light_behavior: ButtonLightBehavior::FollowState,
+        feedback_enabled: true,
         indicator_control: None,
         mute_control: None,
         assign_control: None,
@@ -207,6 +208,34 @@ fn deserialize_binding_indicator_control_defaults_to_none() {
         serde_json::from_value(binding_base_json()).expect("binding should deserialize");
 
     assert!(binding.indicator_control.is_none());
+}
+
+#[test]
+fn feedback_enabled_defaults_true_for_legacy_bindings() {
+    let binding: Binding =
+        serde_json::from_value(binding_base_json()).expect("legacy binding should deserialize");
+
+    assert!(binding.feedback_enabled);
+    let serialized = serde_json::to_value(binding).expect("binding should serialize");
+    assert_eq!(serialized["feedback_enabled"], serde_json::json!(true));
+}
+
+#[test]
+fn explicitly_disabled_feedback_round_trips_and_suppresses_button_values() {
+    let mut binding = mapped_button_binding(BindingAction::ToggleMute, vec![BindingTarget::Master]);
+    binding.feedback_enabled = false;
+
+    let serialized = serde_json::to_value(&binding).expect("binding should serialize");
+    assert_eq!(serialized["feedback_enabled"], serde_json::json!(false));
+
+    let restored: Binding =
+        serde_json::from_value(serialized).expect("disabled binding should deserialize");
+    assert!(!restored.feedback_enabled);
+    assert_eq!(restored.mapped_button_light_feedback_value(), None);
+    assert_eq!(
+        restored.button_light_feedback_value(Some(true), Some(true)),
+        None
+    );
 }
 
 #[test]

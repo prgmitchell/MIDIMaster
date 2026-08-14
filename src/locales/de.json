@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "Feedback-Ausgabe",
   "bindings.feedbackOutputHelp": "Hinweis, CC oder Pitch Bend Adresse, die Fader Feedback erhält.",
   "bindings.feedbackMessageType": "Feedback-Nachrichttyp",
+  "bindings.feedbackDisabled": "Deaktiviert",
   "bindings.feedbackChannelLabel": "Feedback-Kanal",
   "bindings.feedbackControlLabel": "Rückmeldungen",
   "bindings.pitchBend": "Pitch Bend",

@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "Producto de retroalimentación",
   "bindings.feedbackOutputHelp": "Nota, CC, o Pitch Bend dirección que recibe comentarios de moda.",
   "bindings.feedbackMessageType": "Tipo de mensaje de comentarios",
+  "bindings.feedbackDisabled": "Desactivado",
   "bindings.feedbackChannelLabel": "Canal de información",
   "bindings.feedbackControlLabel": "Control de retroalimentación",
   "bindings.pitchBend": "Pitch Bend",

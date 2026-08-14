@@ -162,12 +162,16 @@ fn stale_assign_feedback_outputs(
 ) -> HashSet<FeedbackControlKey> {
     let mut current_outputs = assign_feedback_outputs(current_bindings);
     for binding in current_bindings {
-        current_outputs.insert(binding_feedback_control_key(binding));
+        if binding.feedback_enabled {
+            current_outputs.insert(binding_feedback_control_key(binding));
+        }
         if let Some(control) = binding.mute_control.as_ref() {
             current_outputs.insert(FeedbackControlKey::from_aux(control));
         }
-        if let Some(control) = binding.indicator_control.as_ref() {
-            current_outputs.insert(FeedbackControlKey::from_aux(control));
+        if binding.feedback_enabled {
+            if let Some(control) = binding.indicator_control.as_ref() {
+                current_outputs.insert(FeedbackControlKey::from_aux(control));
+            }
         }
     }
     assign_feedback_outputs(previous_bindings)
@@ -260,6 +264,9 @@ pub fn send_button_light_feedback_to_binding(
     binding: &Binding,
     options: FeedbackSendOptions<'_>,
 ) {
+    if !binding.feedback_enabled {
+        return;
+    }
     let logical_key = BindingKey::from_binding(binding);
     let output_control = button_light_feedback_control_key(binding);
     let output_key = output_control.to_binding_key();
@@ -322,6 +329,9 @@ pub fn send_feedback_to_binding(
     binding: &Binding,
     options: FeedbackSendOptions<'_>,
 ) {
+    if !binding.feedback_enabled {
+        return;
+    }
     let logical_key = BindingKey::from_binding(binding);
     let output_control = binding_feedback_control_key(binding);
     let output_key = output_control.to_binding_key();
@@ -398,6 +408,7 @@ mod tests {
             mute_behavior: model::MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            feedback_enabled: true,
             indicator_control: None,
             mute_control: None,
             assign_control: None,
@@ -488,6 +499,17 @@ mod tests {
 
         binding.assign_control.as_mut().unwrap().msg_type = model::MidiMessageType::ProgramChange;
         assert!(assign_button_feedback(&binding).is_none());
+    }
+
+    #[test]
+    fn disabled_primary_feedback_keeps_assign_feedback_active() {
+        let mut binding = button_binding(21);
+        binding.feedback_enabled = false;
+        binding.assign_control = Some(indicator_control(30));
+
+        let (control, value) = assign_button_feedback(&binding).expect("assign feedback");
+        assert_eq!(control.controller, 30);
+        assert_eq!(value, 1.0);
     }
 
     #[test]

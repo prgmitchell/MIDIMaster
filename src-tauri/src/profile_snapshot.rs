@@ -126,6 +126,7 @@ mod tests {
             mute_behavior: MuteBehavior::ToggleOnPress,
             button_light_mode: ButtonLightMode::Activity,
             button_light_behavior: ButtonLightBehavior::FollowState,
+            feedback_enabled: true,
             indicator_control: None,
             mute_control: None,
             assign_control: None,

@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "Terugkoppelingsuitvoer",
   "bindings.feedbackOutputHelp": "Opmerking, CC, of Pitch Bend adres dat Fader feedback ontvangt.",
   "bindings.feedbackMessageType": "Type feedbackbericht",
+  "bindings.feedbackDisabled": "Uitgeschakeld",
   "bindings.feedbackChannelLabel": "Terugkoppelingskanaal",
   "bindings.feedbackControlLabel": "Terugkoppelingscontrole",
   "bindings.pitchBend": "Pitch Bend",

@@ -849,6 +849,7 @@ mod tests {
             mute_behavior: MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            feedback_enabled: true,
             indicator_control: None,
             mute_control: mute_device_id.map(|id| aux_control(id, 18)),
             assign_control: assign_device_id.map(|id| aux_control(id, 19)),

@@ -126,6 +126,7 @@ export function applyCurveToNormalized(binding, normalized) {
 
 export function ensureBindingShape(binding) {
   if (!binding || typeof binding !== "object") return;
+  binding.feedback_enabled = binding.feedback_enabled !== false;
   binding.macro_name = String(binding.macro_name || "").trim().slice(0, 80);
   if (!binding.mode || (binding.mode !== "Absolute" && binding.mode !== "Relative")) {
     binding.mode = "Absolute";

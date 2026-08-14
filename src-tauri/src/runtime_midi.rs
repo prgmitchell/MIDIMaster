@@ -227,6 +227,12 @@ pub(super) fn update_activity_button_light_hold_feedback(
     key: BindingKey,
     input_active: bool,
 ) {
+    if !binding.feedback_enabled {
+        if let Ok(mut generations) = state.activity_button_light_generations.lock() {
+            cancel_activity_button_light_generation(&mut generations, &key);
+        }
+        return;
+    }
     if matches!(
         binding.control.msg_type,
         model::MidiMessageType::ProgramChange

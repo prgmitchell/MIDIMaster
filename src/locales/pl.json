@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "Wyjście zwrotne",
   "bindings.feedbackOutputHelp": "Uwaga, CC, lub adres Pitch Bend, który otrzymuje informacje zwrotne Fader.",
   "bindings.feedbackMessageType": "Typ wiadomości zwrotnej",
+  "bindings.feedbackDisabled": "Wyłączone",
   "bindings.feedbackChannelLabel": "Kanał zwrotny",
   "bindings.feedbackControlLabel": "Kontrola zwrotna",
   "bindings.pitchBend": "Pętla",

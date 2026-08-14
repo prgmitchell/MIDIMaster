@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "Produit de rétroaction",
   "bindings.feedbackOutputHelp": "Remarque, adresse CC ou Pitch Bend qui reçoit la rétroaction du fader.",
   "bindings.feedbackMessageType": "Type de message de rétroaction",
+  "bindings.feedbackDisabled": "Désactivé",
   "bindings.feedbackChannelLabel": "Voie de rétroaction",
   "bindings.feedbackControlLabel": "Contrôle de la rétroaction",
   "bindings.pitchBend": "Pitch Bend",

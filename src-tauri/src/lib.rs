@@ -627,6 +627,7 @@ mod tests {
             mute_behavior: model::MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            feedback_enabled: true,
             indicator_control: None,
             mute_control: None,
             assign_control: None,
@@ -663,6 +664,7 @@ mod tests {
             mute_behavior: model::MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            feedback_enabled: true,
             indicator_control: None,
             mute_control: None,
             assign_control: None,
@@ -871,6 +873,56 @@ mod tests {
             .unwrap();
         assert!((synced - 1.0).abs() < f32::EPSILON);
         assert!((state.binding_action_value(&key).unwrap() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn disabled_custom_feedback_does_not_erase_an_enabled_binding_on_the_same_address() {
+        let state = test_app_state(TestAudioBackend::new(vec![model::SessionInfo {
+            id: "session-firefox".to_string(),
+            display_name: "Firefox".to_string(),
+            application_key: None,
+            process_name: Some("firefox.exe".to_string()),
+            process_path: Some("C:\\Program Files\\Mozilla Firefox\\firefox.exe".to_string()),
+            icon_data: None,
+            volume: 0.75,
+            is_muted: false,
+            is_master: false,
+        }]));
+        let enabled = relative_application_volume_binding("firefox");
+        let enabled_key = BindingKey::from_binding(&enabled);
+        let mut disabled = enabled.clone();
+        disabled.id = "binding-disabled".to_string();
+        disabled.control.controller = 43;
+        disabled.feedback_enabled = false;
+        disabled.indicator_control = Some(model::AuxiliaryControl {
+            device_id: enabled.device_id.clone(),
+            channel: enabled.control.channel,
+            controller: enabled.control.controller,
+            msg_type: enabled.control.msg_type.clone(),
+            control_kind: model::BindingControlKind::Continuous,
+            mode: model::MidiMode::Absolute,
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: model::MuteBehavior::ToggleOnPress,
+        });
+        let profile = model::Profile {
+            name: "Default".to_string(),
+            bindings: vec![enabled, disabled],
+            osd_settings: model::OsdSettings::default(),
+            plugin_settings: HashMap::new(),
+            midi_device_preference: model::MidiDevicePreference::default(),
+            midi_device_preference_set: false,
+        };
+
+        state.sync_feedback_values(&profile);
+
+        let value = state
+            .feedback_values
+            .lock()
+            .unwrap()
+            .get(&enabled_key)
+            .copied();
+        assert_eq!(value, Some(0.75));
     }
 
     #[test]

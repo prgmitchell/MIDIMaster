@@ -584,6 +584,9 @@ export function createBindingsFeature({
   }
 
   function buttonLightLabel(binding) {
+    if (binding?.feedback_enabled === false) {
+      return t("bindings.feedbackDisabled");
+    }
     switch (effectiveButtonLightMode(binding)) {
       case "MappedWhenAssigned":
         return t("bindings.buttonLightWhenMapped");
@@ -599,6 +602,9 @@ export function createBindingsFeature({
   }
 
   function buttonLightOptionText(value) {
+    if (value === "Disabled") {
+      return t("bindings.feedbackDisabled");
+    }
     const mode = value === "MappedWhenAssigned"
       ? "MappedWhenAssigned"
       : normalizeButtonLightBehavior(value);
@@ -617,6 +623,7 @@ export function createBindingsFeature({
   }
 
   function buttonLightSelectValue(binding) {
+    if (binding?.feedback_enabled === false) return "Disabled";
     return effectiveButtonLightMode(binding);
   }
 
@@ -711,7 +718,7 @@ export function createBindingsFeature({
     return fallback;
   }
 
-  function syncFeedbackControllerInputState(lockClear = false) {
+  function syncFeedbackControllerInputState(lockClear = false, feedbackDisabled = false) {
     if (!d.bindingConfigFeedbackController) return;
     const isPitchBend = d.bindingConfigFeedbackMsgType?.value === "PitchBend";
     if (isPitchBend) {
@@ -727,12 +734,13 @@ export function createBindingsFeature({
     d.bindingConfigFeedbackController.max = "127";
     d.bindingConfigFeedbackController.step = "1";
     d.bindingConfigFeedbackController.inputMode = "numeric";
-    d.bindingConfigFeedbackController.disabled = lockClear;
+    d.bindingConfigFeedbackController.disabled = lockClear || feedbackDisabled;
     d.bindingConfigFeedbackController.readOnly = false;
     d.bindingConfigFeedbackController.classList.remove("is-readonly");
   }
 
   function syncIndicatorUi(binding, options = {}) {
+    const feedbackDisabled = binding?.feedback_enabled === false;
     let custom = normalizeIndicatorControl(binding?.indicator_control);
     if (binding && custom) binding.indicator_control = custom;
     if (options.forceCustom && binding && !custom) {
@@ -742,6 +750,7 @@ export function createBindingsFeature({
       d.bindingConfigIndicatorCustom.classList.remove("hidden");
       d.bindingConfigIndicatorCustom.classList.add("is-visible");
       d.bindingConfigIndicatorCustom.setAttribute("aria-hidden", "false");
+      d.bindingConfigIndicatorCustom.classList.toggle("is-feedback-disabled", feedbackDisabled);
     }
     d.bindingConfigButtonLightSection?.classList.add("is-indicator-custom");
     const control = custom || defaultIndicatorControl(binding);
@@ -752,6 +761,7 @@ export function createBindingsFeature({
   }
 
   function syncFeedbackOutputUi(binding, options = {}) {
+    const feedbackDisabled = binding?.feedback_enabled === false;
     let custom = normalizeIndicatorControl(binding?.indicator_control, {
       allowPitchBend: true,
       controlKind: "Continuous",
@@ -764,12 +774,18 @@ export function createBindingsFeature({
       d.bindingConfigFeedbackOutputCustom.classList.remove("hidden");
       d.bindingConfigFeedbackOutputCustom.classList.add("is-visible");
       d.bindingConfigFeedbackOutputCustom.setAttribute("aria-hidden", "false");
+      d.bindingConfigFeedbackOutputCustom.classList.toggle("is-feedback-disabled", feedbackDisabled);
     }
     const control = custom || defaultIndicatorControl(binding, "Continuous");
-    if (d.bindingConfigFeedbackMsgType) d.bindingConfigFeedbackMsgType.value = control?.msg_type || "Note";
+    if (d.bindingConfigFeedbackMsgType) {
+      d.bindingConfigFeedbackMsgType.value = feedbackDisabled ? "Disabled" : (control?.msg_type || "Note");
+    }
     if (d.bindingConfigFeedbackChannel) d.bindingConfigFeedbackChannel.value = String((control?.channel ?? 0) + 1);
     if (d.bindingConfigFeedbackController) d.bindingConfigFeedbackController.value = String(control?.controller ?? 0);
-    syncFeedbackControllerInputState(Boolean(transferPrompt) || Boolean(configLearnField));
+    syncFeedbackControllerInputState(
+      Boolean(transferPrompt) || Boolean(configLearnField),
+      feedbackDisabled,
+    );
     renderIndicatorDropdowns();
   }
 
@@ -791,6 +807,14 @@ export function createBindingsFeature({
   function updateFeedbackOutputFromFields() {
     const binding = getConfigBinding();
     if (!binding) return;
+    if (d.bindingConfigFeedbackMsgType?.value === "Disabled") {
+      binding.feedback_enabled = false;
+      syncFeedbackOutputUi(binding);
+      updateAuxLearnUi();
+      renderConfigPreview();
+      return;
+    }
+    binding.feedback_enabled = true;
     const current = ensureIndicatorControl(binding, "Continuous");
     if (!current) return;
     const msgType = d.bindingConfigFeedbackMsgType?.value === "PitchBend"
@@ -3047,6 +3071,8 @@ export function createBindingsFeature({
     const learningPrimary = configLearnField === "control";
     const binding = getConfigBinding();
     const isButton = effectiveIsButton(binding);
+    const feedbackDisabled = binding?.feedback_enabled === false;
+    const buttonFeedbackDisabled = isButton && feedbackDisabled;
 
     if (muteLearn) {
       const active = configLearnField === "mute_control";
@@ -3070,7 +3096,9 @@ export function createBindingsFeature({
       indicatorLearn.classList.toggle("is-learning", active);
       indicatorLearn.title = label;
       indicatorLearn.setAttribute("aria-label", label);
-      indicatorLearn.disabled = transferLocked || Boolean(configLearnField && !active);
+      indicatorLearn.disabled = buttonFeedbackDisabled
+        || transferLocked
+        || Boolean(configLearnField && !active);
     }
     if (feedbackLearn) {
       const active = configLearnField === "indicator_control";
@@ -3084,14 +3112,24 @@ export function createBindingsFeature({
     const lockClear = transferLocked || Boolean(configLearnField);
     if (muteClear) muteClear.disabled = lockClear;
     if (assignClear) assignClear.disabled = lockClear;
-    if (indicatorClear) indicatorClear.disabled = lockClear;
+    if (indicatorClear) indicatorClear.disabled = lockClear || buttonFeedbackDisabled;
     if (feedbackClear) feedbackClear.disabled = lockClear;
-    if (d.bindingConfigIndicatorMsgType) d.bindingConfigIndicatorMsgType.disabled = lockClear;
-    if (d.bindingConfigIndicatorChannel) d.bindingConfigIndicatorChannel.disabled = lockClear;
-    if (d.bindingConfigIndicatorController) d.bindingConfigIndicatorController.disabled = lockClear;
+    if (d.bindingConfigIndicatorMsgType) d.bindingConfigIndicatorMsgType.disabled = lockClear || buttonFeedbackDisabled;
+    if (d.bindingConfigIndicatorChannel) d.bindingConfigIndicatorChannel.disabled = lockClear || buttonFeedbackDisabled;
+    if (d.bindingConfigIndicatorController) d.bindingConfigIndicatorController.disabled = lockClear || buttonFeedbackDisabled;
     if (d.bindingConfigFeedbackMsgType) d.bindingConfigFeedbackMsgType.disabled = lockClear;
-    if (d.bindingConfigFeedbackChannel) d.bindingConfigFeedbackChannel.disabled = lockClear;
-    syncFeedbackControllerInputState(lockClear);
+    if (d.bindingConfigFeedbackChannel) d.bindingConfigFeedbackChannel.disabled = lockClear || feedbackDisabled;
+    syncFeedbackControllerInputState(lockClear, feedbackDisabled);
+    if (indicatorMsgTypeDropdown) {
+      indicatorMsgTypeDropdown.button.disabled = lockClear || buttonFeedbackDisabled;
+      indicatorMsgTypeDropdown.button.setAttribute("aria-disabled", String(lockClear || buttonFeedbackDisabled));
+      indicatorMsgTypeDropdown.root.classList.toggle("is-disabled", lockClear || buttonFeedbackDisabled);
+    }
+    if (feedbackOutputMsgTypeDropdown) {
+      feedbackOutputMsgTypeDropdown.button.disabled = lockClear;
+      feedbackOutputMsgTypeDropdown.button.setAttribute("aria-disabled", String(lockClear));
+      feedbackOutputMsgTypeDropdown.root.classList.toggle("is-disabled", lockClear);
+    }
     if (d.bindingConfigMuteModeButton) d.bindingConfigMuteModeButton.disabled = lockClear;
     if (d.bindingConfigAssignModeButton) d.bindingConfigAssignModeButton.disabled = lockClear;
     for (const learnButton of [previewLearnButton, buttonLearnButton]) {
@@ -4771,6 +4809,7 @@ export function createBindingsFeature({
         mapping.mute_behavior = normalizeMuteBehavior(mapping.mute_behavior || binding.mute_behavior);
       }
       binding[field] = mapping;
+      if (field === "indicator_control") binding.feedback_enabled = true;
     }
     if (sameBindingTransfer) {
       configAcceptedTransfers.delete(field);
@@ -4820,6 +4859,7 @@ export function createBindingsFeature({
         mapping.mute_behavior = normalizeMuteBehavior(mapping.mute_behavior || binding.mute_behavior);
       }
       binding[field] = mapping;
+      if (field === "indicator_control") binding.feedback_enabled = true;
     }
     configAcceptedTransfers.delete(field);
     if (field === "control") {
@@ -6128,14 +6168,19 @@ export function createBindingsFeature({
         const binding = getConfigBinding();
         if (!binding) return;
         const nextMode = d.bindingConfigButtonLightSelect.value;
-        if (nextMode === "MappedWhenAssigned") {
+        if (nextMode === "Disabled") {
+          binding.feedback_enabled = false;
+        } else if (nextMode === "MappedWhenAssigned") {
+          binding.feedback_enabled = true;
           binding.button_light_mode = "MappedWhenAssigned";
           binding.button_light_behavior = normalizeButtonLightBehavior(binding.button_light_behavior);
         } else {
+          binding.feedback_enabled = true;
           binding.button_light_mode = "Activity";
           binding.button_light_behavior = normalizeButtonLightBehavior(nextMode);
         }
         syncButtonLightUi(binding);
+        updateAuxLearnUi();
         renderConfigPreview();
       });
     }
@@ -6238,6 +6283,12 @@ export function createBindingsFeature({
     }
     if (d.bindingConfigFeedbackLearn) {
       d.bindingConfigFeedbackLearn.addEventListener("click", async () => {
+        const binding = getConfigBinding();
+        if (!binding) return;
+        binding.feedback_enabled = true;
+        syncFeedbackOutputUi(binding);
+        updateAuxLearnUi();
+        renderConfigPreview();
         await startAuxLearn("indicator_control");
       });
     }
@@ -6290,6 +6341,7 @@ export function createBindingsFeature({
         if (transferPrompt) return;
         const binding = getConfigBinding();
         if (!binding) return;
+        binding.feedback_enabled = true;
         binding.indicator_control = null;
         configAcceptedTransfers.delete("indicator_control");
         syncFeedbackOutputUi(binding);

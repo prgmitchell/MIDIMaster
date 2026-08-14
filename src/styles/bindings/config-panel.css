@@ -1354,6 +1354,12 @@
   display: grid;
 }
 
+.binding-config-indicator-custom.is-feedback-disabled > .binding-config-indicator-heading,
+.binding-config-indicator-custom.is-feedback-disabled > .binding-config-indicator-field:not(:first-of-type),
+.binding-config-indicator-custom.is-feedback-disabled > .binding-config-indicator-actions {
+  opacity: 0.5;
+}
+
 .binding-config-indicator-heading {
   grid-column: 1 / -1;
   min-width: 0;

@@ -80,6 +80,10 @@ pub enum ButtonLightBehavior {
     Pressed,
 }
 
+fn default_feedback_enabled() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum RelativeFormat {
     #[default]
@@ -898,6 +902,8 @@ pub struct Binding {
     pub button_light_mode: ButtonLightMode,
     #[serde(default)]
     pub button_light_behavior: ButtonLightBehavior,
+    #[serde(default = "default_feedback_enabled")]
+    pub feedback_enabled: bool,
     #[serde(default)]
     pub indicator_control: Option<AuxiliaryControl>,
     #[serde(default)]
@@ -1009,7 +1015,8 @@ impl Binding {
         &self,
         target_is_available: impl Fn(&BindingTarget) -> bool,
     ) -> Option<f32> {
-        if !self.is_button_binding()
+        if !self.feedback_enabled
+            || !self.is_button_binding()
             || !matches!(&self.button_light_mode, ButtonLightMode::MappedWhenAssigned)
         {
             return None;
@@ -1061,7 +1068,7 @@ impl Binding {
         input_active: Option<bool>,
         state_active: Option<bool>,
     ) -> Option<f32> {
-        if !self.is_button_binding() {
+        if !self.feedback_enabled || !self.is_button_binding() {
             return None;
         }
 

@@ -45,6 +45,9 @@ fn send_resolved_binding_feedback(
     force_hardware_feedback: bool,
     context: &str,
 ) {
+    if !binding.feedback_enabled {
+        return;
+    }
     if binding.is_button_binding() {
         feedback::send_button_light_feedback_to_binding(
             state,
@@ -75,6 +78,9 @@ fn resolved_binding_feedback_control_key(binding: &Binding) -> FeedbackControlKe
 }
 
 fn binding_has_clearable_feedback_output(binding: &Binding) -> bool {
+    if !binding.feedback_enabled {
+        return false;
+    }
     if binding
         .button_light_feedback_value(Some(false), None)
         .is_some()
@@ -108,18 +114,26 @@ fn stale_feedback_bindings_for_removed_outputs(
         .collect()
 }
 
-fn clear_binding_feedback_output(state: &AppState, binding: &Binding) {
+fn should_clear_stale_feedback_hardware(previous: &Binding, replacement: Option<&Binding>) -> bool {
+    previous.is_button_binding()
+        || !replacement
+            .is_some_and(|current| current.id == previous.id && !current.feedback_enabled)
+}
+
+fn clear_binding_feedback_output(state: &AppState, binding: &Binding, clear_hardware: bool) {
     let logical_key = BindingKey::from_binding(binding);
     let output_key = resolved_binding_feedback_control_key(binding).to_binding_key();
     if let Ok(mut feedback_values) = state.feedback_values.lock() {
         feedback_values.remove(&logical_key);
         feedback_values.remove(&output_key);
     }
-    if let Ok(mut midi) = state.midi.lock() {
-        if binding.is_button_binding() {
-            let _ = midi.send_binding_light_feedback(binding, 0.0);
-        } else {
-            let _ = midi.send_binding_feedback(binding, 0.0);
+    if clear_hardware {
+        if let Ok(mut midi) = state.midi.lock() {
+            if binding.is_button_binding() {
+                let _ = midi.send_binding_light_feedback(binding, 0.0);
+            } else {
+                let _ = midi.send_binding_feedback(binding, 0.0);
+            }
         }
     }
 }
@@ -502,7 +516,7 @@ pub(crate) fn add_binding_to_active_profile(
         return Err("Binding cannot have more than 8 targets".to_string());
     }
 
-    let (saved_profile, stale_feedback_bindings, previous_bindings) = {
+    let (saved_profile, stale_feedback_bindings, previous_bindings, feedback_was_reenabled) = {
         let mut profile_guard = state
             .active_profile
             .lock()
@@ -519,6 +533,9 @@ pub(crate) fn add_binding_to_active_profile(
                 midi_device_preference_set: false,
             });
         let previous_bindings = profile.bindings.clone();
+        let feedback_was_reenabled = previous_bindings.iter().any(|existing| {
+            existing.id == binding.id && !existing.feedback_enabled && binding.feedback_enabled
+        });
         let mut removed_bindings = Vec::new();
         profile.bindings.retain(|existing| {
             let remove = existing.id == binding.id
@@ -528,23 +545,63 @@ pub(crate) fn add_binding_to_active_profile(
             }
             !remove
         });
+        let replacement = binding.clone();
         profile.bindings.push(binding);
         let active_outputs = active_feedback_outputs(&profile.bindings);
-        let stale_feedback_bindings =
-            stale_feedback_bindings_for_removed_outputs(&removed_bindings, &active_outputs);
+        let stale_feedback_bindings: Vec<_> =
+            stale_feedback_bindings_for_removed_outputs(&removed_bindings, &active_outputs)
+                .into_iter()
+                .map(|previous| {
+                    let clear_hardware =
+                        should_clear_stale_feedback_hardware(&previous, Some(&replacement));
+                    (previous, clear_hardware)
+                })
+                .collect();
         state
             .profile_store
             .save_profile(profile.clone())
             .map_err(|err| err.to_string())?;
         *profile_guard = Some(AppState::profile_snapshot(profile.clone()));
-        (profile, stale_feedback_bindings, previous_bindings)
+        (
+            profile,
+            stale_feedback_bindings,
+            previous_bindings,
+            feedback_was_reenabled,
+        )
     };
-    for binding in stale_feedback_bindings {
-        clear_binding_feedback_output(state, &binding);
+    state.cancel_activity_button_light_holds();
+    for (binding, clear_hardware) in stale_feedback_bindings {
+        clear_binding_feedback_output(state, &binding, clear_hardware);
     }
     feedback::reconcile_assign_feedback_outputs(state, &previous_bindings, &saved_profile.bindings);
     state.sync_feedback_values(&saved_profile);
     state.send_idle_button_light_feedback_values(&saved_profile);
+    if feedback_was_reenabled {
+        if let Some(binding) = saved_profile.bindings.iter().find(|binding| {
+            binding.feedback_enabled
+                && !binding.is_button_binding()
+                && previous_bindings
+                    .iter()
+                    .any(|previous| previous.id == binding.id && !previous.feedback_enabled)
+        }) {
+            let key = BindingKey::from_binding(binding);
+            let value = state
+                .feedback_values
+                .lock()
+                .ok()
+                .and_then(|values| values.get(&key).copied());
+            if let Some(value) = value {
+                send_resolved_binding_feedback(
+                    state,
+                    binding,
+                    value,
+                    false,
+                    true,
+                    &format!("feedback_reenabled:{}", binding.id),
+                );
+            }
+        }
+    }
     run_logger::info(
         "bindings_cmd",
         "add_succeeded",
@@ -816,7 +873,7 @@ pub fn set_binding_feedback(
     if matches!(effective_action, model::BindingAction::ToggleMute) {
         let mut emitted_controls: HashSet<FeedbackControlKey> = HashSet::new();
 
-        if action_matches_binding {
+        if action_matches_binding && binding.feedback_enabled {
             let emitted_key = resolved_binding_feedback_control_key(&binding);
             emitted_controls.insert(emitted_key);
         }
@@ -852,7 +909,7 @@ pub fn set_binding_feedback(
                 let candidate_button_light_value =
                     state.button_light_feedback_value(candidate, None, Some(value > 0.5));
                 let emitted_key = resolved_binding_feedback_control_key(candidate);
-                if emitted_controls.insert(emitted_key) {
+                if candidate.feedback_enabled && emitted_controls.insert(emitted_key) {
                     let candidate_value = candidate_button_light_value.unwrap_or(value);
                     send_resolved_binding_feedback(
                         &state,
@@ -868,7 +925,7 @@ pub fn set_binding_feedback(
     }
     if matches!(effective_action, model::BindingAction::Volume) {
         let mut emitted_controls: HashSet<FeedbackControlKey> = HashSet::new();
-        if action_matches_binding {
+        if action_matches_binding && binding.feedback_enabled {
             let emitted_key = resolved_binding_feedback_control_key(&binding);
             emitted_controls.insert(emitted_key);
         }
@@ -883,7 +940,7 @@ pub fn set_binding_feedback(
             let candidate_button_light_value =
                 state.button_light_feedback_value(candidate, input_active, None);
             let emitted_key = resolved_binding_feedback_control_key(candidate);
-            if emitted_controls.insert(emitted_key) {
+            if candidate.feedback_enabled && emitted_controls.insert(emitted_key) {
                 let candidate_value = candidate_button_light_value.unwrap_or(value);
                 send_resolved_binding_feedback(
                     &state,
@@ -1208,6 +1265,7 @@ mod tests {
             mute_behavior: model::MuteBehavior::ToggleOnPress,
             button_light_mode: model::ButtonLightMode::Activity,
             button_light_behavior: model::ButtonLightBehavior::FollowState,
+            feedback_enabled: true,
             indicator_control: None,
             mute_control: None,
             assign_control: None,
@@ -1312,6 +1370,36 @@ mod tests {
 
         assert_eq!(stale.len(), 1);
         assert_eq!(stale[0].id, previous.id);
+    }
+
+    #[test]
+    fn disabled_bindings_are_not_active_primary_feedback_outputs() {
+        let mut binding = integration_button_binding("stateful");
+        binding.feedback_enabled = false;
+        binding.indicator_control = Some(indicator_control(22));
+
+        assert!(active_feedback_outputs(&[binding]).is_empty());
+    }
+
+    #[test]
+    fn disabling_button_feedback_clears_hardware_but_disabling_fader_does_not() {
+        let button = integration_button_binding("stateful");
+        let mut disabled_button = button.clone();
+        disabled_button.feedback_enabled = false;
+        assert!(should_clear_stale_feedback_hardware(
+            &button,
+            Some(&disabled_button)
+        ));
+
+        let mut fader = integration_button_binding("stateful");
+        fader.control_kind = model::BindingControlKind::Continuous;
+        let mut disabled_fader = fader.clone();
+        disabled_fader.feedback_enabled = false;
+        assert!(!should_clear_stale_feedback_hardware(
+            &fader,
+            Some(&disabled_fader)
+        ));
+        assert!(should_clear_stale_feedback_hardware(&fader, None));
     }
 
     #[test]

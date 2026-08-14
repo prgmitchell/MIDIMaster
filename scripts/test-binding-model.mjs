@@ -129,6 +129,27 @@ function testProgramChangeAutoBindingIsButton() {
   assert.equal(bindingModel.resolveButtonVisualActive(binding, { inputValue: 1 }), true);
 }
 
+function testFeedbackEnabledDefaultsTrueAndPreservesExplicitDisabled() {
+  const legacy = bindingModel.normalizeBinding(buttonBinding());
+  const disabled = bindingModel.normalizeBinding(buttonBinding({ feedback_enabled: false }));
+
+  assert.equal(legacy.feedback_enabled, true);
+  assert.equal(disabled.feedback_enabled, false);
+  assert.equal(bindingModel.bindingFeedbackEnabled(legacy), true);
+  assert.equal(bindingModel.bindingFeedbackEnabled(disabled), false);
+}
+
+function testDisabledFeedbackKeepsButtonVisualOff() {
+  const disabled = buttonBinding({
+    feedback_enabled: false,
+    button_light_mode: "MappedWhenAssigned",
+    target: "Master",
+  });
+
+  assert.equal(bindingModel.mappedButtonLightFeedbackValue(disabled), null);
+  assert.equal(bindingModel.resolveButtonVisualActive(disabled, { inputValue: 1, stateValue: 1 }), false);
+}
+
 function testProgramChangeButtonBindingIsButton() {
   const binding = buttonBinding({
     control_kind: "Button",
@@ -898,6 +919,8 @@ testAutoDetectionUsesSignMagnitudeWithoutMidpoint();
 testAutoDetectionUsesTwosComplementForHighNegativeBand();
 testWaveLinkSetMainOutputIsMomentary();
 testProgramChangeAutoBindingIsButton();
+testFeedbackEnabledDefaultsTrueAndPreservesExplicitDisabled();
+testDisabledFeedbackKeepsButtonVisualOff();
 testProgramChangeButtonBindingIsButton();
 testMomentaryButtonFollowsInputValue();
 testMappedLightControlsButtonVisualState();

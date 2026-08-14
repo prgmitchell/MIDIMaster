@@ -1,5 +1,6 @@
 {
   "fr": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.settings": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
@@ -629,6 +630,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "es": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.settings": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
@@ -1258,6 +1260,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "de": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.settings": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
     "bindings.addBinding": "af9b66324765770030ee282c7f4c5620c5270daed359eda96d1586ec546d2e1e",
@@ -1887,6 +1890,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "it": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.plugins": "9514b7ff4860ead73491768e45cce0ce20e6e3473a7b272e496c43c875d80ac5",
     "app.nav.settings": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
@@ -2516,6 +2520,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "pt-BR": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.settings": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
     "bindings.addBinding": "af9b66324765770030ee282c7f4c5620c5270daed359eda96d1586ec546d2e1e",
@@ -3145,6 +3150,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "nl": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.settings": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
     "bindings.addBinding": "af9b66324765770030ee282c7f4c5620c5270daed359eda96d1586ec546d2e1e",
@@ -3774,6 +3780,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "pl": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.plugins": "9514b7ff4860ead73491768e45cce0ce20e6e3473a7b272e496c43c875d80ac5",
     "app.nav.settings": "74a883a037bc227f91891ab654a753d3a99f31ab06ae5b5d2b6e594a692b41f8",
@@ -4403,6 +4410,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "ja": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.plugins": "9514b7ff4860ead73491768e45cce0ce20e6e3473a7b272e496c43c875d80ac5",
@@ -5032,6 +5040,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "ko": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.plugins": "9514b7ff4860ead73491768e45cce0ce20e6e3473a7b272e496c43c875d80ac5",
@@ -5661,6 +5670,7 @@
     "midi.loadingDevices": "b3f4c73bd2052b54921ab6e1b4823c7033217f079553d254e170685e02d5b8ca"
   },
   "zh-Hans": {
+    "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
     "app.nav.primary": "e1bfe7eccc45465f536688db2ec9f2cc8a09819fe80bdd9f4dc098363eb9f0b4",
     "app.nav.bindings": "7697ab84cd811cc93711c93ef0e92469f1e314a5e8957ad987d9b1fa54d691c4",
     "app.nav.plugins": "9514b7ff4860ead73491768e45cce0ce20e6e3473a7b272e496c43c875d80ac5",

@@ -171,9 +171,14 @@ function mappedButtonLightVisualActive(binding) {
   return mappedButtonLightTargetComplete(binding);
 }
 
+export function bindingFeedbackEnabled(binding) {
+  return binding?.feedback_enabled !== false;
+}
+
 export function mappedButtonLightFeedbackValue(binding) {
   if (
-    !bindingLooksLikeButton(binding)
+    !bindingFeedbackEnabled(binding)
+    || !bindingLooksLikeButton(binding)
     || effectiveButtonLightMode(binding) !== "MappedWhenAssigned"
   ) {
     return null;
@@ -239,6 +244,7 @@ function activeFromStateValue(value) {
 }
 
 export function resolveButtonVisualActive(binding, options = {}) {
+  if (!bindingFeedbackEnabled(binding)) return false;
   const behavior = buttonVisualBehavior(binding);
   if (!behavior) return false;
 
@@ -547,6 +553,7 @@ export function normalizeMacroDraftSteps(steps) {
 export function normalizeBinding(binding) {
   if (!binding || typeof binding !== "object") return binding;
   const out = { ...binding };
+  out.feedback_enabled = out.feedback_enabled !== false;
   const preferredSpecial = out.action === "Macro" || out.action === "Soundboard" ? out.action : null;
   let selectedSpecial = null;
   const normalizedTargets = getBindingTargets(out).filter((target) => {

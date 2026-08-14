@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "공급 능력",
   "bindings.feedbackOutputHelp": "참고, CC, 또는 파더 피드백을받을 피치 벤드 주소.",
   "bindings.feedbackMessageType": "피드백 메시지 유형",
+  "bindings.feedbackDisabled": "비활성화",
   "bindings.feedbackChannelLabel": "연락처",
   "bindings.feedbackControlLabel": "연락처",
   "bindings.pitchBend": "피치 벤드",

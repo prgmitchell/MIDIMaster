@@ -297,6 +297,9 @@ impl AppState {
         input_active: Option<bool>,
         state_active: Option<bool>,
     ) -> Option<f32> {
+        if !binding.feedback_enabled {
+            return None;
+        }
         if binding.is_button_binding() && !self.binding_has_available_target(binding) {
             return Some(0.0);
         }
@@ -635,13 +638,28 @@ impl AppState {
         let now = Instant::now();
         let mut relative_volume_state_updates = Vec::new();
 
+        // Clear disabled outputs before rebuilding enabled feedback so a disabled
+        // custom destination cannot erase a later binding that shares the address.
+        for binding in &profile.bindings {
+            if binding.feedback_enabled {
+                continue;
+            }
+            let key = BindingKey::from_binding(binding);
+            let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
+            feedback.remove(&key);
+            feedback.remove(&output_key);
+        }
+
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
             if let Some((assign_control, value)) = feedback::assign_button_feedback(binding) {
                 feedback.insert(assign_control.to_binding_key(), value);
             }
+            if !binding.feedback_enabled {
+                continue;
+            }
+            let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
             if !self.binding_has_available_target(binding) {
-                let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
                 if binding.is_button_binding() {
                     feedback.insert(key.clone(), 0.0);
                     if output_key != key {
@@ -741,13 +759,11 @@ impl AppState {
                 let feedback_value = self
                     .button_light_feedback_value(binding, Some(input_active), state_active)
                     .unwrap_or(val);
-                let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
                 feedback.insert(key.clone(), feedback_value);
                 if output_key != key {
                     feedback.insert(output_key, feedback_value);
                 }
             } else if let Some(value) = idle_feedback_value {
-                let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
                 feedback.insert(key.clone(), value);
                 if output_key != key {
                     feedback.insert(output_key, value);

@@ -155,6 +155,7 @@
   "bindings.feedbackOutput": "フィードバック出力",
   "bindings.feedbackOutputHelp": "注意、CC、または、フェーダーのフィードバックを受信するBendアドレスをピッチ.",
   "bindings.feedbackMessageType": "フィードバックメッセージタイプ",
+  "bindings.feedbackDisabled": "無効",
   "bindings.feedbackChannelLabel": "フィードバックチャネル",
   "bindings.feedbackControlLabel": "フィードバック制御",
   "bindings.pitchBend": "ピッチベンド",
