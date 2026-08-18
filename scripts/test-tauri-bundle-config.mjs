@@ -41,6 +41,8 @@ assert.ok(releaseConfig.bundle.windows.signCommand.args.includes("%1"));
 assert.match(artifactSigningScript, /Invoke-ArtifactSigning/u);
 assert.match(artifactSigningScript, /ArtifactSigning.*0\.1\.17|0\.1\.17/u);
 assert.match(artifactSigningScript, /Assert-Authenticode\.ps1/u);
+assert.match(artifactSigningScript, /\^nst\[0-9a-f\]\+\\\.tmp\$/u, "signer must recognize NSIS temporary uninstallers");
+assert.match(artifactSigningScript, /0x4D.*0x5A/su, "signer must require an MZ header for NSIS temporary uninstallers");
 assert.match(installedSignatureTest, /uninstall\.exe/u);
 assert.match(installedSignatureTest, /midimaster-virtual-audio-setup\.exe/u);
 

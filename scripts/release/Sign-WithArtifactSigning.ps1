@@ -22,7 +22,18 @@ foreach ($name in $requiredEnvironment) {
 
 $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
 $extension = [System.IO.Path]::GetExtension($resolved).ToLowerInvariant()
-if ($extension -notin @(".dll", ".exe")) {
+$fileName = [System.IO.Path]::GetFileName($resolved)
+$isNsisUninstaller = $false
+if ($extension -eq ".tmp" -and $fileName -match '^nst[0-9a-f]+\.tmp$') {
+    $stream = [System.IO.File]::OpenRead($resolved)
+    try {
+        $isNsisUninstaller = $stream.ReadByte() -eq 0x4D -and $stream.ReadByte() -eq 0x5A
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+if ($extension -notin @(".dll", ".exe") -and -not $isNsisUninstaller) {
     throw "Refusing to Authenticode-sign unsupported file type '$extension': $resolved"
 }
 
