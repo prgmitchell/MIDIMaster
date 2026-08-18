@@ -4347,6 +4347,8 @@ export function createBindingsFeature({
           speed: normalizeSoundboardMapping(binding.soundboard)?.speed ?? 1,
           output_device_id: normalizeSoundboardMapping(binding.soundboard)?.output_device_id ?? null,
           output_device_display: normalizeSoundboardMapping(binding.soundboard)?.output_device_display ?? null,
+          send_to_monitor: normalizeSoundboardMapping(binding.soundboard)?.send_to_monitor ?? true,
+          send_to_virtual_mic: normalizeSoundboardMapping(binding.soundboard)?.send_to_virtual_mic ?? false,
         };
         soundboardAnalysis = analysis;
         soundboardAnalysisError = "";
@@ -4408,6 +4410,24 @@ export function createBindingsFeature({
       mapping.output_device_display = selectedId ? (selected?.display || mapping.output_device_display || null) : null;
       binding.soundboard = mapping;
       stopSoundboardPreview().catch(() => { });
+      renderSoundboardEditor(binding);
+    };
+    if (d.bindingConfigSoundboardMonitor) d.bindingConfigSoundboardMonitor.onchange = () => {
+      const binding = getConfigBinding();
+      const mapping = normalizeSoundboardMapping(binding?.soundboard);
+      if (!binding || !mapping) return;
+      mapping.send_to_monitor = d.bindingConfigSoundboardMonitor.checked;
+      if (!mapping.send_to_monitor && !mapping.send_to_virtual_mic) mapping.send_to_virtual_mic = true;
+      binding.soundboard = mapping;
+      renderSoundboardEditor(binding);
+    };
+    if (d.bindingConfigSoundboardVirtualMic) d.bindingConfigSoundboardVirtualMic.onchange = () => {
+      const binding = getConfigBinding();
+      const mapping = normalizeSoundboardMapping(binding?.soundboard);
+      if (!binding || !mapping) return;
+      mapping.send_to_virtual_mic = d.bindingConfigSoundboardVirtualMic.checked;
+      if (!mapping.send_to_virtual_mic && !mapping.send_to_monitor) mapping.send_to_monitor = true;
+      binding.soundboard = mapping;
       renderSoundboardEditor(binding);
     };
     if (d.bindingConfigSoundboardVolume) d.bindingConfigSoundboardVolume.oninput = () => {
@@ -4484,6 +4504,16 @@ export function createBindingsFeature({
     d.bindingConfigSoundboardVolumeValue.textContent = `${Math.round((mapping?.volume ?? 1) * 100)}%`;
     d.bindingConfigSoundboardSpeed.value = String(Math.round((mapping?.speed ?? 1) * 100));
     d.bindingConfigSoundboardSpeedValue.textContent = `${(mapping?.speed ?? 1).toFixed(2)}×`;
+    if (d.bindingConfigSoundboardMonitor) {
+      d.bindingConfigSoundboardMonitor.checked = mapping?.send_to_monitor ?? true;
+      d.bindingConfigSoundboardMonitor.disabled = !mapping;
+    }
+    if (d.bindingConfigSoundboardVirtualMic) {
+      d.bindingConfigSoundboardVirtualMic.checked = mapping?.send_to_virtual_mic ?? false;
+      d.bindingConfigSoundboardVirtualMic.disabled = !mapping;
+    }
+    if (d.bindingConfigSoundboardOutput) d.bindingConfigSoundboardOutput.disabled = !mapping || mapping.send_to_monitor === false;
+    if (soundboardOutputDropdown?.button) soundboardOutputDropdown.button.disabled = !mapping || mapping.send_to_monitor === false;
     [
       d.bindingConfigSoundboardStart,
       d.bindingConfigSoundboardEnd,

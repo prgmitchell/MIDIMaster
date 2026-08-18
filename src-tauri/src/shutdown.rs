@@ -175,6 +175,7 @@ async fn stop_background_tasks(app: &AppHandle) {
 fn stop_managed_resources(app: &AppHandle) {
     let state = app.state::<AppState>();
     state.soundboard.stop_all();
+    state.virtual_audio.stop();
     state.cancel_activity_button_light_holds();
 
     let profile = state
@@ -219,6 +220,7 @@ fn stop_managed_resources(app: &AppHandle) {
 fn stop_managed_resources_best_effort(app: &AppHandle) {
     let state = app.state::<AppState>();
     state.soundboard.stop_all();
+    state.virtual_audio.stop();
     state.cancel_activity_button_light_holds();
 
     let profile = state

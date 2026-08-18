@@ -4,7 +4,7 @@
   "identifier": "com.midimaster.midimaster",
   "build": {
     "beforeDevCommand": "",
-    "beforeBuildCommand": "",
+    "beforeBuildCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/virtual-audio/Build-VirtualAudio.ps1 -Configuration Release",
     "frontendDist": "../src"
   },
   "app": {
@@ -29,6 +29,9 @@
     "createUpdaterArtifacts": false,
     "targets": ["nsis"],
     "icon": ["icons/MIDIMaster.png", "icons/icon.ico"],
+    "resources": {
+      "../virtual-audio/dist": "virtual-audio"
+    },
     "windows": {
       "nsis": {
         "installerHooks": "./windows/hooks.nsh"

@@ -180,6 +180,10 @@ fn default_soundboard_speed() -> f32 {
     1.0
 }
 
+fn default_soundboard_monitor_route() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SoundboardMapping {
     #[serde(default)]
@@ -198,6 +202,10 @@ pub struct SoundboardMapping {
     pub output_device_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_device_display: Option<String>,
+    #[serde(default = "default_soundboard_monitor_route")]
+    pub send_to_monitor: bool,
+    #[serde(default)]
+    pub send_to_virtual_mic: bool,
 }
 
 impl SoundboardMapping {
@@ -248,6 +256,11 @@ impl SoundboardMapping {
             },
             output_device_id,
             output_device_display,
+            // A clip with no destination is indistinguishable from a broken
+            // binding. Keep legacy/invalid payloads useful by restoring the
+            // monitor route when neither destination is selected.
+            send_to_monitor: self.send_to_monitor || !self.send_to_virtual_mic,
+            send_to_virtual_mic: self.send_to_virtual_mic,
         })
     }
 }

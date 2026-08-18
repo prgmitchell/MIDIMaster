@@ -1165,6 +1165,57 @@
   gap: 12px;
 }
 
+.soundboard-routing-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.soundboard-routing-row legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.soundboard-route-option {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-raised) 84%, transparent);
+}
+
+.soundboard-route-option > span:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.soundboard-route-option strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.soundboard-route-option small {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.soundboard-route-option .settings-toggle {
+  flex: 0 0 auto;
+}
+
 .soundboard-output-row {
   display: grid;
   grid-template-columns: 110px minmax(0, 1fr);

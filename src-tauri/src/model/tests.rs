@@ -1084,6 +1084,8 @@ fn soundboard_mapping_serializes_and_round_trips() {
         speed: 1.25,
         output_device_id: Some("wasapi:device-1".to_string()),
         output_device_display: Some("Studio Speakers".to_string()),
+        send_to_monitor: true,
+        send_to_virtual_mic: true,
     });
 
     let json = serde_json::to_value(&binding).unwrap();
@@ -1118,6 +1120,29 @@ fn soundboard_defaults_preserve_old_profiles() {
     assert_eq!(mapping.volume, 1.0);
     assert_eq!(mapping.speed, 1.0);
     assert_eq!(mapping.output_device_id, None);
+    assert!(mapping.send_to_monitor);
+    assert!(!mapping.send_to_virtual_mic);
+}
+
+#[test]
+fn soundboard_normalization_keeps_at_least_one_destination() {
+    let mapping = SoundboardMapping {
+        path: "C:\\sounds\\ding.wav".to_string(),
+        display: "ding.wav".to_string(),
+        trim_start_ms: 0,
+        trim_end_ms: None,
+        volume: 1.0,
+        speed: 1.0,
+        output_device_id: None,
+        output_device_display: None,
+        send_to_monitor: false,
+        send_to_virtual_mic: false,
+    }
+    .normalized()
+    .expect("soundboard mapping");
+
+    assert!(mapping.send_to_monitor);
+    assert!(!mapping.send_to_virtual_mic);
 }
 
 #[test]
@@ -1131,6 +1156,8 @@ fn soundboard_normalization_clamps_volume_and_invalid_end() {
         speed: 0.1,
         output_device_id: Some(" device ".to_string()),
         output_device_display: Some(" Speakers ".to_string()),
+        send_to_monitor: true,
+        send_to_virtual_mic: false,
     }
     .normalized()
     .unwrap();
@@ -1158,6 +1185,8 @@ fn soundboard_button_mapping_is_complete_and_momentary() {
         speed: 1.0,
         output_device_id: None,
         output_device_display: None,
+        send_to_monitor: true,
+        send_to_virtual_mic: false,
     });
 
     assert!(binding.has_complete_mapped_button_light_target(&binding.targets));
@@ -1215,6 +1244,8 @@ fn macro_and_soundboard_conflict_keeps_only_the_preferred_special_target() {
         speed: 1.0,
         output_device_id: None,
         output_device_display: None,
+        send_to_monitor: true,
+        send_to_virtual_mic: false,
     });
     binding.ensure_targets();
     assert_eq!(binding.targets, vec![BindingTarget::Soundboard]);

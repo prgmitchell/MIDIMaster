@@ -219,6 +219,18 @@
                     </span>
                     <span class="settings-nav-label" data-i18n="settings.appearance">Appearance</span>
                   </button>
+                  <button class="settings-nav-item" type="button" data-settings-section="virtual-audio">
+                    <span class="settings-nav-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M5 9v6"></path>
+                        <path d="M9 6v12"></path>
+                        <path d="M13 4v16"></path>
+                        <path d="M17 7v10"></path>
+                        <path d="M21 10v4"></path>
+                      </svg>
+                    </span>
+                    <span class="settings-nav-label" data-i18n="virtualAudio.title">Virtual Audio</span>
+                  </button>
                   <button class="settings-nav-item" type="button" data-settings-section="maintenance">
                     <span class="settings-nav-icon" aria-hidden="true">
                       <svg viewBox="0 0 24 24" focusable="false">
@@ -379,6 +391,122 @@
                       </span>
                       <span class="settings-button-label" data-i18n="settings.checkForUpdates">Check for updates</span>
                     </button>
+                  </div>
+                </section>
+
+                <section id="virtual-audio-panel" class="settings-section settings-section-panel virtual-audio-section" data-settings-panel="virtual-audio" data-virtual-audio-state="not-installed">
+                  <div class="settings-card virtual-audio-setup-card" data-virtual-audio-view="not-installed">
+                    <div class="virtual-audio-setup-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 20h14"></path></svg>
+                    </div>
+                    <div class="virtual-audio-setup-copy">
+                      <h3 data-i18n="virtualAudio.setupTitle">Set up your virtual microphone</h3>
+                      <p data-i18n="virtualAudio.setupDescription">This installs the signed USBIP system driver and MIDIMaster audio service. USB devices may briefly reconnect and Windows may require a restart.</p>
+                    </div>
+                    <button id="virtual-audio-install" class="settings-action virtual-audio-primary-action" type="button">
+                      <span class="settings-button-label" data-i18n="virtualAudio.install">Install Virtual Audio</span>
+                    </button>
+                  </div>
+
+                  <div class="settings-card virtual-audio-progress-card hidden" data-virtual-audio-view="installing" role="status" aria-live="polite">
+                    <span class="virtual-audio-spinner" aria-hidden="true"></span>
+                    <div>
+                      <h3 data-i18n="virtualAudio.installing">Setting up Virtual Audio…</h3>
+                      <p data-i18n="virtualAudio.installingDescription">Approve the Windows prompt if it appears. MIDIMaster will finish setup automatically.</p>
+                    </div>
+                  </div>
+
+                  <div class="settings-card virtual-audio-restart-card hidden" data-virtual-audio-view="restart-required">
+                    <div>
+                      <h3 data-i18n="virtualAudio.restartTitle">Restart required</h3>
+                      <p data-i18n="virtualAudio.restartDescription">Windows needs to restart before the virtual microphone is ready.</p>
+                    </div>
+                    <div class="virtual-audio-button-row">
+                      <button id="virtual-audio-restart" class="settings-action virtual-audio-primary-action" type="button"><span class="settings-button-label" data-i18n="virtualAudio.restartNow">Restart Now</span></button>
+                      <button id="virtual-audio-restart-later" class="settings-action" type="button"><span class="settings-button-label" data-i18n="virtualAudio.later">Later</span></button>
+                    </div>
+                  </div>
+
+                  <div class="virtual-audio-ready-layout hidden" data-virtual-audio-view="ready">
+                    <div class="settings-card virtual-audio-routing-card">
+                      <div class="settings-card-section-heading settings-card-section-heading--inline">
+                        <span data-i18n="virtualAudio.routing">Routing</span>
+                        <label class="settings-toggle" title="Enable virtual microphone routing" data-i18n-title="virtualAudio.enableRouting">
+                          <input id="virtual-audio-enabled" type="checkbox" />
+                          <span class="plugins-toggle-ui" aria-hidden="true"></span>
+                        </label>
+                      </div>
+                      <p id="virtual-audio-routing-error" class="virtual-audio-routing-error hidden" role="alert"></p>
+                      <div class="virtual-audio-control-row virtual-audio-control-row--select">
+                        <span class="virtual-audio-control-copy">
+                          <strong data-i18n="virtualAudio.microphone">Microphone</strong>
+                          <small data-i18n="virtualAudio.microphoneHelp">Choose the microphone mixed with soundboard clips.</small>
+                        </span>
+                        <select id="virtual-audio-input-device" aria-label="Microphone" data-i18n-aria-label="virtualAudio.microphone"></select>
+                      </div>
+                      <label class="virtual-audio-control-row">
+                        <span class="virtual-audio-control-copy"><strong data-i18n="virtualAudio.microphoneGain">Microphone gain</strong></span>
+                        <span class="settings-range-control">
+                          <input id="virtual-audio-microphone-gain" class="binding-volume-slider" type="range" min="-24" max="24" step="1" value="0" />
+                          <span id="virtual-audio-microphone-gain-value" class="settings-range-value">0 dB</span>
+                        </span>
+                      </label>
+                      <label class="virtual-audio-control-row">
+                        <span class="virtual-audio-control-copy"><strong data-i18n="virtualAudio.soundboardGain">Soundboard gain</strong></span>
+                        <span class="settings-range-control">
+                          <input id="virtual-audio-soundboard-gain" class="binding-volume-slider" type="range" min="-24" max="12" step="1" value="-6" />
+                          <span id="virtual-audio-soundboard-gain-value" class="settings-range-value">-6 dB</span>
+                        </span>
+                      </label>
+                    </div>
+
+                    <div class="settings-card virtual-audio-meters-card">
+                      <div class="settings-card-section-heading settings-card-section-heading--inline"><span data-i18n="virtualAudio.levels">Levels</span></div>
+                      <div class="virtual-audio-meter-grid">
+                        <div class="virtual-audio-meter-row"><span data-i18n="virtualAudio.microphone">Microphone</span><div id="virtual-audio-microphone-meter" class="virtual-audio-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div></div>
+                        <div class="virtual-audio-meter-row"><span data-i18n="soundboard.title">Soundboard</span><div id="virtual-audio-soundboard-meter" class="virtual-audio-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div></div>
+                        <div class="virtual-audio-meter-row"><span data-i18n="virtualAudio.finalOutput">Final output</span><div id="virtual-audio-output-meter" class="virtual-audio-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div></div>
+                        <div class="virtual-audio-meter-row"><span><span data-i18n="virtualAudio.limiter">Limiter</span> <strong id="virtual-audio-limiter-value">0.0 dB</strong></span><div id="virtual-audio-limiter-meter" class="virtual-audio-meter virtual-audio-meter--limiter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div></div>
+                      </div>
+                    </div>
+
+                    <div class="settings-card virtual-audio-health-card">
+                      <div class="settings-card-section-heading settings-card-section-heading--inline">
+                        <span data-i18n="virtualAudio.componentHealth">Component health</span>
+                        <button id="virtual-audio-refresh" class="virtual-audio-icon-button" type="button" title="Refresh status" data-i18n-title="virtualAudio.refreshStatus" aria-label="Refresh status" data-i18n-aria-label="virtualAudio.refreshStatus">
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M6.7 9A7 7 0 0 1 18 6.5L20 11"></path><path d="M17.3 15A7 7 0 0 1 6 17.5L4 13"></path></svg>
+                        </button>
+                      </div>
+                      <div id="virtual-audio-update-notice" class="virtual-audio-update-notice hidden" role="status">
+                        <span class="virtual-audio-update-copy">
+                          <strong data-i18n="virtualAudio.updateAvailable">Virtual Audio update available</strong>
+                          <small data-i18n="virtualAudio.updateDescription">Install the Virtual Audio service included with this version of MIDIMaster.</small>
+                        </span>
+                        <button id="virtual-audio-update" class="settings-action virtual-audio-primary-action" type="button"><span class="settings-button-label" data-i18n="virtualAudio.update">Update Virtual Audio</span></button>
+                      </div>
+                      <dl class="virtual-audio-health-grid">
+                        <div><dt data-i18n="virtualAudio.driverVersion">USBIP driver</dt><dd id="virtual-audio-driver-version">—</dd></div>
+                        <div><dt data-i18n="virtualAudio.service">Audio service</dt><dd id="virtual-audio-service-status">—</dd></div>
+                        <div><dt data-i18n="virtualAudio.endpoint">Virtual microphone</dt><dd id="virtual-audio-endpoint-status">—</dd></div>
+                      </dl>
+                      <p id="virtual-audio-diagnostics-counts" class="settings-field-help"></p>
+                      <p class="settings-field-help virtual-audio-remove-help" data-i18n="virtualAudio.removeHelp">Removing Virtual Audio removes the MIDIMaster device and service. The shared USBIP driver stays installed.</p>
+                      <div class="virtual-audio-button-row">
+                        <button id="virtual-audio-repair" class="settings-action" type="button"><span class="settings-button-label" data-i18n="virtualAudio.repair">Repair Virtual Audio</span></button>
+                        <button id="virtual-audio-remove" class="settings-action virtual-audio-danger-action" type="button"><span class="settings-button-label" data-i18n="virtualAudio.remove">Remove Virtual Audio</span></button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="settings-card virtual-audio-problem-card hidden" data-virtual-audio-view="problem">
+                    <div class="virtual-audio-problem-copy">
+                      <h3 data-i18n="virtualAudio.problemTitle">Virtual Audio needs attention</h3>
+                      <p id="virtual-audio-problem-message" role="alert"></p>
+                    </div>
+                    <div class="virtual-audio-button-row">
+                      <button id="virtual-audio-copy-diagnostics" class="settings-action" type="button"><span class="settings-button-label" data-i18n="virtualAudio.copyDiagnostics">Copy Diagnostics</span></button>
+                      <button id="virtual-audio-problem-repair" class="settings-action" type="button"><span class="settings-button-label" data-i18n="virtualAudio.repair">Repair Virtual Audio</span></button>
+                    </div>
                   </div>
                 </section>
 
@@ -839,6 +967,23 @@
                 </label>
               </div>
               <div class="soundboard-options-grid">
+                <fieldset class="soundboard-routing-row">
+                  <legend data-i18n="soundboard.routing">Send sound to</legend>
+                  <label class="soundboard-route-option">
+                    <span>
+                      <strong data-i18n="soundboard.monitor">Monitor</strong>
+                      <small data-i18n="soundboard.monitorHelp">Play through the selected output device.</small>
+                    </span>
+                    <span class="settings-toggle"><input id="binding-config-soundboard-monitor" type="checkbox" checked /><span class="plugins-toggle-ui" aria-hidden="true"></span></span>
+                  </label>
+                  <label class="soundboard-route-option">
+                    <span>
+                      <strong data-i18n="soundboard.virtualMicrophone">Virtual microphone</strong>
+                      <small data-i18n="soundboard.virtualMicrophoneHelp">Send this clip to MIDIMaster Virtual Microphone.</small>
+                    </span>
+                    <span class="settings-toggle"><input id="binding-config-soundboard-virtual-mic" type="checkbox" /><span class="plugins-toggle-ui" aria-hidden="true"></span></span>
+                  </label>
+                </fieldset>
                 <div class="soundboard-output-row">
                   <span id="binding-config-soundboard-output-label" data-i18n="soundboard.outputDevice">Output device</span>
                   <select id="binding-config-soundboard-output" aria-labelledby="binding-config-soundboard-output-label"></select>

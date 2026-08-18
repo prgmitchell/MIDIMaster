@@ -30,6 +30,7 @@ mod shutdown;
 mod soundboard;
 mod store_api;
 mod telemetry;
+mod virtual_audio;
 mod voicemeeter;
 mod windows_autostart;
 mod windows_display;
@@ -428,6 +429,11 @@ pub fn run() {
                 shutdown.subscribe(),
             );
             shutdown.track_background_task(feedback_task);
+            let virtual_audio_task = background_tasks::spawn_virtual_audio_refresh_loop(
+                app.handle().clone(),
+                shutdown.subscribe(),
+            );
+            shutdown.track_background_task(virtual_audio_task);
 
             #[cfg(feature = "perf-audit")]
             log_startup_milestone("rust_setup_complete", phase_started, setup_started);

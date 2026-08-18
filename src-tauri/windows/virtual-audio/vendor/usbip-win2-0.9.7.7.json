@@ -1,0 +1,10 @@
+{
+  "name": "usbip-win2",
+  "version": "0.9.7.7",
+  "architecture": "x64",
+  "file": "USBip-0.9.7.7-x64.exe",
+  "size": 33226344,
+  "sha256": "51620fa5f9f8be5932bc9d786deee557ce06d5407a99cab490dcfac71f185fea",
+  "source": "https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.7.7/USBip-0.9.7.7-x64.exe"
+}
+

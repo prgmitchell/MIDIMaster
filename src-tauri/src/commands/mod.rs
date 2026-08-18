@@ -6,6 +6,7 @@ pub mod settings;
 pub mod soundboard;
 pub mod telemetry;
 pub mod updates;
+pub mod virtual_audio;
 
 pub use audio::*;
 pub use bindings::*;
@@ -15,6 +16,7 @@ pub use settings::*;
 pub use soundboard::*;
 pub use telemetry::*;
 pub use updates::*;
+pub use virtual_audio::*;
 
 macro_rules! command_registry {
     () => {
@@ -86,6 +88,15 @@ macro_rules! command_registry {
             set_soundboard_preview_volume,
             set_soundboard_preview_paused,
             stop_soundboard_preview,
+            get_virtual_audio_status,
+            get_virtual_audio_settings,
+            set_virtual_audio_settings,
+            list_virtual_audio_input_devices,
+            install_virtual_audio,
+            repair_virtual_audio,
+            remove_virtual_audio,
+            restart_system,
+            copy_virtual_audio_diagnostics,
             get_plugins_dir,
             list_plugins,
             read_plugin_text,

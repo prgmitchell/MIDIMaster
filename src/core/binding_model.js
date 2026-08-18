@@ -639,6 +639,11 @@ export function normalizeSoundboardMapping(raw) {
   const speedRaw = Number(raw.speed);
   const outputDeviceId = String(raw.output_device_id ?? raw.outputDeviceId ?? "").trim();
   const outputDeviceDisplay = String(raw.output_device_display ?? raw.outputDeviceDisplay ?? "").trim();
+  const sendToMonitorRaw = raw.send_to_monitor ?? raw.sendToMonitor;
+  const sendToVirtualMicRaw = raw.send_to_virtual_mic ?? raw.sendToVirtualMic;
+  let sendToMonitor = sendToMonitorRaw == null ? true : Boolean(sendToMonitorRaw);
+  const sendToVirtualMic = sendToVirtualMicRaw == null ? false : Boolean(sendToVirtualMicRaw);
+  if (!sendToMonitor && !sendToVirtualMic) sendToMonitor = true;
   return {
     path,
     display: String(raw.display || "").trim() || fallbackDisplay,
@@ -648,6 +653,8 @@ export function normalizeSoundboardMapping(raw) {
     speed: Number.isFinite(speedRaw) ? Math.min(2, Math.max(0.5, speedRaw)) : 1,
     output_device_id: outputDeviceId || null,
     output_device_display: outputDeviceId ? (outputDeviceDisplay || null) : null,
+    send_to_monitor: sendToMonitor,
+    send_to_virtual_mic: sendToVirtualMic,
   };
 }
 
