@@ -41,7 +41,17 @@ if ($item.Length -ne $expectedSize) {
     throw "USBIP payload size mismatch: expected $expectedSize bytes, got $($item.Length)."
 }
 
-$actualHash = (Get-FileHash -LiteralPath $payloadPathResolved -Algorithm SHA256).Hash.ToLowerInvariant()
+$sha256 = [System.Security.Cryptography.SHA256]::Create()
+try {
+    $payloadStream = [System.IO.File]::OpenRead($payloadPathResolved)
+    try {
+        $actualHash = ([System.BitConverter]::ToString($sha256.ComputeHash($payloadStream))).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $payloadStream.Dispose()
+    }
+} finally {
+    $sha256.Dispose()
+}
 $expectedHash = ([string]$manifest.sha256).ToLowerInvariant()
 if ($actualHash -ne $expectedHash) {
     throw "USBIP payload SHA-256 mismatch: expected $expectedHash, got $actualHash."
