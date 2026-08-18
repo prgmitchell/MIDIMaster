@@ -2,6 +2,12 @@ name: Windows Signing Dry Run
 
 on:
   workflow_dispatch:
+  # Temporary branch trigger: workflow_dispatch is unavailable until a
+  # workflow file exists on the default branch. This snapshot is never merged
+  # with the trigger intact.
+  push:
+    branches:
+      - codex/signing-dry-run
 
 permissions:
   contents: read
