@@ -1,11 +1,16 @@
 use crate::model::SoundboardMapping;
+use crate::virtual_audio::{db_to_linear, is_virtual_audio_name};
 use rodio::cpal::traits::{DeviceTrait as _, HostTrait as _};
-use rodio::{cpal, Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, Source};
+use rodio::{
+    cpal,
+    mixer::{mixer, Mixer, MixerSource},
+    ChannelCount, Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, SampleRate, Source,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
@@ -53,6 +58,50 @@ struct ActivePlayer {
     output_key: String,
 }
 
+struct MeteredSource<S> {
+    inner: S,
+    meter: Arc<AtomicU32>,
+    gain: f32,
+}
+
+impl<S> MeteredSource<S> {
+    fn new(inner: S, meter: Arc<AtomicU32>, gain: f32) -> Self {
+        Self { inner, meter, gain }
+    }
+}
+
+impl<S: Source> Iterator for MeteredSource<S> {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let sample = self.inner.next()?;
+        update_atomic_peak(&self.meter, (sample * self.gain).abs());
+        Some(sample)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<S: Source> Source for MeteredSource<S> {
+    fn current_span_len(&self) -> Option<usize> {
+        self.inner.current_span_len()
+    }
+
+    fn channels(&self) -> ChannelCount {
+        self.inner.channels()
+    }
+
+    fn sample_rate(&self) -> SampleRate {
+        self.inner.sample_rate()
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        self.inner.total_duration()
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct SoundboardOutputDevice {
     pub id: String,
@@ -63,13 +112,27 @@ pub struct SoundboardOutputDevice {
 pub struct SoundboardService {
     playback: Mutex<PlaybackState>,
     analysis_cache: Mutex<HashMap<PathBuf, CachedAnalysis>>,
+    virtual_routing_enabled: AtomicBool,
+    virtual_bus_gain: AtomicU32,
+    virtual_level: Arc<AtomicU32>,
+    virtual_mixer: Mixer,
+    virtual_source: Mutex<Option<MixerSource>>,
 }
 
 impl Default for SoundboardService {
     fn default() -> Self {
+        let (virtual_mixer, virtual_source) = mixer(
+            ChannelCount::new(2).expect("stereo channel count"),
+            SampleRate::new(48_000).expect("48 kHz sample rate"),
+        );
         Self {
             playback: Mutex::new(PlaybackState::default()),
             analysis_cache: Mutex::new(HashMap::new()),
+            virtual_routing_enabled: AtomicBool::new(false),
+            virtual_bus_gain: AtomicU32::new(db_to_linear(-6.0).to_bits()),
+            virtual_level: Arc::new(AtomicU32::new(0.0_f32.to_bits())),
+            virtual_mixer,
+            virtual_source: Mutex::new(Some(virtual_source)),
         }
     }
 }
@@ -91,6 +154,9 @@ impl SoundboardService {
                 .description()
                 .map(|description| description.name().to_string())
                 .unwrap_or_else(|_| id.to_string());
+            if is_virtual_audio_name(&display) {
+                continue;
+            }
             let id = id.to_string();
             output.push(SoundboardOutputDevice {
                 is_default: default_id.as_deref() == Some(id.as_str()),
@@ -179,11 +245,124 @@ impl SoundboardService {
         binding_id: &str,
         mapping: &SoundboardMapping,
     ) -> Result<(), String> {
-        self.play(binding_id, mapping)
+        let mapping = mapping
+            .normalized()
+            .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())?;
+        if !mapping.send_to_monitor && !mapping.send_to_virtual_mic {
+            return Err(
+                "Choose Monitor, Virtual Microphone, or both for this Soundboard action"
+                    .to_string(),
+            );
+        }
+
+        self.stop_binding_players(binding_id);
+        let mut successes = 0usize;
+        let mut errors = Vec::new();
+        if mapping.send_to_monitor {
+            let key = destination_player_key(binding_id, "monitor");
+            match self.play_destination(
+                &key,
+                &mapping,
+                mapping.output_device_id.as_deref(),
+                normalize_volume(mapping.volume),
+                false,
+            ) {
+                Ok(()) => successes += 1,
+                Err(error) => errors.push(format!("Monitor: {error}")),
+            }
+        }
+        if mapping.send_to_virtual_mic && self.virtual_routing_enabled.load(Ordering::Acquire) {
+            let key = destination_player_key(binding_id, "virtual");
+            let gain = f32::from_bits(self.virtual_bus_gain.load(Ordering::Acquire));
+            let volume = (normalize_volume(mapping.volume) * gain).clamp(0.0, 4.0);
+            match self.play_virtual_destination(&key, &mapping, volume) {
+                Ok(()) => successes += 1,
+                Err(error) => errors.push(format!("Virtual Microphone: {error}")),
+            }
+        }
+
+        if successes == 0 && !errors.is_empty() {
+            Err(errors.join("; "))
+        } else {
+            if !errors.is_empty() {
+                crate::run_logger::warn("soundboard", "partial_route_failure", &errors.join("; "));
+            }
+            Ok(())
+        }
     }
 
     pub fn play_preview(&self, mapping: &SoundboardMapping) -> Result<(), String> {
-        self.play(PREVIEW_PLAYER_KEY, mapping)
+        let mapping = mapping
+            .normalized()
+            .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())?;
+        self.play_destination(
+            PREVIEW_PLAYER_KEY,
+            &mapping,
+            mapping.output_device_id.as_deref(),
+            normalize_volume(mapping.volume),
+            false,
+        )
+    }
+
+    pub fn set_virtual_bus_gain_db(&self, gain_db: f32) {
+        self.virtual_bus_gain.store(
+            db_to_linear(gain_db.clamp(-24.0, 12.0)).to_bits(),
+            Ordering::Release,
+        );
+    }
+
+    pub fn take_virtual_source(&self) -> Result<MixerSource, String> {
+        self.virtual_source
+            .lock()
+            .map_err(|_| "Virtual soundboard mixer lock failed".to_string())?
+            .take()
+            .ok_or_else(|| "Virtual soundboard mixer is already connected".to_string())
+    }
+
+    pub fn set_virtual_routing_enabled(&self, enabled: bool) {
+        self.virtual_routing_enabled
+            .store(enabled, Ordering::Release);
+        if enabled {
+            return;
+        }
+        if let Ok(mut playback) = self.playback.lock() {
+            let virtual_players: Vec<String> = playback
+                .players
+                .keys()
+                .filter(|key| key.ends_with(":virtual"))
+                .cloned()
+                .collect();
+            for key in virtual_players {
+                if let Some(player) = playback.players.remove(&key) {
+                    player.player.stop();
+                }
+            }
+        }
+        self.virtual_level
+            .store(0.0_f32.to_bits(), Ordering::Relaxed);
+    }
+
+    pub fn virtual_level(&self) -> f32 {
+        let playing = self
+            .playback
+            .lock()
+            .map(|playback| {
+                playback
+                    .players
+                    .iter()
+                    .any(|(key, player)| key.ends_with(":virtual") && !player.player.empty())
+            })
+            .unwrap_or(false);
+        if playing {
+            f32::from_bits(
+                self.virtual_level
+                    .swap(0.0_f32.to_bits(), Ordering::Relaxed),
+            )
+        } else {
+            self.virtual_level
+                .store(0.0_f32.to_bits(), Ordering::Relaxed);
+            0.0
+        }
     }
 
     pub fn set_preview_volume(&self, volume: f32) {
@@ -223,10 +402,25 @@ impl SoundboardService {
         }
     }
 
-    fn play(&self, key: &str, mapping: &SoundboardMapping) -> Result<(), String> {
-        let mapping = mapping
-            .normalized()
-            .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())?;
+    fn stop_binding_players(&self, binding_id: &str) {
+        if let Ok(mut playback) = self.playback.lock() {
+            for destination in ["monitor", "virtual"] {
+                let key = destination_player_key(binding_id, destination);
+                if let Some(player) = playback.players.remove(&key) {
+                    player.player.stop();
+                }
+            }
+        }
+    }
+
+    fn play_destination(
+        &self,
+        key: &str,
+        mapping: &SoundboardMapping,
+        output_device_id: Option<&str>,
+        volume: f32,
+        virtual_route: bool,
+    ) -> Result<(), String> {
         let path = validate_audio_path(Path::new(&mapping.path))?;
         let file = File::open(&path).map_err(|err| format!("Unable to open audio file: {err}"))?;
         let decoder = Decoder::try_from(file)
@@ -238,7 +432,7 @@ impl SoundboardService {
         if duration_ms > MAX_AUDIO_DURATION_MS {
             return Err("Audio files must be 10 minutes or shorter".to_string());
         }
-        let (start_ms, end_ms) = validated_trim_range(&mapping, duration_ms)?;
+        let (start_ms, end_ms) = validated_trim_range(mapping, duration_ms)?;
         let source = decoder
             .skip_duration(Duration::from_millis(start_ms))
             .take_duration(Duration::from_millis(end_ms - start_ms));
@@ -247,7 +441,7 @@ impl SoundboardService {
             .playback
             .lock()
             .map_err(|_| "Soundboard playback lock failed".to_string())?;
-        let output_key = mapping.output_device_id.as_deref().unwrap_or("__default__");
+        let output_key = output_device_id.unwrap_or("__default__");
         let failed_outputs: Vec<String> = playback
             .outputs
             .iter()
@@ -275,7 +469,7 @@ impl SoundboardService {
         if !playback.outputs.contains_key(output_key) {
             let failed = Arc::new(AtomicBool::new(false));
             let callback_failed = failed.clone();
-            let builder = if let Some(device_id) = mapping.output_device_id.as_deref() {
+            let builder = if let Some(device_id) = output_device_id {
                 let parsed = device_id
                     .parse::<cpal::DeviceId>()
                     .map_err(|_| "The selected Soundboard output device is invalid".to_string())?;
@@ -304,9 +498,14 @@ impl SoundboardService {
             .get(output_key)
             .ok_or_else(|| "Playback device is unavailable".to_string())?;
         let player = Player::connect_new(output.sink.mixer());
-        player.set_volume(normalize_volume(mapping.volume));
+        player.set_volume(volume);
         player.set_speed(mapping.speed);
-        player.append(source);
+        if virtual_route {
+            let meter = self.virtual_level.clone();
+            player.append(MeteredSource::new(source, meter, volume));
+        } else {
+            player.append(source);
+        }
         playback.players.insert(
             key.to_string(),
             ActivePlayer {
@@ -316,6 +515,74 @@ impl SoundboardService {
         );
         Ok(())
     }
+
+    fn play_virtual_destination(
+        &self,
+        key: &str,
+        mapping: &SoundboardMapping,
+        volume: f32,
+    ) -> Result<(), String> {
+        let path = validate_audio_path(Path::new(&mapping.path))?;
+        let file = File::open(&path).map_err(|err| format!("Unable to open audio file: {err}"))?;
+        let decoder = Decoder::try_from(file)
+            .map_err(|err| format!("Unsupported or invalid audio file: {err}"))?;
+        let duration = decoder
+            .total_duration()
+            .ok_or_else(|| "Unable to determine the audio duration".to_string())?;
+        let duration_ms = duration_to_ms(duration);
+        if duration_ms > MAX_AUDIO_DURATION_MS {
+            return Err("Audio files must be 10 minutes or shorter".to_string());
+        }
+        let (start_ms, end_ms) = validated_trim_range(mapping, duration_ms)?;
+        let source = decoder
+            .skip_duration(Duration::from_millis(start_ms))
+            .take_duration(Duration::from_millis(end_ms - start_ms));
+
+        let mut playback = self
+            .playback
+            .lock()
+            .map_err(|_| "Soundboard playback lock failed".to_string())?;
+        playback.players.retain(|_, player| !player.player.empty());
+        if let Some(previous) = playback.players.remove(key) {
+            previous.player.stop();
+        }
+        let player = Player::connect_new(&self.virtual_mixer);
+        player.set_volume(volume);
+        player.set_speed(mapping.speed);
+        player.append(MeteredSource::new(
+            source,
+            self.virtual_level.clone(),
+            volume,
+        ));
+        playback.players.insert(
+            key.to_string(),
+            ActivePlayer {
+                player,
+                output_key: "__virtual_bus__".to_string(),
+            },
+        );
+        Ok(())
+    }
+}
+
+fn update_atomic_peak(meter: &AtomicU32, value: f32) {
+    let value = value.clamp(0.0, 1.0);
+    let mut previous = meter.load(Ordering::Relaxed);
+    while value > f32::from_bits(previous) {
+        match meter.compare_exchange_weak(
+            previous,
+            value.to_bits(),
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => break,
+            Err(current) => previous = current,
+        }
+    }
+}
+
+fn destination_player_key(binding_id: &str, destination: &str) -> String {
+    format!("{binding_id}:{destination}")
 }
 
 pub fn validated_trim_range(
@@ -435,6 +702,8 @@ mod tests {
             speed: 1.0,
             output_device_id: None,
             output_device_display: None,
+            send_to_monitor: true,
+            send_to_virtual_mic: false,
         }
     }
 
@@ -464,6 +733,8 @@ mod tests {
             speed: 3.0,
             output_device_id: Some("  ".to_string()),
             output_device_display: Some(" Speakers ".to_string()),
+            send_to_monitor: true,
+            send_to_virtual_mic: false,
         }
         .normalized()
         .expect("mapping");
@@ -535,5 +806,24 @@ mod tests {
         assert!(!should_trigger_from_input(0.0));
         assert!(!should_trigger_from_input(-1.0));
         assert!(!should_trigger_from_input(f32::NAN));
+    }
+
+    #[test]
+    fn meter_keeps_peak_until_status_poll() {
+        let meter = AtomicU32::new(0.0_f32.to_bits());
+        update_atomic_peak(&meter, 0.25);
+        update_atomic_peak(&meter, 0.75);
+        update_atomic_peak(&meter, 0.5);
+        assert_eq!(f32::from_bits(meter.load(Ordering::Relaxed)), 0.75);
+    }
+
+    #[test]
+    fn disabled_virtual_routing_silently_skips_virtual_only_clips() {
+        let service = SoundboardService::default();
+        let mut mapping = mapping(0, None, 1.0);
+        mapping.path = "missing.wav".to_string();
+        mapping.send_to_monitor = false;
+        mapping.send_to_virtual_mic = true;
+        assert!(service.play_binding("virtual-only", &mapping).is_ok());
     }
 }

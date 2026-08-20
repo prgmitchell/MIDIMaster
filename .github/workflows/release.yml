@@ -7,13 +7,21 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+
+concurrency:
+  group: windows-release-signing
+  cancel-in-progress: false
 
 env:
   TAURI_CLI_VERSION: 2.11.2
+  ARTIFACT_SIGNING_MODULE_VERSION: 0.1.17
+  WINDOWS_SIGNING_PUBLISHER: MITCHELL SOFTWARE SOLUTIONS LLC
 
 jobs:
   build-and-release-windows:
     runs-on: windows-latest
+    environment: windows-release
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +33,7 @@ jobs:
         with:
           workspaces: |
             src-tauri -> target
+            virtual-audio -> target
           shared-key: windows-rust-v1
 
       - name: Restore Tauri CLI cache
@@ -98,6 +107,35 @@ jobs:
             throw "Missing TAURI_SIGNING_PRIVATE_KEY secret. Configure updater signing secrets before releasing."
           }
 
+      - name: Validate Azure signing configuration
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          AZURE_ARTIFACT_SIGNING_PROFILE: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+        run: |
+          $required = @(
+            "AZURE_CLIENT_ID"
+            "AZURE_TENANT_ID"
+            "AZURE_SUBSCRIPTION_ID"
+            "AZURE_ARTIFACT_SIGNING_ENDPOINT"
+            "AZURE_ARTIFACT_SIGNING_ACCOUNT"
+            "AZURE_ARTIFACT_SIGNING_PROFILE"
+          )
+          foreach ($name in $required) {
+            $value = [Environment]::GetEnvironmentVariable($name)
+            if ([string]::IsNullOrWhiteSpace($value)) {
+              throw "Missing windows-release environment variable: $name"
+            }
+          }
+          $endpoint = $env:AZURE_ARTIFACT_SIGNING_ENDPOINT.TrimEnd("/")
+          if ($endpoint -ne "https://eus.codesigning.azure.net") {
+            throw "Artifact Signing endpoint must be East US (https://eus.codesigning.azure.net), got '$endpoint'."
+          }
+
       - name: Validate Cloudflare Pages publish secrets
         shell: pwsh
         env:
@@ -128,21 +166,173 @@ jobs:
             throw "Missing NETLIFY_SITE_ID secret. It is required while NETLIFY_BRIDGE_PUBLISH is enabled."
           }
 
-      - name: Build (Tauri)
+      - name: Download pinned usbip-win2 0.9.7.7 payload
+        shell: pwsh
+        run: |
+          $manifestPath = "src-tauri/windows/virtual-audio/vendor/usbip-win2-0.9.7.7.json"
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          $expectedUrl = "https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.7.7/USBip-0.9.7.7-x64.exe"
+          if ($manifest.version -ne "0.9.7.7" -or $manifest.source -ne $expectedUrl) {
+            throw "Virtual Audio dependency manifest is not pinned to the approved usbip-win2 0.9.7.7 release."
+          }
+          $payloadPath = Join-Path (Split-Path -Parent $manifestPath) $manifest.file
+          Invoke-WebRequest -Uri $expectedUrl -OutFile $payloadPath
+          & "scripts/virtual-audio/Test-UsbipPayload.ps1" `
+            -ManifestPath $manifestPath `
+            -PayloadPath $payloadPath `
+            -RequireValidSignature
+
+      - name: Stage and verify Virtual Audio payload
+        shell: pwsh
+        env:
+          MIDIMASTER_VIRTUAL_AUDIO_STRICT: "1"
+          MIDIMASTER_RELEASE_USB_VID: ${{ vars.MIDIMASTER_RELEASE_USB_VID }}
+          MIDIMASTER_RELEASE_USB_PID: ${{ vars.MIDIMASTER_RELEASE_USB_PID }}
+        run: |
+          & "scripts/virtual-audio/Build-VirtualAudio.ps1" -Configuration Release
+
+      - name: Build application without bundling
+        shell: pwsh
+        env:
+          MIDIMASTER_VIRTUAL_AUDIO_STRICT: "1"
+          MIDIMASTER_RELEASE_USB_VID: ${{ vars.MIDIMASTER_RELEASE_USB_VID }}
+          MIDIMASTER_RELEASE_USB_PID: ${{ vars.MIDIMASTER_RELEASE_USB_PID }}
+        run: |
+          Push-Location "src-tauri"
+          try {
+            $timer = Measure-Command {
+              cargo tauri build --no-bundle --config tauri.release.conf.json
+              if ($LASTEXITCODE -ne 0) { throw "Tauri application build failed with exit code $LASTEXITCODE." }
+            }
+            Write-Host ("Tauri application build completed in {0:N1}s" -f $timer.TotalSeconds)
+          } finally {
+            Pop-Location
+          }
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install pinned Artifact Signing module
+        shell: pwsh
+        run: |
+          Install-Module `
+            -Name ArtifactSigning `
+            -RequiredVersion $env:ARTIFACT_SIGNING_MODULE_VERSION `
+            -Repository PSGallery `
+            -Scope CurrentUser `
+            -Force `
+            -AllowClobber
+          $module = Get-Module -ListAvailable -Name ArtifactSigning |
+            Where-Object { $_.Version -eq [version]$env:ARTIFACT_SIGNING_MODULE_VERSION } |
+            Select-Object -First 1
+          if (-not $module) {
+            throw "ArtifactSigning $env:ARTIFACT_SIGNING_MODULE_VERSION was not installed."
+          }
+
+      - name: Sign MIDIMaster executables
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files: |
+            ${{ github.workspace }}\src-tauri\target\release\midimaster.exe
+            ${{ github.workspace }}\virtual-audio\dist\midimaster-virtual-audio-service.exe
+            ${{ github.workspace }}\virtual-audio\dist\midimaster-virtual-audio-setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: MIDIMaster
+          description-url: https://midimaster.app/
+
+      - name: Verify signed executables and pinned dependency
+        shell: pwsh
+        run: |
+          & "scripts/release/Assert-Authenticode.ps1" `
+            -Path @(
+              "src-tauri/target/release/midimaster.exe"
+              "virtual-audio/dist/midimaster-virtual-audio-service.exe"
+              "virtual-audio/dist/midimaster-virtual-audio-setup.exe"
+            ) `
+            -ExpectedPublisher $env:WINDOWS_SIGNING_PUBLISHER `
+            -RequireTimestamp
+          & "scripts/release/Assert-Authenticode.ps1" `
+            -Path "virtual-audio/dist/USBip-0.9.7.7-x64.exe" `
+            -ExpectedPublisher "Cloudyne Systems (Scheibling Consulting AB)" `
+            -RequireTimestamp
+
+      - name: Bundle signed application as NSIS
+        shell: pwsh
+        env:
+          AZURE_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          AZURE_ARTIFACT_SIGNING_ACCOUNT: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          AZURE_ARTIFACT_SIGNING_PROFILE: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+        run: |
+          Push-Location "src-tauri"
+          try {
+            cargo tauri bundle --bundles nsis --config tauri.release.conf.json
+            if ($LASTEXITCODE -ne 0) { throw "Tauri NSIS bundling failed with exit code $LASTEXITCODE." }
+          } finally {
+            Pop-Location
+          }
+
+      - name: Resolve NSIS installer
+        id: windows_artifacts
+        shell: pwsh
+        run: |
+          $nsisDir = "src-tauri/target/release/bundle/nsis"
+          $setupExe = Get-ChildItem -LiteralPath $nsisDir -Filter *.exe |
+            Where-Object { $_.Name -like "*setup*.exe" } |
+            Select-Object -First 1
+          if (-not $setupExe) { throw "Could not find NSIS setup executable in $nsisDir" }
+          "setup_exe=$($setupExe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Verify signed installer and clean installation
+        shell: pwsh
+        run: |
+          & "scripts/release/Assert-Authenticode.ps1" `
+            -Path "${{ steps.windows_artifacts.outputs.setup_exe }}" `
+            -ExpectedPublisher $env:WINDOWS_SIGNING_PUBLISHER `
+            -RequireTimestamp
+          & "scripts/release/Test-NSISInstalledSignatures.ps1" `
+            -InstallerPath "${{ steps.windows_artifacts.outputs.setup_exe }}" `
+            -ExpectedPublisher $env:WINDOWS_SIGNING_PUBLISHER
+
+      - name: Generate updater signature from signed installer
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
+          $setupExe = "${{ steps.windows_artifacts.outputs.setup_exe }}"
           Push-Location "src-tauri"
           try {
-            $timer = Measure-Command {
-              cargo tauri build --bundles nsis --config tauri.release.conf.json
-            }
-            Write-Host ("Tauri bundle build completed in {0:N1}s" -f $timer.TotalSeconds)
+            cargo tauri signer sign $setupExe
+            if ($LASTEXITCODE -ne 0) { throw "Tauri updater signing failed with exit code $LASTEXITCODE." }
           } finally {
             Pop-Location
           }
+          $signaturePath = "$setupExe.sig"
+          if (-not (Test-Path -LiteralPath $signaturePath -PathType Leaf)) {
+            throw "Tauri updater signature was not created: $signaturePath"
+          }
+          if ([string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $signaturePath -Raw))) {
+            throw "Tauri updater signature is empty: $signaturePath"
+          }
+
+      - name: Scan final artifacts with Microsoft Defender
+        shell: pwsh
+        run: |
+          & "scripts/release/Invoke-DefenderArtifactScan.ps1" -Path @(
+            "src-tauri/target/release/midimaster.exe"
+            "virtual-audio/dist/midimaster-virtual-audio-service.exe"
+            "virtual-audio/dist/midimaster-virtual-audio-setup.exe"
+            "${{ steps.windows_artifacts.outputs.setup_exe }}"
+          )
 
       - name: Generate updater metadata (latest.json)
         shell: pwsh

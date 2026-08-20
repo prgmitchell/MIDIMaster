@@ -57,6 +57,65 @@ fn default_text_rendering() -> String {
 
 pub const CURRENT_STARTUP_REGISTRATION_VERSION: u32 = 2;
 
+fn default_microphone_gain_db() -> f32 {
+    0.0
+}
+
+fn default_soundboard_gain_db() -> f32 {
+    -6.0
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct VirtualAudioSettings {
+    pub enabled: bool,
+    pub input_device_id: Option<String>,
+    pub follow_default_input: bool,
+    #[serde(default = "default_microphone_gain_db")]
+    pub microphone_gain_db: f32,
+    #[serde(default = "default_soundboard_gain_db")]
+    pub soundboard_gain_db: f32,
+}
+
+impl Default for VirtualAudioSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            input_device_id: None,
+            follow_default_input: true,
+            microphone_gain_db: default_microphone_gain_db(),
+            soundboard_gain_db: default_soundboard_gain_db(),
+        }
+    }
+}
+
+impl VirtualAudioSettings {
+    pub fn normalized(&self) -> Self {
+        let finite_or = |value: f32, fallback: f32| {
+            if value.is_finite() {
+                value
+            } else {
+                fallback
+            }
+        };
+        Self {
+            enabled: self.enabled,
+            input_device_id: if self.follow_default_input {
+                None
+            } else {
+                self.input_device_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string)
+            },
+            follow_default_input: self.follow_default_input,
+            microphone_gain_db: finite_or(self.microphone_gain_db, 0.0).clamp(-24.0, 24.0),
+            soundboard_gain_db: finite_or(self.soundboard_gain_db, -6.0).clamp(-24.0, 12.0),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MidiDeviceInventoryConsent {
@@ -205,6 +264,7 @@ pub struct AppSettings {
     pub auto_check_updates: bool,
     pub language: String,
     pub appearance: AppAppearanceSettings,
+    pub virtual_audio: VirtualAudioSettings,
     pub fader_curve_presets: Vec<FaderCurvePreset>,
     pub midi_device_inventory_consent: MidiDeviceInventoryConsent,
     pub midi_device_inventory_notice_version: u32,
@@ -230,6 +290,7 @@ impl Default for AppSettings {
             auto_check_updates: true,
             language: "en".to_string(),
             appearance: AppAppearanceSettings::default(),
+            virtual_audio: VirtualAudioSettings::default(),
             fader_curve_presets: Vec::new(),
             midi_device_inventory_consent: MidiDeviceInventoryConsent::Unknown,
             midi_device_inventory_notice_version: 0,
@@ -295,7 +356,7 @@ impl AppSettingsStore {
 mod tests {
     use super::{
         AppAppearanceSettings, AppSettings, AppSettingsStore, AppearanceTheme, FaderCurvePreset,
-        MidiDeviceInventoryConsent,
+        MidiDeviceInventoryConsent, VirtualAudioSettings,
     };
     use crate::durable_json_store::new_recovery_notices;
     use crate::model::FaderCurvePoint;
@@ -522,5 +583,30 @@ mod tests {
         assert_eq!(loaded.fader_curve_presets[0].name, "Drums Ride");
         assert_eq!(loaded.fader_curve_presets[0].points[1].x, 0.5);
         assert_eq!(loaded.fader_curve_presets[0].points[1].y, 0.7);
+    }
+
+    #[test]
+    fn legacy_settings_default_virtual_audio_to_disabled() {
+        let loaded: AppSettings =
+            serde_json::from_str(r#"{"language":"en"}"#).expect("deserialize legacy settings");
+        assert_eq!(loaded.virtual_audio, VirtualAudioSettings::default());
+        assert!(!loaded.virtual_audio.enabled);
+        assert!(loaded.virtual_audio.follow_default_input);
+    }
+
+    #[test]
+    fn virtual_audio_settings_are_normalized_before_use() {
+        let normalized = VirtualAudioSettings {
+            enabled: true,
+            input_device_id: Some(" stale-device ".to_string()),
+            follow_default_input: true,
+            microphone_gain_db: 99.0,
+            soundboard_gain_db: f32::NAN,
+        }
+        .normalized();
+        assert!(normalized.enabled);
+        assert_eq!(normalized.input_device_id, None);
+        assert_eq!(normalized.microphone_gain_db, 24.0);
+        assert_eq!(normalized.soundboard_gain_db, -6.0);
     }
 }

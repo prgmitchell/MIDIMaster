@@ -1099,6 +1099,8 @@ export function createBindingsFeature({
   let soundboardOutputDevices = [];
   let soundboardOutputDevicesLoaded = false;
   let soundboardOutputDropdown = null;
+  let soundboardVirtualAudioState = "loading";
+  let soundboardVirtualAudioStatusToken = 0;
   let soundboardPointerHandle = null;
   let configMacroSelectedPath = null;
   let configMacroPendingSelectedScroll = false;
@@ -4213,6 +4215,25 @@ export function createBindingsFeature({
     if (binding && configSoundboardPageOpen) renderSoundboardEditor(binding);
   }
 
+  async function loadSoundboardVirtualAudioStatus() {
+    const token = ++soundboardVirtualAudioStatusToken;
+    soundboardVirtualAudioState = "loading";
+    const loadingBinding = getConfigBinding();
+    if (loadingBinding && configSoundboardPageOpen) renderSoundboardEditor(loadingBinding);
+    try {
+      const status = await invoke("get_virtual_audio_status");
+      if (token !== soundboardVirtualAudioStatusToken) return;
+      soundboardVirtualAudioState = String(status?.install_state || status?.state || "") === "ready"
+        ? "ready"
+        : "unavailable";
+    } catch {
+      if (token !== soundboardVirtualAudioStatusToken) return;
+      soundboardVirtualAudioState = "unavailable";
+    }
+    const binding = getConfigBinding();
+    if (binding && configSoundboardPageOpen) renderSoundboardEditor(binding);
+  }
+
   function renderSoundboardOutputOptions(mapping) {
     const select = d.bindingConfigSoundboardOutput;
     if (!select) return;
@@ -4329,6 +4350,7 @@ export function createBindingsFeature({
     if (d.bindingConfigSoundboardEdit) d.bindingConfigSoundboardEdit.onclick = () => {
       configSoundboardPageOpen = true;
       loadSoundboardOutputDevices().catch(() => { });
+      loadSoundboardVirtualAudioStatus().catch(() => { });
       renderConfigModal();
     };
     if (d.bindingConfigSoundboardReplace) d.bindingConfigSoundboardReplace.onclick = async () => {
@@ -4347,6 +4369,8 @@ export function createBindingsFeature({
           speed: normalizeSoundboardMapping(binding.soundboard)?.speed ?? 1,
           output_device_id: normalizeSoundboardMapping(binding.soundboard)?.output_device_id ?? null,
           output_device_display: normalizeSoundboardMapping(binding.soundboard)?.output_device_display ?? null,
+          send_to_monitor: normalizeSoundboardMapping(binding.soundboard)?.send_to_monitor ?? true,
+          send_to_virtual_mic: normalizeSoundboardMapping(binding.soundboard)?.send_to_virtual_mic ?? false,
         };
         soundboardAnalysis = analysis;
         soundboardAnalysisError = "";
@@ -4408,6 +4432,27 @@ export function createBindingsFeature({
       mapping.output_device_display = selectedId ? (selected?.display || mapping.output_device_display || null) : null;
       binding.soundboard = mapping;
       stopSoundboardPreview().catch(() => { });
+      renderSoundboardEditor(binding);
+    };
+    if (d.bindingConfigSoundboardMonitor) d.bindingConfigSoundboardMonitor.onchange = () => {
+      const binding = getConfigBinding();
+      const mapping = normalizeSoundboardMapping(binding?.soundboard);
+      if (!binding || !mapping) return;
+      mapping.send_to_monitor = d.bindingConfigSoundboardMonitor.checked;
+      if (!mapping.send_to_monitor && !mapping.send_to_virtual_mic) {
+        if (soundboardVirtualAudioState === "ready") mapping.send_to_virtual_mic = true;
+        else mapping.send_to_monitor = true;
+      }
+      binding.soundboard = mapping;
+      renderSoundboardEditor(binding);
+    };
+    if (d.bindingConfigSoundboardVirtualMic) d.bindingConfigSoundboardVirtualMic.onchange = () => {
+      const binding = getConfigBinding();
+      const mapping = normalizeSoundboardMapping(binding?.soundboard);
+      if (!binding || !mapping) return;
+      mapping.send_to_virtual_mic = d.bindingConfigSoundboardVirtualMic.checked;
+      if (!mapping.send_to_virtual_mic && !mapping.send_to_monitor) mapping.send_to_monitor = true;
+      binding.soundboard = mapping;
       renderSoundboardEditor(binding);
     };
     if (d.bindingConfigSoundboardVolume) d.bindingConfigSoundboardVolume.oninput = () => {
@@ -4484,6 +4529,31 @@ export function createBindingsFeature({
     d.bindingConfigSoundboardVolumeValue.textContent = `${Math.round((mapping?.volume ?? 1) * 100)}%`;
     d.bindingConfigSoundboardSpeed.value = String(Math.round((mapping?.speed ?? 1) * 100));
     d.bindingConfigSoundboardSpeedValue.textContent = `${(mapping?.speed ?? 1).toFixed(2)}×`;
+    if (d.bindingConfigSoundboardMonitor) {
+      d.bindingConfigSoundboardMonitor.checked = mapping?.send_to_monitor ?? true;
+      d.bindingConfigSoundboardMonitor.disabled = !mapping;
+    }
+    if (d.bindingConfigSoundboardVirtualMic) {
+      d.bindingConfigSoundboardVirtualMic.checked = mapping?.send_to_virtual_mic ?? false;
+      d.bindingConfigSoundboardVirtualMic.disabled = !mapping || soundboardVirtualAudioState !== "ready";
+    }
+    if (d.bindingConfigSoundboardVirtualMicOption) {
+      const unavailable = soundboardVirtualAudioState !== "ready";
+      d.bindingConfigSoundboardVirtualMicOption.classList.toggle("is-unavailable", unavailable);
+      d.bindingConfigSoundboardVirtualMicOption.setAttribute("aria-disabled", String(unavailable));
+      d.bindingConfigSoundboardVirtualMicOption.title = unavailable
+        ? t(soundboardVirtualAudioState === "loading" ? "virtualAudio.checking" : "virtualAudio.setupTitle")
+        : "";
+    }
+    if (d.bindingConfigSoundboardVirtualMicHelp) {
+      d.bindingConfigSoundboardVirtualMicHelp.textContent = soundboardVirtualAudioState === "loading"
+        ? t("virtualAudio.checking")
+        : soundboardVirtualAudioState === "ready"
+          ? t("soundboard.virtualMicrophoneHelp")
+          : t("virtualAudio.setupTitle");
+    }
+    if (d.bindingConfigSoundboardOutput) d.bindingConfigSoundboardOutput.disabled = !mapping || mapping.send_to_monitor === false;
+    if (soundboardOutputDropdown?.button) soundboardOutputDropdown.button.disabled = !mapping || mapping.send_to_monitor === false;
     [
       d.bindingConfigSoundboardStart,
       d.bindingConfigSoundboardEnd,
@@ -4506,8 +4576,10 @@ export function createBindingsFeature({
       : null;
     await stopSoundboardPreview();
     soundboardAnalysisToken += 1;
+    soundboardVirtualAudioStatusToken += 1;
     soundboardAnalysis = null;
     soundboardAnalysisError = "";
+    soundboardVirtualAudioState = "loading";
     soundboardPointerHandle = null;
     stopHotkeyLearn();
     stopAuxLearn();
@@ -4955,11 +5027,15 @@ export function createBindingsFeature({
     soundboardAnalysis = options.soundboardAnalysis || null;
     soundboardAnalysisError = "";
     soundboardOutputDevicesLoaded = false;
+    soundboardVirtualAudioState = "loading";
     configAcceptedTransfers.clear();
     if (d.bindingConfigPanel) d.bindingConfigPanel.classList.remove("hidden");
     startConfigPreviewTimer();
     renderConfigModal();
-    if (configSoundboardPageOpen) loadSoundboardOutputDevices().catch(() => { });
+    if (configSoundboardPageOpen) {
+      loadSoundboardOutputDevices().catch(() => { });
+      loadSoundboardVirtualAudioStatus().catch(() => { });
+    }
   }
 
   async function saveConfigModal() {

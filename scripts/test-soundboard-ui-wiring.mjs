@@ -22,6 +22,10 @@ for (const id of [
   "binding-config-soundboard-speed",
   "binding-config-soundboard-output",
   "binding-config-soundboard-playback-time",
+  "binding-config-soundboard-monitor",
+  "binding-config-soundboard-virtual-mic-option",
+  "binding-config-soundboard-virtual-mic-help",
+  "binding-config-soundboard-virtual-mic",
 ]) {
   assert.match(html, new RegExp(`id="${id}"`), `${id} should exist`);
   assert.match(domRefs, new RegExp(`getElementById\\("${id}"\\)`), `${id} should have a DOM reference`);
@@ -49,6 +53,13 @@ assert.match(bindings, /async function closeConfigModal[\s\S]*?await stopSoundbo
 assert.match(bindings, /set_soundboard_preview_volume/, "preview volume should update live");
 assert.match(bindings, /set_soundboard_preview_paused/, "preview transport should pause and resume");
 assert.match(bindings, /list_soundboard_output_devices/, "output devices should be selectable");
+assert.match(bindings, /mapping\.send_to_monitor = d\.bindingConfigSoundboardMonitor\.checked/, "clips should independently target the monitor");
+assert.match(bindings, /mapping\.send_to_virtual_mic = d\.bindingConfigSoundboardVirtualMic\.checked/, "clips should independently target the virtual microphone");
+assert.match(bindings, /!mapping\.send_to_monitor && !mapping\.send_to_virtual_mic/, "clips should always retain at least one destination");
+assert.match(bindings, /invoke\("get_virtual_audio_status"\)/, "the Soundboard editor should check whether Virtual Audio is ready");
+assert.match(bindings, /bindingConfigSoundboardVirtualMic\.disabled = !mapping \|\| soundboardVirtualAudioState !== "ready"/, "the virtual microphone route should be disabled until Virtual Audio is ready");
+assert.match(bindings, /bindingConfigSoundboardVirtualMicOption\.classList\.toggle\("is-unavailable", unavailable\)/, "the unavailable virtual microphone route should expose a dimmed state");
+assert.match(configCss, /soundboard-route-option\.is-unavailable[\s\S]*?opacity:\s*\.52/, "the unavailable virtual microphone route should look disabled");
 assert.match(bindings, /requestAnimationFrame/, "waveform playback should animate a playhead");
 assert.doesNotMatch(targets, /replacesExclusiveTarget/, "normal targets should coexist with Soundboard and Macro");
 assert.match(targets, /soundboardAlreadyConfigured[\s\S]*?onSoundboardAlreadyConfigured/, "a second Soundboard should show the configured warning");

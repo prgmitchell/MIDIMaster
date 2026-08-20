@@ -1,6 +1,6 @@
 [package]
 name = "midimaster"
-version = "4.6.4"
+version = "4.6.5"
 edition = "2021"
 default-run = "midimaster"
 license = "MIT"
@@ -63,6 +63,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 semver = "1"
 rfd = "0.15"
 rodio = { version = "0.22.2", default-features = false, features = ["playback", "symphonia-flac", "symphonia-mp3", "symphonia-aac", "symphonia-isomp4", "symphonia-ogg", "symphonia-vorbis", "symphonia-pcm", "symphonia-wav"] }
+ringbuf = "0.5"
 
 [target.'cfg(windows)'.dependencies]
 libloading = "0.8"

@@ -24,6 +24,7 @@ import {
   normalizeMidiDeviceInventoryConsent,
   normalizeMidiDeviceInventorySettings,
 } from "../../app/midi_device_inventory.js";
+import { createVirtualAudioSettingsController } from "./virtual_audio.js";
 
 export function createSettingsFeature({
   invoke,
@@ -172,6 +173,13 @@ export function createSettingsFeature({
     body: "",
   };
   let updateCheckPromise = null;
+  const virtualAudio = createVirtualAudioSettingsController({
+    invoke,
+    dom: d,
+    i18n,
+    showAlert: showSettingsAlert,
+    renderSelectDropdown: (select) => renderSettingsSelectDropdown(select),
+  });
 
   function setTextContent(target, text, selector = null) {
     const value = String(text ?? "");
@@ -1132,6 +1140,7 @@ export function createSettingsFeature({
 
   function closeSettingsPanel() {
     if (!d.settingsPanel) return;
+    virtualAudio.setActive(false).catch(() => {});
     d.settingsPanel.classList.add("hidden");
   }
 
@@ -1170,6 +1179,7 @@ export function createSettingsFeature({
       panel.classList.toggle("active", active);
       panel.classList.toggle("hidden", !active);
     });
+    virtualAudio.setActive(activeSection === "virtual-audio").catch(() => {});
     if (activeSection === "osd") {
       syncOsdAppearanceControls();
     } else if (activeSection === "appearance") {
@@ -1399,6 +1409,8 @@ export function createSettingsFeature({
     if (!entry) return;
     selectEl.classList.add("hidden");
     selectEl.parentElement?.classList.add("has-custom-select");
+    entry.button.disabled = Boolean(selectEl.disabled);
+    entry.root.classList.toggle("is-disabled", Boolean(selectEl.disabled));
     renderNativeSelectDropdown({
       entry,
       selectEl,
@@ -1417,6 +1429,9 @@ export function createSettingsFeature({
     }
     if (d.osdLabelModeSelect) {
       renderSettingsSelectDropdown(d.osdLabelModeSelect);
+    }
+    if (d.virtualAudioInputDevice) {
+      renderSettingsSelectDropdown(d.virtualAudioInputDevice);
     }
   }
 
@@ -1626,6 +1641,7 @@ export function createSettingsFeature({
 
   function bindUi() {
     bindUpdaterEvents().catch(() => {});
+    virtualAudio.bindUi();
     populateLanguageSelect();
     if (d.settingsPanel) {
       activateSettingsSection(defaultSettingsSection);

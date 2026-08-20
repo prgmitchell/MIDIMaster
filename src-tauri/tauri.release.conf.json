@@ -1,5 +1,23 @@
 {
+  "build": {
+    "beforeBuildCommand": "pwsh -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/virtual-audio/Build-VirtualAudio.ps1 -Configuration Release"
+  },
   "bundle": {
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false,
+    "windows": {
+      "signCommand": {
+        "cmd": "pwsh",
+        "args": [
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "../scripts/release/Sign-WithArtifactSigning.ps1",
+          "%1"
+        ]
+      }
+    }
   }
 }

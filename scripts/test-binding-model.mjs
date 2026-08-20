@@ -827,6 +827,8 @@ function testNormalizeSoundboardBindingAndDefaults() {
     speed: 1,
     output_device_id: null,
     output_device_display: null,
+    send_to_monitor: true,
+    send_to_virtual_mic: false,
   });
   assert.equal(bindingModel.buttonVisualBehavior(normalized), "momentary");
 }
@@ -846,6 +848,24 @@ function testSoundboardMappingRejectsBlankPathAndClampsEnd() {
     speed: 1,
     output_device_id: null,
     output_device_display: null,
+    send_to_monitor: true,
+    send_to_virtual_mic: false,
+  });
+  assert.deepEqual(bindingModel.normalizeSoundboardMapping({
+    path: "silent.wav",
+    send_to_monitor: false,
+    send_to_virtual_mic: false,
+  }), {
+    path: "silent.wav",
+    display: "silent.wav",
+    trim_start_ms: 0,
+    trim_end_ms: null,
+    volume: 1,
+    speed: 1,
+    output_device_id: null,
+    output_device_display: null,
+    send_to_monitor: true,
+    send_to_virtual_mic: false,
   });
 }
 

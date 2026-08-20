@@ -87,6 +87,10 @@ export function createDomRefs() {
   const bindingConfigSoundboardSpeed = document.getElementById("binding-config-soundboard-speed");
   const bindingConfigSoundboardSpeedValue = document.getElementById("binding-config-soundboard-speed-value");
   const bindingConfigSoundboardOutput = document.getElementById("binding-config-soundboard-output");
+  const bindingConfigSoundboardMonitor = document.getElementById("binding-config-soundboard-monitor");
+  const bindingConfigSoundboardVirtualMicOption = document.getElementById("binding-config-soundboard-virtual-mic-option");
+  const bindingConfigSoundboardVirtualMicHelp = document.getElementById("binding-config-soundboard-virtual-mic-help");
+  const bindingConfigSoundboardVirtualMic = document.getElementById("binding-config-soundboard-virtual-mic");
   const bindingConfigCurveSection = document.getElementById("binding-config-curve-section");
   const bindingConfigFeedbackOutputSection = document.getElementById("binding-config-feedback-output-section");
   const bindingConfigFeedbackOutputCustom = document.getElementById("binding-config-feedback-output-custom");
@@ -210,6 +214,32 @@ export function createDomRefs() {
   const osdScaleInput = document.getElementById("osd-scale");
   const osdScaleValue = document.getElementById("osd-scale-value");
   const osdPositionPicker = document.getElementById("osd-position-picker");
+  const virtualAudioPanel = document.getElementById("virtual-audio-panel");
+  const virtualAudioInstall = document.getElementById("virtual-audio-install");
+  const virtualAudioUpdate = document.getElementById("virtual-audio-update");
+  const virtualAudioUpdateNotice = document.getElementById("virtual-audio-update-notice");
+  const virtualAudioRepair = document.getElementById("virtual-audio-repair");
+  const virtualAudioProblemRepair = document.getElementById("virtual-audio-problem-repair");
+  const virtualAudioRemove = document.getElementById("virtual-audio-remove");
+  const virtualAudioRestart = document.getElementById("virtual-audio-restart");
+  const virtualAudioRestartLater = document.getElementById("virtual-audio-restart-later");
+  const virtualAudioCopyDiagnostics = document.getElementById("virtual-audio-copy-diagnostics");
+  const virtualAudioEnabled = document.getElementById("virtual-audio-enabled");
+  const virtualAudioRoutingError = document.getElementById("virtual-audio-routing-error");
+  const virtualAudioInputDevice = document.getElementById("virtual-audio-input-device");
+  const virtualAudioMicrophoneGain = document.getElementById("virtual-audio-microphone-gain");
+  const virtualAudioMicrophoneGainValue = document.getElementById("virtual-audio-microphone-gain-value");
+  const virtualAudioSoundboardGain = document.getElementById("virtual-audio-soundboard-gain");
+  const virtualAudioSoundboardGainValue = document.getElementById("virtual-audio-soundboard-gain-value");
+  const virtualAudioMicrophoneMeter = document.getElementById("virtual-audio-microphone-meter");
+  const virtualAudioSoundboardMeter = document.getElementById("virtual-audio-soundboard-meter");
+  const virtualAudioOutputMeter = document.getElementById("virtual-audio-output-meter");
+  const virtualAudioLimiterMeter = document.getElementById("virtual-audio-limiter-meter");
+  const virtualAudioLimiterValue = document.getElementById("virtual-audio-limiter-value");
+  const virtualAudioDriverVersion = document.getElementById("virtual-audio-driver-version");
+  const virtualAudioServiceStatus = document.getElementById("virtual-audio-service-status");
+  const virtualAudioEndpointStatus = document.getElementById("virtual-audio-endpoint-status");
+  const virtualAudioProblemMessage = document.getElementById("virtual-audio-problem-message");
   const startWithWindowsSelect = document.getElementById("start-with-windows");
   const startInTraySelect = document.getElementById("start-in-tray");
   const minimizeToTraySelect = document.getElementById("minimize-to-tray");
@@ -314,6 +344,10 @@ export function createDomRefs() {
     bindingConfigSoundboardSpeed,
     bindingConfigSoundboardSpeedValue,
     bindingConfigSoundboardOutput,
+    bindingConfigSoundboardMonitor,
+    bindingConfigSoundboardVirtualMicOption,
+    bindingConfigSoundboardVirtualMicHelp,
+    bindingConfigSoundboardVirtualMic,
     bindingConfigCurveSection,
     bindingConfigFeedbackOutputSection,
     bindingConfigFeedbackOutputCustom,
@@ -406,6 +440,32 @@ export function createDomRefs() {
     osdScaleInput,
     osdScaleValue,
     osdPositionPicker,
+    virtualAudioPanel,
+    virtualAudioInstall,
+    virtualAudioUpdate,
+    virtualAudioUpdateNotice,
+    virtualAudioRepair,
+    virtualAudioProblemRepair,
+    virtualAudioRemove,
+    virtualAudioRestart,
+    virtualAudioRestartLater,
+    virtualAudioCopyDiagnostics,
+    virtualAudioEnabled,
+    virtualAudioRoutingError,
+    virtualAudioInputDevice,
+    virtualAudioMicrophoneGain,
+    virtualAudioMicrophoneGainValue,
+    virtualAudioSoundboardGain,
+    virtualAudioSoundboardGainValue,
+    virtualAudioMicrophoneMeter,
+    virtualAudioSoundboardMeter,
+    virtualAudioOutputMeter,
+    virtualAudioLimiterMeter,
+    virtualAudioLimiterValue,
+    virtualAudioDriverVersion,
+    virtualAudioServiceStatus,
+    virtualAudioEndpointStatus,
+    virtualAudioProblemMessage,
     startWithWindowsSelect,
     startInTraySelect,
     minimizeToTraySelect,
@@ -446,7 +506,7 @@ export function createDomRefs() {
     }),
     profiles: selectRefs(all, { prefixes: ["profile"] }),
     settings: selectRefs(all, {
-      prefixes: ["settings", "osd"],
+      prefixes: ["settings", "osd", "virtualAudio"],
       keys: [
         "settingsButton",
         "topbarUpdateButton",

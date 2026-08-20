@@ -13,6 +13,7 @@ use crate::profile_store::ProfileStore;
 use crate::run_logger;
 use crate::runtime_helpers::LearnCandidate;
 use crate::soundboard::SoundboardService;
+use crate::virtual_audio::VirtualAudioRuntime;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -91,6 +92,7 @@ pub(crate) struct AppState {
     pub(crate) activity_button_light_generations: Arc<Mutex<HashMap<BindingKey, u64>>>,
     pub(crate) running_macros: Arc<Mutex<std::collections::HashSet<String>>>,
     pub(crate) soundboard: Arc<SoundboardService>,
+    pub(crate) virtual_audio: Arc<VirtualAudioRuntime>,
     pub(crate) last_mute_input_active: Mutex<HashMap<BindingKey, bool>>,
     pub(crate) focus_volume_failure_logs: Mutex<HashMap<String, Instant>>,
     pub(crate) mute_transition_until: Mutex<HashMap<BindingKey, Instant>>,
@@ -222,6 +224,22 @@ impl AppState {
         app_settings: AppSettings,
         storage_recovery_notices: StorageRecoveryNotices,
     ) -> Self {
+        let soundboard = Arc::new(SoundboardService::default());
+        let soundboard_source = soundboard
+            .take_virtual_source()
+            .expect("connect the virtual soundboard mixer once");
+        let virtual_audio = Arc::new(VirtualAudioRuntime::new(
+            app_settings.virtual_audio.clone(),
+            soundboard_source,
+        ));
+        soundboard.set_virtual_routing_enabled(app_settings.virtual_audio.enabled);
+        soundboard.set_virtual_bus_gain_db(app_settings.virtual_audio.soundboard_gain_db);
+        if app_settings.virtual_audio.enabled {
+            if let Err(error) = virtual_audio.apply_settings(app_settings.virtual_audio.clone()) {
+                run_logger::warn("virtual_audio", "startup_route_failed", &error);
+            }
+        }
+
         Self {
             audio,
             midi: Arc::new(Mutex::new(MidiManager::new())),
@@ -235,7 +253,8 @@ impl AppState {
             integration_connection_states: Mutex::new(HashMap::new()),
             activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
             running_macros: Arc::new(Mutex::new(std::collections::HashSet::new())),
-            soundboard: Arc::new(SoundboardService::default()),
+            soundboard,
+            virtual_audio,
             last_mute_input_active: Mutex::new(HashMap::new()),
             focus_volume_failure_logs: Mutex::new(HashMap::new()),
             mute_transition_until: Mutex::new(HashMap::new()),

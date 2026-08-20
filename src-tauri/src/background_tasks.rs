@@ -193,6 +193,37 @@ pub(crate) fn spawn_midi_event_queue_loop(
     })
 }
 
+pub(crate) fn spawn_virtual_audio_refresh_loop(
+    app_handle: AppHandle,
+    mut shutdown: watch::Receiver<bool>,
+) -> JoinHandle<()> {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            if shutdown_requested(&shutdown) {
+                break;
+            }
+
+            let runtime = app_handle.state::<AppState>().virtual_audio.clone();
+            match tauri::async_runtime::spawn_blocking(move || runtime.refresh()).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    run_logger::warn("virtual_audio", "background_refresh_failed", &error)
+                }
+                Err(error) => run_logger::warn(
+                    "virtual_audio",
+                    "background_refresh_task_failed",
+                    &format!("error={error}"),
+                ),
+            }
+
+            if sleep_or_shutdown(&mut shutdown, IDLE_BACKGROUND_INTERVAL).await {
+                break;
+            }
+        }
+        run_logger::info("app", "virtual_audio_refresh_loop_stopped", "");
+    })
+}
+
 pub(crate) fn spawn_feedback_refresh_loop(
     app_handle: AppHandle,
     mut shutdown: watch::Receiver<bool>,

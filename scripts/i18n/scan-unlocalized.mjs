@@ -16,6 +16,7 @@ const ignoredLiteralPatterns = [
   /^data:/i,
   /^<svg\b/i,
   /^\.?[A-Za-z0-9_-]+$/,
+  /^[+-]?\d+(?:\.\d+)?\s*dB$/i,
   /^MIDI: \$\{/,
 ];
 
@@ -112,13 +113,17 @@ function scanHtml(filePath, source) {
   const lines = source.split(/\r?\n/);
   lines.forEach((line, index) => {
     if (!/[A-Za-z]/.test(line)) return;
-    const tagTail = lines.slice(index, Math.min(lines.length, index + 12)).join(" ");
-    const currentTag = tagTail.split(">")[0] || line;
-    const hasDataI18n = /data-i18n/.test(currentTag);
     const visible = line.match(/>([^<>{}]*[A-Za-z][^<>{}]*)</);
+    const visibleTagStart = visible ? line.lastIndexOf("<", visible.index) : -1;
+    const visibleTag = visibleTagStart >= 0
+      ? line.slice(visibleTagStart, visible.index + 1)
+      : "";
+    const hasDataI18n = /data-i18n(?:\s|=|>)/.test(visibleTag);
     if (visible && !hasDataI18n && !shouldIgnoreLiteral(visible[1])) {
       findings.push({ file: relative(filePath), line: index + 1, value: visible[1].trim().slice(0, 120) });
     }
+    const tagTail = lines.slice(index, Math.min(lines.length, index + 12)).join(" ");
+    const currentTag = tagTail.split(">")[0] || line;
     for (const attr of ["placeholder", "title", "aria-label"]) {
       const attrMatch = line.match(new RegExp(`${attr}="([^"]*[A-Za-z][^"]*)"`));
       if (attrMatch && !new RegExp(`data-i18n-${attr.replace("aria-label", "aria-label")}`).test(currentTag)) {

@@ -26,6 +26,14 @@ target/
 # Tauri
 src-tauri/gen/
 
+# Pinned third-party payload is supplied out-of-band and verified before release.
+src-tauri/windows/virtual-audio/vendor/USBip-0.9.7.7-x64.exe
+virtual-audio/target/
+virtual-audio/dist/*.exe
+virtual-audio/dist/*.json
+virtual-audio/dist/*.txt
+!virtual-audio/dist/README.txt
+
 # Netlify local metadata
 .netlify/
 netlify.toml
