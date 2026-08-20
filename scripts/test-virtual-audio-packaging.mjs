@@ -54,5 +54,10 @@ assert.match(virtualAudioUi, /service_update_available/u);
 assert.match(virtualAudioUi, /runAction\("repair_virtual_audio"\)/u);
 assert.match(virtualAudioCommands, /bundled_service_path/u);
 assert.match(virtualAudioCommands, /service_binary_update_available/u);
+assert.match(
+  virtualAudioCommands,
+  /Start-Process[^\r\n]+-Verb RunAs -WindowStyle Hidden -Wait -PassThru/u,
+  "the elevated setup helper must not expose an interactive console window",
+);
 
 console.log("Virtual Audio packaging tests passed");

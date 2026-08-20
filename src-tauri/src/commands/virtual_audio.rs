@@ -527,7 +527,7 @@ fn installed_service_path() -> Option<PathBuf> {
 fn run_elevated_helper(path: &Path, operation: SetupOperation) -> Result<(), String> {
     let escaped_path = path.to_string_lossy().replace('\'', "''");
     let script = format!(
-        "$p = Start-Process -FilePath '{}' -ArgumentList '{}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode",
+        "$p = Start-Process -FilePath '{}' -ArgumentList '{}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode",
         escaped_path,
         operation.argument()
     );
