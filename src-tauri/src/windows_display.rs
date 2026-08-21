@@ -159,8 +159,10 @@ fn read_registry_string(sub_path: &str, name: &str) -> Option<String> {
     }
 
     let words: Vec<u16> = data
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|chunk| u16::from_le_bytes(*chunk))
         .take_while(|value| *value != 0)
         .collect();
     let raw = String::from_utf16_lossy(&words);

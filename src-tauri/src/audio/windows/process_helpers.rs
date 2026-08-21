@@ -181,19 +181,24 @@ pub fn extract_executable_icon_base64(path: &str) -> Option<String> {
 }
 
 fn restore_legacy_icon_alpha(pixels: &mut [u8], mask_pixels: Option<&[u8]>) {
-    if pixels.chunks_exact(4).any(|pixel| pixel[3] != 0) {
+    if pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0) {
         return;
     }
 
     if let Some(mask) = mask_pixels.filter(|mask| mask.len() >= pixels.len()) {
-        for (pixel, mask_pixel) in pixels.chunks_exact_mut(4).zip(mask.chunks_exact(4)) {
+        for (pixel, mask_pixel) in pixels
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(mask.as_chunks::<4>().0.iter())
+        {
             let transparent = mask_pixel[0] != 0 || mask_pixel[1] != 0 || mask_pixel[2] != 0;
             pixel[3] = if transparent { 0 } else { u8::MAX };
         }
         return;
     }
 
-    for pixel in pixels.chunks_exact_mut(4) {
+    for pixel in pixels.as_chunks_mut::<4>().0 {
         pixel[3] = u8::MAX;
     }
 }
@@ -271,7 +276,7 @@ pub(super) fn icon_to_png_base64(icon: HICON) -> Option<String> {
         )
     };
     let mask_pixels = if lines != 0
-        && pixels.chunks_exact(4).all(|pixel| pixel[3] == 0)
+        && pixels.as_chunks::<4>().0.iter().all(|pixel| pixel[3] == 0)
         && !icon_info.hbmColor.is_invalid()
         && !icon_info.hbmMask.is_invalid()
     {
@@ -314,7 +319,7 @@ pub(super) fn icon_to_png_base64(icon: HICON) -> Option<String> {
     }
 
     restore_legacy_icon_alpha(&mut pixels, mask_pixels.as_deref());
-    for chunk in pixels.chunks_exact_mut(4) {
+    for chunk in pixels.as_chunks_mut::<4>().0 {
         chunk.swap(0, 2);
     }
 
