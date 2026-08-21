@@ -749,7 +749,7 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
 
-    let mut any_applied = false;
+    let mut applied_targets = Vec::new();
     let mut integration_volume_batches: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
     let mut button_event_for_event: Option<Option<&'static str>> = None;
     let mut skipped_button_integration_event = false;
@@ -801,7 +801,7 @@ pub(crate) fn apply_midi_event(
                   "original_target_index": target_index,
                   "binding_target_count": targets.len(),
                 }));
-            any_applied = true;
+            applied_targets.push(target);
         } else if binding_actions::execute_local_target_action(
             state,
             &binding.id,
@@ -810,7 +810,7 @@ pub(crate) fn apply_midi_event(
             volume,
             "bindings",
         ) {
-            any_applied = true;
+            applied_targets.push(target);
         }
     }
 
@@ -834,7 +834,7 @@ pub(crate) fn apply_midi_event(
         );
     }
 
-    if !any_applied {
+    if applied_targets.is_empty() {
         if skipped_button_integration_event {
             return Ok(());
         }
@@ -897,8 +897,8 @@ pub(crate) fn apply_midi_event(
         .lock()
         .map(|settings| settings.enabled)
         .unwrap_or(true);
-    let binding_primary_target = targets.first().cloned();
-    for target in targets {
+    let binding_primary_target = applied_targets.first().map(|target| (*target).clone());
+    for target in applied_targets {
         let focus_session = if matches!(target, model::BindingTarget::Focus) {
             state.audio.focused_session().ok().flatten()
         } else {
