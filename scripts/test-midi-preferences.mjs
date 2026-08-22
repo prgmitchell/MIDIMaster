@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  applyBindingDeviceMigrations,
   buildPersistedMidiPreference,
   hasMidiPreference,
   normalizeMidiPreference,
@@ -62,6 +63,30 @@ assert.deepEqual(buildPersistedMidiPreference(normalized), {
     output_device_name: "Controller",
     enabled: true,
   }],
+});
+
+assert.deepEqual(applyBindingDeviceMigrations({
+  id: "mixed-device-binding",
+  device_id: "midi:0",
+  mute_control: { device_id: "midi:0", controller: 1 },
+  assign_control: { device_id: "midi:1", controller: 2 },
+}, [
+  {
+    bindingId: "mixed-device-binding",
+    previousDeviceId: "midi:0",
+    deviceId: "midi:1",
+  },
+  {
+    bindingId: "mixed-device-binding",
+    previousDeviceId: "midi:1",
+    deviceId: "midi:0",
+  },
+]), {
+  id: "mixed-device-binding",
+  device_id: "midi:1",
+  mute_control: { device_id: "midi:1", controller: 1 },
+  assign_control: { device_id: "midi:0", controller: 2 },
+  indicator_control: undefined,
 });
 
 console.log("MIDI preference tests passed");

@@ -27,6 +27,7 @@ import { createConnectionsPanelController } from "./app/connections_panel.js";
 import { createAlertsController } from "./app/alerts.js";
 import { createTauriBridge, scheduleRetry } from "./app/bootstrap.js";
 import {
+  applyBindingDeviceMigrations,
   hasMidiPreference,
   normalizeMidiPreference,
   normalizeMidiRoutes,
@@ -1966,30 +1967,9 @@ async function setupListeners() {
       }).filter(Boolean);
       if (parsedMigrations.length === 0) return;
 
-      const migrateAuxControl = (control, migration) => {
-        if (!control || typeof control !== "object") return control;
-        if (migration.previousDeviceId && control.device_id !== migration.previousDeviceId) {
-          return control;
-        }
-        return { ...control, device_id: migration.deviceId };
-      };
-
-      bindings = (bindings || []).map((binding) => {
-        let nextBinding = binding;
-        parsedMigrations.forEach((migration) => {
-          if (migration.bindingId !== String(nextBinding?.id || "")) return;
-          nextBinding = {
-            ...nextBinding,
-            device_id: migration.previousDeviceId && nextBinding.device_id !== migration.previousDeviceId
-              ? nextBinding.device_id
-              : migration.deviceId,
-            mute_control: migrateAuxControl(nextBinding?.mute_control, migration),
-            assign_control: migrateAuxControl(nextBinding?.assign_control, migration),
-            indicator_control: migrateAuxControl(nextBinding?.indicator_control, migration),
-          };
-        });
-        return nextBinding;
-      });
+      bindings = (bindings || []).map((binding) => (
+        applyBindingDeviceMigrations(binding, parsedMigrations)
+      ));
       requestBindingsRerender("bindings_migrated");
       return;
     }

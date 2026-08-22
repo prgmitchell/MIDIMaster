@@ -131,6 +131,7 @@ fn migrate_profile_route_inputs(
     let saved_routes = profile.midi_device_preference.normalized_routes();
     let mut migrated_count = 0usize;
     let mut migrations = Vec::new();
+    let mut route_input_migrations = Vec::new();
 
     for route in routes {
         let Some(next_route) = route.normalized() else {
@@ -161,16 +162,22 @@ fn migrate_profile_route_inputs(
                 .map(str::trim)
                 .map(|name| name == next_input_name)
                 .unwrap_or(false);
-            if saved_name_matches {
-                migrated_count += migrate_control_device_id(
-                    profile,
-                    previous_input_id,
-                    next_input_id,
-                    &mut migrations,
-                );
+            if saved_name_matches
+                && !route_input_migrations
+                    .iter()
+                    .any(|(previous, _): &(String, String)| previous == previous_input_id)
+            {
+                route_input_migrations
+                    .push((previous_input_id.to_string(), next_input_id.to_string()));
             }
         }
     }
+
+    // Apply all name-based route changes from the original IDs in one pass. Applying
+    // them one at a time corrupts a swap (midi:0 -> midi:1, midi:1 -> midi:0), because
+    // the second migration would also move controls changed by the first migration.
+    migrated_count +=
+        migrate_control_device_ids_atomically(profile, &route_input_migrations, &mut migrations);
 
     migrated_count += migrate_orphaned_binding_device_ids_to_primary_route(
         profile,
@@ -183,6 +190,64 @@ fn migrate_profile_route_inputs(
         migrate_pitch_bend_bindings_saved_to_route_outputs(profile, routes, &mut migrations);
 
     (migrated_count, migrations)
+}
+
+fn migrate_control_device_ids_atomically(
+    profile: &mut Profile,
+    device_id_migrations: &[(String, String)],
+    migrations: &mut Vec<BindingDeviceMigration>,
+) -> usize {
+    let mut migrated_count = 0usize;
+
+    for binding in &mut profile.bindings {
+        let mut binding_migrations = Vec::new();
+
+        if let Some(migration) = migrate_device_id(&mut binding.device_id, device_id_migrations) {
+            migrated_count += 1;
+            binding_migrations.push(migration);
+        }
+        if let Some(mute_control) = binding.mute_control.as_mut() {
+            if let Some(migration) =
+                migrate_device_id(&mut mute_control.device_id, device_id_migrations)
+            {
+                migrated_count += 1;
+                binding_migrations.push(migration);
+            }
+        }
+        if let Some(assign_control) = binding.assign_control.as_mut() {
+            if let Some(migration) =
+                migrate_device_id(&mut assign_control.device_id, device_id_migrations)
+            {
+                migrated_count += 1;
+                binding_migrations.push(migration);
+            }
+        }
+        if let Some(indicator_control) = binding.indicator_control.as_mut() {
+            if let Some(migration) =
+                migrate_device_id(&mut indicator_control.device_id, device_id_migrations)
+            {
+                migrated_count += 1;
+                binding_migrations.push(migration);
+            }
+        }
+
+        for (previous_device_id, device_id) in binding_migrations {
+            record_binding_migration(migrations, &binding.id, &previous_device_id, &device_id);
+        }
+    }
+
+    migrated_count
+}
+
+fn migrate_device_id(
+    device_id: &mut String,
+    device_id_migrations: &[(String, String)],
+) -> Option<(String, String)> {
+    let (_, next_device_id) = device_id_migrations
+        .iter()
+        .find(|(previous_device_id, _)| device_id == previous_device_id)?;
+    let previous_device_id = std::mem::replace(device_id, next_device_id.clone());
+    Some((previous_device_id, next_device_id.clone()))
 }
 
 fn migrate_control_device_id(
@@ -967,6 +1032,60 @@ mod tests {
                 .device_id,
             "midi:2"
         );
+    }
+
+    #[test]
+    fn migrate_route_inputs_applies_two_device_id_swap_atomically() {
+        let mut x_touch_binding = binding("midi:0", Some("midi:0"), None);
+        x_touch_binding.id = "x-touch-fader".to_string();
+        let mut usb_midi_binding = binding("midi:1", Some("midi:1"), None);
+        usb_midi_binding.id = "usb-midi-fader".to_string();
+
+        let mut profile = profile_with(x_touch_binding);
+        profile.bindings.push(usb_midi_binding);
+        profile.midi_device_preference.routes = vec![
+            route("midi:0", "midi:2", "X-Touch-Ext"),
+            route("midi:1", "midi:3", "USB-Midi"),
+        ];
+
+        let (migrated_count, migrations) = migrate_profile_route_inputs(
+            &mut profile,
+            &[
+                route("midi:1", "midi:2", "X-Touch-Ext"),
+                route("midi:0", "midi:3", "USB-Midi"),
+            ],
+        );
+
+        assert_eq!(migrated_count, 4);
+        assert_eq!(migrations.len(), 2);
+        assert_eq!(profile.bindings[0].device_id, "midi:1");
+        assert_eq!(
+            profile.bindings[0]
+                .mute_control
+                .as_ref()
+                .expect("X-Touch mute control")
+                .device_id,
+            "midi:1"
+        );
+        assert_eq!(profile.bindings[1].device_id, "midi:0");
+        assert_eq!(
+            profile.bindings[1]
+                .mute_control
+                .as_ref()
+                .expect("USB-Midi mute control")
+                .device_id,
+            "midi:0"
+        );
+        assert!(migrations.contains(&BindingDeviceMigration {
+            binding_id: "x-touch-fader".to_string(),
+            previous_device_id: "midi:0".to_string(),
+            device_id: "midi:1".to_string(),
+        }));
+        assert!(migrations.contains(&BindingDeviceMigration {
+            binding_id: "usb-midi-fader".to_string(),
+            previous_device_id: "midi:1".to_string(),
+            device_id: "midi:0".to_string(),
+        }));
     }
 
     #[test]

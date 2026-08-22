@@ -195,7 +195,11 @@ pub fn run() {
             run_logger::info(
                 "app",
                 "startup",
-                &format!("config_dir={}", config_dir.display()),
+                &format!(
+                    "app_version={} config_dir={}",
+                    app.package_info().version,
+                    config_dir.display()
+                ),
             );
 
             builtin_plugins::ensure_builtin_plugins(app.handle());

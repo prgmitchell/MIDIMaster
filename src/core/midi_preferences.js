@@ -92,6 +92,34 @@ export function stripUnavailableMidiSuffix(label) {
   return raw.endsWith(" (Unavailable)") ? raw.slice(0, -" (Unavailable)".length) : raw;
 }
 
+export function applyBindingDeviceMigrations(binding, migrations) {
+  const current = (binding && typeof binding === "object") ? binding : {};
+  const applicable = (Array.isArray(migrations) ? migrations : [])
+    .filter((migration) => String(migration?.bindingId || "") === String(current.id || ""));
+  if (applicable.length === 0) return binding;
+
+  const migratedDeviceId = (deviceId) => {
+    const value = String(deviceId || "");
+    const migration = applicable.find((candidate) => (
+      candidate.previousDeviceId && candidate.previousDeviceId === value
+    ));
+    return migration ? migration.deviceId : value;
+  };
+  const migratedControl = (control) => (
+    control && typeof control === "object"
+      ? { ...control, device_id: migratedDeviceId(control.device_id) }
+      : control
+  );
+
+  return {
+    ...current,
+    device_id: migratedDeviceId(current.device_id),
+    mute_control: migratedControl(current.mute_control),
+    assign_control: migratedControl(current.assign_control),
+    indicator_control: migratedControl(current.indicator_control),
+  };
+}
+
 function sameInputRouteIdentity(left, right) {
   const leftInputId = String(left?.inputDeviceId || left?.input_device_id || "").trim();
   const rightInputId = String(right?.inputDeviceId || right?.input_device_id || "").trim();
