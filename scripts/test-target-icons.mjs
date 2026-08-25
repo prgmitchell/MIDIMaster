@@ -89,7 +89,7 @@ const monitorFeature = createTargetsFeature({
     { stable_id: "DISPLAY\\SAM7058\\2", name: "LC32G7xT", is_primary: false },
   ] : null,
 });
-await new Promise((resolve) => setTimeout(resolve, 0));
+await monitorFeature.start();
 const individualOptions = monitorFeature.buildTargetOptions({
   MonitorBrightness: {
     monitor_id: "DISPLAY\\SAM7058\\2",

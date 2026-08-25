@@ -299,6 +299,116 @@ pub(super) fn update_activity_button_light_hold_feedback(
     });
 }
 
+fn mark_binding_user_activity(state: &AppState, key: &BindingKey) {
+    if let Ok(mut states) = state.binding_state.lock() {
+        if let Some(binding_state) = states.get_mut(key) {
+            binding_state.last_update = Instant::now();
+        }
+    }
+}
+
+fn schedule_latched_button_feedback_resend(
+    state: &AppState,
+    binding: &model::Binding,
+    key: &BindingKey,
+) {
+    let key = key.clone();
+    let feedback_values = state.feedback_values.clone();
+    let midi = state.midi.clone();
+    let binding = binding.clone();
+
+    tauri::async_runtime::spawn(async move {
+        // Let the controller finish processing Note Off before restoring its latched LED.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        if let Ok(feedback) = feedback_values.lock() {
+            let current_value = feedback.get(&key).copied().unwrap_or(0.0);
+            if let Ok(mut midi) = midi.lock() {
+                let _ = midi.send_binding_light_feedback(&binding, current_value);
+            }
+        }
+    });
+}
+
+fn handle_latched_button_release(
+    state: &AppState,
+    binding: &model::Binding,
+    key: &BindingKey,
+    event: &MidiEvent,
+) -> bool {
+    if event.value != 0 || binding.mute_behavior != model::MuteBehavior::ToggleOnPress {
+        return false;
+    }
+    schedule_latched_button_feedback_resend(state, binding, key);
+    true
+}
+
+fn resolve_stateful_button_transition(
+    state: &AppState,
+    binding: &model::Binding,
+    key: &BindingKey,
+    event: &MidiEvent,
+    current_state: bool,
+) -> Option<bool> {
+    let tracks_input_edges = binding.mute_behavior == model::MuteBehavior::SetFromValue;
+    let previous_input_active = if tracks_input_edges {
+        state
+            .last_mute_input_active
+            .lock()
+            .ok()
+            .and_then(|inputs| inputs.get(key).copied())
+    } else {
+        None
+    };
+    let next_state = AppState::resolve_target_mute_state(
+        event.value,
+        current_state,
+        binding.mute_behavior.clone(),
+        previous_input_active,
+    );
+
+    if tracks_input_edges {
+        if let Ok(mut inputs) = state.last_mute_input_active.lock() {
+            inputs.insert(key.clone(), event.value > 0);
+        }
+    }
+    next_state
+}
+
+fn emit_integration_targets(
+    app: &AppHandle,
+    binding: &model::Binding,
+    targets: &[model::BindingTarget],
+    value: f32,
+) -> bool {
+    let mut any_applied = false;
+    for (target_index, target) in targets.iter().enumerate() {
+        if let model::BindingTarget::Integration {
+            integration_id,
+            kind,
+            data,
+        } = target
+        {
+            binding_actions::emit_integration_binding_triggered(
+                app,
+                IntegrationTrigger {
+                    binding_id: &binding.id,
+                    action: &binding.action,
+                    value,
+                    target_index,
+                    target_count: targets.len(),
+                    integration_id,
+                    kind,
+                    data,
+                    source: None,
+                    source_sequence: None,
+                },
+            );
+            any_applied = true;
+        }
+    }
+    any_applied
+}
+
 pub(crate) fn apply_midi_event(
     state: &AppState,
     app: &AppHandle,
@@ -458,68 +568,25 @@ pub(crate) fn apply_midi_event(
     // Handle toggle mute action for button bindings
     if binding.action == model::BindingAction::ToggleMute {
         // Mark user activity to prevent stale feedback loop
-        if let Ok(mut states) = state.binding_state.lock() {
-            if let Some(state) = states.get_mut(&key) {
-                state.last_update = Instant::now();
-            }
-        }
+        mark_binding_user_activity(state, &key);
 
         // On button release (value == 0), re-send current state to enforce latching check
         // This fixes controllers that turn off LED on release (momentary behavior)
-        if event.value == 0 && binding.mute_behavior == model::MuteBehavior::ToggleOnPress {
+        if handle_latched_button_release(state, binding, &key, &event) {
             run_logger::debug(
                 "bindings",
                 "toggle_mute_release_resend",
                 &format!("binding_id={} device_id={}", binding.id, binding.device_id),
             );
-            let key_clone = key.clone();
-            // Clone Arcs for async task
-            let feedback_arc = state.feedback_values.clone();
-            let midi_arc = state.midi.clone();
-            let binding_clone = binding.clone();
-
-            tauri::async_runtime::spawn(async move {
-                // Sleep for 20ms to allow the hardware to process the "Note Off" completely
-                tokio::time::sleep(Duration::from_millis(20)).await;
-
-                if let Ok(feedback) = feedback_arc.lock() {
-                    let current_val = feedback.get(&key_clone).cloned().unwrap_or(0.0);
-                    if let Ok(mut midi) = midi_arc.lock() {
-                        let _ = midi.send_binding_light_feedback(&binding_clone, current_val);
-                    }
-                }
-            });
             return Ok(());
         }
 
         let current_muted = state.current_binding_toggle_state(targets, &key);
-        let previous_input_active = if binding.mute_behavior == model::MuteBehavior::SetFromValue {
-            state
-                .last_mute_input_active
-                .lock()
-                .ok()
-                .and_then(|inputs| inputs.get(&key).copied())
-        } else {
-            None
-        };
-        let Some(muted) = AppState::resolve_target_mute_state(
-            event.value,
-            current_muted,
-            binding.mute_behavior.clone(),
-            previous_input_active,
-        ) else {
-            if binding.mute_behavior == model::MuteBehavior::SetFromValue {
-                if let Ok(mut inputs) = state.last_mute_input_active.lock() {
-                    inputs.insert(key.clone(), event.value > 0);
-                }
-            }
+        let Some(muted) =
+            resolve_stateful_button_transition(state, binding, &key, &event, current_muted)
+        else {
             return Ok(());
         };
-        if binding.mute_behavior == model::MuteBehavior::SetFromValue {
-            if let Ok(mut inputs) = state.last_mute_input_active.lock() {
-                inputs.insert(key.clone(), event.value > 0);
-            }
-        }
         let outcome = binding_actions::execute_target_action(
             app,
             state,
@@ -581,26 +648,9 @@ pub(crate) fn apply_midi_event(
     }
 
     if binding_actions::action_is_stateful_integration_toggle(&binding.action) {
-        if let Ok(mut states) = state.binding_state.lock() {
-            if let Some(state) = states.get_mut(&key) {
-                state.last_update = Instant::now();
-            }
-        }
+        mark_binding_user_activity(state, &key);
 
-        if event.value == 0 && binding.mute_behavior == model::MuteBehavior::ToggleOnPress {
-            let key_clone = key.clone();
-            let feedback_arc = state.feedback_values.clone();
-            let midi_arc = state.midi.clone();
-            let binding_clone = binding.clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(20)).await;
-                if let Ok(feedback) = feedback_arc.lock() {
-                    let current_val = feedback.get(&key_clone).cloned().unwrap_or(0.0);
-                    if let Ok(mut midi) = midi_arc.lock() {
-                        let _ = midi.send_binding_light_feedback(&binding_clone, current_val);
-                    }
-                }
-            });
+        if handle_latched_button_release(state, binding, &key, &event) {
             return Ok(());
         }
 
@@ -608,60 +658,14 @@ pub(crate) fn apply_midi_event(
             .binding_action_value(&key)
             .map(|value| value > 0.5)
             .unwrap_or(false);
-        let previous_input_active = if binding.mute_behavior == model::MuteBehavior::SetFromValue {
-            state
-                .last_mute_input_active
-                .lock()
-                .ok()
-                .and_then(|inputs| inputs.get(&key).copied())
-        } else {
-            None
-        };
-        let Some(next_enabled) = AppState::resolve_target_mute_state(
-            event.value,
-            current_enabled,
-            binding.mute_behavior.clone(),
-            previous_input_active,
-        ) else {
-            if binding.mute_behavior == model::MuteBehavior::SetFromValue {
-                if let Ok(mut inputs) = state.last_mute_input_active.lock() {
-                    inputs.insert(key.clone(), event.value > 0);
-                }
-            }
+        let Some(next_enabled) =
+            resolve_stateful_button_transition(state, binding, &key, &event, current_enabled)
+        else {
             return Ok(());
         };
-        if binding.mute_behavior == model::MuteBehavior::SetFromValue {
-            if let Ok(mut inputs) = state.last_mute_input_active.lock() {
-                inputs.insert(key.clone(), event.value > 0);
-            }
-        }
 
-        let mut any_applied = false;
-        for (target_index, target) in targets.iter().enumerate() {
-            if let model::BindingTarget::Integration {
-                integration_id,
-                kind,
-                data,
-            } = target
-            {
-                binding_actions::emit_integration_binding_triggered(
-                    app,
-                    IntegrationTrigger {
-                        binding_id: &binding.id,
-                        action: &binding.action,
-                        value: if next_enabled { 1.0 } else { 0.0 },
-                        target_index,
-                        target_count: targets.len(),
-                        integration_id,
-                        kind,
-                        data,
-                        source: None,
-                        source_sequence: None,
-                    },
-                );
-                any_applied = true;
-            }
-        }
+        let any_applied =
+            emit_integration_targets(app, binding, targets, if next_enabled { 1.0 } else { 0.0 });
 
         if !any_applied {
             run_logger::warn(
@@ -700,32 +704,7 @@ pub(crate) fn apply_midi_event(
             return Ok(());
         }
 
-        let mut any_applied = false;
-        for (target_index, target) in targets.iter().enumerate() {
-            if let model::BindingTarget::Integration {
-                integration_id,
-                kind,
-                data,
-            } = target
-            {
-                binding_actions::emit_integration_binding_triggered(
-                    app,
-                    IntegrationTrigger {
-                        binding_id: &binding.id,
-                        action: &binding.action,
-                        value: 1.0,
-                        target_index,
-                        target_count: targets.len(),
-                        integration_id,
-                        kind,
-                        data,
-                        source: None,
-                        source_sequence: None,
-                    },
-                );
-                any_applied = true;
-            }
-        }
+        let any_applied = emit_integration_targets(app, binding, targets, 1.0);
 
         if !any_applied {
             run_logger::warn(

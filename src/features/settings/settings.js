@@ -20,11 +20,28 @@ import {
   toBackendAppearanceSettings,
 } from "../../app/appearance.js";
 import {
+  hsvToRgb,
+  rgbToHex,
+} from "../../app/color.js";
+import {
   MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
   normalizeMidiDeviceInventoryConsent,
   normalizeMidiDeviceInventorySettings,
 } from "../../app/midi_device_inventory.js";
 import { createVirtualAudioSettingsController } from "./virtual_audio.js";
+import { createUpdaterController } from "./updater_controller.js";
+import {
+  APPEARANCE_COLOR_CONTROLS,
+  COLOR_PICKER_SWATCHES,
+  appearanceColorControlValue,
+  colorInputValue,
+  colorPickerAppearancePatch,
+  createAppearanceColorPickerState,
+  findAppearanceColorControl,
+  findAppearanceIntensityControl,
+  parseHexColorInput,
+  setColorPickerStateFromHex,
+} from "./appearance_controls.js";
 
 export function createSettingsFeature({
   invoke,
@@ -50,6 +67,7 @@ export function createSettingsFeature({
   const d = (dom && typeof dom === "object") ? dom : {};
   const getAppSettings = () => settingsStore.get();
   const setAppSettings = (next) => settingsStore.update(next);
+  let uiBound = false;
   const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
   const applyTranslations = () => {
     if (i18n && typeof i18n.applyTranslations === "function") {
@@ -63,22 +81,10 @@ export function createSettingsFeature({
   let monitorDocClickBound = false;
   let settingsDocClickBound = false;
   const settingsSelectDropdowns = new Map();
-  let updaterUnlisten = null;
   let settingsNavIndicatorRaf = 0;
   let osdAppearanceRaf = 0;
   let osdPreviewResizeObserver = null;
-  const appearanceColorPickerState = {
-    open: false,
-    target: "accent",
-    token: "",
-    name: "",
-    color: "#5aa7ff",
-    hue: 210,
-    saturation: 0.65,
-    value: 1,
-    anchor: null,
-    dragging: false,
-  };
+  const appearanceColorPickerState = createAppearanceColorPickerState();
   const defaultSettingsSection = "startup";
   const defaultOsdAppearance = {
     style: "midnight",
@@ -101,78 +107,10 @@ export function createSettingsFeature({
   const languageOptions = Array.isArray(i18n?.supportedLocales) ? i18n.supportedLocales : [
     { code: "en", label: "English" },
   ];
-  const accentSwatches = [
-    "#5aa7ff",
-    "#2f78d4",
-    "#8b6dff",
-    "#7c3aed",
-    "#24c8d6",
-    "#14b8a6",
-    "#69c95a",
-    "#22c55e",
-    "#f0a12d",
-    "#f97316",
-    "#f25c61",
-    "#dc2626",
-    "#d44aa4",
-    "#ec4899",
-  ];
-  const colorPickerSwatches = [
-    ...accentSwatches,
-    "#ffffff",
-    "#d8dee9",
-    "#7b8794",
-    "#111820",
-  ];
-  const appearanceColorControls = [
-    {
-      target: "accent",
-      token: "",
-      intensityToken: "accentIntensity",
-      labelKey: "settings.appearance.accentColor",
-      swatches: ["#5aa7ff", "#2f78d4", "#8b6dff", "#24c8d6", "#69c95a", "#ec4899"],
-    },
-    {
-      target: "token",
-      token: "themeTint",
-      intensityToken: "themeTintIntensity",
-      labelKey: "settings.appearance.themeTint",
-      swatches: ["#172334", "#1d4ed8", "#7c3aed", "#0e7490", "#15803d", "#be185d"],
-    },
-    {
-      target: "token",
-      token: "controlBorder",
-      intensityToken: "controlBorderIntensity",
-      labelKey: "settings.appearance.colorBorders",
-      swatches: ["#5aa7ff", "#8b6dff", "#24c8d6", "#69c95a", "#f0a12d", "#ec4899"],
-    },
-    {
-      target: "token",
-      token: "textPrimary",
-      intensityToken: "textPrimaryIntensity",
-      labelKey: "settings.appearance.colorText",
-      swatches: ["#f3f6fb", "#7fbfff", "#c4b5fd", "#67e8f9", "#bbf7d0", "#f9a8d4"],
-    },
-    {
-      target: "token",
-      token: "iconColor",
-      intensityToken: "iconColorIntensity",
-      labelKey: "settings.appearance.iconColor",
-      swatches: ["#5aa7ff", "#2f78d4", "#8b6dff", "#24c8d6", "#69c95a", "#f0a12d"],
-    },
-  ];
+  const colorPickerSwatches = COLOR_PICKER_SWATCHES;
+  const appearanceColorControls = APPEARANCE_COLOR_CONTROLS;
   const appearanceBuiltInPresets = getBuiltInAppearancePresets();
   const appearanceBuiltInPresetIds = new Set(appearanceBuiltInPresets.map((preset) => preset.id));
-  const updateState = {
-    currentVersion: "-",
-    latestVersion: "-",
-    available: false,
-    checking: false,
-    downloading: false,
-    hasChecked: false,
-    body: "",
-  };
-  let updateCheckPromise = null;
   const virtualAudio = createVirtualAudioSettingsController({
     invoke,
     dom: d,
@@ -180,6 +118,22 @@ export function createSettingsFeature({
     showAlert: showSettingsAlert,
     renderSelectDropdown: (select) => renderSettingsSelectDropdown(select),
   });
+  const updater = createUpdaterController({
+    invoke,
+    listen,
+    dom: d,
+    translate: t,
+    getSettings: getAppSettings,
+  });
+  const updateState = updater.state;
+  const renderUpdateUi = updater.render;
+  const renderSidebarVersion = updater.renderSidebarVersion;
+  const setStaticUpdateStatus = updater.setStaticStatus;
+  const checkForUpdates = updater.checkForUpdates;
+  const ensureAutoUpdateCheck = updater.ensureAutoUpdateCheck;
+  const installAvailableUpdate = updater.installAvailableUpdate;
+  const bindUpdaterEvents = updater.bindEvents;
+  const loadCurrentAppVersion = updater.loadCurrentVersion;
 
   function setTextContent(target, text, selector = null) {
     const value = String(text ?? "");
@@ -355,32 +309,6 @@ export function createSettingsFeature({
     return activeCustom?.scheme === "light" ? "light" : "dark";
   }
 
-  function colorInputValue(value, fallback = "#000000") {
-    const raw = String(value || "").trim();
-    return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : fallback;
-  }
-
-  function findAppearanceColorControl(target = "accent", token = "") {
-    const normalizedTarget = target === "token" ? "token" : "accent";
-    const normalizedToken = normalizedTarget === "token" ? String(token || "") : "";
-    return appearanceColorControls.find((control) => (
-      control.target === normalizedTarget && String(control.token || "") === normalizedToken
-    )) || appearanceColorControls[0];
-  }
-
-  function appearanceColorControlValue(control, appearance, resolved = null) {
-    if (control?.target === "token") {
-      const resolvedAppearance = resolved || resolveAppearance(appearance, { matchMediaSource: window });
-      return colorInputValue(appearance?.tokens?.[control.token], colorInputValue(resolvedAppearance.tokens[control.token]));
-    }
-    return colorInputValue(appearance?.accentColor, "#5aa7ff");
-  }
-
-  function findAppearanceIntensityControl(intensityToken = "") {
-    const normalizedToken = String(intensityToken || "");
-    return appearanceColorControls.find((control) => control.intensityToken === normalizedToken) || null;
-  }
-
   function appearanceColorControlIntensity(control, appearance) {
     return Math.round(clampNumber(appearance?.tokens?.[control?.intensityToken], 0, 100, 100));
   }
@@ -401,104 +329,12 @@ export function createSettingsFeature({
     applyAppearanceUpdate({ tokens: { [control.intensityToken]: String(intensity) } }, { persist, render });
   }
 
-  function parseHexColorInput(value) {
-    const raw = String(value || "").trim().replace(/^#?/, "#");
-    if (/^#[0-9a-f]{6}$/i.test(raw)) return raw.toLowerCase();
-    const short = raw.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
-    if (!short) return "";
-    return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
-  }
-
-  function hexToRgbColor(hex) {
-    const normalized = colorInputValue(hex).slice(1);
-    return {
-      r: parseInt(normalized.slice(0, 2), 16),
-      g: parseInt(normalized.slice(2, 4), 16),
-      b: parseInt(normalized.slice(4, 6), 16),
-    };
-  }
-
-  function rgbToHexColor({ r, g, b }) {
-    return `#${[r, g, b].map((part) => (
-      Math.round(Math.min(255, Math.max(0, part))).toString(16).padStart(2, "0")
-    )).join("")}`;
-  }
-
-  function rgbToHsvColor({ r, g, b }) {
-    const red = r / 255;
-    const green = g / 255;
-    const blue = b / 255;
-    const max = Math.max(red, green, blue);
-    const min = Math.min(red, green, blue);
-    const delta = max - min;
-    let hue = 0;
-    if (delta > 0) {
-      if (max === red) {
-        hue = 60 * (((green - blue) / delta) % 6);
-      } else if (max === green) {
-        hue = 60 * (((blue - red) / delta) + 2);
-      } else {
-        hue = 60 * (((red - green) / delta) + 4);
-      }
-    }
-    if (hue < 0) hue += 360;
-    return {
-      h: hue,
-      s: max === 0 ? 0 : delta / max,
-      v: max,
-    };
-  }
-
-  function hsvToRgbColor({ h, s, v }) {
-    const hue = ((Number(h) % 360) + 360) % 360;
-    const saturation = Math.min(1, Math.max(0, Number(s) || 0));
-    const value = Math.min(1, Math.max(0, Number(v) || 0));
-    const chroma = value * saturation;
-    const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
-    const m = value - chroma;
-    let red = 0;
-    let green = 0;
-    let blue = 0;
-    if (hue < 60) {
-      red = chroma;
-      green = x;
-    } else if (hue < 120) {
-      red = x;
-      green = chroma;
-    } else if (hue < 180) {
-      green = chroma;
-      blue = x;
-    } else if (hue < 240) {
-      green = x;
-      blue = chroma;
-    } else if (hue < 300) {
-      red = x;
-      blue = chroma;
-    } else {
-      red = chroma;
-      blue = x;
-    }
-    return {
-      r: (red + m) * 255,
-      g: (green + m) * 255,
-      b: (blue + m) * 255,
-    };
-  }
-
   function setAppearanceColorPickerFromHex(color) {
-    const value = colorInputValue(color, appearanceColorPickerState.color);
-    const hsv = rgbToHsvColor(hexToRgbColor(value));
-    appearanceColorPickerState.color = value;
-    appearanceColorPickerState.hue = hsv.h;
-    appearanceColorPickerState.saturation = hsv.s;
-    appearanceColorPickerState.value = hsv.v;
+    setColorPickerStateFromHex(appearanceColorPickerState, color);
   }
 
   function appearanceColorPickerPatch() {
-    if (appearanceColorPickerState.target === "token" && appearanceColorPickerState.token) {
-      return { tokens: { [appearanceColorPickerState.token]: appearanceColorPickerState.color } };
-    }
-    return { accentColor: appearanceColorPickerState.color };
+    return colorPickerAppearancePatch(appearanceColorPickerState);
   }
 
   function syncAppearanceColorPickerAnchor() {
@@ -609,7 +445,7 @@ export function createSettingsFeature({
     appearanceColorPickerState.hue = ((Number(next.h) % 360) + 360) % 360;
     appearanceColorPickerState.saturation = Math.min(1, Math.max(0, Number(next.s) || 0));
     appearanceColorPickerState.value = Math.min(1, Math.max(0, Number(next.v) || 0));
-    appearanceColorPickerState.color = rgbToHexColor(hsvToRgbColor({
+    appearanceColorPickerState.color = rgbToHex(hsvToRgb({
       h: appearanceColorPickerState.hue,
       s: appearanceColorPickerState.saturation,
       v: appearanceColorPickerState.value,
@@ -895,247 +731,12 @@ export function createSettingsFeature({
     }
   }
 
-  function renderSidebarVersion() {
-    if (!d.sidebarAppVersion) return;
-    const currentVersion = String(updateState.currentVersion || "").trim();
-    d.sidebarAppVersion.textContent = currentVersion ? `v${currentVersion}` : "v-";
-  }
-
-  function renderAutoCheckButton() {
-    if (!d.autoCheckUpdatesButton) return;
-    const enabled = (typeof getAppSettings === "function")
-      ? ((getAppSettings() || {}).autoCheckUpdates !== false)
-      : true;
-    d.autoCheckUpdatesButton.checked = enabled;
-  }
-
   function syncMidiDeviceInventoryToggle(settings = null) {
     if (!d.midiDeviceInventoryConsentToggle) return;
     const current = settings || ((typeof getAppSettings === "function") ? (getAppSettings() || {}) : {});
     const inventory = normalizeMidiDeviceInventorySettings(current);
     d.midiDeviceInventoryConsentToggle.checked = inventory.consent === "enabled"
       && inventory.noticeVersion >= MIDI_DEVICE_INVENTORY_NOTICE_VERSION;
-  }
-
-  function formatUpdaterError(error) {
-    const message = String(error || t("settings.updateCheckFailed"));
-    const normalized = message.toLowerCase();
-    if (
-      normalized.includes("valid release json")
-      || normalized.includes("latest.json")
-      || normalized.includes("404")
-    ) {
-      return t("settings.updateMetadataMissing");
-    }
-    if (normalized.includes("network") || normalized.includes("timeout")) {
-      return t("settings.updateNetworkError");
-    }
-    return message;
-  }
-
-  function setUpdateStatus(message, kind = "") {
-    if (!d.settingsUpdateStatus) return;
-    d.settingsUpdateStatus.querySelector(".settings-status-text")?.removeAttribute("data-i18n");
-    setTextContent(d.settingsUpdateStatus, String(message || ""), ".settings-status-text");
-    d.settingsUpdateStatus.classList.remove("error", "success");
-    if (kind === "error" || kind === "success") {
-      d.settingsUpdateStatus.classList.add(kind);
-    }
-  }
-
-  function setStaticUpdateStatus(key, kind = "") {
-    if (!d.settingsUpdateStatus) return;
-    const textEl = d.settingsUpdateStatus.querySelector(".settings-status-text");
-    if (textEl) {
-      textEl.setAttribute("data-i18n", key);
-    }
-    setTextContent(d.settingsUpdateStatus, t(key), ".settings-status-text");
-    d.settingsUpdateStatus.classList.remove("error", "success");
-    if (kind === "error" || kind === "success") {
-      d.settingsUpdateStatus.classList.add(kind);
-    }
-  }
-
-  function renderIdleUpdateStatus() {
-    if (updateState.checking || updateState.downloading || updateState.hasChecked || updateState.available) return;
-    setStaticUpdateStatus(
-      shouldAutoCheckUpdates() ? "settings.noUpdateCheckYet" : "settings.autoCheckUpdatesOff",
-    );
-  }
-
-  function renderUpdateUi() {
-    if (d.updateCurrentVersion) {
-      d.updateCurrentVersion.textContent = updateState.currentVersion || "-";
-    }
-    if (d.updateLatestVersion) {
-      d.updateLatestVersion.textContent = updateState.latestVersion || "-";
-    }
-    if (d.checkForUpdatesButton) {
-      if (updateState.downloading) {
-        setTextContent(d.checkForUpdatesButton, t("settings.downloadingUpdate"), ".settings-button-label");
-      } else if (updateState.checking) {
-        setTextContent(d.checkForUpdatesButton, t("settings.checkingUpdates"), ".settings-button-label");
-      } else if (updateState.available) {
-        setTextContent(d.checkForUpdatesButton, t("settings.downloadAndInstall"), ".settings-button-label");
-      } else {
-        setTextContent(d.checkForUpdatesButton, t("settings.checkForUpdates"), ".settings-button-label");
-      }
-      d.checkForUpdatesButton.disabled = updateState.checking || updateState.downloading;
-    }
-    renderSidebarVersion();
-    if (d.topbarUpdateButton) {
-      const showTopbarUpdate = updateState.available && !updateState.downloading;
-      d.topbarUpdateButton.classList.toggle("hidden", !showTopbarUpdate);
-      d.topbarUpdateButton.closest(".topbar")?.classList.toggle("has-update", showTopbarUpdate);
-      d.topbarUpdateButton.disabled = updateState.checking || updateState.downloading;
-      d.topbarUpdateButton.setAttribute("aria-hidden", showTopbarUpdate ? "false" : "true");
-      const label = updateState.latestVersion && updateState.latestVersion !== "-"
-        ? t("topbar.updateAvailableVersion", { version: updateState.latestVersion })
-        : t("topbar.updateAvailable");
-      d.topbarUpdateButton.setAttribute("aria-label", label);
-      d.topbarUpdateButton.setAttribute("title", label);
-      d.topbarUpdateButton.title = label;
-    }
-    renderAutoCheckButton();
-    renderIdleUpdateStatus();
-  }
-
-  function normalizeUpdateInfo(updateInfo) {
-    const info = (updateInfo && typeof updateInfo === "object") ? updateInfo : {};
-    const available = Boolean(info.available);
-    const currentVersion = String(info.current_version ?? info.currentVersion ?? updateState.currentVersion ?? "-");
-    const latestVersionRaw = info.version ?? null;
-    const latestVersion = latestVersionRaw ? String(latestVersionRaw) : currentVersion;
-    const body = info.body ? String(info.body) : "";
-    return { available, currentVersion, latestVersion, body };
-  }
-
-  function shouldAutoCheckUpdates() {
-    return (typeof getAppSettings === "function")
-      ? ((getAppSettings() || {}).autoCheckUpdates !== false)
-      : true;
-  }
-
-  function ensureAutoUpdateCheck() {
-    if (!shouldAutoCheckUpdates() || updateState.hasChecked) {
-      return updateCheckPromise || Promise.resolve(null);
-    }
-    return checkForUpdates({ silent: true });
-  }
-
-  async function checkForUpdates({ silent = false } = {}) {
-    if (updateCheckPromise) {
-      return updateCheckPromise;
-    }
-    updateState.checking = true;
-    updateState.hasChecked = true;
-    renderUpdateUi();
-    setUpdateStatus(t("settings.checkingUpdates"));
-    updateCheckPromise = (async () => {
-      try {
-        const updateInfo = await invoke("check_for_updates");
-        const normalized = normalizeUpdateInfo(updateInfo);
-        updateState.currentVersion = normalized.currentVersion;
-        updateState.latestVersion = normalized.latestVersion;
-        updateState.available = normalized.available;
-        updateState.body = normalized.body;
-        if (normalized.available) {
-          setUpdateStatus(
-            normalized.body
-              ? t("settings.updateAvailableNotes", { version: normalized.latestVersion })
-              : t("settings.updateAvailable", { version: normalized.latestVersion }),
-            "success",
-          );
-        } else {
-          setUpdateStatus(t("settings.upToDate"), "success");
-        }
-        return normalized;
-      } catch (error) {
-        updateState.available = false;
-        updateState.body = "";
-        console.error("Updater check failed:", error);
-        setUpdateStatus(formatUpdaterError(error), "error");
-        return null;
-      } finally {
-        updateState.checking = false;
-        renderUpdateUi();
-        updateCheckPromise = null;
-      }
-    })();
-    return updateCheckPromise;
-  }
-
-  async function installAvailableUpdate() {
-    updateState.downloading = true;
-    renderUpdateUi();
-    setUpdateStatus(t("settings.downloadingUpdate"));
-    try {
-      await invoke("download_and_install_update");
-    } catch (error) {
-      updateState.available = false;
-      updateState.body = "";
-      console.error("Updater install failed:", error);
-      setUpdateStatus(String(error || t("settings.updateInstallFailed")), "error");
-    } finally {
-      updateState.downloading = false;
-      renderUpdateUi();
-    }
-  }
-
-  async function bindUpdaterEvents() {
-    if (updaterUnlisten || typeof listen !== "function") return;
-    updaterUnlisten = await listen("updater_status", (event) => {
-      const payload = (event && typeof event.payload === "object") ? event.payload : {};
-      const phase = String(payload.phase || "").trim();
-      if (payload.current_version) {
-        updateState.currentVersion = String(payload.current_version);
-      }
-      if (payload.version) {
-        updateState.latestVersion = String(payload.version);
-      }
-      if (phase === "checking") {
-        updateState.checking = true;
-        setUpdateStatus(t("settings.checkingUpdates"));
-      } else if (phase === "available") {
-        updateState.available = true;
-        setUpdateStatus(t("settings.updateAvailable", { version: updateState.latestVersion }), "success");
-      } else if (phase === "no_update") {
-        updateState.available = false;
-        updateState.body = "";
-        setUpdateStatus(t("settings.upToDate"), "success");
-      } else if (phase === "downloading") {
-        updateState.downloading = true;
-        const downloaded = Number(payload.downloaded || 0);
-        const total = Number(payload.content_length || 0);
-        if (total > 0) {
-          const pct = Math.min(100, Math.round((downloaded / total) * 100));
-          setUpdateStatus(t("settings.downloadingUpdatePercent", { percent: pct }));
-        } else {
-          setUpdateStatus(t("settings.downloadingUpdate"));
-        }
-      } else if (phase === "downloaded") {
-        setUpdateStatus(t("settings.updateDownloadedInstalling"));
-      } else if (phase === "installed") {
-        updateState.available = false;
-        updateState.body = "";
-        setUpdateStatus(t("settings.updateInstalledRestarting"), "success");
-      } else if (phase === "failed") {
-        updateState.available = false;
-        updateState.checking = false;
-        updateState.downloading = false;
-        if (payload.message) {
-          console.error("Updater event failure:", payload.message);
-        }
-        setUpdateStatus(formatUpdaterError(payload.message || t("settings.updateInstallFailed")), "error");
-      }
-      if (phase === "available" || phase === "no_update" || phase === "installed") {
-        updateState.checking = false;
-      }
-      if (phase === "installed") {
-        updateState.downloading = false;
-      }
-      renderUpdateUi();
-    });
   }
 
   function closeSettingsPanel() {
@@ -1640,6 +1241,8 @@ export function createSettingsFeature({
   }
 
   function bindUi() {
+    if (uiBound) return;
+    uiBound = true;
     bindUpdaterEvents().catch(() => {});
     virtualAudio.bindUi();
     populateLanguageSelect();
@@ -2071,22 +1674,6 @@ export function createSettingsFeature({
     loadCurrentAppVersion().catch(() => {});
   }
 
-  async function loadCurrentAppVersion() {
-    try {
-      const version = await invoke("get_app_version");
-      if (version) {
-        updateState.currentVersion = String(version);
-        if (!updateState.latestVersion || updateState.latestVersion === "-") {
-          updateState.latestVersion = updateState.currentVersion;
-        }
-        renderUpdateUi();
-        renderSidebarVersion();
-      }
-    } catch {
-      // ignore version fetch failures
-    }
-  }
-
   return {
     bindUi,
     openSettingsPanel,
@@ -2105,5 +1692,6 @@ export function createSettingsFeature({
     renderAllSettingsSelectDropdowns,
     syncOsdAppearanceControls,
     syncAppearanceControls,
+    dispose: () => updater.dispose(),
   };
 }

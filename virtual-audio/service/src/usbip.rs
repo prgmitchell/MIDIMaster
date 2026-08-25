@@ -618,7 +618,7 @@ fn write_op_header(writer: &mut impl Write, code: u16, status: u32) -> io::Resul
 }
 fn write_fixed(writer: &mut impl Write, value: &str, length: usize) -> io::Result<()> {
     let mut bytes = vec![0; length];
-    let copy = value.as_bytes().len().min(length);
+    let copy = value.len().min(length);
     bytes[..copy].copy_from_slice(&value.as_bytes()[..copy]);
     writer.write_all(&bytes)
 }

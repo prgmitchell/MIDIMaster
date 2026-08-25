@@ -179,7 +179,7 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
         if (!pluginId || !rel) return;
         const key = `${pluginId}:${rel}`;
         if (installedIconCache.has(key)) return;
-        const b64 = await invoke("read_plugin_base64", { pluginId, relPath: rel, plugin_id: pluginId, rel_path: rel });
+        const b64 = await invoke("read_plugin_base64", { pluginId, relPath: rel });
         const mime = guessMimeFromPath(rel);
         installedIconCache.set(key, `data:${mime};base64,${b64}`);
       } catch {
@@ -461,12 +461,12 @@ export function createPluginsTabs({ invoke, i18n, getPluginHost, reloadPlugins, 
   async function runEntryAction(entry, action, setStatus) {
     try {
       if (action === "toggle") {
-        await invoke("set_plugin_enabled", { pluginId: entry.id, enabled: !entry.enabled, plugin_id: entry.id });
+        await invoke("set_plugin_enabled", { pluginId: entry.id, enabled: !entry.enabled });
       } else if (action === "uninstall") {
-        await invoke("uninstall_plugin", { pluginId: entry.id, plugin_id: entry.id });
+        await invoke("uninstall_plugin", { pluginId: entry.id });
         setStatus("");
       } else if (action === "install-store") {
-        await invoke("install_store_plugin", { pluginId: entry.id, plugin_id: entry.id });
+        await invoke("install_store_plugin", { pluginId: entry.id });
         setStatus("");
       }
       await preloadInstalledPlugins(true);

@@ -35,17 +35,19 @@ import {
   MACRO_MAX_PARALLEL_STEPS,
   MACRO_MAX_TOP_LEVEL_STEPS,
   MACRO_MAX_WAIT_MS,
-  buildHotkeyMappingFromEvent,
   buttonVisualBehavior,
   effectiveButtonLightMode,
   getBindingTargets as getTargets,
   getPrimaryBindingTarget as getPrimaryTarget,
   mappedButtonLightFeedbackValue,
+  normalizeAutoHotkeyScriptMapping,
   normalizeButtonLightBehavior,
   normalizeFaderCurve,
+  normalizeHotkeyMapping,
   normalizeMacroActionState,
   normalizeMacroActionStep,
   normalizeMacroSteps,
+  normalizeOpenApplicationMapping,
   normalizeRelativeFormat,
   normalizeSoundboardMapping,
   presetCurvePoints,
@@ -63,7 +65,7 @@ import {
   resolveBindingVolumeValue,
   resolveTargetChangeVolumeValue,
 } from "./value_sync.js";
-import { reorderVisibleBindings } from "./reorder.js";
+import { bindingActionIconSvg, muteIconSvg } from "./icons.js";
 import {
   MAX_FADER_CURVE_PRESETS,
   curvePointsForBinding,
@@ -74,14 +76,42 @@ import {
   normalizeCurvePresetPoints,
   normalizeFaderCurvePresets,
 } from "./fader_curve_presets.js";
+import {
+  CUSTOM_CURVE_MIN_POINT_SPACING,
+  CUSTOM_CURVE_VIEWBOX_SIZE,
+  curvePathData,
+  curveSvgX,
+  curveSvgY,
+  curveYAtSegmentPoint,
+  localCustomCurvePoint,
+  segmentCurveFromPointer,
+  segmentIndexForCurveX,
+} from "./curve_geometry.js";
+import {
+  blankMacroActionStep,
+  clearMacroActionStep,
+  clonePlain,
+  defaultMacroActionStep,
+  defaultMacroParallelActionStep,
+  defaultMacroParallelStep,
+  defaultMacroWaitStep,
+  ensureMacroName,
+  macroActionHasTarget,
+  macroActionIsLegacyTriggerPlaceholder,
+  macroActionRole,
+  macroActionUsesValue,
+  macroIntegrationActionLabel,
+  macroIntegrationTarget,
+  normalizeMacroDraftActionStep,
+  normalizeMacroDraftSteps,
+  normalizeMacroName,
+  prepareMacroDraftBinding,
+} from "./macro_draft.js";
 import { createBindingDomIndex } from "../../app/binding_dom_index.js";
 import { captureElementScroll, restoreElementScroll } from "../../app/scroll_position.js";
-
-const CUSTOM_CURVE_VIEWBOX_SIZE = 120;
-const CUSTOM_CURVE_PADDING = 10;
-const CUSTOM_CURVE_PLOT_SIZE = CUSTOM_CURVE_VIEWBOX_SIZE - (CUSTOM_CURVE_PADDING * 2);
-const CUSTOM_CURVE_MIN_POINT_SPACING = 0.035;
-const CUSTOM_CURVE_EPSILON = 0.0001;
+import { createBindingDragController } from "./binding_drag.js";
+import { createHotkeyLearnController } from "./hotkey_learn.js";
+import { createBindingRenderModel } from "./render_model.js";
 
 export function createBindingsFeature({
   invoke,
@@ -204,8 +234,33 @@ export function createBindingsFeature({
 
   const getDrag = (typeof getDragState === "function") ? getDragState : (() => null);
   const setDrag = (typeof setDragState === "function") ? setDragState : (() => { });
+  const bindingDragController = createBindingDragController({
+    container: d.bindingsContainer,
+    getDragState: getDrag,
+    setDragState: setDrag,
+    getBindings: getB,
+    setBindings: setB,
+    renderBindings: () => renderBindings(),
+    finishMutation: (reason) => finishBindingUiMutation(reason),
+    flushPendingRerender: () => flushPendingRerender(),
+  });
+  const {
+    start: startBindingDrag,
+    update: updateBindingDrag,
+    end: endBindingDrag,
+    cancel: cancelBindingDrag,
+  } = bindingDragController;
   const getSearchQuery = () => String(d.bindingSearchInput?.value || "").trim().toLowerCase();
-  const bindingTypeFilterValues = new Set(["all", "faders", "buttons"]);
+  const bindingRenderModel = createBindingRenderModel({
+    fallbackNameFor,
+    labelForControl,
+    displayModeName,
+    getTargets,
+    isButtonBinding: effectiveIsButton,
+  });
+  const normalizeBindingTypeFilter = bindingRenderModel.normalizeTypeFilter;
+  const bindingMatchesTypeFilter = bindingRenderModel.matchesTypeFilter;
+  const bindingSearchText = bindingRenderModel.searchText;
   let bindingTypeFilter = "all";
   let compactBindings = false;
   let bindingDensitySaveSequence = 0;
@@ -240,11 +295,6 @@ export function createBindingsFeature({
     ].join("|");
   }
 
-  function normalizeBindingTypeFilter(value) {
-    const normalized = String(value || "all").toLowerCase();
-    return bindingTypeFilterValues.has(normalized) ? normalized : "all";
-  }
-
   function getBindingTypeFilter() {
     return normalizeBindingTypeFilter(bindingTypeFilter);
   }
@@ -262,13 +312,6 @@ export function createBindingsFeature({
       { value: "faders", label: t("bindings.filterFaders") },
       { value: "buttons", label: t("bindings.filterButtons") },
     ];
-  }
-
-  function bindingMatchesTypeFilter(binding, filterValue = getBindingTypeFilter()) {
-    const normalized = normalizeBindingTypeFilter(filterValue);
-    if (normalized === "all") return true;
-    const isButton = effectiveIsButton(binding);
-    return normalized === "buttons" ? isButton : !isButton;
   }
 
   function updateBindingTypeFilterUi() {
@@ -843,38 +886,10 @@ export function createBindingsFeature({
     }, 160);
   }
 
-  function bindingSearchText(binding, index) {
-    return [
-      binding?.name || "",
-      fallbackNameFor(binding, index),
-      labelForControl(binding?.control || {}),
-      displayModeName(binding),
-      JSON.stringify(getTargets(binding)),
-      binding?.action || "",
-      binding?.soundboard?.display || "",
-      binding?.soundboard?.path || "",
-    ].join(" ").toLowerCase();
-  }
-
-  function actionIconSvg(name) {
-    const icons = {
-      edit: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20h4l11-11-4-4L4 16v4Z"/><path d="m14 6 4 4"/></svg>',
-      delete: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="M8 7l1 13h6l1-13"/><path d="M10.5 11v5M13.5 11v5"/></svg>',
-    };
-    return icons[name] || "";
-  }
-
   function setActionIcon(button, name, label) {
-    button.innerHTML = actionIconSvg(name);
+    button.innerHTML = bindingActionIconSvg(name);
     button.title = label;
     button.setAttribute("aria-label", label);
-  }
-
-  function muteIconSvg(muted) {
-    if (muted) {
-      return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m18 9-4 6M14 9l4 6"/></svg>';
-    }
-    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
   }
 
   function setMuteButtonState(button, muted) {
@@ -1117,13 +1132,17 @@ export function createBindingsFeature({
   let curvePresetFormPresetId = null;
   let selectedCustomCurvePresetId = null;
   let macroDragState = null;
-  let hotkeyLearnBindingId = null;
-  let hotkeyLearnCleanup = null;
   const nameDrafts = new Map();
   let pendingRerender = false;
   let suppressPendingFocusClearUntil = 0;
   const defaultLearnPanelTitle = () => t("bindings.waitingMidiTitle");
   const defaultLearnPanelMessage = () => t("bindings.learnMessage");
+  const hotkeyLearn = createHotkeyLearnController({
+    dom: d,
+    translate: t,
+    canStart: () => !transferPrompt && !configLearnField,
+  });
+  const startHotkeyLearn = (binding) => hotkeyLearn.start(binding);
 
   function clearTransferPrompt() {
     transferPrompt = null;
@@ -1183,250 +1202,6 @@ export function createBindingsFeature({
       d.learnPanelConfirm.classList.remove("hidden");
     }
     showLearnPanel();
-  }
-
-  function normalizeHotkeyMapping(rawHotkey) {
-    if (!rawHotkey || typeof rawHotkey !== "object") return null;
-    const keys = Array.isArray(rawHotkey.keys)
-      ? rawHotkey.keys
-        .map((key) => String(key || "").trim())
-        .filter(Boolean)
-      : [];
-    if (keys.length === 0) return null;
-    const display = String(rawHotkey.display || "").trim() || keys.join("+");
-    return { keys, display };
-  }
-
-  function normalizeOpenApplicationMapping(rawOpenApplication) {
-    if (!rawOpenApplication || typeof rawOpenApplication !== "object") return null;
-    const path = String(rawOpenApplication.path || "").trim();
-    const display = String(rawOpenApplication.display || "").trim();
-    const icon_data = typeof rawOpenApplication.icon_data === "string" && rawOpenApplication.icon_data.trim()
-      ? rawOpenApplication.icon_data.trim()
-      : null;
-    if (!path) return null;
-    return {
-      path,
-      display: display || path,
-      icon_data,
-    };
-  }
-
-  function normalizeAutoHotkeyScriptMapping(rawScript) {
-    if (!rawScript || typeof rawScript !== "object") return null;
-    const path = String(rawScript.path || "").trim();
-    const display = String(rawScript.display || "").trim();
-    return path ? { path, display: display || path } : null;
-  }
-
-  function clonePlain(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
-  function normalizeMacroName(raw) {
-    return String(raw || "").trim().slice(0, 80);
-  }
-
-  function defaultMacroName(binding) {
-    const name = String(binding?.name || "").trim();
-    return name && !/^Binding\s+\d+$/i.test(name) ? name.slice(0, 80) : "My Macro";
-  }
-
-  function ensureMacroName(binding, { defaultIfBlank = false } = {}) {
-    if (!binding || typeof binding !== "object") return "";
-    const normalized = normalizeMacroName(binding.macro_name);
-    binding.macro_name = normalized || (defaultIfBlank ? defaultMacroName(binding) : "");
-    return binding.macro_name;
-  }
-
-  function blankMacroActionStep({ includeKind = true } = {}) {
-    const step = {
-      action: "",
-      targets: [],
-      state: "Default",
-    };
-    return includeKind ? { kind: "action", ...step } : step;
-  }
-
-  function defaultMacroActionStep() {
-    return blankMacroActionStep();
-  }
-
-  function defaultMacroParallelActionStep() {
-    return blankMacroActionStep({ includeKind: false });
-  }
-
-  function defaultMacroWaitStep() {
-    return {
-      kind: "wait",
-      duration_ms: 500,
-    };
-  }
-
-  function defaultMacroParallelStep() {
-    return {
-      kind: "parallel",
-      steps: [
-        defaultMacroParallelActionStep(),
-        defaultMacroParallelActionStep(),
-      ],
-    };
-  }
-
-  function macroDraftHasCommandMetadata(step) {
-    const explicit = String(step?.action_label || step?.actionLabel || "").trim();
-    if (explicit) return true;
-    const targets = Array.isArray(step?.targets) ? step.targets : [];
-    return targets.some((target) => {
-      const integration = target?.Integration || target?.integration;
-      const data = integration?.data || {};
-      return Boolean(
-        data.action_label
-        || data.action_value
-        || data.action_kind
-        || data.button_action
-        || data.osd_value_text
-      );
-    });
-  }
-
-  function macroDraftLooksLikeLegacyTriggerPlaceholder(step) {
-    if (String(step?.action || "") !== "Volume") return false;
-    const role = String(step?.action_role || step?.actionRole || "").trim().toLowerCase();
-    return role !== "value" && !macroDraftHasCommandMetadata(step);
-  }
-
-  function normalizeMacroDraftActionStep(step, { includeKind = false } = {}) {
-    if (macroDraftLooksLikeLegacyTriggerPlaceholder(step)) {
-      const draft = blankMacroActionStep({ includeKind });
-      draft.targets = (Array.isArray(step?.targets) ? step.targets : [])
-        .filter((target) => target && target !== "Unset" && !isMacroTarget(target))
-        .slice(0, 8);
-      draft.state = normalizeMacroActionState(step?.state || "Default");
-      return draft;
-    }
-    const normalized = normalizeMacroActionStep(step);
-    if (normalized) {
-      return includeKind ? { kind: "action", ...normalized } : normalized;
-    }
-    const draft = blankMacroActionStep({ includeKind });
-    const targets = (Array.isArray(step?.targets) ? step.targets : [])
-      .filter((target) => target && target !== "Unset" && !isMacroTarget(target))
-      .slice(0, 8);
-    if (targets.length > 0) {
-      draft.targets = targets;
-      draft.action = "";
-      draft.state = normalizeMacroActionState(step?.state || "Default");
-      draft.hotkey = normalizeHotkeyMapping(step?.hotkey);
-      draft.open_application = normalizeOpenApplicationMapping(step?.open_application);
-      draft.autohotkey_script = normalizeAutoHotkeyScriptMapping(step?.autohotkey_script);
-    }
-    return draft;
-  }
-
-  function normalizeMacroDraftStep(step) {
-    if (!step || typeof step !== "object") return null;
-    const kind = String(step.kind || "action");
-    if (kind === "wait") {
-      const durationMs = Math.round(Number(step.duration_ms ?? step.durationMs ?? 0));
-      return {
-        kind: "wait",
-        duration_ms: Math.min(MACRO_MAX_WAIT_MS, Math.max(0, Number.isFinite(durationMs) ? durationMs : 0)),
-      };
-    }
-    if (kind === "parallel") {
-      const steps = (Array.isArray(step.steps) ? step.steps : [])
-        .map((child) => normalizeMacroDraftActionStep(child))
-        .slice(0, MACRO_MAX_PARALLEL_STEPS);
-      return {
-        kind: "parallel",
-        steps: steps.length > 0 ? steps : [defaultMacroParallelActionStep()],
-      };
-    }
-    return normalizeMacroDraftActionStep(step, { includeKind: true });
-  }
-
-  function normalizeMacroDraftSteps(steps) {
-    return (Array.isArray(steps) ? steps : [])
-      .map(normalizeMacroDraftStep)
-      .filter(Boolean)
-      .slice(0, MACRO_MAX_TOP_LEVEL_STEPS);
-  }
-
-  function prepareMacroDraftBinding(binding, { preservePlaceholders = false } = {}) {
-    if (!binding || typeof binding !== "object") return;
-    binding.action = "Macro";
-    setTargets(binding, ["Macro"]);
-    binding.hotkey = null;
-    binding.open_application = null;
-    binding.autohotkey_script = null;
-    ensureMacroName(binding, { defaultIfBlank: preservePlaceholders });
-    binding.macro_steps = preservePlaceholders
-      ? normalizeMacroDraftSteps(binding.macro_steps)
-      : normalizeMacroSteps(binding.macro_steps);
-  }
-
-  function clearMacroActionStep(step) {
-    Object.keys(step).forEach((key) => delete step[key]);
-    Object.assign(step, blankMacroActionStep());
-  }
-
-  function macroActionHasTarget(step) {
-    return Array.isArray(step?.targets) && step.targets.some((target) => target && target !== "Unset" && !isMacroTarget(target));
-  }
-
-  function macroIntegrationTarget(step) {
-    const targets = Array.isArray(step?.targets) ? step.targets : [];
-    const target = targets.find((candidate) => candidate?.Integration || candidate?.integration);
-    return target?.Integration || target?.integration || null;
-  }
-
-  function macroIntegrationActionLabel(step) {
-    const stepLabel = String(step?.action_label || step?.actionLabel || "").trim();
-    if (stepLabel) return stepLabel;
-    const integration = macroIntegrationTarget(step);
-    const data = integration?.data || {};
-    const explicit = String(data.action_label || "").trim();
-    if (explicit) return explicit;
-    const buttonAction = String(data.button_action || data.action_value || data.action || "").trim();
-    const normalized = buttonAction.toLowerCase().replace(/[-\s]+/g, "_");
-    if (normalized === "turn_on" || normalized === "on") return "Turn On";
-    if (normalized === "turn_off" || normalized === "off") return "Turn Off";
-    if (normalized === "toggle" || normalized === "toggle_on_off") return "Toggle";
-    const osdText = String(data.osd_value_text || "").trim().toUpperCase();
-    if (osdText === "ON") return "Turn On";
-    if (osdText === "OFF") return "Turn Off";
-    return "";
-  }
-
-  function macroActionRole(step) {
-    const role = String(step?.action_role || step?.actionRole || "").trim().toLowerCase();
-    if (role) return role;
-    if (String(step?.action || "") !== "Volume") return "";
-    const integration = macroIntegrationTarget(step);
-    if (!integration) return "value";
-    const data = integration?.data || {};
-    if (
-      data.action_label
-      || data.action_value
-      || data.action_kind
-      || data.button_action
-      || data.osd_value_text
-    ) {
-      return "command";
-    }
-    return typeof step?.value === "number" ? "value" : "command";
-  }
-
-  function macroActionUsesValue(step) {
-    if (String(step?.action || "") !== "Volume") return false;
-    return macroActionRole(step) === "value";
-  }
-
-  function macroActionIsLegacyTriggerPlaceholder(step) {
-    return String(step?.action || "") === "Volume"
-      && !macroActionUsesValue(step)
-      && !macroIntegrationActionLabel(step);
   }
 
   function macroActionTitle(action, step = null) {
@@ -2991,73 +2766,6 @@ export function createBindingsFeature({
     scrollSelectedMacroStepIntoView();
   }
 
-  function stopHotkeyLearn(result = null) {
-    if (hotkeyLearnCleanup) {
-      hotkeyLearnCleanup();
-      hotkeyLearnCleanup = null;
-    }
-    hotkeyLearnBindingId = null;
-    hideLearnPanel();
-    return result;
-  }
-
-  async function startHotkeyLearn(binding) {
-    if (!binding || transferPrompt || configLearnField || hotkeyLearnBindingId) {
-      return null;
-    }
-
-    hotkeyLearnBindingId = binding.id;
-    if (d.learnPanelTitle) d.learnPanelTitle.textContent = t("bindings.pressHotkey");
-    if (d.learnPanelMessage) {
-      d.learnPanelMessage.textContent = t("bindings.pressHotkeyMessage");
-    }
-    if (d.learnPanelSpinner) d.learnPanelSpinner.classList.add("hidden");
-    if (d.learnPanelActions) d.learnPanelActions.classList.remove("hidden");
-    if (d.learnPanelCancel) d.learnPanelCancel.textContent = t("common.cancel");
-    if (d.learnPanelConfirm) d.learnPanelConfirm.classList.add("hidden");
-    showLearnPanel();
-
-    return await new Promise((resolve) => {
-      let settled = false;
-      const finish = (mapping) => {
-        if (settled) return;
-        settled = true;
-        stopHotkeyLearn(mapping);
-        resolve(mapping);
-      };
-
-      const onCancel = () => finish(null);
-      const onOverlay = (event) => {
-        if (event.target === d.learnPanel) finish(null);
-      };
-      const onKeydown = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (event.key === "Escape") {
-          finish(null);
-          return;
-        }
-
-        const mapping = buildHotkeyMappingFromEvent(event);
-        if (!mapping) return;
-        finish(mapping);
-      };
-
-      window.addEventListener("keydown", onKeydown, true);
-      d.learnPanelCancel?.addEventListener("click", onCancel);
-      d.learnPanelClose?.addEventListener("click", onCancel);
-      d.learnPanel?.addEventListener("click", onOverlay);
-
-      hotkeyLearnCleanup = () => {
-        window.removeEventListener("keydown", onKeydown, true);
-        d.learnPanelCancel?.removeEventListener("click", onCancel);
-        d.learnPanelClose?.removeEventListener("click", onCancel);
-        d.learnPanel?.removeEventListener("click", onOverlay);
-      };
-    });
-  }
-
   function updateAuxLearnUi() {
     const muteLearn = d.bindingConfigMuteLearn;
     const assignLearn = d.bindingConfigAssignLearn;
@@ -3830,40 +3538,6 @@ export function createBindingsFeature({
     renderConfigModal();
   }
 
-  function curveSvgX(value) {
-    return CUSTOM_CURVE_PADDING + (Math.min(1, Math.max(0, Number(value) || 0)) * CUSTOM_CURVE_PLOT_SIZE);
-  }
-
-  function curveSvgY(value) {
-    return CUSTOM_CURVE_VIEWBOX_SIZE
-      - CUSTOM_CURVE_PADDING
-      - (Math.min(1, Math.max(0, Number(value) || 0)) * CUSTOM_CURVE_PLOT_SIZE);
-  }
-
-  function clampSegmentCurve(start, end, curve) {
-    const midpointY = ((Number(start?.y) || 0) + (Number(end?.y) || 0)) / 2;
-    return Math.min(1 - midpointY, Math.max(-midpointY, Number(curve) || 0));
-  }
-
-  function curvePathData(points) {
-    const safePoints = normalizeCustomCurve(points);
-    if (!safePoints.length) return "";
-    const commands = [`M${curveSvgX(safePoints[0].x)} ${curveSvgY(safePoints[0].y)}`];
-    for (let index = 0; index < safePoints.length - 1; index += 1) {
-      const start = safePoints[index];
-      const end = safePoints[index + 1];
-      const curve = clampSegmentCurve(start, end, start.curve || 0);
-      if (Math.abs(curve) > CUSTOM_CURVE_EPSILON) {
-        const controlX = (start.x + end.x) / 2;
-        const controlY = ((start.y + end.y) / 2) + curve;
-        commands.push(`Q${curveSvgX(controlX)} ${curveSvgY(controlY)} ${curveSvgX(end.x)} ${curveSvgY(end.y)}`);
-      } else {
-        commands.push(`L${curveSvgX(end.x)} ${curveSvgY(end.y)}`);
-      }
-    }
-    return commands.join(" ");
-  }
-
   function buildCurveCardSvg(binding, curve) {
     const pathMap = {
       Linear: "M10 110 L110 10",
@@ -3954,41 +3628,6 @@ export function createBindingsFeature({
     const surface = event.target.closest('[data-curve-editor-surface="custom"]');
     const card = surface?.closest?.(".binding-config-curve-card");
     return card?.dataset?.curve === "Custom" ? surface : null;
-  }
-
-  function localCustomCurvePoint(event, surfaceEl) {
-    const svg = surfaceEl?.querySelector?.("svg");
-    const rect = (svg || surfaceEl)?.getBoundingClientRect?.();
-    if (!rect?.width || !rect.height) return null;
-    const svgX = ((event.clientX - rect.left) / rect.width) * CUSTOM_CURVE_VIEWBOX_SIZE;
-    const svgY = ((event.clientY - rect.top) / rect.height) * CUSTOM_CURVE_VIEWBOX_SIZE;
-    return {
-      x: Math.min(1, Math.max(0, (svgX - CUSTOM_CURVE_PADDING) / CUSTOM_CURVE_PLOT_SIZE)),
-      y: Math.min(1, Math.max(0, (CUSTOM_CURVE_VIEWBOX_SIZE - CUSTOM_CURVE_PADDING - svgY) / CUSTOM_CURVE_PLOT_SIZE)),
-    };
-  }
-
-  function segmentIndexForCurveX(points, x) {
-    if (!Array.isArray(points) || points.length < 2) return -1;
-    for (let index = 0; index < points.length - 1; index += 1) {
-      if (x <= points[index + 1].x) return index;
-    }
-    return points.length - 2;
-  }
-
-  function curveYAtSegmentPoint(start, end, t) {
-    const linear = start.y + ((end.y - start.y) * t);
-    return Math.min(1, Math.max(0, linear + ((Number(start.curve) || 0) * 2 * (1 - t) * t)));
-  }
-
-  function segmentCurveFromPointer(start, end, localPoint) {
-    const span = end.x - start.x;
-    if (Math.abs(span) < CUSTOM_CURVE_EPSILON) return start.curve || 0;
-    const t = Math.min(1, Math.max(0, (localPoint.x - start.x) / span));
-    const denominator = 2 * (1 - t) * t;
-    if (denominator < 0.08) return start.curve || 0;
-    const linear = start.y + ((end.y - start.y) * t);
-    return clampSegmentCurve(start, end, (localPoint.y - linear) / denominator);
   }
 
   function refreshCustomCurvePointerSurface() {
@@ -4300,20 +3939,6 @@ export function createBindingsFeature({
     renderSoundboardEditor(binding);
   }
 
-  function renderSoundboardSummary(binding) {
-    if (!d.bindingConfigSoundboardSummary) return;
-    wireSoundboardEditor();
-    const mapping = normalizeSoundboardMapping(binding?.soundboard);
-    d.bindingConfigSoundboardSummary.innerHTML = "";
-    const name = document.createElement("strong");
-    name.textContent = mapping?.display || t("soundboard.noFile");
-    const detail = document.createElement("span");
-    detail.textContent = mapping
-      ? t("soundboard.summary", { volume: Math.round(mapping.volume * 100), speed: mapping.speed.toFixed(2) })
-      : t("soundboard.unavailable");
-    d.bindingConfigSoundboardSummary.append(name, detail);
-  }
-
   async function loadSoundboardAnalysis(binding, { force = false } = {}) {
     const mapping = normalizeSoundboardMapping(binding?.soundboard);
     if (!mapping || (!force && soundboardAnalysis?.path === mapping.path)) return;
@@ -4347,12 +3972,6 @@ export function createBindingsFeature({
   }
 
   function wireSoundboardEditor() {
-    if (d.bindingConfigSoundboardEdit) d.bindingConfigSoundboardEdit.onclick = () => {
-      configSoundboardPageOpen = true;
-      loadSoundboardOutputDevices().catch(() => { });
-      loadSoundboardVirtualAudioStatus().catch(() => { });
-      renderConfigModal();
-    };
     if (d.bindingConfigSoundboardReplace) d.bindingConfigSoundboardReplace.onclick = async () => {
       try {
         const analysis = await invoke("pick_soundboard_audio");
@@ -4581,7 +4200,7 @@ export function createBindingsFeature({
     soundboardAnalysisError = "";
     soundboardVirtualAudioState = "loading";
     soundboardPointerHandle = null;
-    stopHotkeyLearn();
+    hotkeyLearn.stop();
     stopAuxLearn();
     clearTransferPrompt();
     closeMuteModeMenu();
@@ -4680,7 +4299,6 @@ export function createBindingsFeature({
     if (d.bindingConfigButtonLearnSection) d.bindingConfigButtonLearnSection.classList.toggle("hidden", !isButton || showSpecialPage);
     if (d.bindingConfigMacroSummarySection) d.bindingConfigMacroSummarySection.classList.add("hidden");
     if (d.bindingConfigMacroSection) d.bindingConfigMacroSection.classList.toggle("hidden", !showMacroPage);
-    if (d.bindingConfigSoundboardSummarySection) d.bindingConfigSoundboardSummarySection.classList.toggle("hidden", !isSoundboardBinding || showSoundboardPage);
     if (d.bindingConfigSoundboardSection) d.bindingConfigSoundboardSection.classList.toggle("hidden", !showSoundboardPage);
     if (d.bindingConfigPreviewLearnShell) d.bindingConfigPreviewLearnShell.classList.toggle("hidden", isButton || showSpecialPage);
     if (d.bindingConfigCurveSection) d.bindingConfigCurveSection.classList.toggle("hidden", isButton || showSpecialPage);
@@ -4701,7 +4319,6 @@ export function createBindingsFeature({
         d.bindingConfigMacroList.innerHTML = "";
         if (d.bindingConfigMacroSummary) d.bindingConfigMacroSummary.innerHTML = "";
       }
-      if (isSoundboardBinding && !showSoundboardPage) renderSoundboardSummary(binding);
     } else {
       syncCurvePresetToolbar(binding);
       renderCurveCards();
@@ -6034,148 +5651,6 @@ export function createBindingsFeature({
     onBindingsRendered?.();
   }
 
-  function startBindingDrag(item, dragInfo, event) {
-    const rect = item.getBoundingClientRect();
-    const ghost = item.cloneNode(true);
-    ghost.classList.add("binding-ghost");
-    ghost.style.width = `${rect.width}px`;
-    ghost.style.height = `${rect.height}px`;
-    ghost.style.left = `${rect.left}px`;
-    ghost.style.top = `${rect.top}px`;
-    ghost.style.opacity = "0";
-
-    const placeholder = document.createElement("div");
-    placeholder.className = "binding-placeholder";
-    placeholder.style.height = `${rect.height}px`;
-
-    document.body.appendChild(ghost);
-
-    const bindingId = String(dragInfo?.bindingId || item.dataset?.bindingId || "");
-    const visibleIndex = Number.isInteger(dragInfo?.visibleIndex)
-      ? dragInfo.visibleIndex
-      : Number(item.dataset?.visibleIndex || 0);
-    const visibleBindingIds = Array.isArray(dragInfo?.visibleBindingIds)
-      ? dragInfo.visibleBindingIds.map((id) => String(id || ""))
-      : Array.from(d.bindingsContainer.querySelectorAll(".binding-item[data-binding-id]"))
-        .map((bindingItem) => String(bindingItem.dataset?.bindingId || ""))
-        .filter(Boolean);
-
-    setDrag({
-      bindingId,
-      visibleIndex,
-      visibleBindingIds,
-      item,
-      ghost,
-      placeholder,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-      startX: event.clientX,
-      startY: event.clientY,
-      active: false,
-    });
-
-    item.classList.add("dragging");
-    document.body.classList.add("dragging-binding");
-  }
-
-  function updateBindingDrag(event) {
-    const dragState = getDrag();
-    if (!dragState) return;
-
-    const deltaX = event.clientX - dragState.startX;
-    const deltaY = event.clientY - dragState.startY;
-    if (!dragState.active) {
-      if (Math.hypot(deltaX, deltaY) < 6) {
-        return;
-      }
-      dragState.active = true;
-      dragState.item.style.display = "none";
-      d.bindingsContainer.insertBefore(dragState.placeholder, dragState.item.nextSibling);
-      dragState.ghost.style.opacity = "0.85";
-    }
-
-    dragState.ghost.style.left = `${event.clientX - dragState.offsetX}px`;
-    dragState.ghost.style.top = `${event.clientY - dragState.offsetY}px`;
-
-    const target = document.elementFromPoint(event.clientX, event.clientY);
-    const bindingItem = target?.closest(".binding-item");
-    if (!bindingItem || bindingItem === dragState.item) {
-      return;
-    }
-
-    const rect = bindingItem.getBoundingClientRect();
-    const insertBefore = event.clientY < rect.top + rect.height / 2;
-    const reference = insertBefore ? bindingItem : bindingItem.nextSibling;
-    if (reference !== dragState.placeholder) {
-      d.bindingsContainer.insertBefore(dragState.placeholder, reference);
-    }
-  }
-
-  function placeholderVisibleIndex(visibleBindingIds = []) {
-    const visibleIdSet = new Set(visibleBindingIds.map((id) => String(id || "")));
-    const children = Array.from(d.bindingsContainer.children);
-    let index = 0;
-    for (const child of children) {
-      if (child.classList.contains("binding-placeholder")) {
-        return index;
-      }
-      if (
-        child.classList.contains("binding-item")
-        && visibleIdSet.has(String(child.dataset?.bindingId || ""))
-      ) {
-        index += 1;
-      }
-    }
-    return null;
-  }
-
-  async function endBindingDrag() {
-    const dragState = getDrag();
-    if (!dragState) return;
-    const { bindingId, visibleIndex, visibleBindingIds, item, ghost, placeholder, active } = dragState;
-    const newIndex = active ? placeholderVisibleIndex(visibleBindingIds) : null;
-    setDrag(null);
-
-    item.style.display = "";
-    item.classList.remove("dragging");
-    ghost.remove();
-    if (active) {
-      placeholder.remove();
-    }
-    document.body.classList.remove("dragging-binding");
-
-    if (active && newIndex !== null) {
-      const destinationVisibleIndex = (newIndex > visibleIndex) ? (newIndex - 1) : newIndex;
-      const result = reorderVisibleBindings(
-        getB(),
-        visibleBindingIds,
-        bindingId,
-        destinationVisibleIndex,
-      );
-      if (result.changed) {
-        setB(result.bindings);
-        renderBindings();
-        finishBindingUiMutation("reorder bindings");
-      }
-    }
-
-    flushPendingRerender();
-  }
-
-  function cancelBindingDrag() {
-    const dragState = getDrag();
-    if (!dragState) return;
-    dragState.item.style.display = "";
-    dragState.item.classList.remove("dragging");
-    dragState.ghost.remove();
-    if (dragState.active) {
-      dragState.placeholder.remove();
-    }
-    setDrag(null);
-    document.body.classList.remove("dragging-binding");
-    flushPendingRerender();
-  }
-
   function bindConfigModalUi() {
     const cancelAuxLearnFlow = () => {
       if (!configBindingId) return;
@@ -6278,7 +5753,7 @@ export function createBindingsFeature({
     }
     document.addEventListener("keydown", (event) => {
       if (!configBindingId || event.key !== "Escape") return;
-      if (transferPrompt || configLearnField || hotkeyLearnBindingId) return;
+      if (transferPrompt || configLearnField || hotkeyLearn.isActive()) return;
       closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
     });
     if (d.bindingConfigCustomReset) {
@@ -6486,21 +5961,21 @@ export function createBindingsFeature({
     if (d.learnPanel) {
       d.learnPanel.addEventListener("click", (event) => {
         if (event.target !== d.learnPanel) return;
-        if (hotkeyLearnBindingId) return;
+        if (hotkeyLearn.isActive()) return;
         if (!configBindingId) return;
         cancelAuxLearnFlow();
       });
     }
     if (d.learnPanelClose) {
       d.learnPanelClose.addEventListener("click", () => {
-        if (hotkeyLearnBindingId) return;
+        if (hotkeyLearn.isActive()) return;
         if (!configBindingId) return;
         cancelAuxLearnFlow();
       });
     }
     if (d.learnPanelCancel) {
       d.learnPanelCancel.addEventListener("click", () => {
-        if (hotkeyLearnBindingId) return;
+        if (hotkeyLearn.isActive()) return;
         if (!configBindingId) return;
         cancelAuxLearnFlow();
       });
@@ -6600,41 +6075,49 @@ export function createBindingsFeature({
     });
   }
 
-  document.addEventListener("pointerdown", (event) => {
-    const pendingId = getPendingFocusId();
-    if (!pendingId) return;
-    if (Date.now() < suppressPendingFocusClearUntil) {
-      return;
-    }
-    const target = event.target;
-    if (target && target.classList?.contains("binding-name-input")) {
-      return;
-    }
-    setPendingFocusId(null);
-  }, true);
+  let uiBound = false;
 
-  bindConfigModalUi();
-  bindBindingTypeFilterUi();
-  bindBindingDensityUi();
-  if (d.bindingSearchInput) {
-    d.bindingSearchInput.addEventListener("input", () => {
-      renderBindings();
+  function bindUi() {
+    if (uiBound) return;
+    uiBound = true;
+
+    document.addEventListener("pointerdown", (event) => {
+      const pendingId = getPendingFocusId();
+      if (!pendingId) return;
+      if (Date.now() < suppressPendingFocusClearUntil) {
+        return;
+      }
+      const target = event.target;
+      if (target && target.classList?.contains("binding-name-input")) {
+        return;
+      }
+      setPendingFocusId(null);
+    }, true);
+
+    bindConfigModalUi();
+    bindBindingTypeFilterUi();
+    bindBindingDensityUi();
+    if (d.bindingSearchInput) {
+      d.bindingSearchInput.addEventListener("input", () => {
+        renderBindings();
+      });
+    }
+    window.addEventListener("resize", () => {
+      bindingsScrollbarWidth = 0;
+      queueBindingsScrollLayoutSync();
     });
-  }
-  window.addEventListener("resize", () => {
-    bindingsScrollbarWidth = 0;
+    window.addEventListener("midimaster:locale-changed", () => {
+      updateBindingTypeFilterUi();
+      renderBindings();
+      resetLearnPanelUi();
+      renderConfigModal();
+    });
     queueBindingsScrollLayoutSync();
-  });
-  window.addEventListener("midimaster:locale-changed", () => {
-    updateBindingTypeFilterUi();
-    renderBindings();
-    resetLearnPanelUi();
-    renderConfigModal();
-  });
-  queueBindingsScrollLayoutSync();
-  updateAuxLearnUi();
+    updateAuxLearnUi();
+  }
 
   return {
+    bindUi,
     updateSliderFill,
     setSliderVolume,
     isBindingInteractionActive,

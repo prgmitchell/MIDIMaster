@@ -15,11 +15,16 @@ import {
   normalizeMidiRoutes,
   orderMidiRoutesByPreference,
   resolvePreferredMidiDevicePair,
-  resolvePreferredMidiDeviceRoutes,
   sharedOutputCounts,
   stripUnavailableSuffix,
   unavailableDeviceLabel,
 } from "./device_preferences.js";
+import {
+  createMidiRoutePolicy,
+  preserveUnavailableRouteDrafts as mergeUnavailableRouteDrafts,
+  routesFromResolvedPreferences,
+} from "./route_policy.js";
+import { createSessionRefreshScheduler } from "./session_refresh_scheduler.js";
 
 function routeDeviceLabel(route, kind) {
   if (!route) return "";
@@ -85,16 +90,11 @@ export function createMidiFeature({
   const MIDI_AUTO_REFRESH_INTERVAL_MS = 3000;
   const MIDI_OUTPUT_ENUM_DELAY_MS = 250;
   const LEARN_POLL_MS = 50;
-  const SESSION_REFRESH_VISIBLE_INTERVAL_MS = 3000;
-  const SESSION_REFRESH_HIDDEN_INTERVAL_MS = 15000;
 
   let autoRefreshTimer = null;
-  let sessionRefreshTimer = null;
-  let sessionRefreshFn = null;
-  let sessionRefreshMainScreenEl = null;
-  let sessionVisibilityListenerBound = false;
   let learnTimer = null;
   let availabilityTimer = null;
+  let uiBound = false;
   let availabilityCheckInFlight = false;
   let deviceRefreshInFlight = null;
   let lastDeviceRefreshAt = 0;
@@ -111,7 +111,8 @@ export function createMidiFeature({
   const routeEditor = createMidiRouteDraftController();
   let routeEditorApplyInFlight = false;
   let currentProfilePreference = null;
-  let lastRouteResolutionIssueSignature = "";
+  const routePolicy = createMidiRoutePolicy();
+  const sessionRefreshScheduler = createSessionRefreshScheduler();
   let inputStatusEl = null;
   let inputStatusDisplayEl = null;
   let outputStatusEl = null;
@@ -154,81 +155,21 @@ export function createMidiFeature({
     return normalizeMidiPreference(currentProfilePreference).routes;
   }
 
-  function routeMatchesIdentity(route, candidate) {
-    if (!route || !candidate) return false;
-    const inputId = String(route.inputDeviceId || "").trim();
-    const inputName = stripUnavailableSuffix(route.inputDeviceName || "");
-    const candidateId = String(candidate.inputDeviceId || "").trim();
-    const candidateName = stripUnavailableSuffix(candidate.inputDeviceName || "");
-    if (inputId && candidateId && inputId === candidateId) {
-      return !(inputName && candidateName && inputName !== candidateName);
-    }
-    return Boolean(inputName && candidateName && inputName === candidateName);
-  }
-
   function preserveUnavailableRouteDrafts(aliveRoutes, missingRoutes) {
-    const pref = normalizeMidiPreference(currentProfilePreference);
-    const baseRoutes = pref.routes.length
-      ? pref.routes
-      : connectedRoutes;
-    const replacements = [...aliveRoutes, ...missingRoutes];
-    const merged = normalizeMidiRoutes({ routes: baseRoutes }).map((route) => (
-      replacements.find((candidate) => routeMatchesIdentity(route, candidate)) || route
-    ));
-
-    replacements.forEach((route) => {
-      if (!merged.some((candidate) => routeMatchesIdentity(candidate, route))) {
-        merged.push(route);
-      }
-    });
-
-    return normalizeMidiRoutes({ routes: merged });
-  }
-
-  function routesFromResolvedPreferences(resolvedRoutes) {
-    const resolved = Array.isArray(resolvedRoutes?.routes) ? resolvedRoutes.routes : [];
-    return normalizeMidiRoutes({
-      routes: resolved.map((route) => {
-        if (route.preference?.enabled === false) return route.preference;
-        if (!route.inputMatch || !route.outputMatch) return route.preference;
-        return {
-          inputDeviceId: route.inputMatch.id,
-          outputDeviceId: route.outputMatch.id,
-          inputDeviceName: route.inputMatch.name || route.preference?.inputDeviceName,
-          outputDeviceName: route.outputMatch.name || route.preference?.outputDeviceName,
-          enabled: true,
-        };
-      }),
-    });
+    return mergeUnavailableRouteDrafts(
+      aliveRoutes,
+      missingRoutes,
+      currentProfilePreference,
+      connectedRoutes,
+    );
   }
 
   function resolveDesiredRouteSet(snapshot, preference, context = "unknown") {
-    const resolved = resolvePreferredMidiDeviceRoutes(snapshot, preference);
-    const issues = resolved.routes
-      .filter((route) => route.preference?.enabled !== false && !route.available)
-      .map((route) => ({
-        inputDeviceName: route.preference?.inputDeviceName || route.preference?.inputDeviceId || "",
-        outputDeviceName: route.preference?.outputDeviceName || route.preference?.outputDeviceId || "",
-        inputStatus: route.inputStatus,
-        outputStatus: route.outputStatus,
-      }));
-    const signature = JSON.stringify(issues);
-    if (signature !== lastRouteResolutionIssueSignature) {
-      lastRouteResolutionIssueSignature = signature;
-      if (issues.length > 0) {
-        const kind = issues.some((issue) => (
-          issue.inputStatus === "ambiguous" || issue.outputStatus === "ambiguous"
-        )) ? "ambiguous" : "unavailable";
-        console.warn(`MIDI route resolution ${kind} (${context})`, issues);
-      }
-    }
-    return resolved;
+    return routePolicy.resolveDesiredRouteSet(snapshot, preference, context);
   }
 
   function unresolvedRouteStatus(resolved, fallbackKey = "midi.partialRetrying") {
-    return resolved?.routes?.some((route) => route.ambiguous)
-      ? t("midi.ambiguousRoute")
-      : t(fallbackKey);
+    return routePolicy.unresolvedRouteStatus(resolved, t, fallbackKey);
   }
 
   function markSelectedPairUnavailable(inputId, outputId, inputName, outputName) {
@@ -1565,61 +1506,12 @@ export function createMidiFeature({
     }
   }
 
-  function sessionRefreshIsHidden(mainScreenEl) {
-    return Boolean(document.hidden || (mainScreenEl && mainScreenEl.classList.contains("hidden")));
-  }
-
-  function sessionRefreshDelay(mainScreenEl) {
-    return sessionRefreshIsHidden(mainScreenEl)
-      ? SESSION_REFRESH_HIDDEN_INTERVAL_MS
-      : SESSION_REFRESH_VISIBLE_INTERVAL_MS;
-  }
-
-  function scheduleSessionRefresh(delayMs) {
-    if (!sessionRefreshFn) return;
-    sessionRefreshTimer = setTimeout(async () => {
-      sessionRefreshTimer = null;
-      if (!sessionRefreshIsHidden(sessionRefreshMainScreenEl)) {
-        await sessionRefreshFn();
-      }
-      scheduleSessionRefresh(sessionRefreshDelay(sessionRefreshMainScreenEl));
-    }, delayMs);
-  }
-
-  function restartSessionRefresh(delayMs = 0) {
-    if (!sessionRefreshFn) return;
-    if (sessionRefreshTimer) {
-      clearTimeout(sessionRefreshTimer);
-      sessionRefreshTimer = null;
-    }
-    scheduleSessionRefresh(delayMs);
-  }
-
-  function ensureSessionVisibilityListener() {
-    if (sessionVisibilityListenerBound) return;
-    sessionVisibilityListenerBound = true;
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
-        restartSessionRefresh(0);
-      }
-    });
-  }
-
   function startSessionRefresh(refreshFn, mainScreenEl) {
-    sessionRefreshFn = refreshFn;
-    sessionRefreshMainScreenEl = mainScreenEl;
-    ensureSessionVisibilityListener();
-    if (sessionRefreshTimer) return;
-    scheduleSessionRefresh(sessionRefreshDelay(mainScreenEl));
+    sessionRefreshScheduler.start(refreshFn, mainScreenEl);
   }
 
   function stopSessionRefresh() {
-    if (sessionRefreshTimer) {
-      clearTimeout(sessionRefreshTimer);
-      sessionRefreshTimer = null;
-    }
-    sessionRefreshFn = null;
-    sessionRefreshMainScreenEl = null;
+    sessionRefreshScheduler.stop();
   }
 
   function closeLearnPanel() {
@@ -2040,6 +1932,8 @@ export function createMidiFeature({
   }
 
   function bindUi() {
+    if (uiBound) return;
+    uiBound = true;
     startAvailabilityMonitor();
     ensureDeviceDropdowns();
     renderDeviceDropdowns();

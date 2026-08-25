@@ -2,8 +2,7 @@
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { parseArgs, parsePositiveIntegers, splitCsv } from "./lib/cli.mjs";
+import { parseArgs, parsePositiveIntegers, runMain, splitCsv } from "./lib/cli.mjs";
 import { writeJson } from "./lib/files.mjs";
 
 export const BUNDLED_PLUGIN_IDS = ["hue", "obs", "voicemeeter", "wavelink"];
@@ -198,9 +197,4 @@ async function main() {
   console.log(`Generated ${fixtures.length} fixtures under ${output}`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error(error.stack ?? error.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

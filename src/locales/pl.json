@@ -634,6 +634,7 @@
   "midi.applyingChange": "Zastosowanie zmiany urządzenia MIDI...",
   "midi.connectFailed": "Połączenie nie powiodło się: {message}",
   "midi.disconnected": "Urządzenie MIDI wyłączone.",
+  "midi.connected": "Połączono.",
   "midi.reconnectedProfile": "Odtworzony do profilu urządzenia MIDI.",
   "midi.selectInputDevice": "Wybierz urządzenie wejściowe",
   "midi.selectOutputDevice": "Wybierz urządzenie wyjściowe",

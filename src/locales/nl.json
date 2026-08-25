@@ -634,6 +634,7 @@
   "midi.applyingChange": "MIDI-apparaatwijziging toepassen...",
   "midi.connectFailed": "Verbinden mislukt: {message}",
   "midi.disconnected": "MIDI apparaat afgesloten.",
+  "midi.connected": "Verbonden.",
   "midi.reconnectedProfile": "Gekoppeld aan profiel MIDI apparaat.",
   "midi.selectInputDevice": "Selecteer invoerapparaat",
   "midi.selectOutputDevice": "Selecteer uitvoerapparaat",

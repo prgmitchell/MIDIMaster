@@ -634,6 +634,7 @@
   "midi.applyingChange": "MIDI 장치 변경 적용...",
   "midi.connectFailed": "연결 실패: {message}",
   "midi.disconnected": "MIDI 장치 차단.",
+  "midi.connected": "연결되었습니다.",
   "midi.reconnectedProfile": "MIDI 장치를 프로파일에 연결.",
   "midi.selectInputDevice": "입력 장치 선택",
   "midi.selectOutputDevice": "출력 장치 선택",

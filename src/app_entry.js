@@ -3,8 +3,10 @@ import { createSettingsFeature } from "./features/settings/settings.js";
 import { createProfilesFeature } from "./features/profiles/profiles.js";
 import { createBindingsFeature } from "./features/bindings/bindings.js";
 import { normalizeFaderCurvePresets } from "./features/bindings/fader_curve_presets.js";
+import { muteIconSvg } from "./features/bindings/icons.js";
 import { createTargetsFeature } from "./features/targets/targets.js";
 import { createMidiFeature } from "./features/midi/midi.js";
+import { createMidiConnectionStatusHandler } from "./features/midi/connection_status.js";
 import {
   applyCustomFaderCurve,
   applyFaderCurve,
@@ -38,17 +40,11 @@ import {
   defaultAppearanceSettings,
   normalizeAppearanceSettings,
 } from "./app/appearance.js";
-import {
-  MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
-  canSubmitMidiDeviceInventory,
-  normalizeMidiDeviceInventorySettings,
-  shouldPromptMidiDeviceInventoryConsent,
-} from "./app/midi_device_inventory.js";
+import { createMidiInventoryController } from "./app/midi_inventory_controller.js";
 import { createSessionRefresher } from "./app/session_refresh.js";
 import { createPluginRuntime } from "./app/plugin_runtime.js";
 import {
   createFrameBatcher,
-  midiPayloadControlKey,
   volumePayloadKey,
 } from "./app/render_batching.js";
 import { createDomRefs } from "./app/dom_refs.js";
@@ -56,6 +52,9 @@ import { createAppShell } from "./app/app_shell.js";
 import { createSettingsStore } from "./app/settings_store.js";
 import { performanceAudit } from "./app/performance_audit_api.js";
 import { createBindingLookupIndex } from "./app/binding_lookup_index.js";
+import { parseEventPayload } from "./app/event_payload.js";
+import { createEventSubscriptions } from "./app/event_subscriptions.js";
+import { createMidiEventDispatch } from "./app/midi_event_dispatch.js";
 import {
   applyTranslations,
   initI18n,
@@ -80,6 +79,7 @@ function diagnosticError(event, error) {
 
 const tauriBridge = createTauriBridge();
 const { invoke, listen } = tauriBridge;
+const eventSubscriptions = createEventSubscriptions({ listen });
 
 function recordPerformanceResult(metric, value, kind = "operation", dimensions = {}) {
   if (!performanceAudit.enabled || !Number.isFinite(Number(value))) return Promise.resolve(false);
@@ -159,6 +159,19 @@ const {
   alertOk,
 } = dom.alerts;
 
+const alertsController = createAlertsController({
+  alertOverlay,
+  alertTitle,
+  alertMessage,
+  alertClose,
+  alertSecondary,
+  alertCancel,
+  alertOk,
+});
+const showAlert = (title, message = "") => alertsController.showAlert(message, title);
+const showChoices = (options = {}) => alertsController.showChoices(options);
+const closeAlert = (...args) => alertsController.closeAlert(...args);
+
 function bindTauriApi() {
   return tauriBridge.bind();
 }
@@ -202,13 +215,6 @@ let persistedMidiOutputName = "";
 let persistedMidiRoutes = [];
 let persistedActiveProfileName = "";
 let activeMidiRouteCount = 0;
-
-function muteIconSvg(muted) {
-  if (muted) {
-    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m18 9-4 6M14 9l4 6"/></svg>';
-  }
-  return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
-}
 
 function setInlineMuteButtonState(button, muted) {
   if (!button) return;
@@ -460,6 +466,14 @@ function showMain(inputName, outputName, options = {}) {
     : t("midi.statusConnected", { input, output });
 }
 
+const midiConnectionStatus = createMidiConnectionStatusHandler({
+  normalizeRoutes: normalizeMidiRoutes,
+  setActiveRouteCount: (count) => { activeMidiRouteCount = count; },
+  showMain,
+  statusElement: midiStatus,
+  translate: t,
+});
+
 function enabledMidiRouteCount(routes = []) {
   return normalizeMidiRoutes({ routes })
     .filter((route) => route.enabled !== false)
@@ -596,49 +610,6 @@ function bindingIsButtonLike(binding, payload = null) {
   return msgType === "Note" || msgType === "ProgramChange";
 }
 
-function shouldPreserveMidiUiEvent(payload) {
-  return bindingIsButtonLike(findBindingForEvent(payload), payload);
-}
-
-function getMidiUiBatcher() {
-  if (!midiUiBatcher) {
-    midiUiBatcher = createFrameBatcher({
-      keyFor: midiPayloadControlKey,
-      shouldPreserve: shouldPreserveMidiUiEvent,
-      onFlush: flushMidiUiEvents,
-    });
-  }
-  return midiUiBatcher;
-}
-
-function queueMidiUiEvent(payload) {
-  getMidiUiBatcher().queue(payload);
-}
-
-function queuePerfMidiDispatch(payload) {
-  const key = midiPayloadControlKey(payload);
-  if (!key) return;
-  const pending = perfMidiDispatches.get(key) || [];
-  pending.push(payload);
-  if (pending.length > 2_048) pending.splice(0, pending.length - 2_048);
-  perfMidiDispatches.set(key, pending);
-}
-
-function takePerfMidiDispatch(payload) {
-  const key = midiPayloadControlKey(payload);
-  const pending = key ? perfMidiDispatches.get(key) : null;
-  if (!pending?.length) return null;
-  const next = pending.shift();
-  if (pending.length === 0) perfMidiDispatches.delete(key);
-  return next;
-}
-
-function flushMidiUiEvents(events) {
-  for (const payload of events) {
-    applyMidiUiEvent(payload);
-  }
-}
-
 function isBindingTargetMenuOpen() {
   return Boolean(document.querySelector(".target-dropdown.open"));
 }
@@ -717,9 +688,14 @@ const bindingLastValues = {}; // Track last valid volume per binding ID
 const bindingMuteValues = {}; // Track last known mute per binding ID (from feedback)
 const bindingTriggerFlashTimes = {};
 const liveMidiValuesByControl = new Map();
-let midiUiBatcher = null;
 let volumeUpdateBatcher = null;
-const perfMidiDispatches = new Map();
+const midiEventDispatch = createMidiEventDispatch({
+  shouldPreserve: (payload) => bindingIsButtonLike(findBindingForEvent(payload), payload),
+  applyEvent: (payload) => applyMidiUiEvent(payload),
+});
+const queueMidiUiEvent = (payload) => midiEventDispatch.queue(payload);
+const queuePerfMidiDispatch = (payload) => midiEventDispatch.queuePerformance(payload);
+const takePerfMidiDispatch = (payload) => midiEventDispatch.takePerformance(payload);
 
 function midiControlSignature(deviceId, control) {
   if (!control) return "";
@@ -804,7 +780,7 @@ pluginRuntime = createPluginRuntime({
   requestBindingsRerender,
   mountConnectionsTabs: (options) => connectionsController?.mountConnectionsTabs?.(options),
   showAlert: (title, message = "") => showAlert(title, message),
-  showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
+  showConfirm: (options = {}) => alertsController.showConfirm(options),
 });
 
 // Feature modules
@@ -875,7 +851,7 @@ profilesFeature = createProfilesFeature({
     await midiFeature?.syncToProfileDevice?.(activeProfileMidiPreference);
   },
   showAlert: (title, message = "") => showAlert(title, message),
-  showChoices: (options = {}) => alertsController?.showChoices?.(options) || Promise.resolve("close"),
+  showChoices,
 });
 diagnosticInfo("profiles_factory_ok");
 diagnosticInfo("profiles_bind_start");
@@ -904,6 +880,7 @@ targetsFeature = createTargetsFeature({
 diagnosticInfo("targets_factory_ok");
 diagnosticInfo("targets_bind_start");
 targetsFeature.bindUi();
+void targetsFeature.start();
 diagnosticInfo("targets_bind_ok");
 
 diagnosticInfo("bindings_factory_start");
@@ -942,11 +919,24 @@ bindingsFeature = createBindingsFeature({
   createTargetIcon,
   resolveOsdTarget,
   showAlert: (title, message = "") => showAlert(title, message),
-  showChoices: (options = {}) => alertsController?.showChoices?.(options) || Promise.resolve("close"),
-  showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
+  showChoices,
+  showConfirm: (options = {}) => alertsController.showConfirm(options),
   onBindingsRendered: rebuildBindingLookupIndex,
 });
+const midiInventoryController = createMidiInventoryController({
+  invoke,
+  settingsStore,
+  syncSettingsUi: (patch) => settingsFeature?.syncAppSettingsUI?.(patch),
+  showChoices,
+  translate: t,
+  reportError: diagnosticError,
+});
+const queueMidiDeviceInventorySubmit = (reason) => midiInventoryController.queueSubmit(reason);
+const maybePromptMidiDeviceInventoryConsent = () => midiInventoryController.maybePromptConsent();
 diagnosticInfo("bindings_factory_ok");
+diagnosticInfo("bindings_bind_start");
+bindingsFeature.bindUi();
+diagnosticInfo("bindings_bind_ok");
 
 diagnosticInfo("midi_factory_start");
 midiFeature = createMidiFeature({
@@ -1391,7 +1381,7 @@ const pluginsTabs = createPluginsTabs({
   i18n: { t },
   getPluginHost,
   reloadPlugins: () => connectionsController?.reloadPlugins?.(),
-  showConfirm: (options = {}) => alertsController?.showConfirm?.(options) || Promise.resolve(false),
+  showConfirm: (options = {}) => alertsController.showConfirm(options),
 });
 
 connectionsController = createConnectionsPanelController({
@@ -1450,19 +1440,6 @@ async function loadAppSettings(options) {
     return settingsFeature.loadAppSettings(options);
   }
 }
-
-const alertsController = createAlertsController({
-  alertOverlay,
-  alertTitle,
-  alertMessage,
-  alertClose,
-  alertSecondary,
-  alertCancel,
-  alertOk,
-});
-const showAlert = (title, message = "") => alertsController.showAlert(message, title);
-const showChoices = (options = {}) => alertsController.showChoices(options);
-const closeAlert = (...args) => alertsController.closeAlert(...args);
 
 function showUpdateAvailableDialog(info = {}, { standaloneIfMainHidden = false } = {}) {
   const latest = String(info.latestVersion || info.version || "").trim();
@@ -1555,102 +1532,6 @@ if (resetAppDataButton) {
     localStorage.clear();
     window.location.reload();
   });
-}
-
-let midiDeviceInventorySubmitTimer = 0;
-let midiDeviceInventorySubmitInFlight = false;
-let midiDeviceInventorySubmitQueued = false;
-
-function applyMidiDeviceInventorySettings(settings = {}) {
-  const normalized = normalizeMidiDeviceInventorySettings(settings);
-  settingsStore.update({
-    midiDeviceInventoryConsent: normalized.consent,
-    midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
-  });
-  settingsFeature?.syncAppSettingsUI?.({
-    midiDeviceInventoryConsent: normalized.consent,
-    midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
-  });
-  return normalized;
-}
-
-async function updateMidiDeviceInventoryConsent(consent) {
-  const updated = await invoke("update_midi_device_inventory_consent", {
-    consent,
-    noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
-  });
-  return applyMidiDeviceInventorySettings(updated || {
-    consent,
-    noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
-  });
-}
-
-async function maybePromptMidiDeviceInventoryConsent() {
-  if (!shouldPromptMidiDeviceInventoryConsent(settingsStore.get())) {
-    return;
-  }
-  const choice = await showChoices({
-    title: t("privacy.midiDeviceInventoryTitle"),
-    message: t("privacy.midiDeviceInventoryMessage"),
-    panelClass: "alert-panel-content--midi-consent",
-    options: [
-      { id: "disabled", label: t("privacy.midiDeviceInventoryDecline"), variant: "secondary" },
-      { id: "enabled", label: t("privacy.midiDeviceInventoryAccept"), variant: "primary" },
-    ],
-  });
-  if (choice !== "enabled" && choice !== "disabled") {
-    return;
-  }
-  const consent = choice;
-  const normalized = await updateMidiDeviceInventoryConsent(consent).catch((error) => {
-    diagnosticError("midi_device_inventory_consent_update_failed", error);
-    return applyMidiDeviceInventorySettings({
-      consent: "disabled",
-      noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
-    });
-  });
-  if (normalized.consent === "enabled") {
-    queueMidiDeviceInventorySubmit("consent_prompt_enabled");
-  }
-}
-
-function queueMidiDeviceInventorySubmit(reason = "unknown") {
-  if (!canSubmitMidiDeviceInventory(settingsStore.get())) {
-    return;
-  }
-  midiDeviceInventorySubmitQueued = true;
-  if (midiDeviceInventorySubmitTimer) {
-    clearTimeout(midiDeviceInventorySubmitTimer);
-  }
-  midiDeviceInventorySubmitTimer = setTimeout(() => {
-    midiDeviceInventorySubmitTimer = 0;
-    flushMidiDeviceInventorySubmit(reason).catch((error) => {
-      diagnosticError("midi_device_inventory_submit_flush_failed", error);
-    });
-  }, 900);
-}
-
-async function flushMidiDeviceInventorySubmit(reason = "unknown") {
-  if (!midiDeviceInventorySubmitQueued || midiDeviceInventorySubmitInFlight) {
-    return;
-  }
-  midiDeviceInventorySubmitQueued = false;
-  if (!canSubmitMidiDeviceInventory(settingsStore.get())) {
-    return;
-  }
-  midiDeviceInventorySubmitInFlight = true;
-  try {
-    await invoke("submit_midi_device_inventory");
-  } catch (error) {
-    diagnosticError(`midi_device_inventory_submit_failed_${reason}`, error);
-  } finally {
-    midiDeviceInventorySubmitInFlight = false;
-    if (midiDeviceInventorySubmitQueued) {
-      flushMidiDeviceInventorySubmit("queued").catch((error) => {
-        diagnosticError("midi_device_inventory_submit_flush_failed", error);
-      });
-    }
-  }
 }
 
 function buildTargetOptions(currentTarget, isButton = false) {
@@ -1872,32 +1753,17 @@ document.addEventListener("pointercancel", () => {
 
 async function setupListeners() {
   if (performanceAudit.enabled) {
-    await listen("perf_audit_midi_dispatch", (event) => {
-      const payload = typeof event.payload === "string"
-        ? (() => {
-          try {
-            return JSON.parse(event.payload);
-          } catch {
-            return null;
-          }
-        })()
-        : event.payload;
+    await eventSubscriptions.subscribe("perf_audit_midi_dispatch", (event) => {
+      const payload = parseEventPayload(event);
       if (payload && typeof payload === "object") {
         queuePerfMidiDispatch(payload);
       }
     });
   }
 
-  await listen("profile_switch_requested", async (event) => {
+  await eventSubscriptions.subscribe("profile_switch_requested", async (event) => {
     if (profileSwitchInFlight) return;
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        payload = null;
-      }
-    }
+    const payload = parseEventPayload(event);
     const name = String(payload?.name || "").trim();
     if (!name || name === activeProfileName) return;
 
@@ -1916,15 +1782,8 @@ async function setupListeners() {
     }
   });
 
-  await listen("osd_settings_update", (event) => {
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        return;
-      }
-    }
+  await eventSubscriptions.subscribe("osd_settings_update", (event) => {
+    const payload = parseEventPayload(event);
     if (!payload || typeof payload !== "object") return;
     osdSettings = {
       enabled: Boolean(payload.enabled),
@@ -1942,15 +1801,8 @@ async function setupListeners() {
     if (!osdSettings.enabled) hideVolumeOsd();
   });
 
-  await listen("bindings_migrated", (event) => {
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        return;
-      }
-    }
+  await eventSubscriptions.subscribe("bindings_migrated", (event) => {
+    const payload = parseEventPayload(event);
     const count = Number(payload?.count || 0);
     if (!Number.isFinite(count) || count <= 0) {
       return;
@@ -1994,15 +1846,8 @@ async function setupListeners() {
     requestBindingsRerender("bindings_migrated");
   });
 
-  await listen("binding_aux_error", (event) => {
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        payload = null;
-      }
-    }
+  await eventSubscriptions.subscribe("binding_aux_error", (event) => {
+    const payload = parseEventPayload(event);
     if (!payload) return;
     if (payload.reason === "target_list_full") {
       showAlert(t("dialogs.targetListFullTitle"), t("dialogs.targetListFullMessage"));
@@ -2013,15 +1858,8 @@ async function setupListeners() {
     }
   });
 
-  await listen("binding_action_error", (event) => {
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        payload = null;
-      }
-    }
+  await eventSubscriptions.subscribe("binding_action_error", (event) => {
+    const payload = parseEventPayload(event);
     if (!payload || typeof payload !== "object") return;
     const params = (payload.params && typeof payload.params === "object") ? payload.params : {};
     const title = String(
@@ -2033,15 +1871,8 @@ async function setupListeners() {
     showAlert(title, message);
   });
 
-  await listen("binding_aux_assign_update", (event) => {
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        payload = null;
-      }
-    }
+  await eventSubscriptions.subscribe("binding_aux_assign_update", (event) => {
+    const payload = parseEventPayload(event);
     if (payload?.binding_id) {
       const binding = bindings.find((b) => b && b.id === payload.binding_id);
       if (binding) {
@@ -2065,15 +1896,8 @@ async function setupListeners() {
     requestBindingsRerender("binding_aux_assign_update");
   });
 
-  await listen("binding_aux_mute_update", (event) => {
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        payload = null;
-      }
-    }
+  await eventSubscriptions.subscribe("binding_aux_mute_update", (event) => {
+    const payload = parseEventPayload(event);
     if (!payload || !payload.binding_id) return;
     bindingMuteValues[payload.binding_id] = Boolean(payload.muted);
     const muteButton = findInlineMuteButton(payload.binding_id);
@@ -2086,19 +1910,11 @@ async function setupListeners() {
     showMuteOsd(primaryTarget, Boolean(payload.muted));
   });
 
-  await listen("midi_event", (event) => {
+  await eventSubscriptions.subscribe("midi_event", (event) => {
     if (mainScreen.classList.contains("hidden")) {
       midiStatus.textContent = t("midi.eventStatus", { payload: JSON.stringify(event.payload) });
     }
-    const payload = typeof event.payload === "string"
-      ? (() => {
-        try {
-          return JSON.parse(event.payload);
-        } catch {
-          return null;
-        }
-      })()
-      : event.payload;
+    const payload = parseEventPayload(event);
 
     if (!payload || typeof payload !== "object") {
       return;
@@ -2122,72 +1938,18 @@ async function setupListeners() {
     }
   });
 
-  await listen("midi_connection_status", (event) => {
-    const payload = typeof event.payload === "string"
-      ? (() => {
-        try {
-          return JSON.parse(event.payload);
-        } catch {
-          return null;
-        }
-      })()
-      : event.payload;
-    if (!payload || typeof payload !== "object" || !midiStatus) return;
-    const routes = normalizeMidiRoutes({ routes: payload.routes || [] });
-    const routeCount = Number(payload.routeCount ?? payload.route_count ?? routes.length);
-    if (Number.isFinite(routeCount)) {
-      activeMidiRouteCount = Math.max(0, routeCount);
-    }
-    if (payload.state === "disconnected") {
-      if (routes.length > 0) {
-        const first = routes[0] || {};
-        showMain(
-          first.inputDeviceName || first.inputDeviceId,
-          first.outputDeviceName || first.outputDeviceId,
-          { routeCount: routes.length, routes },
-        );
-      } else {
-        midiStatus.textContent = t("midi.disconnected");
-      }
-    } else if (payload.state === "reconnecting") {
-      midiStatus.textContent = t("midi.searchingDevices");
-    } else if (payload.state === "failed") {
-      midiStatus.textContent = t("midi.connectFailed", { message: payload.reason || "MIDI connection failed" });
-    } else if (payload.state === "connected") {
-      if (routes.length > 0) {
-        const first = routes[0] || {};
-        showMain(
-          first.inputDeviceName || first.inputDeviceId,
-          first.outputDeviceName || first.outputDeviceId,
-          { routeCount: routes.length, routes },
-        );
-      } else {
-        midiStatus.textContent = "Connected.";
-      }
-    }
+  await eventSubscriptions.subscribe("midi_connection_status", (event) => {
+    const payload = parseEventPayload(event);
+    midiConnectionStatus.handle(payload);
   });
 
-  await listen("focused_session_update", (event) => {
-    let payload = event.payload ?? null;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        payload = null;
-      }
-    }
+  await eventSubscriptions.subscribe("focused_session_update", (event) => {
+    const payload = parseEventPayload(event);
     updateFocusedSessionState(payload);
   });
 
-  await listen("mute_update", (event) => {
-    let payload = event.payload;
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        return;
-      }
-    }
+  await eventSubscriptions.subscribe("mute_update", (event) => {
+    const payload = parseEventPayload(event);
     if (!payload) return;
     updateIntegrationStateFromEventPayload(payload);
     if (Object.prototype.hasOwnProperty.call(payload, "focus_session")) {
@@ -2231,15 +1993,8 @@ async function setupListeners() {
     }
   });
 
-  await listen("volume_update", (event) => {
-    let payload = event.payload ?? {};
-    if (typeof payload === "string") {
-      try {
-        payload = JSON.parse(payload);
-      } catch {
-        payload = {};
-      }
-    }
+  await eventSubscriptions.subscribe("volume_update", (event) => {
+    const payload = parseEventPayload(event, {});
     if (!payload || typeof payload !== "object") {
       return;
     }
@@ -2507,5 +2262,10 @@ export async function startMidimasterApp() {
 }
 
 window.addEventListener("beforeunload", () => {
+  targetsFeature?.dispose?.();
+  settingsFeature?.dispose?.();
+  midiInventoryController.dispose();
+  midiEventDispatch.clearPerformance();
+  eventSubscriptions.dispose();
   invoke("stop_midi_device").catch(() => { });
 });

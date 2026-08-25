@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { DOM_REF_IDS } from "../src/app/dom_refs.js";
+import { readCssBundle } from "./css_bundle.mjs";
 
 const [html, domRefs, bindings, targets, tableCss, configCss, controlsCss] = await Promise.all([
   readFile(new URL("../src/index.html", import.meta.url), "utf8"),
@@ -7,7 +9,7 @@ const [html, domRefs, bindings, targets, tableCss, configCss, controlsCss] = awa
   readFile(new URL("../src/features/bindings/bindings.js", import.meta.url), "utf8"),
   readFile(new URL("../src/features/targets/targets.js", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/bindings/table.css", import.meta.url), "utf8"),
-  readFile(new URL("../src/styles/bindings/config-panel.css", import.meta.url), "utf8"),
+  readCssBundle(new URL("../src/styles/bindings/config-panel.css", import.meta.url)),
   readFile(new URL("../src/styles/osd-and-controls.css", import.meta.url), "utf8"),
 ]);
 
@@ -28,7 +30,7 @@ for (const id of [
   "binding-config-soundboard-virtual-mic",
 ]) {
   assert.match(html, new RegExp(`id="${id}"`), `${id} should exist`);
-  assert.match(domRefs, new RegExp(`getElementById\\("${id}"\\)`), `${id} should have a DOM reference`);
+  assert.ok(Object.values(DOM_REF_IDS).includes(id), `${id} should have a DOM reference`);
 }
 
 assert.match(targets, /kind: "soundboard-target"/, "Soundboard should be in the target picker");
@@ -46,6 +48,8 @@ assert.ok(cancelCleanupStart >= 0 && cancelCleanupEnd > cancelCleanupStart, "emp
 assert.doesNotMatch(bindings.slice(cancelCleanupStart, cancelCleanupEnd), /remove_binding/, "Canceling an empty Soundboard target must not delete the binding");
 assert.match(bindings, /bindingConfigSoundboardSection\.classList\.toggle\("is-empty", !mapping\)/, "the editor should expose a dedicated empty state before a file is selected");
 assert.match(html, /soundboard-waveform-empty[\s\S]*?data-i18n="soundboard\.noFile"/, "the existing waveform should have an in-place empty placeholder");
+assert.doesNotMatch(html, /binding-config-soundboard-summary|binding-config-soundboard-edit/, "normal Button Configuration should not include a redundant Soundboard card");
+assert.doesNotMatch(`${domRefs}\n${bindings}`, /bindingConfigSoundboardSummary|bindingConfigSoundboardEdit/, "removed Soundboard summary controls should have no stale references");
 assert.match(configCss, /binding-config-section--soundboard\.is-empty \.soundboard-waveform-empty[\s\S]*?display: flex/, "the in-place waveform placeholder should appear before a file is selected");
 assert.doesNotMatch(configCss, /is-empty > :not\(\.soundboard-file-row\)/, "the empty state should keep the existing editor visible");
 assert.match(bindings, /getTargets\(binding\)\.some\(isSoundboardTarget\)[\s\S]*?soundboardPage: true/, "Soundboard rows should open the dedicated editor even with another primary action");

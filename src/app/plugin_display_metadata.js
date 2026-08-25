@@ -89,8 +89,6 @@ export function createPluginDisplayMetadataCache({ invoke } = {}) {
     const pending = Promise.resolve(invoke("read_plugin_base64", {
       pluginId,
       relPath,
-      plugin_id: pluginId,
-      rel_path: relPath,
     })).then((encoded) => {
       const base64 = normalizeId(encoded);
       if (!base64) return;

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { parseArgs, requireArg } from "./lib/cli.mjs";
+import { parseArgs, requireArg, runMain } from "./lib/cli.mjs";
 import { readJson, writeJson } from "./lib/files.mjs";
 
 function wildcard(pattern, value) {
@@ -147,9 +146,4 @@ async function main() {
   if (!result.passed) process.exitCode = 1;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error(error.stack ?? error.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

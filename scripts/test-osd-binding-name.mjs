@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { DOM_REF_IDS } from "../src/app/dom_refs.js";
+import { readCssBundle } from "./css_bundle.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const [html, domRefs, settings, profiles, osd, osdEntry, css, rustSettings, runtime, aux, commands] = await Promise.all([
@@ -9,7 +11,7 @@ const [html, domRefs, settings, profiles, osd, osdEntry, css, rustSettings, runt
   read("../src/features/profiles/profiles.js"),
   read("../src/features/osd/osd.js"),
   read("../src/osd_entry.js"),
-  read("../src/styles/settings.css"),
+  readCssBundle(new URL("../src/styles/settings.css", import.meta.url)),
   read("../src-tauri/src/commands/settings.rs"),
   read("../src-tauri/src/runtime_midi.rs"),
   read("../src-tauri/src/runtime_midi/aux_controls.rs"),
@@ -18,7 +20,7 @@ const [html, domRefs, settings, profiles, osd, osdEntry, css, rustSettings, runt
 
 assert.match(html, /id="osd-label-mode"[\s\S]*?value="target"[\s\S]*?value="binding"/);
 assert.match(html, /data-i18n="settings\.general">General<[\s\S]*?data-i18n="settings\.enabled">Enabled<[\s\S]*?id="osd-enabled"[\s\S]*?data-i18n="settings\.monitor">Monitor<[\s\S]*?id="osd-monitor"/);
-assert.match(domRefs, /const osdLabelModeSelect = document\.getElementById\("osd-label-mode"\)/);
+assert.equal(DOM_REF_IDS.osdLabelModeSelect, "osd-label-mode");
 assert.match(settings, /renderSettingsSelectDropdown\(d\.osdLabelModeSelect\)/, "label mode should use the styled settings dropdown");
 assert.match(settings, /showBindingName: d\.osdLabelModeSelect\.value === "binding"/);
 assert.match(settings, /showBindingName: Boolean\(settings\.show_binding_name/);

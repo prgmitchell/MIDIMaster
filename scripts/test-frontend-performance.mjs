@@ -183,6 +183,10 @@ async function testPluginIconsAreReadyForFirstBindingRender() {
   assert.equal(metadata.getIntegrationDisplayMetadata("hue")?.icon_data, null);
   assert.equal(calls.filter(([command]) => command === "list_plugins").length, 1);
   assert.equal(calls.filter(([command]) => command === "read_plugin_base64").length, 1);
+  assert.deepEqual(calls.find(([command]) => command === "read_plugin_base64"), [
+    "read_plugin_base64",
+    { pluginId: "obs", relPath: "OBSLogo.png" },
+  ]);
 
   const targetCore = createTargetCore({
     getSessions: () => [],

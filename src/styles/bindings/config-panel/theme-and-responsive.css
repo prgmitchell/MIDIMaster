@@ -1,0 +1,429 @@
+body[data-theme] .binding-config-panel--button .binding-config-section,
+body[data-theme] .binding-config-panel--button .binding-config-preview-stage,
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary--midi,
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary--status {
+  border-color: var(--control-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, var(--surface-raised)) 0%, var(--surface) 100%);
+}
+
+body[data-theme] #binding-config-panel.binding-config-panel--button .binding-config-preview-meta {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-toggle-row {
+  border-color: transparent;
+  background: transparent;
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-preview-button-face {
+  border-color: var(--control-border);
+  background: color-mix(in srgb, var(--control-bg) 72%, var(--surface-muted) 28%);
+  color: var(--text-secondary);
+}
+
+body[data-theme="dark"] .binding-config-panel--button .binding-config-preview-button-face {
+  background: color-mix(in srgb, var(--control-bg) 58%, var(--surface-muted) 42%);
+  color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-muted) 16%);
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-preview-button-face.is-active {
+  border-color: color-mix(in srgb, var(--accent) 74%, var(--control-border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 76%, white) 0%, var(--accent) 100%);
+  color: #f7fbff;
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-toggle-title,
+body[data-theme] .binding-config-panel--button .binding-config-preview-stage-title,
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary-value {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-panel--button .binding-config-toggle-help,
+body[data-theme] .binding-config-panel--button .binding-config-preview-summary-label {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-config-panel--macro-page .binding-config-section--macro {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body[data-theme] .binding-config-macro-name-field,
+body[data-theme] .binding-config-macro-add-label,
+body[data-theme] .binding-config-macro-properties-nav {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-config-macro-name-field input,
+body[data-theme] .binding-config-macro-property-select,
+body[data-theme] .binding-config-macro-property-field input[type="number"],
+body[data-theme] .binding-config-macro-value-editor {
+  border-color: var(--control-border);
+  background: var(--control-bg);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-macro-action-dropdown .target-button:disabled {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-config-macro-steps-panel,
+body[data-theme] .binding-config-macro-properties-panel {
+  border-color: var(--control-border);
+  background: color-mix(in srgb, var(--surface-raised) 84%, var(--surface) 16%);
+}
+
+body[data-theme] .binding-config-macro-panel-title,
+body[data-theme] .binding-config-macro-properties-header,
+body[data-theme] .binding-config-macro-selected-type,
+body[data-theme] .binding-config-macro-property-field {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-macro-count,
+body[data-theme] .binding-config-macro-step-number {
+  background: color-mix(in srgb, var(--control-bg-hover) 78%, var(--surface-muted) 22%);
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-config-macro-step-card {
+  border-color: color-mix(in srgb, var(--control-border) 78%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 64%, var(--surface) 36%);
+}
+
+body[data-theme] .binding-config-macro-row-summary,
+body[data-theme] .binding-config-macro-icon-button,
+body[data-theme] .binding-config-macro-value-editor span,
+body[data-theme] .binding-config-macro-info-box {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-config-macro-icon-button:hover,
+body[data-theme] .binding-config-macro-icon-button:focus-visible {
+  color: var(--text-primary);
+  background: var(--control-bg-hover);
+  border-color: var(--control-border);
+}
+
+body[data-theme] .binding-config-macro-overflow-menu {
+  border-color: var(--control-border);
+  background: var(--surface-raised);
+}
+
+body[data-theme] .binding-config-macro-overflow-menu button {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-macro-overflow-menu button.is-danger {
+  color: var(--danger);
+}
+
+body[data-theme] .binding-config-macro-overflow-menu button:hover,
+body[data-theme] .binding-config-macro-info-box {
+  background: var(--control-bg-hover);
+}
+
+body[data-theme] .binding-config-macro-overflow-menu button.is-danger:hover {
+  background: var(--danger-soft);
+}
+
+body[data-theme] .binding-config-macro-step,
+body[data-theme] .binding-config-macro-action {
+  border-color: color-mix(in srgb, var(--control-border) 78%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 64%, var(--surface) 36%);
+}
+
+body[data-theme] .binding-config-macro-action {
+  background: color-mix(in srgb, var(--surface) 78%, var(--surface-raised) 22%);
+}
+
+body[data-theme] .binding-config-macro-step-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--control-border));
+  background: color-mix(in srgb, var(--control-bg-hover) 54%, var(--surface-raised) 46%);
+}
+
+body[data-theme] .binding-config-macro-step-card.is-selected,
+body[data-theme] .binding-config-macro-step-card.is-selected:hover {
+  border-color: color-mix(in srgb, var(--accent) 84%, var(--control-border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised) 88%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+body[data-theme] .binding-config-macro-step-card.is-selected:hover {
+  border-color: color-mix(in srgb, var(--accent) 92%, var(--control-border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-raised) 86%);
+}
+
+body[data-theme] .binding-config-macro-row-title {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-macro-row-summary,
+body[data-theme] .binding-config-macro-empty,
+body[data-theme] .binding-config-macro-empty-state,
+body[data-theme] .binding-config-macro-drag,
+body[data-theme] .binding-config-macro-number,
+body[data-theme] .binding-config-macro-summary-empty,
+body[data-theme] .binding-config-macro-summary-more {
+  color: var(--text-secondary);
+}
+
+body[data-theme] .binding-config-macro-empty,
+body[data-theme] .binding-config-macro-empty-state {
+  border-color: color-mix(in srgb, var(--control-border) 72%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, var(--surface-raised) 30%);
+}
+
+body[data-theme] .binding-config-macro-drag:hover,
+body[data-theme] .binding-config-macro-drag:focus-visible {
+  color: var(--text-primary);
+  background: var(--control-bg-hover);
+}
+
+body[data-theme] .binding-config-macro-number input,
+body[data-theme] .binding-config-macro-select {
+  border-color: var(--control-border);
+  background: var(--control-bg);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-macro-placeholder {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--control-border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+body[data-theme] .binding-config-macro-ghost {
+  border-color: var(--control-border);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-macro-parallel-children {
+  border-left-color: color-mix(in srgb, var(--accent) 34%, var(--control-border));
+}
+
+@media (max-width: 980px) {
+  .binding-config-macro-designer {
+    --macro-editor-columns: minmax(0, 1fr);
+  }
+
+  .binding-config-macro-designer-header {
+    align-items: stretch;
+  }
+
+  .binding-config-macro-name-field {
+    width: 100%;
+  }
+
+  .binding-config-macro-add-actions .binding-config-button {
+    min-width: 0;
+  }
+
+  .binding-config-macro-designer-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .binding-config-macro-step-card {
+    grid-template-columns: 24px 34px 38px minmax(0, 1fr) 32px;
+  }
+}
+
+body[data-theme] .binding-config-midi-device {
+  color: var(--text-primary);
+}
+
+body[data-theme] .binding-config-midi-control {
+  color: var(--text-secondary);
+}
+
+.binding-config-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid rgba(122, 141, 179, 0.16);
+  flex: 0 0 auto;
+}
+
+.binding-config-footer button {
+  min-width: 136px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+@media (max-height: 780px) {
+  .target-panel {
+    padding: 6px;
+  }
+
+  .target-panel-header {
+    padding: 8px 12px;
+  }
+
+  .binding-config-curve-cards {
+    gap: 8px;
+  }
+
+  .binding-config-curve-toolbar {
+    grid-template-columns: auto minmax(150px, 1fr) auto auto;
+    gap: 8px;
+  }
+
+  .binding-config-content {
+    max-height: calc(100vh - 24px);
+  }
+
+  .binding-config-layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(236px, 0.8fr);
+  }
+
+  .binding-config-main-column,
+  .binding-config-preview-column {
+    padding: 6px;
+  }
+
+  .binding-config-main-column,
+  .binding-config-stack,
+  .binding-config-section {
+    gap: 8px;
+  }
+
+  .binding-config-section,
+  .binding-config-preview-shell {
+    padding: 8px;
+  }
+
+  .binding-config-section--curve {
+    gap: 8px;
+  }
+
+  .binding-config-button,
+  .binding-config-mode-trigger,
+  .binding-config-mode-option,
+  .binding-config-stack input[type="text"],
+  .binding-config-curve-preset-button {
+    height: 36px;
+  }
+
+  .binding-config-button {
+    min-width: 78px;
+    padding: 0 12px;
+  }
+
+  .binding-config-label {
+    min-height: 36px;
+    padding: 0 12px;
+  }
+
+  .binding-config-curve-card {
+    min-height: 82px;
+    gap: 6px;
+    padding: 7px;
+  }
+
+  .binding-config-curve-card-visual {
+    padding: 6px;
+  }
+
+  .binding-config-curve-help {
+    min-height: auto;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+}
+
+@media (max-width: 1100px) {
+  .binding-config-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .binding-config-main-column {
+    border-right: none;
+    border-bottom: 1px solid rgba(122, 141, 179, 0.16);
+  }
+
+  .binding-config-preview-card {
+    grid-template-columns: 1fr;
+  }
+
+  .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "name"
+      "curve"
+      "feedback"
+      "mute"
+      "assign"
+      "live"
+      "learn";
+  }
+}
+
+@media (max-width: 860px) {
+  .binding-config-curve-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .binding-config-curve-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .binding-config-curve-toolbar-label,
+  .binding-config-curve-preset-root {
+    grid-column: 1 / -1;
+  }
+
+  .binding-config-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .binding-config-preview-stage {
+    min-height: 300px;
+  }
+
+  .binding-config-preview-card {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 620px) {
+  .binding-config-content {
+    width: min(96vw, 1370px);
+  }
+
+  .binding-config-main-column,
+  .binding-config-preview-column {
+    padding: 14px;
+  }
+
+  .binding-config-curve-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .binding-config-curve-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .binding-config-curve-preset-menu {
+    width: min(280px, calc(96vw - 48px));
+  }
+
+  .binding-config-preview-track {
+    min-height: 220px;
+  }
+
+  .binding-config-footer {
+    flex-direction: column;
+  }
+
+  .binding-config-footer button {
+    width: 100%;
+  }
+}

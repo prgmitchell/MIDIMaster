@@ -634,6 +634,7 @@
   "midi.applyingChange": "正在应用 MIDI 设备更改...",
   "midi.connectFailed": "连接失败: {message}",
   "midi.disconnected": "MIDI设备已断开 .",
+  "midi.connected": "已连接。",
   "midi.reconnectedProfile": "重新连接到配置 MIDI 设备 .",
   "midi.selectInputDevice": "选择输入设备",
   "midi.selectOutputDevice": "选择输出设备",

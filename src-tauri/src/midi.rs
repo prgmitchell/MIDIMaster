@@ -1,13 +1,15 @@
-use crate::model::{
-    AuxiliaryControl, Binding, BindingAction, DeviceInfo, MidiDeviceRoute, MidiEvent,
-    MidiMessageType, MidiMode,
+mod ports;
+mod protocol;
+
+use self::ports::*;
+use self::protocol::{
+    binding_feedback_send, binding_light_feedback_sends, build_feedback_message,
+    parse_midi_message, send_feedback_messages, FeedbackMessage,
 };
+use crate::model::{Binding, DeviceInfo, MidiDeviceRoute, MidiEvent, MidiMessageType};
 use crate::run_logger;
 use anyhow::{anyhow, Result};
-use midir::{
-    Ignore, MidiInput, MidiInputConnection, MidiInputPort, MidiOutput, MidiOutputConnection,
-    MidiOutputPort,
-};
+use midir::{Ignore, MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnection};
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -15,17 +17,12 @@ use std::sync::{
 };
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-const MIDI_PORT_PREFIX: &str = "midi:";
 const LOG_MIDI_MESSAGES: bool = false;
 const MIDI_DIAGNOSTIC_MIN_INTERVAL_MS: u128 = 250;
 const EMPTY_INPUT_ENUMERATION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 const OUTPUT_RECONNECT_COOLDOWN: Duration = Duration::from_secs(5);
 const OUTPUT_RECONNECT_SKIPPED_LOG_INTERVAL: Duration = Duration::from_secs(30);
 const MAX_OUTPUT_RECONNECT_FAILURES: u32 = 3;
-static INPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
-static OUTPUT_DEVICE_SIGNATURE: OnceLock<Mutex<String>> = OnceLock::new();
-static INPUT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(0);
-static OUTPUT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(0);
 static EMPTY_INPUT_ENUMERATION_LOG_STATE: OnceLock<Mutex<EmptyEnumerationLogState>> =
     OnceLock::new();
 static INPUT_DIAGNOSTICS: OnceLock<Mutex<HashMap<MidiDiagnosticKey, MidiDiagnosticState>>> =
@@ -54,20 +51,6 @@ struct EmptyEnumerationLogState {
     last_logged_at: Option<Instant>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct FeedbackMessage {
-    logical_bytes: Vec<u8>,
-    logical_raw_midi_value: u16,
-    physical_bytes: Vec<u8>,
-    physical_messages: Vec<Vec<u8>>,
-    physical_channel: u8,
-    physical_controller: u8,
-    physical_msg_type: MidiMessageType,
-    physical_raw_midi_value: u16,
-    normalized_value: f32,
-    protocol: &'static str,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MidiConnectionHealth {
@@ -92,81 +75,6 @@ pub struct MidiManager {
     output_routes: HashMap<String, MidiOutputRoute>,
 }
 
-struct BindingLightFeedbackSend {
-    device_id: String,
-    channel: u8,
-    controller: u8,
-    value: f32,
-    msg_type: MidiMessageType,
-    use_binding_protocol: bool,
-}
-
-fn primary_light_feedback_send(
-    binding: &Binding,
-    value: f32,
-    use_binding_protocol: bool,
-) -> BindingLightFeedbackSend {
-    BindingLightFeedbackSend {
-        device_id: binding.device_id.clone(),
-        channel: binding.control.channel,
-        controller: binding.control.controller,
-        value,
-        msg_type: binding.control.msg_type.clone(),
-        use_binding_protocol,
-    }
-}
-
-fn indicator_light_feedback_send(
-    indicator: &AuxiliaryControl,
-    value: f32,
-) -> BindingLightFeedbackSend {
-    BindingLightFeedbackSend {
-        device_id: indicator.device_id.clone(),
-        channel: indicator.channel,
-        controller: indicator.controller,
-        value,
-        msg_type: indicator.msg_type.clone(),
-        use_binding_protocol: false,
-    }
-}
-
-fn light_feedback_send_matches_primary(send: &BindingLightFeedbackSend, binding: &Binding) -> bool {
-    send.device_id == binding.device_id
-        && send.channel == binding.control.channel
-        && send.controller == binding.control.controller
-        && send.msg_type == binding.control.msg_type
-}
-
-fn binding_light_feedback_sends(binding: &Binding, value: f32) -> Vec<BindingLightFeedbackSend> {
-    if !binding.feedback_enabled {
-        return Vec::new();
-    }
-    let Some(indicator) = binding.indicator_feedback_control() else {
-        return vec![primary_light_feedback_send(binding, value, true)];
-    };
-
-    let indicator_send = indicator_light_feedback_send(indicator, value);
-    let should_suppress_primary = !light_feedback_send_matches_primary(&indicator_send, binding);
-    let mut sends = vec![indicator_send];
-    if should_suppress_primary {
-        sends.push(primary_light_feedback_send(binding, 0.0, false));
-    }
-    sends
-}
-
-fn binding_feedback_send(binding: &Binding, value: f32) -> Option<BindingLightFeedbackSend> {
-    if !binding.feedback_enabled {
-        return None;
-    }
-    if !binding.is_button_binding() {
-        if let Some(output) = binding.custom_feedback_output_control() {
-            return Some(indicator_light_feedback_send(output, value));
-        }
-    }
-
-    Some(primary_light_feedback_send(binding, value, true))
-}
-
 struct MidiInputRoute {
     input_connection: Option<MidiInputConnection<()>>,
     input_device_id: String,
@@ -186,14 +94,6 @@ struct MidiOutputRoute {
     reconnect_failures: u32,
     connection_suspect: bool,
     connection_suspect_reason: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-struct PreparedMidiRoute {
-    input_device_id: String,
-    output_device_id: String,
-    input_device_name: Option<String>,
-    output_device_name: Option<String>,
 }
 
 impl MidiManager {
@@ -1386,247 +1286,6 @@ impl MidiManager {
     }
 }
 
-fn build_feedback_message(
-    channel: u8,
-    controller: u8,
-    value: f32,
-    msg_type: &MidiMessageType,
-    binding: Option<&Binding>,
-    output_device_name: &str,
-) -> FeedbackMessage {
-    let logical = build_direct_feedback_bytes(channel, controller, value, msg_type);
-    if let Some(binding) = binding {
-        if let Some(physical) =
-            build_xtouch_mini_standard_feedback(binding, value, output_device_name)
-        {
-            return FeedbackMessage {
-                logical_bytes: logical.bytes,
-                logical_raw_midi_value: logical.raw_midi_value,
-                physical_bytes: physical.bytes,
-                physical_messages: physical.messages,
-                physical_channel: physical.channel,
-                physical_controller: physical.controller,
-                physical_msg_type: physical.msg_type,
-                physical_raw_midi_value: physical.raw_midi_value,
-                normalized_value: logical.normalized_value,
-                protocol: "xtouch_mini_standard_fan",
-            };
-        }
-        if let Some(physical) = build_xtouch_mc_vpot_feedback(binding, value, output_device_name) {
-            return FeedbackMessage {
-                logical_bytes: logical.bytes,
-                logical_raw_midi_value: logical.raw_midi_value,
-                physical_bytes: physical.bytes,
-                physical_messages: physical.messages,
-                physical_channel: physical.channel,
-                physical_controller: physical.controller,
-                physical_msg_type: physical.msg_type,
-                physical_raw_midi_value: physical.raw_midi_value,
-                normalized_value: logical.normalized_value,
-                protocol: "xtouch_mc_vpot_fan",
-            };
-        }
-    }
-
-    FeedbackMessage {
-        logical_bytes: logical.bytes.clone(),
-        logical_raw_midi_value: logical.raw_midi_value,
-        physical_bytes: logical.bytes.clone(),
-        physical_messages: logical.messages,
-        physical_channel: logical.channel,
-        physical_controller: logical.controller,
-        physical_msg_type: logical.msg_type,
-        physical_raw_midi_value: logical.raw_midi_value,
-        normalized_value: logical.normalized_value,
-        protocol: "direct",
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct FeedbackBytes {
-    bytes: Vec<u8>,
-    messages: Vec<Vec<u8>>,
-    channel: u8,
-    controller: u8,
-    msg_type: MidiMessageType,
-    normalized_value: f32,
-    raw_midi_value: u16,
-}
-
-fn build_direct_feedback_bytes(
-    channel: u8,
-    controller: u8,
-    value: f32,
-    msg_type: &MidiMessageType,
-) -> FeedbackBytes {
-    let normalized_value = value.clamp(0.0, 1.0);
-
-    match msg_type {
-        MidiMessageType::Note => {
-            let status = 0x90 | (channel & 0x0F);
-            let velocity = (normalized_value * 127.0).round() as u8;
-            let bytes = vec![status, controller, velocity];
-            FeedbackBytes {
-                messages: vec![bytes.clone()],
-                bytes,
-                channel: channel & 0x0F,
-                controller,
-                msg_type: msg_type.clone(),
-                normalized_value,
-                raw_midi_value: velocity as u16,
-            }
-        }
-        MidiMessageType::PitchBend => {
-            let status = 0xE0 | (channel & 0x0F);
-            let value14 = (normalized_value * 16383.0).round() as u16;
-            let lsb = (value14 & 0x7F) as u8;
-            let msb = ((value14 >> 7) & 0x7F) as u8;
-            let bytes = vec![status, lsb, msb];
-            FeedbackBytes {
-                messages: vec![bytes.clone()],
-                bytes,
-                channel: channel & 0x0F,
-                controller: 0xE0,
-                msg_type: msg_type.clone(),
-                normalized_value,
-                raw_midi_value: value14,
-            }
-        }
-        MidiMessageType::ControlChange => {
-            let status = 0xB0 | (channel & 0x0F);
-            let value7 = (normalized_value * 127.0).round() as u8;
-            let bytes = vec![status, controller, value7];
-            FeedbackBytes {
-                messages: vec![bytes.clone()],
-                bytes,
-                channel: channel & 0x0F,
-                controller,
-                msg_type: msg_type.clone(),
-                normalized_value,
-                raw_midi_value: value7 as u16,
-            }
-        }
-        MidiMessageType::ProgramChange => {
-            let status = 0xC0 | (channel & 0x0F);
-            let bytes = vec![status, controller & 0x7F];
-            FeedbackBytes {
-                messages: vec![bytes.clone()],
-                bytes,
-                channel: channel & 0x0F,
-                controller: controller & 0x7F,
-                msg_type: msg_type.clone(),
-                normalized_value,
-                raw_midi_value: (controller & 0x7F) as u16,
-            }
-        }
-    }
-}
-
-fn build_xtouch_mini_standard_feedback(
-    binding: &Binding,
-    value: f32,
-    output_device_name: &str,
-) -> Option<FeedbackBytes> {
-    if !is_xtouch_mini_output(output_device_name)
-        || binding.action != BindingAction::Volume
-        || binding.is_button_binding()
-        || binding.control.msg_type != MidiMessageType::ControlChange
-        || !(1..=8).contains(&binding.control.controller)
-    {
-        return None;
-    }
-
-    let normalized_value = value.clamp(0.0, 1.0);
-    let channel = binding.control.channel & 0x0F;
-    let status = 0xB0 | channel;
-    let behavior_controller = binding.control.controller;
-    let value_controller = behavior_controller + 8;
-    let raw_midi_value = xtouch_mini_standard_ring_value(normalized_value);
-    let behavior_message = vec![status, behavior_controller, 2];
-    let value_message = vec![status, value_controller, raw_midi_value as u8];
-
-    Some(FeedbackBytes {
-        bytes: value_message.clone(),
-        messages: vec![behavior_message, value_message],
-        channel,
-        controller: value_controller,
-        msg_type: MidiMessageType::ControlChange,
-        normalized_value,
-        raw_midi_value,
-    })
-}
-
-fn build_xtouch_mc_vpot_feedback(
-    binding: &Binding,
-    value: f32,
-    output_device_name: &str,
-) -> Option<FeedbackBytes> {
-    if !is_xtouch_mc_vpot_output(output_device_name)
-        || binding.action != BindingAction::Volume
-        || binding.mode != MidiMode::Relative
-        || binding.control.msg_type != MidiMessageType::ControlChange
-        || binding.control.channel != 0
-        || !(16..=23).contains(&binding.control.controller)
-    {
-        return None;
-    }
-
-    let normalized_value = value.clamp(0.0, 1.0);
-    let knob_index = binding.control.controller - 16;
-    let physical_controller = 48 + knob_index;
-    let raw_midi_value = xtouch_mc_vpot_fan_value(normalized_value);
-    let bytes = vec![0xB0, physical_controller, raw_midi_value as u8];
-    Some(FeedbackBytes {
-        messages: vec![bytes.clone()],
-        bytes,
-        channel: 0,
-        controller: physical_controller,
-        msg_type: MidiMessageType::ControlChange,
-        normalized_value,
-        raw_midi_value,
-    })
-}
-
-fn is_xtouch_mini_output(output_device_name: &str) -> bool {
-    output_device_name
-        .to_ascii_uppercase()
-        .contains("X-TOUCH MINI")
-}
-
-fn is_xtouch_mc_vpot_output(output_device_name: &str) -> bool {
-    let normalized_name = output_device_name.to_ascii_uppercase();
-    normalized_name.contains("X-TOUCH MINI")
-        || normalized_name.contains("X-TOUCH-EXT")
-        || normalized_name.contains("X-TOUCH EXTENDER")
-}
-
-fn xtouch_mc_vpot_fan_value(normalized_value: f32) -> u16 {
-    let value = normalized_value.clamp(0.0, 1.0);
-    if value <= 0.0 {
-        return 0;
-    }
-    let led_value = (value * 11.0).ceil().clamp(1.0, 11.0) as u16;
-    0x20 | led_value
-}
-
-fn xtouch_mini_standard_ring_value(normalized_value: f32) -> u16 {
-    let value = normalized_value.clamp(0.0, 1.0);
-    if value <= 0.0 {
-        return 0;
-    }
-    (value * 13.0).ceil().clamp(1.0, 13.0) as u16
-}
-
-fn send_feedback_messages<F, E>(messages: &[Vec<u8>], mut send: F) -> std::result::Result<(), E>
-where
-    F: FnMut(&[u8]) -> std::result::Result<(), E>,
-{
-    for message in messages {
-        send(message)?;
-    }
-    Ok(())
-}
-
 fn log_midi_input_if_needed(event: &MidiEvent, raw_message: &[u8]) {
     let raw_value = event.value_14.unwrap_or(event.value as u16);
     let max_value = diagnostic_max_value(&event.msg_type);
@@ -1852,207 +1511,6 @@ fn note_non_empty_input_enumeration() {
     }
 }
 
-fn log_inventory_if_changed(kind: &str, devices: &[DeviceInfo]) {
-    let signature = devices
-        .iter()
-        .map(|device| format!("{}:{}", device.id, device.name))
-        .collect::<Vec<_>>()
-        .join("|");
-
-    let slot = if kind == "input" {
-        INPUT_DEVICE_SIGNATURE.get_or_init(|| Mutex::new(String::new()))
-    } else {
-        OUTPUT_DEVICE_SIGNATURE.get_or_init(|| Mutex::new(String::new()))
-    };
-
-    if let Ok(mut last) = slot.lock() {
-        if *last == signature {
-            return;
-        }
-        *last = signature;
-    }
-    if kind == "input" {
-        INPUT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
-    } else {
-        OUTPUT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
-    }
-
-    run_logger::info(
-        "midi",
-        &format!("{}_inventory_changed", kind),
-        &format!("port_count={}", devices.len()),
-    );
-
-    for (index, device) in devices.iter().enumerate() {
-        run_logger::debug(
-            "midi",
-            &format!("{}_port", kind),
-            &format!("index={} id={} name={}", index, device.id, device.name),
-        );
-    }
-}
-
-fn clean_expected_device_name(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-}
-
-fn inventory_device_name<'a>(devices: &'a [DeviceInfo], device_id: &str) -> Option<&'a str> {
-    devices
-        .iter()
-        .find(|device| device.id == device_id)
-        .map(|device| device.name.as_str())
-}
-
-fn parse_midi_port_index(device_id: &str, kind: &str) -> Result<usize> {
-    device_id
-        .strip_prefix(MIDI_PORT_PREFIX)
-        .ok_or_else(|| anyhow!("Invalid MIDI {} device id: {}", kind, device_id))?
-        .parse::<usize>()
-        .map_err(|err| anyhow!("Invalid MIDI {} device id {}: {}", kind, device_id, err))
-}
-
-fn validate_expected_device_name(
-    kind: &str,
-    device_id: &str,
-    expected_name: Option<&str>,
-    actual_name: &str,
-) -> Result<()> {
-    let Some(expected_name) = clean_expected_device_name(expected_name) else {
-        return Ok(());
-    };
-    if expected_name == actual_name {
-        return Ok(());
-    }
-
-    log_route_device_mismatch(kind, device_id, &expected_name, Some(actual_name));
-    Err(anyhow!(
-        "MIDI {} device id {} now resolves to '{}' instead of '{}'",
-        kind,
-        device_id,
-        actual_name,
-        expected_name
-    ))
-}
-
-fn device_name_mismatch(expected_name: Option<&str>, actual_name: Option<&str>) -> bool {
-    match (
-        clean_expected_device_name(expected_name),
-        actual_name.and_then(|name| clean_expected_device_name(Some(name))),
-    ) {
-        (Some(expected), Some(actual)) => expected != actual,
-        (Some(_), None) => true,
-        _ => false,
-    }
-}
-
-fn preflight_midi_routes(routes: &[PreparedMidiRoute]) -> Result<()> {
-    if routes.is_empty() {
-        return Ok(());
-    }
-
-    let midi_in = MidiInput::new("MIDIMaster preflight")?;
-    let midi_out = MidiOutput::new("MIDIMaster preflight")?;
-    for route in routes {
-        resolve_input_port(
-            &midi_in,
-            &route.input_device_id,
-            route.input_device_name.as_deref(),
-        )?;
-        resolve_output_port(
-            &midi_out,
-            &route.output_device_id,
-            route.output_device_name.as_deref(),
-        )?;
-    }
-    Ok(())
-}
-
-fn log_route_device_mismatch(
-    kind: &str,
-    device_id: &str,
-    expected_name: &str,
-    actual_name: Option<&str>,
-) {
-    run_logger::warn(
-        "midi",
-        "route_device_mismatch",
-        &format!(
-            "kind={} device_id={} expected_name={} actual_name={}",
-            kind,
-            device_id,
-            expected_name,
-            actual_name.unwrap_or("<missing>")
-        ),
-    );
-}
-
-fn resolve_input_port(
-    midi_in: &MidiInput,
-    input_device_id: &str,
-    expected_input_device_name: Option<&str>,
-) -> Result<(MidiInputPort, String)> {
-    let input_port_index = parse_midi_port_index(input_device_id, "input")?;
-    let input_port = find_input_port(midi_in, input_port_index)?;
-    let input_port_name = midi_in
-        .port_name(&input_port)
-        .unwrap_or_else(|_| format!("Input {}", input_port_index));
-    validate_expected_device_name(
-        "input",
-        input_device_id,
-        expected_input_device_name,
-        &input_port_name,
-    )?;
-    Ok((input_port, input_port_name))
-}
-
-fn resolve_output_port(
-    midi_out: &MidiOutput,
-    output_device_id: &str,
-    expected_output_device_name: Option<&str>,
-) -> Result<(MidiOutputPort, String)> {
-    let output_port_index = parse_midi_port_index(output_device_id, "output")?;
-    let output_port = find_output_port(midi_out, output_port_index)?;
-    let output_port_name = midi_out
-        .port_name(&output_port)
-        .unwrap_or_else(|_| format!("Output {}", output_port_index));
-    validate_expected_device_name(
-        "output",
-        output_device_id,
-        expected_output_device_name,
-        &output_port_name,
-    )?;
-    Ok((output_port, output_port_name))
-}
-
-fn current_input_port_name(input_device_id: &str) -> Result<String> {
-    let input_port_index = parse_midi_port_index(input_device_id, "input")?;
-    let midi_in = MidiInput::new("MIDIMaster")?;
-    let input_port = find_input_port(&midi_in, input_port_index)?;
-    Ok(midi_in
-        .port_name(&input_port)
-        .unwrap_or_else(|_| format!("Input {}", input_port_index)))
-}
-
-fn current_output_port_name(output_device_id: &str) -> Result<String> {
-    let output_port_index = parse_midi_port_index(output_device_id, "output")?;
-    let midi_out = MidiOutput::new("MIDIMaster")?;
-    let output_port = find_output_port(&midi_out, output_port_index)?;
-    Ok(midi_out
-        .port_name(&output_port)
-        .unwrap_or_else(|_| format!("Output {}", output_port_index)))
-}
-
-fn inventory_generation(kind: &str) -> u64 {
-    if kind == "input" {
-        INPUT_DEVICE_GENERATION.load(Ordering::Relaxed)
-    } else {
-        OUTPUT_DEVICE_GENERATION.load(Ordering::Relaxed)
-    }
-}
-
 fn now_epoch_millis() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -2067,78 +1525,13 @@ fn atomic_millis_to_option(value: &AtomicU64) -> Option<u64> {
     }
 }
 
-fn find_input_port(midi_in: &MidiInput, index: usize) -> Result<MidiInputPort> {
-    midi_in
-        .ports()
-        .get(index)
-        .cloned()
-        .ok_or_else(|| anyhow!("MIDI input port not found"))
-}
-
-fn find_output_port(midi_out: &MidiOutput, index: usize) -> Result<MidiOutputPort> {
-    midi_out
-        .ports()
-        .get(index)
-        .cloned()
-        .ok_or_else(|| anyhow!("MIDI output port not found"))
-}
-
-fn parse_midi_message(device_id: &str, message: &[u8]) -> Option<MidiEvent> {
-    if message.is_empty() {
-        return None;
-    }
-    let status = message[0];
-    let command = status & 0xF0;
-    let channel = status & 0x0F;
-
-    match command {
-        0xB0 if message.len() >= 3 => Some(MidiEvent {
-            device_id: device_id.to_string(),
-            channel,
-            controller: message[1],
-            value: message[2],
-            value_14: None,
-            msg_type: MidiMessageType::ControlChange,
-        }),
-        0x90 | 0x80 if message.len() >= 3 => Some(MidiEvent {
-            device_id: device_id.to_string(),
-            channel,
-            controller: message[1],                              // Note number
-            value: if command == 0x80 { 0 } else { message[2] }, // Note Off = velocity 0
-            value_14: None,
-            msg_type: MidiMessageType::Note,
-        }),
-        0xC0 if message.len() >= 2 => Some(MidiEvent {
-            device_id: device_id.to_string(),
-            channel,
-            controller: message[1],
-            value: 127,
-            value_14: None,
-            msg_type: MidiMessageType::ProgramChange,
-        }),
-        0xE0 if message.len() >= 3 => {
-            let lsb = message[1] as u16;
-            let msb = message[2] as u16;
-            let value_14 = (msb << 7) | lsb;
-            Some(MidiEvent {
-                device_id: device_id.to_string(),
-                channel,
-                controller: 0xE0,
-                value: message[2],
-                value_14: Some(value_14),
-                msg_type: MidiMessageType::PitchBend,
-            })
-        }
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{
-        AssignMode, AuxiliaryControl, BindingControlKind, BindingTarget, ButtonLightBehavior,
-        ButtonLightMode, FaderCurve, MidiControl, MuteBehavior, RelativeFormat,
+        AssignMode, AuxiliaryControl, BindingAction, BindingControlKind, BindingTarget,
+        ButtonLightBehavior, ButtonLightMode, FaderCurve, MidiControl, MidiMode, MuteBehavior,
+        RelativeFormat,
     };
 
     fn direct_feedback(

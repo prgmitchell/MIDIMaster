@@ -620,6 +620,36 @@ fn list_devices_for_flow(
     Ok(devices)
 }
 
+enum SessionVisit<T> {
+    Continue,
+    Updated,
+    Break(T),
+}
+
+fn visit_audio_sessions<T>(
+    device: &IMMDevice,
+    mut visitor: impl FnMut(&IAudioSessionControl2, &ISimpleAudioVolume, u32) -> Result<SessionVisit<T>>,
+) -> Result<(bool, Option<T>)> {
+    let session_manager = get_session_manager(device)?;
+    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
+    let count = unsafe { enumerator.GetCount() }?;
+    let mut updated = false;
+
+    for index in 0..count {
+        let control = unsafe { enumerator.GetSession(index) }?;
+        let control2: IAudioSessionControl2 = control.cast()?;
+        let simple: ISimpleAudioVolume = control.cast()?;
+        let process_id = unsafe { control2.GetProcessId() }?;
+        match visitor(&control2, &simple, process_id)? {
+            SessionVisit::Continue => {}
+            SessionVisit::Updated => updated = true,
+            SessionVisit::Break(value) => return Ok((true, Some(value))),
+        }
+    }
+
+    Ok((updated, None))
+}
+
 fn collect_device_sessions(
     device: &IMMDevice,
     device_id: &str,
@@ -629,17 +659,8 @@ fn collect_device_sessions(
     icon_cache: &mut HashMap<String, Option<String>>,
     include_visuals: bool,
 ) -> Result<()> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let simple: ISimpleAudioVolume = control.cast()?;
-
-        let process_id = unsafe { control2.GetProcessId() }?;
-        let base_id = session_identifier(&control2, process_id)
+    visit_audio_sessions::<()>(device, |control2, simple, process_id| {
+        let base_id = session_identifier(control2, process_id)
             .unwrap_or_else(|| format!("pid:{}", process_id));
         let session_id = if default_device_id == Some(device_id) {
             base_id
@@ -648,19 +669,20 @@ fn collect_device_sessions(
         };
 
         if let Some(session) = session_info_from_control(
-            &control2,
-            &simple,
+            control2,
+            simple,
             session_id,
             process_id,
             icon_cache,
             include_visuals,
         )? {
             if !seen_ids.insert(session.id.clone()) {
-                continue;
+                return Ok(SessionVisit::Continue);
             }
             sessions.push(session);
         }
-    }
+        Ok(SessionVisit::Continue)
+    })?;
 
     Ok(())
 }
@@ -674,29 +696,12 @@ fn session_info_for_process(
     icon_cache: &mut HashMap<String, Option<String>>,
     include_visuals: bool,
 ) -> Result<Option<SessionInfo>> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let simple: ISimpleAudioVolume = control.cast()?;
-
-        let session_process_id = unsafe { control2.GetProcessId() }?;
-        let mut matches = session_process_id == process_id;
-
-        // Fallback: Check process path if PID mismatch
-        if !matches && session_process_id != 0 {
-            let session_identity = query_effective_process_identity_cached(session_process_id);
-            matches = process_identities_match(&session_identity, process_identity);
+    let (_, session) = visit_audio_sessions(device, |control2, simple, session_process_id| {
+        if !session_matches_process(session_process_id, process_id, process_identity) {
+            return Ok(SessionVisit::Continue);
         }
 
-        if !matches {
-            continue;
-        }
-
-        let base_id = session_identifier(&control2, session_process_id)
+        let base_id = session_identifier(control2, session_process_id)
             .unwrap_or_else(|| format!("pid:{}", session_process_id));
         let session_id = if default_device_id == Some(device_id) {
             base_id
@@ -705,18 +710,19 @@ fn session_info_for_process(
         };
 
         if let Some(session) = session_info_from_control(
-            &control2,
-            &simple,
+            control2,
+            simple,
             session_id,
             session_process_id,
             icon_cache,
             include_visuals,
         )? {
-            return Ok(Some(session));
+            return Ok(SessionVisit::Break(session));
         }
-    }
+        Ok(SessionVisit::Continue)
+    })?;
 
-    Ok(None)
+    Ok(session)
 }
 
 fn session_info_from_control(
@@ -835,6 +841,21 @@ fn process_identities_match(left: &ProcessIdentity, right: &ProcessIdentity) -> 
         )
 }
 
+fn session_matches_process(
+    session_process_id: u32,
+    process_id: u32,
+    process_identity: &ProcessIdentity,
+) -> bool {
+    if session_process_id == process_id {
+        return true;
+    }
+    session_process_id != 0
+        && process_identities_match(
+            &query_effective_process_identity_cached(session_process_id),
+            process_identity,
+        )
+}
+
 fn optional_identity_match(left: Option<&str>, right: Option<&str>) -> bool {
     match (left, right) {
         (Some(left), Some(right)) => {
@@ -857,24 +878,16 @@ fn set_session_volume_on_device(
     session_id: &str,
     target_volume: f32,
 ) -> Result<bool> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let process_id = unsafe { control2.GetProcessId() }?;
-        let id = session_identifier(&control2, process_id)
+    let (updated, _) = visit_audio_sessions(device, |control2, simple, process_id| {
+        let id = session_identifier(control2, process_id)
             .unwrap_or_else(|| format!("pid:{}", process_id));
         if id == session_id {
-            let simple: ISimpleAudioVolume = control.cast()?;
             unsafe { simple.SetMasterVolume(target_volume, std::ptr::null()) }?;
-            return Ok(true);
+            return Ok(SessionVisit::Break(()));
         }
-    }
-
-    Ok(false)
+        Ok(SessionVisit::Continue)
+    })?;
+    Ok(updated)
 }
 
 fn set_session_volume_for_process(
@@ -883,30 +896,13 @@ fn set_session_volume_for_process(
     process_identity: &ProcessIdentity,
     volume: f32,
 ) -> Result<bool> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-    let mut updated = false;
-
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let simple: ISimpleAudioVolume = control.cast()?;
-
-        let session_process_id = unsafe { control2.GetProcessId() }?;
-        let mut matches = session_process_id == process_id;
-
-        if !matches && session_process_id != 0 {
-            let session_identity = query_effective_process_identity_cached(session_process_id);
-            matches = process_identities_match(&session_identity, process_identity);
-        }
-
-        if matches {
+    let (updated, _) = visit_audio_sessions::<()>(device, |_, simple, session_process_id| {
+        if session_matches_process(session_process_id, process_id, process_identity) {
             unsafe { simple.SetMasterVolume(volume, std::ptr::null()) }?;
-            updated = true;
+            return Ok(SessionVisit::Updated);
         }
-    }
-
+        Ok(SessionVisit::Continue)
+    })?;
     Ok(updated)
 }
 
@@ -916,30 +912,13 @@ fn set_session_mute_for_process(
     process_identity: &ProcessIdentity,
     muted: bool,
 ) -> Result<bool> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-    let mut updated = false;
-
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let simple: ISimpleAudioVolume = control.cast()?;
-
-        let session_process_id = unsafe { control2.GetProcessId() }?;
-        let mut matches = session_process_id == process_id;
-
-        if !matches && session_process_id != 0 {
-            let session_identity = query_effective_process_identity_cached(session_process_id);
-            matches = process_identities_match(&session_identity, process_identity);
-        }
-
-        if matches {
+    let (updated, _) = visit_audio_sessions::<()>(device, |_, simple, session_process_id| {
+        if session_matches_process(session_process_id, process_id, process_identity) {
             unsafe { simple.SetMute(muted, std::ptr::null()) }?;
-            updated = true;
+            return Ok(SessionVisit::Updated);
         }
-    }
-
+        Ok(SessionVisit::Continue)
+    })?;
     Ok(updated)
 }
 
@@ -970,122 +949,72 @@ fn session_matches_application_name(
     )
 }
 
-fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Result<bool> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-    let mut updated = false;
+fn audio_session_matches_application_name(
+    control: &IAudioSessionControl2,
+    process_id: u32,
+    target_name: &str,
+) -> bool {
+    let identity = query_effective_process_identity_cached(process_id);
+    let process_path = identity.path.clone();
+    let process_name = process_path
+        .as_ref()
+        .and_then(|path| Path::new(path).file_name())
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string());
 
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let simple: ISimpleAudioVolume = control.cast()?;
-
-        let process_id = unsafe { control2.GetProcessId() }?;
-        let identity = query_effective_process_identity_cached(process_id);
-        let process_path = identity.path.clone();
-        let process_name = process_path
-            .as_ref()
-            .and_then(|path| Path::new(path).file_name())
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string());
-
-        let matches = session_matches_application_name(
-            name,
+    session_matches_application_name(
+        target_name,
+        process_path.as_deref(),
+        process_name.as_deref(),
+        None,
+        &identity,
+    ) || {
+        let display_name = unsafe { control.GetDisplayName() }
+            .ok()
+            .and_then(owned_pwstr_to_string)
+            .and_then(|name| session_display_name(Some(&name)));
+        session_matches_application_name(
+            target_name,
             process_path.as_deref(),
             process_name.as_deref(),
-            None,
+            display_name.as_deref(),
             &identity,
-        ) || {
-            let display_name = unsafe { control2.GetDisplayName() }
-                .ok()
-                .and_then(owned_pwstr_to_string)
-                .and_then(|name| session_display_name(Some(&name)));
-            session_matches_application_name(
-                name,
-                process_path.as_deref(),
-                process_name.as_deref(),
-                display_name.as_deref(),
-                &identity,
-            )
-        };
-
-        if matches {
-            unsafe { simple.SetMasterVolume(volume, std::ptr::null()) }?;
-            updated = true;
-        }
+        )
     }
+}
 
+fn set_session_volume_by_name(device: &IMMDevice, name: &str, volume: f32) -> Result<bool> {
+    let (updated, _) = visit_audio_sessions::<()>(device, |control, simple, process_id| {
+        if audio_session_matches_application_name(control, process_id, name) {
+            unsafe { simple.SetMasterVolume(volume, std::ptr::null()) }?;
+            return Ok(SessionVisit::Updated);
+        }
+        Ok(SessionVisit::Continue)
+    })?;
     Ok(updated)
 }
 
 fn set_session_mute_on_device(device: &IMMDevice, session_id: &str, muted: bool) -> Result<bool> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let process_id = unsafe { control2.GetProcessId() }?;
-        let id = session_identifier(&control2, process_id)
+    let (updated, _) = visit_audio_sessions(device, |control, simple, process_id| {
+        let id = session_identifier(control, process_id)
             .unwrap_or_else(|| format!("pid:{}", process_id));
         if id == session_id {
-            let simple: ISimpleAudioVolume = control.cast()?;
             unsafe { simple.SetMute(muted, std::ptr::null()) }?;
-            return Ok(true);
+            return Ok(SessionVisit::Break(()));
         }
-    }
-
-    Ok(false)
+        Ok(SessionVisit::Continue)
+    })?;
+    Ok(updated)
 }
 
 fn set_session_mute_by_name(device: &IMMDevice, name: &str, muted: bool) -> Result<bool> {
-    let session_manager = get_session_manager(device)?;
-    let enumerator = unsafe { session_manager.GetSessionEnumerator() }?;
-    let count = unsafe { enumerator.GetCount() }?;
-    let mut updated = false;
-
-    for index in 0..count {
-        let control = unsafe { enumerator.GetSession(index) }?;
-        let control2: IAudioSessionControl2 = control.cast()?;
-        let simple: ISimpleAudioVolume = control.cast()?;
-
-        let process_id = unsafe { control2.GetProcessId() }?;
-        let identity = query_effective_process_identity_cached(process_id);
-        let process_path = identity.path.clone();
-        let process_name = process_path
-            .as_ref()
-            .and_then(|path| Path::new(path).file_name())
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string());
-
-        let matches = session_matches_application_name(
-            name,
-            process_path.as_deref(),
-            process_name.as_deref(),
-            None,
-            &identity,
-        ) || {
-            let display_name = unsafe { control2.GetDisplayName() }
-                .ok()
-                .and_then(owned_pwstr_to_string)
-                .and_then(|name| session_display_name(Some(&name)));
-            session_matches_application_name(
-                name,
-                process_path.as_deref(),
-                process_name.as_deref(),
-                display_name.as_deref(),
-                &identity,
-            )
-        };
-
-        if matches {
+    let (updated, _) = visit_audio_sessions::<()>(device, |control, simple, process_id| {
+        if audio_session_matches_application_name(control, process_id, name) {
             unsafe { simple.SetMute(muted, std::ptr::null()) }?;
-            updated = true;
+            return Ok(SessionVisit::Updated);
         }
-    }
-
+        Ok(SessionVisit::Continue)
+    })?;
     Ok(updated)
 }
 

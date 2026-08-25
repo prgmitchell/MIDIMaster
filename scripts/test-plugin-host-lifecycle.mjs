@@ -22,6 +22,8 @@ export async function activate(ctx) {
   ctx.bindings.onChanged(() => events.push("bindings"));
   ctx.tauri.listen("delayed-plugin-event", () => events.push("delayed-plugin-event"));
   await ctx.tauri.listen("plugin-event", () => events.push("plugin-event"));
+  await ctx.assets.readBase64("raw.bin");
+  await ctx.assets.readDataUrl("icon.png", "image/png");
   const wsId = await ctx.ws.open("ws://127.0.0.1:1");
   ctx.ws.onMessage(wsId, () => events.push("ws-message"));
   ctx.connections.registerTab({
@@ -68,6 +70,9 @@ try {
     }
     if (command === "read_plugin_text") {
       return pluginCode;
+    }
+    if (command === "read_plugin_base64") {
+      return "ZmFrZQ==";
     }
     if (command === "ws_open") {
       return 7;
@@ -142,6 +147,14 @@ try {
   assert.ok(unlistened.includes("integration_binding_triggered"));
   assert.ok(unlistened.includes("integration_binding_triggered_batch"));
   assert.ok(invoked.some((entry) => entry.command === "read_plugin_text"));
+  const pluginFileCalls = invoked.filter(({ command }) => (
+    command === "read_plugin_text" || command === "read_plugin_base64"
+  ));
+  assert.deepEqual(pluginFileCalls.map(({ command, args }) => [command, args]), [
+    ["read_plugin_text", { pluginId: "fake", relPath: "plugin.mjs" }],
+    ["read_plugin_base64", { pluginId: "fake", relPath: "raw.bin" }],
+    ["read_plugin_base64", { pluginId: "fake", relPath: "icon.png" }],
+  ]);
 } finally {
   globalThis.Blob = originalBlob;
   URL.createObjectURL = originalCreateObjectUrl;

@@ -384,7 +384,7 @@ export function buildHotkeyMappingFromEvent(event) {
   };
 }
 
-function normalizeHotkeyMapping(rawHotkey) {
+export function normalizeHotkeyMapping(rawHotkey) {
   if (!rawHotkey || typeof rawHotkey !== "object") return null;
   const keys = Array.isArray(rawHotkey.keys)
     ? rawHotkey.keys.map((key) => String(key || "").trim()).filter(Boolean)
@@ -394,7 +394,7 @@ function normalizeHotkeyMapping(rawHotkey) {
   return { keys, display };
 }
 
-function normalizeOpenApplicationMapping(rawOpenApplication) {
+export function normalizeOpenApplicationMapping(rawOpenApplication) {
   if (!rawOpenApplication || typeof rawOpenApplication !== "object") return null;
   const path = String(rawOpenApplication.path || "").trim();
   const display = String(rawOpenApplication.display || "").trim();
@@ -404,7 +404,7 @@ function normalizeOpenApplicationMapping(rawOpenApplication) {
   return path ? { path, display: display || path, icon_data } : null;
 }
 
-function normalizeAutoHotkeyScriptMapping(rawScript) {
+export function normalizeAutoHotkeyScriptMapping(rawScript) {
   if (!rawScript || typeof rawScript !== "object") return null;
   const path = String(rawScript.path || "").trim();
   const display = String(rawScript.display || "").trim();
@@ -433,12 +433,16 @@ function normalizeMacroTargets(rawTargets) {
     .slice(0, 8);
 }
 
-export function normalizeMacroActionStep(step) {
+function normalizeMacroActionFields(step, { draft = false } = {}) {
   if (!step || typeof step !== "object") return null;
-  const action = String(step.action || "Volume");
-  if (!MACRO_ACTIONS.has(action)) return null;
-  const targets = normalizeMacroTargets(step.targets);
-  if (targets.length === 0) return null;
+  const rawAction = String(step.action || (draft ? "" : "Volume"));
+  const nestedSpecialAction = rawAction === "Macro" || rawAction === "Soundboard";
+  const validAction = !nestedSpecialAction && MACRO_ACTIONS.has(rawAction);
+  if (!draft && !validAction) return null;
+
+  const action = validAction ? rawAction : "Volume";
+  const targets = draft && nestedSpecialAction ? [] : normalizeMacroTargets(step.targets);
+  if (!draft && targets.length === 0) return null;
 
   const value = Number(step.value);
   const normalized = {
@@ -464,7 +468,15 @@ export function normalizeMacroActionStep(step) {
   return normalized;
 }
 
-export function normalizeMacroStep(step) {
+export function normalizeMacroActionStep(step) {
+  return normalizeMacroActionFields(step);
+}
+
+function normalizeMacroDraftActionStep(step) {
+  return normalizeMacroActionFields(step, { draft: true });
+}
+
+function normalizeMacroStepMode(step, { draft = false } = {}) {
   if (!step || typeof step !== "object") return null;
   const kind = String(step.kind || "action");
   if (kind === "wait") {
@@ -475,14 +487,21 @@ export function normalizeMacroStep(step) {
     };
   }
   if (kind === "parallel") {
+    const normalizeAction = draft ? normalizeMacroDraftActionStep : normalizeMacroActionStep;
     const steps = (Array.isArray(step.steps) ? step.steps : [])
-      .map(normalizeMacroActionStep)
+      .map(normalizeAction)
       .filter(Boolean)
       .slice(0, MACRO_MAX_PARALLEL_STEPS);
-    return steps.length > 0 ? { kind: "parallel", steps } : null;
+    return draft || steps.length > 0 ? { kind: "parallel", steps } : null;
   }
-  const actionStep = normalizeMacroActionStep(step);
+  const actionStep = draft
+    ? normalizeMacroDraftActionStep(step)
+    : normalizeMacroActionStep(step);
   return actionStep ? { kind: "action", ...actionStep } : null;
+}
+
+export function normalizeMacroStep(step) {
+  return normalizeMacroStepMode(step);
 }
 
 export function normalizeMacroSteps(steps) {
@@ -492,55 +511,8 @@ export function normalizeMacroSteps(steps) {
     .slice(0, MACRO_MAX_TOP_LEVEL_STEPS);
 }
 
-function normalizeMacroDraftActionStep(step) {
-  if (!step || typeof step !== "object") return null;
-  const rawAction = String(step.action || "");
-  const isNestedMacroAction = rawAction === "Macro" || rawAction === "Soundboard";
-  const action = !isNestedMacroAction && MACRO_ACTIONS.has(rawAction) ? rawAction : "Volume";
-  const targets = isNestedMacroAction ? [] : normalizeMacroTargets(step.targets);
-  const value = Number(step.value);
-  const normalized = {
-    action,
-    targets,
-    value: Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : null,
-    state: normalizeMacroActionState(step.state),
-    action_role: normalizeMacroActionRole(step.action_role ?? step.actionRole),
-    action_label: normalizeMacroActionText(step.action_label ?? step.actionLabel),
-    value_kind: normalizeMacroActionText(step.value_kind ?? step.valueKind),
-    hotkey: normalizeHotkeyMapping(step.hotkey),
-    open_application: normalizeOpenApplicationMapping(step.open_application),
-    autohotkey_script: normalizeAutoHotkeyScriptMapping(step.autohotkey_script),
-  };
-
-  if (normalized.value == null) delete normalized.value;
-  if (!normalized.action_role) delete normalized.action_role;
-  if (!normalized.action_label) delete normalized.action_label;
-  if (!normalized.value_kind) delete normalized.value_kind;
-  if (!normalized.hotkey) delete normalized.hotkey;
-  if (!normalized.open_application) delete normalized.open_application;
-  if (!normalized.autohotkey_script) delete normalized.autohotkey_script;
-  return normalized;
-}
-
 export function normalizeMacroDraftStep(step) {
-  if (!step || typeof step !== "object") return null;
-  const kind = String(step.kind || "action");
-  if (kind === "wait") {
-    const durationMs = Math.round(Number(step.duration_ms ?? step.durationMs ?? 0));
-    return {
-      kind: "wait",
-      duration_ms: Math.min(MACRO_MAX_WAIT_MS, Math.max(0, Number.isFinite(durationMs) ? durationMs : 0)),
-    };
-  }
-  if (kind === "parallel") {
-    const steps = (Array.isArray(step.steps) ? step.steps : [])
-      .map(normalizeMacroDraftActionStep)
-      .filter(Boolean)
-      .slice(0, MACRO_MAX_PARALLEL_STEPS);
-    return { kind: "parallel", steps };
-  }
-  const actionStep = normalizeMacroDraftActionStep(step);
-  return actionStep ? { kind: "action", ...actionStep } : null;
+  return normalizeMacroStepMode(step, { draft: true });
 }
 
 export function normalizeMacroDraftSteps(steps) {
@@ -593,23 +565,8 @@ export function normalizeBinding(binding) {
   normalizeButtonLightFields(out);
   delete out.toggle_mute_light_mode;
   if (!out.hotkey || typeof out.hotkey !== "object") out.hotkey = null;
-  if (!out.open_application || typeof out.open_application !== "object") {
-    out.open_application = null;
-  } else {
-    const path = String(out.open_application.path || "").trim();
-    const display = String(out.open_application.display || "").trim();
-    const icon_data = typeof out.open_application.icon_data === "string" && out.open_application.icon_data.trim()
-      ? out.open_application.icon_data.trim()
-      : null;
-    out.open_application = path ? { path, display: display || path, icon_data } : null;
-  }
-  if (!out.autohotkey_script || typeof out.autohotkey_script !== "object") {
-    out.autohotkey_script = null;
-  } else {
-    const path = String(out.autohotkey_script.path || "").trim();
-    const display = String(out.autohotkey_script.display || "").trim();
-    out.autohotkey_script = path ? { path, display: display || path } : null;
-  }
+  out.open_application = normalizeOpenApplicationMapping(out.open_application);
+  out.autohotkey_script = normalizeAutoHotkeyScriptMapping(out.autohotkey_script);
   out.soundboard = normalizeSoundboardMapping(out.soundboard);
   if (selectedSpecial !== "Soundboard") out.soundboard = null;
   if (selectedSpecial !== "Macro") {

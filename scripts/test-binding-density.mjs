@@ -60,6 +60,7 @@ function createHarness(invoke) {
     i18n: { t: (key) => key },
     showAlert: (...args) => alerts.push(args),
   });
+  feature.bindUi();
   return { feature, alerts, mainScreen, comfortableButton, compactButton };
 }
 

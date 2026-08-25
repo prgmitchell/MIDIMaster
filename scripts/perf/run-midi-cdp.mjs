@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { CdpSession, findTarget } from "./capture-cdp.mjs";
-import { parseArgs } from "./lib/cli.mjs";
+import { parseArgs, runMain } from "./lib/cli.mjs";
 import { writeJson } from "./lib/files.mjs";
 
 function metricRecord(identity, metric, value, unit, kind = "operation", dimensions = {}) {
@@ -128,9 +127,4 @@ async function main() {
   console.log(`Injected ${result.injection.message_count} ${result.injection.message_kind} messages; wrote ${result.records.length} records to ${output}`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error(error.stack ?? error.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

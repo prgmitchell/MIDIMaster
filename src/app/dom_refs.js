@@ -1,3 +1,223 @@
+/** Public DOM reference names and their element IDs. */
+export const DOM_REF_IDS = Object.freeze({
+  midiSelect: "midi-device",
+  midiOutputSelect: "midi-output-device",
+  midiStatus: "midi-status",
+  refreshMidiButton: "refresh-midi",
+  learnBindingButton: "learn-binding",
+  bindingAddFooterButton: "binding-add-footer-button",
+  sessionsContainer: "sessions",
+  profileDropdown: "profiles-dropdown",
+  profileToggle: "profile-toggle",
+  profileCurrent: "profile-current",
+  profileList: "profile-list",
+  profilePageList: "profile-page-list",
+  profilePageCreateInput: "profile-page-create-input",
+  profilePageCreateButton: "profile-page-create-button",
+  profilePageImportButton: "profile-page-import",
+  profilePageExportCurrentButton: "profile-page-export-current",
+  bindingsContainer: "bindings",
+  bindingTypeFilter: "binding-type-filter",
+  bindingSearchInput: "binding-search",
+  bindingDensityToggle: "binding-density-toggle",
+  mainScreen: "main-screen",
+  sidebarCollapseToggle: "sidebar-collapse-toggle",
+  targetPanel: "target-panel",
+  targetPanelList: "target-panel-list",
+  targetPanelTitle: "target-panel-title",
+  targetPanelClose: "target-panel-close",
+  targetPanelBack: "target-panel-back",
+  bindingConfigPanel: "binding-config-panel",
+  bindingConfigBack: "binding-config-back",
+  bindingConfigTitle: "binding-config-title",
+  bindingConfigClose: "binding-config-close",
+  bindingConfigCancel: "binding-config-cancel",
+  bindingConfigSave: "binding-config-save",
+  bindingConfigName: "binding-config-name",
+  bindingConfigButtonLightSection: "binding-config-button-light-section",
+  bindingConfigButtonLightSelectRow: "binding-config-button-light-select-row",
+  bindingConfigButtonLightSelect: "binding-config-button-light-select",
+  bindingConfigIndicatorCustom: "binding-config-indicator-custom",
+  bindingConfigIndicatorMsgType: "binding-config-indicator-msg-type",
+  bindingConfigIndicatorChannel: "binding-config-indicator-channel",
+  bindingConfigIndicatorController: "binding-config-indicator-controller",
+  bindingConfigIndicatorLearn: "binding-config-indicator-learn",
+  bindingConfigIndicatorClear: "binding-config-indicator-clear",
+  bindingConfigButtonLearnSection: "binding-config-button-learn-section",
+  bindingConfigButtonLearnButton: "binding-config-button-learn-button",
+  bindingConfigButtonLearnIndicator: "binding-config-button-learn-indicator",
+  bindingConfigButtonLearnStatus: "binding-config-button-learn-status",
+  bindingConfigMacroSummarySection: "binding-config-macro-summary-section",
+  bindingConfigMacroSummary: "binding-config-macro-summary",
+  bindingConfigMacroEdit: "binding-config-macro-edit",
+  bindingConfigMacroSection: "binding-config-macro-section",
+  bindingConfigMacroList: "binding-config-macro-list",
+  bindingConfigMacroAddAction: "binding-config-macro-add-action",
+  bindingConfigMacroAddWait: "binding-config-macro-add-wait",
+  bindingConfigMacroAddParallel: "binding-config-macro-add-parallel",
+  bindingConfigSoundboardSection: "binding-config-soundboard-section",
+  bindingConfigSoundboardFile: "binding-config-soundboard-file",
+  bindingConfigSoundboardStatus: "binding-config-soundboard-status",
+  bindingConfigSoundboardReplace: "binding-config-soundboard-replace",
+  bindingConfigSoundboardPreview: "binding-config-soundboard-preview",
+  bindingConfigSoundboardPlaybackTime: "binding-config-soundboard-playback-time",
+  bindingConfigSoundboardWaveform: "binding-config-soundboard-waveform",
+  bindingConfigSoundboardStart: "binding-config-soundboard-start",
+  bindingConfigSoundboardEnd: "binding-config-soundboard-end",
+  bindingConfigSoundboardStartTime: "binding-config-soundboard-start-time",
+  bindingConfigSoundboardEndTime: "binding-config-soundboard-end-time",
+  bindingConfigSoundboardSelectionTime: "binding-config-soundboard-selection-time",
+  bindingConfigSoundboardVolume: "binding-config-soundboard-volume",
+  bindingConfigSoundboardVolumeValue: "binding-config-soundboard-volume-value",
+  bindingConfigSoundboardSpeed: "binding-config-soundboard-speed",
+  bindingConfigSoundboardSpeedValue: "binding-config-soundboard-speed-value",
+  bindingConfigSoundboardOutput: "binding-config-soundboard-output",
+  bindingConfigSoundboardMonitor: "binding-config-soundboard-monitor",
+  bindingConfigSoundboardVirtualMicOption: "binding-config-soundboard-virtual-mic-option",
+  bindingConfigSoundboardVirtualMicHelp: "binding-config-soundboard-virtual-mic-help",
+  bindingConfigSoundboardVirtualMic: "binding-config-soundboard-virtual-mic",
+  bindingConfigCurveSection: "binding-config-curve-section",
+  bindingConfigFeedbackOutputSection: "binding-config-feedback-output-section",
+  bindingConfigFeedbackOutputCustom: "binding-config-feedback-output-custom",
+  bindingConfigFeedbackMsgType: "binding-config-feedback-msg-type",
+  bindingConfigFeedbackChannel: "binding-config-feedback-channel",
+  bindingConfigFeedbackController: "binding-config-feedback-controller",
+  bindingConfigFeedbackLearn: "binding-config-feedback-learn",
+  bindingConfigFeedbackClear: "binding-config-feedback-clear",
+  bindingConfigMuteSection: "binding-config-mute-section",
+  bindingConfigAssignSection: "binding-config-assign-section",
+  bindingConfigMuteLabel: "binding-config-mute-label",
+  bindingConfigMuteLearn: "binding-config-mute-learn",
+  bindingConfigMuteClear: "binding-config-mute-clear",
+  bindingConfigMuteModeRoot: "binding-config-mute-mode-root",
+  bindingConfigMuteModeButton: "binding-config-mute-mode-button",
+  bindingConfigMuteModeMenu: "binding-config-mute-mode-menu",
+  bindingConfigMuteModeToggle: "binding-config-mute-mode-toggle",
+  bindingConfigMuteModeValue: "binding-config-mute-mode-value",
+  bindingConfigAssignLabel: "binding-config-assign-label",
+  bindingConfigAssignLearn: "binding-config-assign-learn",
+  bindingConfigAssignClear: "binding-config-assign-clear",
+  bindingConfigAssignModeRoot: "binding-config-assign-mode-root",
+  bindingConfigAssignModeButton: "binding-config-assign-mode-button",
+  bindingConfigAssignModeMenu: "binding-config-assign-mode-menu",
+  bindingConfigAssignModeAdd: "binding-config-assign-mode-add",
+  bindingConfigAssignModeReplace: "binding-config-assign-mode-replace",
+  bindingConfigAssignModeClear: "binding-config-assign-mode-clear",
+  bindingConfigCurveCards: "binding-config-curve-cards",
+  bindingConfigCurveHelp: "binding-config-curve-help",
+  bindingConfigCurvePresetRoot: "binding-config-curve-preset-root",
+  bindingConfigCurvePresetButton: "binding-config-curve-preset-button",
+  bindingConfigCurvePresetMenu: "binding-config-curve-preset-menu",
+  bindingConfigCurvePresetSearch: "binding-config-curve-preset-search",
+  bindingConfigCurvePresetList: "binding-config-curve-preset-list",
+  bindingConfigCurvePresetSave: "binding-config-curve-preset-save",
+  bindingConfigCurvePresetForm: "binding-config-curve-preset-form",
+  bindingConfigCurvePresetFormTitle: "binding-config-curve-preset-form-title",
+  bindingConfigCurvePresetName: "binding-config-curve-preset-name",
+  bindingConfigCurvePresetFormSave: "binding-config-curve-preset-form-save",
+  bindingConfigCurvePresetFormCancel: "binding-config-curve-preset-form-cancel",
+  bindingConfigCustomEditor: "binding-config-custom-editor",
+  bindingConfigCustomSurface: "binding-config-custom-surface",
+  bindingConfigCustomReset: "binding-config-custom-reset",
+  bindingConfigAssignHelp: "binding-config-assign-help",
+  bindingConfigPreviewLearnShell: "binding-config-preview-learn-shell",
+  bindingConfigPreviewLearnButton: "binding-config-preview-learn-button",
+  bindingConfigPreviewLearnIndicator: "binding-config-preview-learn-indicator",
+  bindingConfigPreviewLearnStatus: "binding-config-preview-learn-status",
+  bindingConfigPreviewTargetIcon: "binding-config-preview-target-icon",
+  bindingConfigPreviewTargetLabel: "binding-config-preview-target-label",
+  bindingConfigPreviewTargetTags: "binding-config-preview-target-tags",
+  bindingConfigPreviewFill: "binding-config-preview-fill",
+  bindingConfigPreviewThumb: "binding-config-preview-thumb",
+  bindingConfigPreviewButton: "binding-config-preview-button",
+  bindingConfigPreviewButtonFace: "binding-config-preview-button-face",
+  bindingConfigPreviewButtonLabel: "binding-config-preview-button-label",
+  bindingConfigPreviewValue: "binding-config-preview-value",
+  bindingConfigPreviewStatus: "binding-config-preview-status",
+  bindingConfigPreviewMainMidi: "binding-config-preview-main-midi",
+  bindingConfigPreviewMuteRow: "binding-config-preview-mute-row",
+  bindingConfigPreviewMute: "binding-config-preview-mute",
+  bindingConfigPreviewAssignRow: "binding-config-preview-assign-row",
+  bindingConfigPreviewAssign: "binding-config-preview-assign",
+  bindingConfigPreviewCurveRow: "binding-config-preview-curve-row",
+  bindingConfigPreviewCurve: "binding-config-preview-curve",
+  bindingConfigPreviewMidiValue: "binding-config-preview-midi-value",
+  learnPanel: "learn-panel",
+  learnPanelTitle: "learn-panel-title",
+  learnPanelMessage: "learn-panel-message",
+  learnPanelSpinner: "learn-panel-spinner",
+  learnPanelActions: "learn-panel-actions",
+  learnPanelCancel: "learn-panel-cancel",
+  learnPanelConfirm: "learn-panel-confirm",
+  learnPanelClose: "learn-panel-close",
+  settingsButton: "settings-button",
+  topbarUpdateButton: "topbar-update-button",
+  settingsPanel: "settings-panel",
+  settingsPanelClose: "settings-panel-close",
+  connectionsButton: "connections-button",
+  connectionsPanel: "connections-panel",
+  connectionsPanelClose: "connections-panel-close",
+  connectionsSidebar: "connections-sidebar",
+  connectionsContent: "connections-content",
+  osdEnabledToggle: "osd-enabled",
+  osdMonitorSelect: "osd-monitor",
+  osdLabelModeSelect: "osd-label-mode",
+  osdStyleSelect: "osd-style",
+  osdTransparencyInput: "osd-transparency",
+  osdTransparencyValue: "osd-transparency-value",
+  osdScaleInput: "osd-scale",
+  osdScaleValue: "osd-scale-value",
+  osdPositionPicker: "osd-position-picker",
+  virtualAudioPanel: "virtual-audio-panel",
+  virtualAudioInstall: "virtual-audio-install",
+  virtualAudioUpdate: "virtual-audio-update",
+  virtualAudioUpdateNotice: "virtual-audio-update-notice",
+  virtualAudioRepair: "virtual-audio-repair",
+  virtualAudioProblemRepair: "virtual-audio-problem-repair",
+  virtualAudioRemove: "virtual-audio-remove",
+  virtualAudioRestart: "virtual-audio-restart",
+  virtualAudioRestartLater: "virtual-audio-restart-later",
+  virtualAudioCopyDiagnostics: "virtual-audio-copy-diagnostics",
+  virtualAudioEnabled: "virtual-audio-enabled",
+  virtualAudioRoutingError: "virtual-audio-routing-error",
+  virtualAudioInputDevice: "virtual-audio-input-device",
+  virtualAudioMicrophoneGain: "virtual-audio-microphone-gain",
+  virtualAudioMicrophoneGainValue: "virtual-audio-microphone-gain-value",
+  virtualAudioSoundboardGain: "virtual-audio-soundboard-gain",
+  virtualAudioSoundboardGainValue: "virtual-audio-soundboard-gain-value",
+  virtualAudioMicrophoneMeter: "virtual-audio-microphone-meter",
+  virtualAudioSoundboardMeter: "virtual-audio-soundboard-meter",
+  virtualAudioOutputMeter: "virtual-audio-output-meter",
+  virtualAudioLimiterMeter: "virtual-audio-limiter-meter",
+  virtualAudioLimiterValue: "virtual-audio-limiter-value",
+  virtualAudioDriverVersion: "virtual-audio-driver-version",
+  virtualAudioServiceStatus: "virtual-audio-service-status",
+  virtualAudioEndpointStatus: "virtual-audio-endpoint-status",
+  virtualAudioProblemMessage: "virtual-audio-problem-message",
+  startWithWindowsSelect: "start-with-windows",
+  startInTraySelect: "start-in-tray",
+  minimizeToTraySelect: "minimize-to-tray",
+  exitToTraySelect: "exit-to-tray",
+  languageSelect: "language-select",
+  autoCheckUpdatesButton: "auto-check-updates-button",
+  midiDeviceInventoryConsentToggle: "midi-device-inventory-consent-toggle",
+  openLogsFolderButton: "open-logs-folder",
+  resetAppDataButton: "reset-app-data",
+  checkForUpdatesButton: "check-for-updates",
+  settingsUpdateStatus: "settings-update-status",
+  updateCurrentVersion: "update-current-version",
+  updateLatestVersion: "update-latest-version",
+  sidebarAppVersion: "sidebar-app-version",
+  osd: "volume-osd",
+  alertOverlay: "alert-overlay",
+  alertTitle: "alert-title",
+  alertMessage: "alert-message",
+  alertClose: "alert-close",
+  alertSecondary: "alert-secondary",
+  alertCancel: "alert-cancel",
+  alertOk: "alert-ok",
+});
+
 function selectRefs(refs, { prefixes = [], keys = [] }) {
   const namedKeys = new Set(keys);
   return Object.fromEntries(
@@ -7,487 +227,23 @@ function selectRefs(refs, { prefixes = [], keys = [] }) {
   );
 }
 
-export function createDomRefs() {
-  const midiSelect = document.getElementById("midi-device");
-  const midiOutputSelect = document.getElementById("midi-output-device");
-  const midiStatus = document.getElementById("midi-status");
-  const refreshMidiButton = document.getElementById("refresh-midi");
-  const learnBindingButton = document.getElementById("learn-binding");
-  const bindingAddFooterButton = document.getElementById("binding-add-footer-button");
-  const sessionsContainer = document.getElementById("sessions");
-  const profileDropdown = document.getElementById("profiles-dropdown");
-  const profileToggle = document.getElementById("profile-toggle");
-  const profileCurrent = document.getElementById("profile-current");
-  const profileList = document.getElementById("profile-list");
-  const profilePageList = document.getElementById("profile-page-list");
-  const profilePageCreateInput = document.getElementById("profile-page-create-input");
-  const profilePageCreateButton = document.getElementById("profile-page-create-button");
-  const profilePageImportButton = document.getElementById("profile-page-import");
-  const profilePageExportCurrentButton = document.getElementById("profile-page-export-current");
-  const bindingsContainer = document.getElementById("bindings");
-  const bindingTypeFilter = document.getElementById("binding-type-filter");
-  const bindingSearchInput = document.getElementById("binding-search");
-  const bindingDensityToggle = document.getElementById("binding-density-toggle");
-  const mainScreen = document.getElementById("main-screen");
-  const appShell = document.querySelector(".app-shell");
-  const sidebarNav = document.querySelector(".sidebar-nav");
-  const sidebarCollapseToggle = document.getElementById("sidebar-collapse-toggle");
-  const appPages = Array.from(document.querySelectorAll("[data-page-panel]"));
-  const appNavItems = Array.from(document.querySelectorAll("[data-page]"));
-  const targetPanel = document.getElementById("target-panel");
-  const targetPanelList = document.getElementById("target-panel-list");
-  const targetPanelTitle = document.getElementById("target-panel-title");
-  const targetPanelClose = document.getElementById("target-panel-close");
-  const targetPanelBack = document.getElementById("target-panel-back");
-  const bindingConfigPanel = document.getElementById("binding-config-panel");
-  const bindingConfigBack = document.getElementById("binding-config-back");
-  const bindingConfigTitle = document.getElementById("binding-config-title");
-  const bindingConfigClose = document.getElementById("binding-config-close");
-  const bindingConfigCancel = document.getElementById("binding-config-cancel");
-  const bindingConfigSave = document.getElementById("binding-config-save");
-  const bindingConfigName = document.getElementById("binding-config-name");
-  const bindingConfigButtonLightSection = document.getElementById("binding-config-button-light-section");
-  const bindingConfigButtonLightSelectRow = document.getElementById("binding-config-button-light-select-row");
-  const bindingConfigButtonLightSelect = document.getElementById("binding-config-button-light-select");
-  const bindingConfigIndicatorCustom = document.getElementById("binding-config-indicator-custom");
-  const bindingConfigIndicatorMsgType = document.getElementById("binding-config-indicator-msg-type");
-  const bindingConfigIndicatorChannel = document.getElementById("binding-config-indicator-channel");
-  const bindingConfigIndicatorController = document.getElementById("binding-config-indicator-controller");
-  const bindingConfigIndicatorLearn = document.getElementById("binding-config-indicator-learn");
-  const bindingConfigIndicatorClear = document.getElementById("binding-config-indicator-clear");
-  const bindingConfigButtonLearnSection = document.getElementById("binding-config-button-learn-section");
-  const bindingConfigButtonLearnButton = document.getElementById("binding-config-button-learn-button");
-  const bindingConfigButtonLearnIndicator = document.getElementById("binding-config-button-learn-indicator");
-  const bindingConfigButtonLearnStatus = document.getElementById("binding-config-button-learn-status");
-  const bindingConfigMacroSummarySection = document.getElementById("binding-config-macro-summary-section");
-  const bindingConfigMacroSummary = document.getElementById("binding-config-macro-summary");
-  const bindingConfigMacroEdit = document.getElementById("binding-config-macro-edit");
-  const bindingConfigMacroSection = document.getElementById("binding-config-macro-section");
-  const bindingConfigMacroList = document.getElementById("binding-config-macro-list");
-  const bindingConfigMacroAddAction = document.getElementById("binding-config-macro-add-action");
-  const bindingConfigMacroAddWait = document.getElementById("binding-config-macro-add-wait");
-  const bindingConfigMacroAddParallel = document.getElementById("binding-config-macro-add-parallel");
-  const bindingConfigSoundboardSummarySection = document.getElementById("binding-config-soundboard-summary-section");
-  const bindingConfigSoundboardSummary = document.getElementById("binding-config-soundboard-summary");
-  const bindingConfigSoundboardEdit = document.getElementById("binding-config-soundboard-edit");
-  const bindingConfigSoundboardSection = document.getElementById("binding-config-soundboard-section");
-  const bindingConfigSoundboardFile = document.getElementById("binding-config-soundboard-file");
-  const bindingConfigSoundboardStatus = document.getElementById("binding-config-soundboard-status");
-  const bindingConfigSoundboardReplace = document.getElementById("binding-config-soundboard-replace");
-  const bindingConfigSoundboardPreview = document.getElementById("binding-config-soundboard-preview");
-  const bindingConfigSoundboardPlaybackTime = document.getElementById("binding-config-soundboard-playback-time");
-  const bindingConfigSoundboardWaveform = document.getElementById("binding-config-soundboard-waveform");
-  const bindingConfigSoundboardStart = document.getElementById("binding-config-soundboard-start");
-  const bindingConfigSoundboardEnd = document.getElementById("binding-config-soundboard-end");
-  const bindingConfigSoundboardStartTime = document.getElementById("binding-config-soundboard-start-time");
-  const bindingConfigSoundboardEndTime = document.getElementById("binding-config-soundboard-end-time");
-  const bindingConfigSoundboardSelectionTime = document.getElementById("binding-config-soundboard-selection-time");
-  const bindingConfigSoundboardVolume = document.getElementById("binding-config-soundboard-volume");
-  const bindingConfigSoundboardVolumeValue = document.getElementById("binding-config-soundboard-volume-value");
-  const bindingConfigSoundboardSpeed = document.getElementById("binding-config-soundboard-speed");
-  const bindingConfigSoundboardSpeedValue = document.getElementById("binding-config-soundboard-speed-value");
-  const bindingConfigSoundboardOutput = document.getElementById("binding-config-soundboard-output");
-  const bindingConfigSoundboardMonitor = document.getElementById("binding-config-soundboard-monitor");
-  const bindingConfigSoundboardVirtualMicOption = document.getElementById("binding-config-soundboard-virtual-mic-option");
-  const bindingConfigSoundboardVirtualMicHelp = document.getElementById("binding-config-soundboard-virtual-mic-help");
-  const bindingConfigSoundboardVirtualMic = document.getElementById("binding-config-soundboard-virtual-mic");
-  const bindingConfigCurveSection = document.getElementById("binding-config-curve-section");
-  const bindingConfigFeedbackOutputSection = document.getElementById("binding-config-feedback-output-section");
-  const bindingConfigFeedbackOutputCustom = document.getElementById("binding-config-feedback-output-custom");
-  const bindingConfigFeedbackMsgType = document.getElementById("binding-config-feedback-msg-type");
-  const bindingConfigFeedbackChannel = document.getElementById("binding-config-feedback-channel");
-  const bindingConfigFeedbackController = document.getElementById("binding-config-feedback-controller");
-  const bindingConfigFeedbackLearn = document.getElementById("binding-config-feedback-learn");
-  const bindingConfigFeedbackClear = document.getElementById("binding-config-feedback-clear");
-  const bindingConfigMuteSection = document.getElementById("binding-config-mute-section");
-  const bindingConfigAssignSection = document.getElementById("binding-config-assign-section");
-  const bindingConfigMuteLabel = document.getElementById("binding-config-mute-label");
-  const bindingConfigMuteLearn = document.getElementById("binding-config-mute-learn");
-  const bindingConfigMuteClear = document.getElementById("binding-config-mute-clear");
-  const bindingConfigMuteModeRoot = document.getElementById("binding-config-mute-mode-root");
-  const bindingConfigMuteModeButton = document.getElementById("binding-config-mute-mode-button");
-  const bindingConfigMuteModeMenu = document.getElementById("binding-config-mute-mode-menu");
-  const bindingConfigMuteModeToggle = document.getElementById("binding-config-mute-mode-toggle");
-  const bindingConfigMuteModeValue = document.getElementById("binding-config-mute-mode-value");
-  const bindingConfigAssignLabel = document.getElementById("binding-config-assign-label");
-  const bindingConfigAssignLearn = document.getElementById("binding-config-assign-learn");
-  const bindingConfigAssignClear = document.getElementById("binding-config-assign-clear");
-  const bindingConfigAssignModeRoot = document.getElementById("binding-config-assign-mode-root");
-  const bindingConfigAssignModeButton = document.getElementById("binding-config-assign-mode-button");
-  const bindingConfigAssignModeMenu = document.getElementById("binding-config-assign-mode-menu");
-  const bindingConfigAssignModeAdd = document.getElementById("binding-config-assign-mode-add");
-  const bindingConfigAssignModeReplace = document.getElementById("binding-config-assign-mode-replace");
-  const bindingConfigAssignModeClear = document.getElementById("binding-config-assign-mode-clear");
-  const bindingConfigCurveCards = document.getElementById("binding-config-curve-cards");
-  const bindingConfigCurveHelp = document.getElementById("binding-config-curve-help");
-  const bindingConfigCurvePresetRoot = document.getElementById("binding-config-curve-preset-root");
-  const bindingConfigCurvePresetButton = document.getElementById("binding-config-curve-preset-button");
-  const bindingConfigCurvePresetMenu = document.getElementById("binding-config-curve-preset-menu");
-  const bindingConfigCurvePresetSearch = document.getElementById("binding-config-curve-preset-search");
-  const bindingConfigCurvePresetList = document.getElementById("binding-config-curve-preset-list");
-  const bindingConfigCurvePresetSave = document.getElementById("binding-config-curve-preset-save");
-  const bindingConfigCurvePresetForm = document.getElementById("binding-config-curve-preset-form");
-  const bindingConfigCurvePresetFormTitle = document.getElementById("binding-config-curve-preset-form-title");
-  const bindingConfigCurvePresetName = document.getElementById("binding-config-curve-preset-name");
-  const bindingConfigCurvePresetFormSave = document.getElementById("binding-config-curve-preset-form-save");
-  const bindingConfigCurvePresetFormCancel = document.getElementById("binding-config-curve-preset-form-cancel");
-  const bindingConfigCustomEditor = document.getElementById("binding-config-custom-editor");
-  const bindingConfigCustomSurface = document.getElementById("binding-config-custom-surface");
-  const bindingConfigCustomReset = document.getElementById("binding-config-custom-reset");
-  const bindingConfigAssignHelp = document.getElementById("binding-config-assign-help");
-  const bindingConfigPreviewLearnShell = document.getElementById("binding-config-preview-learn-shell");
-  const bindingConfigPreviewLearnButton = document.getElementById("binding-config-preview-learn-button");
-  const bindingConfigPreviewLearnIndicator = document.getElementById("binding-config-preview-learn-indicator");
-  const bindingConfigPreviewLearnStatus = document.getElementById("binding-config-preview-learn-status");
-  const bindingConfigPreviewTargetIcon = document.getElementById("binding-config-preview-target-icon");
-  const bindingConfigPreviewTargetLabel = document.getElementById("binding-config-preview-target-label");
-  const bindingConfigPreviewTargetTags = document.getElementById("binding-config-preview-target-tags");
-  const bindingConfigPreviewFill = document.getElementById("binding-config-preview-fill");
-  const bindingConfigPreviewThumb = document.getElementById("binding-config-preview-thumb");
-  const bindingConfigPreviewButton = document.getElementById("binding-config-preview-button");
-  const bindingConfigPreviewButtonFace = document.getElementById("binding-config-preview-button-face");
-  const bindingConfigPreviewButtonLabel = document.getElementById("binding-config-preview-button-label");
-  const bindingConfigPreviewValue = document.getElementById("binding-config-preview-value");
-  const bindingConfigPreviewStatus = document.getElementById("binding-config-preview-status");
-  const bindingConfigPreviewMainMidi = document.getElementById("binding-config-preview-main-midi");
-  const bindingConfigPreviewMuteRow = document.getElementById("binding-config-preview-mute-row");
-  const bindingConfigPreviewMute = document.getElementById("binding-config-preview-mute");
-  const bindingConfigPreviewAssignRow = document.getElementById("binding-config-preview-assign-row");
-  const bindingConfigPreviewAssign = document.getElementById("binding-config-preview-assign");
-  const bindingConfigPreviewCurveRow = document.getElementById("binding-config-preview-curve-row");
-  const bindingConfigPreviewCurve = document.getElementById("binding-config-preview-curve");
-  const bindingConfigPreviewMidiValue = document.getElementById("binding-config-preview-midi-value");
-  
-  // Defensive cleanup for older builds that injected extra back buttons.
-  try {
-    const header = targetPanelTitle?.closest?.(".target-panel-header");
-    if (header) {
-      header.querySelectorAll(".target-panel-back").forEach((btn) => {
-        if (btn.id !== "target-panel-back") {
-          btn.remove();
-        }
-      });
-      // Flatten any nested header-left wrappers.
-      const left = header.querySelector(".target-panel-header-left");
-      if (left) {
-        left.querySelectorAll(".target-panel-header-left").forEach((inner) => {
-          if (inner === left) return;
-          while (inner.firstChild) {
-            left.appendChild(inner.firstChild);
-          }
-          inner.remove();
-        });
-        if (targetPanelBack && targetPanelBack.parentElement !== left) {
-          left.insertBefore(targetPanelBack, left.firstChild);
-        }
-        if (targetPanelTitle && targetPanelTitle.parentElement !== left) {
-          left.appendChild(targetPanelTitle);
-        }
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-  const learnPanel = document.getElementById("learn-panel");
-  const learnPanelTitle = document.getElementById("learn-panel-title");
-  const learnPanelMessage = document.getElementById("learn-panel-message");
-  const learnPanelSpinner = document.getElementById("learn-panel-spinner");
-  const learnPanelActions = document.getElementById("learn-panel-actions");
-  const learnPanelCancel = document.getElementById("learn-panel-cancel");
-  const learnPanelConfirm = document.getElementById("learn-panel-confirm");
-  const learnPanelClose = document.getElementById("learn-panel-close");
-  const settingsButton = document.getElementById("settings-button");
-  const topbarUpdateButton = document.getElementById("topbar-update-button");
-  const settingsPanel = document.getElementById("settings-panel");
-  const settingsPanelClose = document.getElementById("settings-panel-close");
-  const connectionsButton = document.getElementById("connections-button");
-  const connectionsPanel = document.getElementById("connections-panel");
-  const connectionsPanelClose = document.getElementById("connections-panel-close");
-  const connectionsSidebar = document.getElementById("connections-sidebar");
-  const connectionsContent = document.getElementById("connections-content");
-  const osdEnabledToggle = document.getElementById("osd-enabled");
-  const osdMonitorSelect = document.getElementById("osd-monitor");
-  const osdLabelModeSelect = document.getElementById("osd-label-mode");
-  const osdStyleSelect = document.getElementById("osd-style");
-  const osdTransparencyInput = document.getElementById("osd-transparency");
-  const osdTransparencyValue = document.getElementById("osd-transparency-value");
-  const osdScaleInput = document.getElementById("osd-scale");
-  const osdScaleValue = document.getElementById("osd-scale-value");
-  const osdPositionPicker = document.getElementById("osd-position-picker");
-  const virtualAudioPanel = document.getElementById("virtual-audio-panel");
-  const virtualAudioInstall = document.getElementById("virtual-audio-install");
-  const virtualAudioUpdate = document.getElementById("virtual-audio-update");
-  const virtualAudioUpdateNotice = document.getElementById("virtual-audio-update-notice");
-  const virtualAudioRepair = document.getElementById("virtual-audio-repair");
-  const virtualAudioProblemRepair = document.getElementById("virtual-audio-problem-repair");
-  const virtualAudioRemove = document.getElementById("virtual-audio-remove");
-  const virtualAudioRestart = document.getElementById("virtual-audio-restart");
-  const virtualAudioRestartLater = document.getElementById("virtual-audio-restart-later");
-  const virtualAudioCopyDiagnostics = document.getElementById("virtual-audio-copy-diagnostics");
-  const virtualAudioEnabled = document.getElementById("virtual-audio-enabled");
-  const virtualAudioRoutingError = document.getElementById("virtual-audio-routing-error");
-  const virtualAudioInputDevice = document.getElementById("virtual-audio-input-device");
-  const virtualAudioMicrophoneGain = document.getElementById("virtual-audio-microphone-gain");
-  const virtualAudioMicrophoneGainValue = document.getElementById("virtual-audio-microphone-gain-value");
-  const virtualAudioSoundboardGain = document.getElementById("virtual-audio-soundboard-gain");
-  const virtualAudioSoundboardGainValue = document.getElementById("virtual-audio-soundboard-gain-value");
-  const virtualAudioMicrophoneMeter = document.getElementById("virtual-audio-microphone-meter");
-  const virtualAudioSoundboardMeter = document.getElementById("virtual-audio-soundboard-meter");
-  const virtualAudioOutputMeter = document.getElementById("virtual-audio-output-meter");
-  const virtualAudioLimiterMeter = document.getElementById("virtual-audio-limiter-meter");
-  const virtualAudioLimiterValue = document.getElementById("virtual-audio-limiter-value");
-  const virtualAudioDriverVersion = document.getElementById("virtual-audio-driver-version");
-  const virtualAudioServiceStatus = document.getElementById("virtual-audio-service-status");
-  const virtualAudioEndpointStatus = document.getElementById("virtual-audio-endpoint-status");
-  const virtualAudioProblemMessage = document.getElementById("virtual-audio-problem-message");
-  const startWithWindowsSelect = document.getElementById("start-with-windows");
-  const startInTraySelect = document.getElementById("start-in-tray");
-  const minimizeToTraySelect = document.getElementById("minimize-to-tray");
-  const exitToTraySelect = document.getElementById("exit-to-tray");
-  const languageSelect = document.getElementById("language-select");
-  const autoCheckUpdatesButton = document.getElementById("auto-check-updates-button");
-  const midiDeviceInventoryConsentToggle = document.getElementById("midi-device-inventory-consent-toggle");
-  const openLogsFolderButton = document.getElementById("open-logs-folder");
-  const resetAppDataButton = document.getElementById("reset-app-data");
-  const checkForUpdatesButton = document.getElementById("check-for-updates");
-  const settingsUpdateStatus = document.getElementById("settings-update-status");
-  const updateCurrentVersion = document.getElementById("update-current-version");
-  const updateLatestVersion = document.getElementById("update-latest-version");
-  const sidebarAppVersion = document.getElementById("sidebar-app-version");
-  const osd = document.getElementById("volume-osd");
-  // OSD elements are now dynamic
-  const alertOverlay = document.getElementById("alert-overlay");
-  const alertTitle = document.getElementById("alert-title");
-  const alertMessage = document.getElementById("alert-message");
-  const alertClose = document.getElementById("alert-close");
-  const alertSecondary = document.getElementById("alert-secondary");
-  const alertCancel = document.getElementById("alert-cancel");
-  const alertOk = document.getElementById("alert-ok");
+function findIdRefs(documentSource) {
+  return Object.fromEntries(
+    Object.entries(DOM_REF_IDS).map(([key, id]) => [key, documentSource.getElementById(id)]),
+  );
+}
 
+/**
+ * Creates feature-scoped DOM namespaces.
+ * @param {Document} [documentSource]
+ */
+export function createDomRefs(documentSource = document) {
   const all = {
-    midiSelect,
-    midiOutputSelect,
-    midiStatus,
-    refreshMidiButton,
-    learnBindingButton,
-    bindingAddFooterButton,
-    sessionsContainer,
-    profileDropdown,
-    profileToggle,
-    profileCurrent,
-    profileList,
-    profilePageList,
-    profilePageCreateInput,
-    profilePageCreateButton,
-    profilePageImportButton,
-    profilePageExportCurrentButton,
-    bindingsContainer,
-    bindingTypeFilter,
-    bindingSearchInput,
-    bindingDensityToggle,
-    mainScreen,
-    appShell,
-    sidebarNav,
-    sidebarCollapseToggle,
-    appPages,
-    appNavItems,
-    targetPanel,
-    targetPanelList,
-    targetPanelTitle,
-    targetPanelClose,
-    targetPanelBack,
-    bindingConfigPanel,
-    bindingConfigBack,
-    bindingConfigTitle,
-    bindingConfigClose,
-    bindingConfigCancel,
-    bindingConfigSave,
-    bindingConfigName,
-    bindingConfigButtonLightSection,
-    bindingConfigButtonLightSelectRow,
-    bindingConfigButtonLightSelect,
-    bindingConfigIndicatorCustom,
-    bindingConfigIndicatorMsgType,
-    bindingConfigIndicatorChannel,
-    bindingConfigIndicatorController,
-    bindingConfigIndicatorLearn,
-    bindingConfigIndicatorClear,
-    bindingConfigButtonLearnSection,
-    bindingConfigButtonLearnButton,
-    bindingConfigButtonLearnIndicator,
-    bindingConfigButtonLearnStatus,
-    bindingConfigMacroSummarySection,
-    bindingConfigMacroSummary,
-    bindingConfigMacroEdit,
-    bindingConfigMacroSection,
-    bindingConfigMacroList,
-    bindingConfigMacroAddAction,
-    bindingConfigMacroAddWait,
-    bindingConfigMacroAddParallel,
-    bindingConfigSoundboardSummarySection,
-    bindingConfigSoundboardSummary,
-    bindingConfigSoundboardEdit,
-    bindingConfigSoundboardSection,
-    bindingConfigSoundboardFile,
-    bindingConfigSoundboardStatus,
-    bindingConfigSoundboardReplace,
-    bindingConfigSoundboardPreview,
-    bindingConfigSoundboardPlaybackTime,
-    bindingConfigSoundboardWaveform,
-    bindingConfigSoundboardStart,
-    bindingConfigSoundboardEnd,
-    bindingConfigSoundboardStartTime,
-    bindingConfigSoundboardEndTime,
-    bindingConfigSoundboardSelectionTime,
-    bindingConfigSoundboardVolume,
-    bindingConfigSoundboardVolumeValue,
-    bindingConfigSoundboardSpeed,
-    bindingConfigSoundboardSpeedValue,
-    bindingConfigSoundboardOutput,
-    bindingConfigSoundboardMonitor,
-    bindingConfigSoundboardVirtualMicOption,
-    bindingConfigSoundboardVirtualMicHelp,
-    bindingConfigSoundboardVirtualMic,
-    bindingConfigCurveSection,
-    bindingConfigFeedbackOutputSection,
-    bindingConfigFeedbackOutputCustom,
-    bindingConfigFeedbackMsgType,
-    bindingConfigFeedbackChannel,
-    bindingConfigFeedbackController,
-    bindingConfigFeedbackLearn,
-    bindingConfigFeedbackClear,
-    bindingConfigMuteSection,
-    bindingConfigAssignSection,
-    bindingConfigMuteLabel,
-    bindingConfigMuteLearn,
-    bindingConfigMuteClear,
-    bindingConfigMuteModeRoot,
-    bindingConfigMuteModeButton,
-    bindingConfigMuteModeMenu,
-    bindingConfigMuteModeToggle,
-    bindingConfigMuteModeValue,
-    bindingConfigAssignLabel,
-    bindingConfigAssignLearn,
-    bindingConfigAssignClear,
-    bindingConfigAssignModeRoot,
-    bindingConfigAssignModeButton,
-    bindingConfigAssignModeMenu,
-    bindingConfigAssignModeAdd,
-    bindingConfigAssignModeReplace,
-    bindingConfigAssignModeClear,
-    bindingConfigCurveCards,
-    bindingConfigCurveHelp,
-    bindingConfigCurvePresetRoot,
-    bindingConfigCurvePresetButton,
-    bindingConfigCurvePresetMenu,
-    bindingConfigCurvePresetSearch,
-    bindingConfigCurvePresetList,
-    bindingConfigCurvePresetSave,
-    bindingConfigCurvePresetForm,
-    bindingConfigCurvePresetFormTitle,
-    bindingConfigCurvePresetName,
-    bindingConfigCurvePresetFormSave,
-    bindingConfigCurvePresetFormCancel,
-    bindingConfigCustomEditor,
-    bindingConfigCustomSurface,
-    bindingConfigCustomReset,
-    bindingConfigAssignHelp,
-    bindingConfigPreviewLearnShell,
-    bindingConfigPreviewLearnButton,
-    bindingConfigPreviewLearnIndicator,
-    bindingConfigPreviewLearnStatus,
-    bindingConfigPreviewTargetIcon,
-    bindingConfigPreviewTargetLabel,
-    bindingConfigPreviewTargetTags,
-    bindingConfigPreviewFill,
-    bindingConfigPreviewThumb,
-    bindingConfigPreviewButton,
-    bindingConfigPreviewButtonFace,
-    bindingConfigPreviewButtonLabel,
-    bindingConfigPreviewValue,
-    bindingConfigPreviewStatus,
-    bindingConfigPreviewMainMidi,
-    bindingConfigPreviewMuteRow,
-    bindingConfigPreviewMute,
-    bindingConfigPreviewAssignRow,
-    bindingConfigPreviewAssign,
-    bindingConfigPreviewCurveRow,
-    bindingConfigPreviewCurve,
-    bindingConfigPreviewMidiValue,
-    learnPanel,
-    learnPanelTitle,
-    learnPanelMessage,
-    learnPanelSpinner,
-    learnPanelActions,
-    learnPanelCancel,
-    learnPanelConfirm,
-    learnPanelClose,
-    settingsButton,
-    topbarUpdateButton,
-    settingsPanel,
-    settingsPanelClose,
-    connectionsButton,
-    connectionsPanel,
-    connectionsPanelClose,
-    connectionsSidebar,
-    connectionsContent,
-    osdEnabledToggle,
-    osdMonitorSelect,
-    osdLabelModeSelect,
-    osdStyleSelect,
-    osdTransparencyInput,
-    osdTransparencyValue,
-    osdScaleInput,
-    osdScaleValue,
-    osdPositionPicker,
-    virtualAudioPanel,
-    virtualAudioInstall,
-    virtualAudioUpdate,
-    virtualAudioUpdateNotice,
-    virtualAudioRepair,
-    virtualAudioProblemRepair,
-    virtualAudioRemove,
-    virtualAudioRestart,
-    virtualAudioRestartLater,
-    virtualAudioCopyDiagnostics,
-    virtualAudioEnabled,
-    virtualAudioRoutingError,
-    virtualAudioInputDevice,
-    virtualAudioMicrophoneGain,
-    virtualAudioMicrophoneGainValue,
-    virtualAudioSoundboardGain,
-    virtualAudioSoundboardGainValue,
-    virtualAudioMicrophoneMeter,
-    virtualAudioSoundboardMeter,
-    virtualAudioOutputMeter,
-    virtualAudioLimiterMeter,
-    virtualAudioLimiterValue,
-    virtualAudioDriverVersion,
-    virtualAudioServiceStatus,
-    virtualAudioEndpointStatus,
-    virtualAudioProblemMessage,
-    startWithWindowsSelect,
-    startInTraySelect,
-    minimizeToTraySelect,
-    exitToTraySelect,
-    languageSelect,
-    autoCheckUpdatesButton,
-    midiDeviceInventoryConsentToggle,
-    openLogsFolderButton,
-    resetAppDataButton,
-    checkForUpdatesButton,
-    settingsUpdateStatus,
-    updateCurrentVersion,
-    updateLatestVersion,
-    sidebarAppVersion,
-    osd,
-    alertOverlay,
-    alertTitle,
-    alertMessage,
-    alertClose,
-    alertSecondary,
-    alertCancel,
-    alertOk,
+    ...findIdRefs(documentSource),
+    appShell: documentSource.querySelector(".app-shell"),
+    sidebarNav: documentSource.querySelector(".sidebar-nav"),
+    appPages: Array.from(documentSource.querySelectorAll("[data-page-panel]")),
+    appNavItems: Array.from(documentSource.querySelectorAll("[data-page]")),
   };
 
   return {

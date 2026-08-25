@@ -1,0 +1,507 @@
+.settings-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+[data-page-panel].hidden {
+  display: none !important;
+}
+
+.settings-shell {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  background: transparent;
+  overflow: hidden;
+}
+
+.settings-sidebar {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  padding: 16px 12px 16px 0;
+  background: transparent;
+  border-right: 1px solid var(--control-border);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.settings-page-title {
+  margin: 0 10px 18px;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 750;
+  color: var(--text-primary);
+}
+
+.settings-nav-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-radius: 5px;
+  background: var(--surface-raised);
+  border: 1px solid var(--control-border);
+  box-shadow: inset 3px 0 0 var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.settings-nav-indicator.is-ready {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 120ms ease;
+}
+
+.settings-nav {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-nav-item {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.settings-nav-item:hover {
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-nav-item.active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-primary);
+}
+
+.settings-nav-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.settings-nav-icon svg,
+.settings-button-icon svg,
+.settings-status-icon svg,
+.virtual-audio-setup-icon svg,
+.settings-maintenance-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.settings-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-content {
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 0 12px 16px;
+  background: transparent;
+  overflow: auto;
+}
+
+.settings-section-panel {
+  display: none;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.settings-section-panel.active {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-osd-section .settings-card {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.settings-general-section.active {
+  display: grid;
+  grid-template-rows: minmax(280px, 5fr) minmax(204px, 3fr);
+  gap: 12px;
+}
+
+.settings-general-section .settings-startup-card,
+.settings-general-section .settings-update-card {
+  min-height: 0;
+}
+
+.settings-maintenance-section .settings-maintenance-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.settings-section-panel.hidden {
+  display: none !important;
+}
+
+.virtual-audio-section.active {
+  overflow: visible;
+}
+
+.virtual-audio-setup-card,
+.virtual-audio-progress-card,
+.virtual-audio-restart-card,
+.virtual-audio-problem-card {
+  flex: 1 1 auto;
+  min-height: 240px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px;
+}
+
+.virtual-audio-setup-icon {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.virtual-audio-setup-copy,
+.virtual-audio-problem-copy {
+  max-width: 620px;
+}
+
+.virtual-audio-section h3 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.virtual-audio-section p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.virtual-audio-section .virtual-audio-primary-action,
+.virtual-audio-section .virtual-audio-danger-action,
+.virtual-audio-section .virtual-audio-button-row .settings-action {
+  width: auto;
+  min-height: 40px;
+}
+
+.virtual-audio-section .settings-button-label {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.virtual-audio-primary-action {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--control-border));
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.virtual-audio-danger-action {
+  color: var(--danger);
+}
+
+.virtual-audio-button-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.virtual-audio-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--control-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: virtual-audio-spin 850ms linear infinite;
+}
+
+@keyframes virtual-audio-spin {
+  to { transform: rotate(360deg); }
+}
+
+.virtual-audio-ready-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+  grid-template-rows: auto minmax(min-content, 1fr);
+  gap: 12px;
+}
+
+.virtual-audio-ready-layout.hidden,
+.virtual-audio-section [data-virtual-audio-view].hidden {
+  display: none !important;
+}
+
+.virtual-audio-routing-card,
+.virtual-audio-meters-card,
+.virtual-audio-health-card {
+  padding: 0;
+  gap: 0;
+}
+
+.virtual-audio-routing-card .settings-card-section-heading,
+.virtual-audio-meters-card .settings-card-section-heading,
+.virtual-audio-health-card .settings-card-section-heading {
+  justify-content: space-between;
+}
+
+.virtual-audio-routing-error {
+  margin: 0 !important;
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  color: var(--danger) !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
+
+.virtual-audio-control-row {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: minmax(150px, .8fr) minmax(220px, 1.2fr);
+  align-items: center;
+  gap: 20px;
+  padding: 10px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--control-border) 48%, transparent);
+}
+
+.virtual-audio-control-row:last-child {
+  border-bottom: 0;
+}
+
+.virtual-audio-control-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.virtual-audio-control-copy small {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.virtual-audio-control-row select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  background: var(--control-bg);
+  color: var(--text-primary);
+}
+
+.virtual-audio-control-row .settings-select-dropdown {
+  width: 100%;
+  min-width: 0;
+}
+
+.virtual-audio-control-row .settings-select-dropdown .target-button {
+  width: 100%;
+  min-height: 38px;
+}
+
+.virtual-audio-meter-grid {
+  display: grid;
+  gap: 15px;
+  padding: 16px;
+}
+
+.virtual-audio-meter-row {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.virtual-audio-meter-row > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.virtual-audio-meter {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--slider-track);
+}
+
+.virtual-audio-meter span {
+  display: block;
+  width: var(--meter-level, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  transition: width 80ms linear;
+}
+
+.virtual-audio-meter--limiter span {
+  background: var(--warning, #f59e0b);
+}
+
+.virtual-audio-health-card {
+  grid-column: 1 / -1;
+}
+
+.virtual-audio-update-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, var(--control-border));
+  background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
+}
+
+.virtual-audio-update-notice.hidden {
+  display: none;
+}
+
+.virtual-audio-update-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.virtual-audio-update-copy small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.virtual-audio-section .virtual-audio-update-notice .settings-action {
+  width: auto;
+  min-height: 36px;
+  flex: 0 0 auto;
+}
+
+.virtual-audio-health-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.virtual-audio-health-grid > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border-right: 1px solid color-mix(in srgb, var(--control-border) 48%, transparent);
+}
+
+.virtual-audio-health-grid > div:last-child {
+  border-right: 0;
+}
+
+.virtual-audio-health-grid dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.virtual-audio-health-grid dd {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.virtual-audio-health-card > .settings-field-help {
+  margin: 0;
+  padding: 0 16px 12px;
+}
+
+.virtual-audio-health-card > .virtual-audio-remove-help {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 48%, transparent);
+}
+
+.virtual-audio-health-card > .virtual-audio-button-row {
+  margin-top: auto;
+  justify-content: flex-end;
+  padding: 0 16px 14px;
+}
+
+@media (max-width: 780px) {
+  .virtual-audio-ready-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(min-content, 1fr);
+  }
+
+  .virtual-audio-control-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .virtual-audio-health-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .virtual-audio-health-grid > div {
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--control-border) 48%, transparent);
+  }
+
+  .virtual-audio-update-notice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

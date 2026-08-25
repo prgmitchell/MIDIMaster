@@ -421,21 +421,7 @@ impl SoundboardService {
         volume: f32,
         virtual_route: bool,
     ) -> Result<(), String> {
-        let path = validate_audio_path(Path::new(&mapping.path))?;
-        let file = File::open(&path).map_err(|err| format!("Unable to open audio file: {err}"))?;
-        let decoder = Decoder::try_from(file)
-            .map_err(|err| format!("Unsupported or invalid audio file: {err}"))?;
-        let duration = decoder
-            .total_duration()
-            .ok_or_else(|| "Unable to determine the audio duration".to_string())?;
-        let duration_ms = duration_to_ms(duration);
-        if duration_ms > MAX_AUDIO_DURATION_MS {
-            return Err("Audio files must be 10 minutes or shorter".to_string());
-        }
-        let (start_ms, end_ms) = validated_trim_range(mapping, duration_ms)?;
-        let source = decoder
-            .skip_duration(Duration::from_millis(start_ms))
-            .take_duration(Duration::from_millis(end_ms - start_ms));
+        let source = prepare_playback_source(mapping)?;
 
         let mut playback = self
             .playback
@@ -522,21 +508,7 @@ impl SoundboardService {
         mapping: &SoundboardMapping,
         volume: f32,
     ) -> Result<(), String> {
-        let path = validate_audio_path(Path::new(&mapping.path))?;
-        let file = File::open(&path).map_err(|err| format!("Unable to open audio file: {err}"))?;
-        let decoder = Decoder::try_from(file)
-            .map_err(|err| format!("Unsupported or invalid audio file: {err}"))?;
-        let duration = decoder
-            .total_duration()
-            .ok_or_else(|| "Unable to determine the audio duration".to_string())?;
-        let duration_ms = duration_to_ms(duration);
-        if duration_ms > MAX_AUDIO_DURATION_MS {
-            return Err("Audio files must be 10 minutes or shorter".to_string());
-        }
-        let (start_ms, end_ms) = validated_trim_range(mapping, duration_ms)?;
-        let source = decoder
-            .skip_duration(Duration::from_millis(start_ms))
-            .take_duration(Duration::from_millis(end_ms - start_ms));
+        let source = prepare_playback_source(mapping)?;
 
         let mut playback = self
             .playback
@@ -583,6 +555,26 @@ fn update_atomic_peak(meter: &AtomicU32, value: f32) {
 
 fn destination_player_key(binding_id: &str, destination: &str) -> String {
     format!("{binding_id}:{destination}")
+}
+
+fn prepare_playback_source(
+    mapping: &SoundboardMapping,
+) -> Result<impl Source + Send + 'static, String> {
+    let path = validate_audio_path(Path::new(&mapping.path))?;
+    let file = File::open(&path).map_err(|err| format!("Unable to open audio file: {err}"))?;
+    let decoder = Decoder::try_from(file)
+        .map_err(|err| format!("Unsupported or invalid audio file: {err}"))?;
+    let duration = decoder
+        .total_duration()
+        .ok_or_else(|| "Unable to determine the audio duration".to_string())?;
+    let duration_ms = duration_to_ms(duration);
+    if duration_ms > MAX_AUDIO_DURATION_MS {
+        return Err("Audio files must be 10 minutes or shorter".to_string());
+    }
+    let (start_ms, end_ms) = validated_trim_range(mapping, duration_ms)?;
+    Ok(decoder
+        .skip_duration(Duration::from_millis(start_ms))
+        .take_duration(Duration::from_millis(end_ms - start_ms)))
 }
 
 pub fn validated_trim_range(

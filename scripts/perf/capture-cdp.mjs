@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { parseArgs } from "./lib/cli.mjs";
+import { parseArgs, runMain } from "./lib/cli.mjs";
 import { writeJson } from "./lib/files.mjs";
 
 const sleep = (milliseconds) => new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
@@ -229,9 +228,4 @@ async function main() {
   console.log(`Wrote private CDP artifacts to ${output}`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error(error.stack ?? error.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

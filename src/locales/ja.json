@@ -634,6 +634,7 @@
   "midi.applyingChange": "MIDIデバイスの変更を適用...",
   "midi.connectFailed": "接続失敗: {message}",
   "midi.disconnected": "MIDIデバイスが切断されました.",
+  "midi.connected": "接続済みです。",
   "midi.reconnectedProfile": "MIDIデバイスをプロファイルに再接続.",
   "midi.selectInputDevice": "入力デバイスを選択",
   "midi.selectOutputDevice": "出力デバイスを選択",

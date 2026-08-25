@@ -354,11 +354,6 @@
   justify-content: flex-start;
 }
 
-.binding-value-cell--macro .binding-momentary-value {
-  min-width: 112px;
-  max-width: none;
-}
-
 .binding-value-cell--soundboard .binding-momentary-value {
   min-width: 88px;
   max-width: none;
@@ -877,10 +872,6 @@ body.dark-mode:not([data-theme]) .settings-updates-section {
 }
 
 /* Binding table navigation */
-:root {
-  --bindings-grid-cols: 32px minmax(160px, 1fr) minmax(120px, 144px) minmax(200px, 1fr) minmax(220px, 0.68fr) 76px;
-  --bindings-grid-gap: 16px;
-}
 
 body.osd-only,
 body.osd-only.dark-mode {
@@ -1066,11 +1057,6 @@ body.dark-mode:not([data-theme]) .binding-row .target-button:hover {
 
 .binding-actions {
   gap: 16px;
-}
-
-:root {
-  --bindings-grid-cols: 32px minmax(160px, 1fr) minmax(120px, 144px) minmax(200px, 1fr) minmax(220px, 0.68fr) 76px;
-  --bindings-grid-gap: 16px;
 }
 
 body[data-theme] {
@@ -1452,11 +1438,6 @@ body[data-theme] .binding-value-cell {
 
 body[data-theme] .binding-value-cell--button {
   justify-content: flex-start;
-}
-
-body[data-theme] .binding-value-cell--macro .binding-momentary-value {
-  min-width: 112px;
-  max-width: none;
 }
 
 body[data-theme] .binding-value-cell--button .binding-toggle-value {

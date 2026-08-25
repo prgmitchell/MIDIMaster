@@ -1,0 +1,298 @@
+.binding-config-panel--macro-page .binding-config-section--macro {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.binding-config-stack input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.binding-config-toggle-row {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 144, 184, 0.16);
+  background: rgba(11, 18, 28, 0.62);
+}
+
+.binding-config-toggle-row.is-disabled {
+  opacity: 0.62;
+}
+
+.binding-config-select-row {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 144, 184, 0.16);
+  background: rgba(11, 18, 28, 0.62);
+}
+
+.binding-config-select-row.hidden {
+  display: none;
+}
+
+.binding-config-select-row.is-disabled {
+  opacity: 0.58;
+}
+
+.binding-config-toggle-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.binding-config-toggle-title {
+  color: #e3eeff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.binding-config-toggle-help {
+  color: #93a5c4;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.binding-config-toggle {
+  flex: 0 0 auto;
+}
+
+.binding-config-light-select {
+  width: min(170px, 42vw);
+  min-width: 142px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 144, 184, 0.22);
+  background: rgba(6, 11, 18, 0.72);
+  color: #ecf4ff;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.binding-config-light-select:disabled {
+  cursor: default;
+}
+
+.binding-config-indicator-custom {
+  display: grid;
+  grid-template-columns: minmax(108px, 1fr) minmax(72px, 0.72fr) minmax(82px, 0.82fr) 40px 40px;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+  padding: 2px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.binding-config-indicator-custom.hidden {
+  display: none;
+}
+
+.binding-config-indicator-custom.is-visible,
+.binding-config-section--button-light.is-indicator-custom .binding-config-indicator-custom {
+  display: grid;
+}
+
+.binding-config-indicator-custom.is-feedback-disabled > .binding-config-indicator-heading,
+.binding-config-indicator-custom.is-feedback-disabled > .binding-config-indicator-field:not(:first-of-type),
+.binding-config-indicator-custom.is-feedback-disabled > .binding-config-indicator-actions {
+  opacity: 0.5;
+}
+
+.binding-config-indicator-heading {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.binding-config-indicator-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: #93a5c4;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.binding-config-indicator-field input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 144, 184, 0.22);
+  background: rgba(6, 11, 18, 0.72);
+  color: #ecf4ff;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.binding-config-indicator-actions {
+  display: contents;
+}
+
+.binding-config-indicator-field .binding-config-light-dropdown {
+  width: 100%;
+  min-width: 0;
+}
+
+.binding-config-indicator-field .binding-config-light-dropdown .target-button {
+  min-width: 0;
+}
+
+.binding-config-indicator-actions .binding-config-button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+}
+
+@media (max-width: 720px) {
+  .binding-config-indicator-custom {
+    grid-template-columns: minmax(104px, 1fr) minmax(68px, 0.7fr) minmax(78px, 0.8fr) 40px 40px;
+  }
+
+  .binding-config-indicator-actions {
+    display: contents;
+  }
+}
+
+.binding-config-light-dropdown {
+  width: min(180px, 42vw);
+  min-width: 150px;
+}
+
+.binding-config-light-dropdown .target-button {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.binding-config-light-dropdown .target-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.binding-config-light-dropdown .target-menu {
+  min-width: 150px;
+}
+
+.binding-config-actions {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.binding-config-mode-root {
+  position: relative;
+  display: inline-flex;
+}
+
+.binding-config-mode-trigger {
+  min-width: 40px !important;
+  width: 40px;
+  height: 40px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.binding-config-mode-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.binding-config-mode-menu {
+  position: absolute;
+  left: 0;
+  top: auto;
+  bottom: calc(100% + 6px);
+  min-width: 130px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #f7f9fe;
+  border: 1px solid #d5dbea;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  z-index: 20;
+}
+
+.binding-config-mode-menu.hidden {
+  display: none;
+}
+
+.binding-config-mode-option {
+  width: 100%;
+  height: 40px;
+  border-radius: 8px;
+  text-align: left;
+  padding: 0 10px;
+  font-weight: 600;
+}
+
+.binding-config-label {
+  min-width: 0;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  font-weight: 600;
+}
+
+.binding-config-label-main {
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.binding-config-inline-badge {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: help;
+}

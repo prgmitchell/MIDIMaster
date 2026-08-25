@@ -1,11 +1,23 @@
 import { closeOpenDropdowns, renderLabelFromRawWithTags } from "../ui/dropdown_badges.js";
 import { iconDataForApplicationName, iconDataForSession } from "../../core/target_core.js";
 import {
+  normalizeAutoHotkeyScriptMapping,
+  normalizeOpenApplicationMapping,
+} from "../../core/binding_model.js";
+import {
   MEDIA_ACTIONS,
   actionDefinition,
   pickerMetadataForTarget,
-  targetFromPickerKind,
 } from "../../core/target_model.js";
+import {
+  mapTargetOptionToTarget,
+  normalizeActionRole,
+  normalizeButtonActionOption as normalizeCanonicalButtonActionOption,
+  normalizeSelectedTargets,
+  pushUniqueAction,
+  resolveTargetSelection,
+  targetIdentity as canonicalTargetIdentity,
+} from "./selection_model.js";
 
 export function createTargetsFeature({
   invoke,
@@ -42,6 +54,7 @@ export function createTargetsFeature({
   let activeTargetPanelRefresh = null;
   let brightnessMonitors = [];
   let brightnessMonitorRequest = null;
+  let uiBound = false;
   const HOTKEY_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2' y='4' width='16' height='12' rx='3' fill='%231a2446' stroke='%2398a6cc' stroke-width='1.2'/><rect x='4' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='7' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='10' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='13' y='7' width='2.2' height='2.2' rx='0.6' fill='%23c7d2f3'/><rect x='5.2' y='10.6' width='9.6' height='2.2' rx='0.8' fill='%23c7d2f3'/></svg>";
   const OPEN_APPLICATION_TARGET_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><rect x='2.2' y='3.6' width='15.6' height='12.8' rx='2.2' stroke='%2398a6cc' stroke-width='1.2'/><path d='M6.2 7.3h4.9M6.2 10h7.6M6.2 12.7h5.7' stroke='%23c7d2f3' stroke-width='1.3' stroke-linecap='round'/><path d='M12.3 5.2l2.9 2.9-2.9 2.9' stroke='%238fd5ff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/></svg>";
   const AUTOHOTKEY_SCRIPT_ICON_DATA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'><path d='M5 2.8h7.1L16 6.7v10.5H5V2.8z' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M12.1 2.8v4h3.9' stroke='%2398a6cc' stroke-width='1.2' stroke-linejoin='round'/><path d='M7.3 12.6l1.9-4.2 1.9 4.2M8 11.1h2.4M12.6 9.1v3.5' stroke='%238fd5ff' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/></svg>";
@@ -115,31 +128,21 @@ export function createTargetsFeature({
     ];
   }
 
-  void refreshBrightnessMonitors();
-
   function normalizeOpenApplication(raw) {
-    if (!raw || typeof raw !== "object") return null;
-    const path = String(raw.path || "").trim();
-    const display = String(raw.display || "").trim();
-    const iconData = typeof raw.icon_data === "string" && raw.icon_data.trim()
-      ? raw.icon_data.trim()
-      : null;
-    if (!path) return null;
+    const normalized = normalizeOpenApplicationMapping(raw);
+    if (!normalized) return null;
     return {
-      path,
-      display: friendlyAppName(display || path) || display || path,
-      icon_data: iconData,
+      ...normalized,
+      display: friendlyAppName(normalized.display) || normalized.display,
     };
   }
 
   function normalizeAutoHotkeyScript(raw) {
-    if (!raw || typeof raw !== "object") return null;
-    const path = String(raw.path || "").trim();
-    const display = String(raw.display || "").trim();
-    if (!path) return null;
+    const normalized = normalizeAutoHotkeyScriptMapping(raw);
+    if (!normalized) return null;
     return {
-      path,
-      display: displayNameFromPath(display || path) || display || path,
+      ...normalized,
+      display: displayNameFromPath(normalized.display) || normalized.display,
     };
   }
 
@@ -773,59 +776,21 @@ export function createTargetsFeature({
     const playbackDevices = getPlayback();
     const recordingDevices = getRecording();
 
-    const integration = currentTarget?.Integration || currentTarget?.integration;
-    const selectedAppContainer = currentTarget?.Application || currentTarget?.application;
-    const selectedAppName = selectedAppContainer?.name || selectedAppContainer?.appName;
-    const selectedAppKey = selectedAppName ? String(selectedAppName).toLowerCase() : "";
-    const selectedAppDisplayName = selectedAppContainer?.display_name || selectedAppContainer?.displayName || "";
-    const selectedAppIconData = selectedAppContainer?.icon_data
-      || selectedAppContainer?.iconData
-      || iconDataForApplicationName(selectedAppName)
-      || null;
-    const sessionContainer = currentTarget?.Session || currentTarget?.session;
-    const selectedSessionId = (sessionContainer && typeof sessionContainer === "object")
-      ? (sessionContainer.session_id ?? sessionContainer.sessionId)
-      : (sessionContainer != null ? sessionContainer : null);
-    const selectedSessionKey = (selectedSessionId != null)
-      ? (() => {
-        const s = sessions.find((x) => String(x.id) === String(selectedSessionId));
-        return s ? normalizeKey(s) : null;
-      })()
-      : null;
-    const selectedDeviceId = currentTarget?.Device?.device_id || currentTarget?.device?.device_id;
-    const selectedProfileName = currentTarget?.Profile?.name || currentTarget?.profile?.name;
-    const selectedBrightness = currentTarget?.MonitorBrightness || currentTarget?.monitorBrightness;
-    const selectedBrightnessId = (selectedBrightness && typeof selectedBrightness === "object")
-      ? String(selectedBrightness.monitor_id ?? selectedBrightness.monitorId ?? "").trim()
-      : "";
-
-    const isUnset = currentTarget == null || currentTarget === "" || currentTarget === "Unset";
-    let selectedKind = "placeholder";
-    if (!isUnset) {
-      if (integration) selectedKind = "integration-target";
-      else if (currentTarget?.Session || currentTarget?.session || currentTarget?.Application || currentTarget?.application) selectedKind = "session";
-      else if (currentTarget?.Device || currentTarget?.device) selectedKind = "device";
-      else if (currentTarget?.Profile || currentTarget?.profile) selectedKind = "profile-target";
-      else if (currentTarget === "Master" || currentTarget?.Master != null) selectedKind = "master";
-      else if (currentTarget === "Focus" || currentTarget?.Focus != null) selectedKind = "focus";
-      else if (currentTarget === "MonitorBrightness" || currentTarget?.MonitorBrightness != null || currentTarget?.monitorBrightness != null) selectedKind = "monitor-brightness";
-      else if (currentTarget === "MediaControl") selectedKind = "media-control";
-      else if (currentTarget === "CaptureControl") selectedKind = "capture-control";
-      else if (currentTarget === "Macro") selectedKind = "macro-target";
-      else if (currentTarget === "Soundboard") selectedKind = "soundboard-target";
-      else if (currentTarget === "Hotkey") selectedKind = "hotkey-target";
-      else if (currentTarget === "OpenApplication") selectedKind = "open-application-target";
-      else if (currentTarget === "AutoHotkeyScript") selectedKind = "autohotkey-script-target";
-    }
-
-    let selectedValue = "";
-    if (selectedKind === "integration-target") selectedValue = targetKey(integration);
-    else if (selectedKind === "session") selectedValue = selectedAppKey || selectedSessionKey || "";
-    else if (selectedKind === "device") selectedValue = selectedDeviceId || "";
-    else if (selectedKind === "profile-target") selectedValue = selectedProfileName || "";
-    else if (selectedKind === "monitor-brightness") selectedValue = selectedBrightnessId ? `monitor-brightness:${selectedBrightnessId}` : "monitor-brightness";
-    else if (selectedKind === "master" || selectedKind === "focus" || selectedKind === "media-control" || selectedKind === "capture-control" || selectedKind === "macro-target" || selectedKind === "soundboard-target" || selectedKind === "hotkey-target" || selectedKind === "open-application-target" || selectedKind === "autohotkey-script-target") selectedValue = selectedKind;
-    else if (selectedKind === "placeholder") selectedValue = "placeholder";
+    const {
+      integration,
+      selectedAppName,
+      selectedAppKey,
+      selectedAppDisplayName,
+      selectedAppIconData,
+      selectedDeviceId,
+      selectedBrightnessId,
+      selectedKind,
+      selectedValue,
+    } = resolveTargetSelection(currentTarget, {
+      sessions,
+      normalizeSessionKey: normalizeKey,
+      integrationTargetKey: targetKey,
+    });
 
     const options = [
       {
@@ -1102,51 +1067,8 @@ export function createTargetsFeature({
     button.appendChild(display);
     button.appendChild(caret);
 
-    const normalizeTargets = (value) => {
-      if (Array.isArray(value)) {
-        return value.filter((v) => v && v !== "Unset").slice(0, 8);
-      }
-      if (value != null && value !== "Unset") {
-        return [value];
-      }
-      return [];
-    };
-
-    const targetIdentity = (target) => {
-      if (!target) return "";
-      if (target === "Master" || target?.Master != null) return "master";
-      if (target === "Focus" || target?.Focus != null) return "focus";
-      if (target === "MonitorBrightness") return "monitor-brightness";
-      if (target?.MonitorBrightness != null || target?.monitorBrightness != null) {
-        const brightness = target.MonitorBrightness || target.monitorBrightness;
-        const monitorId = brightness?.monitor_id ?? brightness?.monitorId;
-        return monitorId ? `monitor-brightness:${monitorId}` : "monitor-brightness";
-      }
-      if (target === "MediaControl") return "media-control";
-      if (target === "CaptureControl") return "capture-control";
-      if (target === "Macro") return "macro-target";
-      if (target === "Soundboard") return "soundboard-target";
-      if (target === "Hotkey") return "hotkey-target";
-      if (target === "OpenApplication") return "open-application-target";
-      if (target === "AutoHotkeyScript") return "autohotkey-script-target";
-      const profile = target?.Profile || target?.profile;
-      if (profile?.name) return `profile:${profile.name}`;
-      const integration = target?.Integration || target?.integration;
-      if (integration) {
-        return `integration:${targetKey(integration)}`;
-      }
-      const app = target?.Application || target?.application;
-      if (app?.name) return `app:${String(app.name).toLowerCase()}`;
-      const session = target?.Session || target?.session;
-      if (session?.session_id || session?.sessionId) {
-        return `session:${session.session_id ?? session.sessionId}`;
-      }
-      const device = target?.Device || target?.device;
-      if (device?.device_id || device?.deviceId) {
-        return `device:${device.device_id ?? device.deviceId}`;
-      }
-      return JSON.stringify(target);
-    };
+    const normalizeTargets = normalizeSelectedTargets;
+    const targetIdentity = (target) => canonicalTargetIdentity(target, targetKey);
 
     let selectedTargets = normalizeTargets(currentTarget);
     let hotkeyDisplay = String(currentHotkeyDisplay || "");
@@ -1192,13 +1114,6 @@ export function createTargetsFeature({
     };
 
     selectedActionKind = String(integrationFromTarget(selectedTargets[0])?.data?.action_kind || "").trim();
-
-    const normalizeActionRole = (role, action = "") => {
-      const value = String(role || "").trim().toLowerCase();
-      if (value === "value" || value === "state" || value === "momentary" || value === "command") return value;
-      if (action === "ToggleMute" || action === "ToggleEffect") return "state";
-      return "command";
-    };
 
     if (!selectedActionRole && selectedAction === "Volume") {
       const integ = integrationFromTarget(selectedTargets[0]);
@@ -1465,95 +1380,10 @@ export function createTargetsFeature({
       display.appendChild(chipsWrap);
     };
 
-    const mapOptionToTarget = (option) => {
-      if (option && option.target) {
-        const t = option.target;
-        const integ = t?.Integration || t?.integration;
-        if (integ && typeof integ === "object" && integ.integration_id) {
-          const next = {
-            Integration: {
-              integration_id: String(integ.integration_id),
-              kind: String(integ.kind || ""),
-              data: { ...(integ.data || {}) },
-            },
-          };
-          if (option.label && !String(next.Integration.data.label || "").trim()) {
-            next.Integration.data.label = String(option.label);
-          }
-          if (option.icon_data && !String(next.Integration.data.icon_data || "").trim()) {
-            next.Integration.data.icon_data = option.icon_data;
-          }
-          if (option.__selectedActionLabel) {
-            next.Integration.data.action_label = String(option.__selectedActionLabel);
-          }
-          if (option.__selectedActionValue) {
-            next.Integration.data.action_value = String(option.__selectedActionValue);
-          }
-          if (option.__selectedActionKind) {
-            next.Integration.data.action_kind = String(option.__selectedActionKind);
-          }
-          return next;
-        }
-        return t;
-      }
-      const builtInTarget = targetFromPickerKind(option.kind);
-      if (builtInTarget) return builtInTarget;
-      if (option.kind === "capture-action") {
-        return "CaptureControl";
-      }
-      if (option.kind === "device") {
-        return { Device: { device_id: option.value } };
-      }
-      if (option.kind === "session") {
-        const displayName = String(option.display_name || option.label || "")
-          .replace(/\s*\(Unavailable\)\s*$/i, "")
-          .trim();
-        const app = { name: option.value };
-        if (displayName) app.display_name = displayName;
-        if (option.icon_data) app.icon_data = option.icon_data;
-        return { Application: app };
-      }
-      if (option.kind === "placeholder") {
-        return "Unset";
-      }
-      return selectedTargets[0] || "Unset";
-    };
-
-    const actionKeyForOption = (option) => [
-      String(option?.value || ""),
-      String(option?.role || ""),
-      String(option?.behavior || ""),
-      String(option?.label || ""),
-    ].join("\u0000");
-
-    const pushUniqueAction = (actions, option) => {
-      if (!option) return;
-      const key = actionKeyForOption(option);
-      if (actions.some((existing) => actionKeyForOption(existing) === key)) return;
-      actions.push(option);
-    };
-
-    const normalizeButtonActionOption = (action, targetOption, extra = {}) => {
-      const value = String(action?.value || "Volume");
-      const behavior = String(action?.behavior || action?.action_kind || "").trim();
-      const role = normalizeActionRole(
-        action?.role
-          || action?.action_role
-          || (behavior.toLowerCase() === "stateful" ? "state" : "")
-          || (behavior.toLowerCase() === "momentary" ? "momentary" : ""),
-        value,
-      );
-      return {
-        label: action?.label || value || t("targets.category.actions"),
-        value,
-        kind: "action",
-        icon_data: action?.icon_data || targetOption?.icon_data || null,
-        behavior,
-        role,
-        value_kind: action?.value_kind || action?.valueKind || "",
-        targetOption: extra.targetOption || action?.targetOption || null,
-      };
-    };
+    const mapOptionToTarget = (option) => mapTargetOptionToTarget(option, { fallbackTarget: selectedTargets[0] });
+    const normalizeButtonActionOption = (action, targetOption, extra = {}) => (
+      normalizeCanonicalButtonActionOption(action, targetOption, t, extra)
+    );
 
     const valueActionOption = (targetOption) => ({
       label: t("targets.action.setValue"),
@@ -2628,36 +2458,52 @@ export function createTargetsFeature({
     return container;
   }
 
+  function onTargetPanelClick(event) {
+    if (event.target === d.targetPanel) closeTargetPanel();
+  }
+
+  function onTargetPanelKeydown(event) {
+    if (event.key !== "Escape" || !d.targetPanel || d.targetPanel.classList.contains("hidden")) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    closeTargetPanel();
+  }
+
+  function onIntegrationTargetsChanged(event) {
+    const integrationId = String(event?.detail?.integrationId || event?.detail?.integration_id || "");
+    if (!integrationId || integrationId !== activeTargetPanelIntegrationId) return;
+    activeTargetPanelRefresh?.();
+  }
+
   function bindUi() {
-    if (d.targetPanel) {
-      d.targetPanel.addEventListener("click", (event) => {
-        if (event.target === d.targetPanel) {
-          closeTargetPanel();
-        }
-      });
-    }
-    if (d.targetPanelClose) {
-      d.targetPanelClose.addEventListener("click", closeTargetPanel);
-    }
-    window.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || !d.targetPanel || d.targetPanel.classList.contains("hidden")) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      closeTargetPanel();
-    }, true);
-    window.addEventListener("midimaster:integration-targets-changed", (event) => {
-      const integrationId = String(event?.detail?.integrationId || event?.detail?.integration_id || "");
-      if (!integrationId || integrationId !== activeTargetPanelIntegrationId) return;
-      if (typeof activeTargetPanelRefresh === "function") {
-        activeTargetPanelRefresh();
-      }
-    });
+    if (uiBound) return;
+    uiBound = true;
+    d.targetPanel?.addEventListener("click", onTargetPanelClick);
+    d.targetPanelClose?.addEventListener("click", closeTargetPanel);
+    window.addEventListener("keydown", onTargetPanelKeydown, true);
+    window.addEventListener("midimaster:integration-targets-changed", onIntegrationTargetsChanged);
+  }
+
+  function start() {
+    return refreshBrightnessMonitors();
+  }
+
+  function dispose() {
+    if (!uiBound) return;
+    uiBound = false;
+    d.targetPanel?.removeEventListener("click", onTargetPanelClick);
+    d.targetPanelClose?.removeEventListener("click", closeTargetPanel);
+    window.removeEventListener("keydown", onTargetPanelKeydown, true);
+    window.removeEventListener("midimaster:integration-targets-changed", onIntegrationTargetsChanged);
+    closeTargetPanel();
   }
 
   return {
     bindUi,
+    start,
+    dispose,
     closeTargetMenus,
     createTargetIcon,
     openTargetPanel,

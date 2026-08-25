@@ -1,0 +1,816 @@
+body[data-theme] .midi-routes-button:hover {
+  border-color: var(--control-border-strong);
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
+
+body[data-theme] .midi-routes-button.has-multiple-routes:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--control-bg));
+  color: var(--text-primary);
+}
+
+body[data-theme="light"] .midi-routes-button:hover {
+  background: color-mix(in srgb, var(--accent) 9%, var(--control-bg));
+}
+
+body[data-theme] {
+  --ambient-glow-accent: color-mix(in srgb, var(--accent) var(--appearance-effect-accent, 0%), transparent);
+  --ambient-glow-success: color-mix(in srgb, var(--success) var(--appearance-effect-success, 0%), transparent);
+  --ambient-glow-accent-card: color-mix(in srgb, var(--ambient-glow-accent) 48%, transparent);
+  --ambient-glow-success-card: color-mix(in srgb, var(--ambient-glow-success) 42%, transparent);
+  --ambient-panel-background:
+    radial-gradient(circle at 7% -8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 98% 108%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) var(--appearance-surface-opacity-percent, 70%), transparent),
+      color-mix(in srgb, var(--surface) var(--appearance-surface-opacity-percent, 70%), transparent)
+    );
+  --ambient-card-background:
+    radial-gradient(circle at 2% -22%, var(--ambient-glow-accent-card), transparent 34%),
+    radial-gradient(circle at 104% 118%, var(--ambient-glow-success-card), transparent 44%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 94%, transparent),
+      color-mix(in srgb, var(--surface) 94%, transparent)
+    );
+  --ambient-panel-background-subtle:
+    radial-gradient(circle at 2% -24%, color-mix(in srgb, var(--ambient-glow-accent-card) 58%, transparent), transparent 38%),
+    radial-gradient(circle at 104% 124%, color-mix(in srgb, var(--ambient-glow-success-card) 58%, transparent), transparent 48%),
+    color-mix(in srgb, var(--surface) 94%, transparent);
+  --ambient-danger-card-background:
+    radial-gradient(circle at 0% -22%, color-mix(in srgb, var(--danger) 7%, transparent), transparent 36%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 95%, transparent),
+      color-mix(in srgb, var(--surface) 95%, transparent)
+    );
+  --ambient-row-background: color-mix(in srgb, var(--surface) 76%, transparent);
+  --ambient-row-hover-background: color-mix(in srgb, var(--surface-muted) 82%, transparent);
+  --ambient-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 76%, transparent),
+      color-mix(in srgb, var(--surface) 58%, transparent)
+    );
+  --ambient-bindings-background:
+    radial-gradient(circle at 4% -12%, var(--ambient-glow-accent), transparent 34%),
+    radial-gradient(circle at 96% 112%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 82%, transparent),
+      color-mix(in srgb, var(--surface) 74%, transparent)
+    );
+  --ambient-bindings-toolbar-background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--ambient-glow-accent) 74%, transparent), transparent 38%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 88%, transparent),
+      color-mix(in srgb, var(--surface) 74%, transparent)
+    );
+  --ambient-binding-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 28%, transparent),
+      color-mix(in srgb, var(--surface) 16%, transparent)
+    );
+  --ambient-binding-row-background: color-mix(in srgb, var(--surface) 18%, transparent);
+  --ambient-binding-row-hover-background: color-mix(in srgb, var(--surface-muted) 42%, transparent);
+  --ambient-osd-card-background:
+    radial-gradient(circle at 6% -10%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 96% 108%, var(--ambient-glow-success), transparent 48%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 90%, transparent),
+      color-mix(in srgb, var(--surface) 84%, transparent)
+    );
+  --ambient-osd-preview-background:
+    radial-gradient(circle at 18% 10%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 82% 88%, var(--ambient-glow-success), transparent 44%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-muted) 78%, var(--theme-tint) 22%) 0%,
+      color-mix(in srgb, var(--surface) 80%, var(--theme-tint) 20%) 58%,
+      color-mix(in srgb, var(--surface-subtle) 80%, var(--theme-tint) 20%) 100%
+    );
+}
+
+body[data-theme="light"] {
+  --ambient-glow-accent-card: color-mix(in srgb, var(--ambient-glow-accent) 28%, transparent);
+  --ambient-glow-success-card: color-mix(in srgb, var(--ambient-glow-success) 24%, transparent);
+  --ambient-panel-background:
+    radial-gradient(circle at 7% -8%, color-mix(in srgb, var(--ambient-glow-accent) 58%, transparent), transparent 38%),
+    radial-gradient(circle at 98% 108%, color-mix(in srgb, var(--ambient-glow-success) 52%, transparent), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 98%, var(--app-bg) 2%),
+      color-mix(in srgb, var(--surface) 96%, var(--app-bg) 4%)
+    );
+  --ambient-card-background:
+    radial-gradient(circle at 0% -24%, var(--ambient-glow-accent-card), transparent 32%),
+    radial-gradient(circle at 104% 118%, var(--ambient-glow-success-card), transparent 42%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 98%, var(--app-bg) 2%),
+      color-mix(in srgb, var(--surface) 97%, var(--app-bg) 3%)
+    );
+  --ambient-panel-background-subtle:
+    radial-gradient(circle at 0% -24%, color-mix(in srgb, var(--ambient-glow-accent-card) 50%, transparent), transparent 36%),
+    radial-gradient(circle at 104% 124%, color-mix(in srgb, var(--ambient-glow-success-card) 50%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface) 96%, var(--app-bg) 4%);
+  --ambient-danger-card-background:
+    radial-gradient(circle at 0% -22%, color-mix(in srgb, var(--danger) 5%, transparent), transparent 36%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 98%, var(--app-bg) 2%),
+      color-mix(in srgb, var(--surface) 97%, var(--app-bg) 3%)
+    );
+  --ambient-row-background: color-mix(in srgb, var(--surface-raised) 90%, var(--app-bg) 10%);
+  --ambient-row-hover-background: color-mix(in srgb, var(--surface-muted) 78%, var(--surface-raised) 22%);
+  --ambient-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 90%, var(--app-bg) 10%),
+      color-mix(in srgb, var(--surface) 88%, var(--app-bg) 12%)
+    );
+  --ambient-bindings-background:
+    radial-gradient(circle at 4% -12%, var(--ambient-glow-accent), transparent 34%),
+    radial-gradient(circle at 96% 112%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 78%, transparent),
+      color-mix(in srgb, var(--surface) 66%, transparent)
+    );
+  --ambient-bindings-toolbar-background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--ambient-glow-accent) 82%, transparent), transparent 38%),
+    radial-gradient(circle at 100% 115%, color-mix(in srgb, var(--ambient-glow-success) 58%, transparent), transparent 48%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 86%, transparent),
+      color-mix(in srgb, var(--surface) 78%, transparent)
+    );
+  --ambient-binding-header-background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 18%, transparent),
+      color-mix(in srgb, var(--surface) 8%, transparent)
+    );
+  --ambient-binding-row-background: color-mix(in srgb, var(--surface-raised) 8%, transparent);
+  --ambient-binding-row-hover-background: color-mix(in srgb, var(--surface-muted) 34%, transparent);
+  --ambient-osd-card-background:
+    radial-gradient(circle at 7% -8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 98% 108%, var(--ambient-glow-success), transparent 48%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 90%, transparent),
+      color-mix(in srgb, var(--surface) 82%, transparent)
+    );
+  --ambient-osd-preview-background:
+    radial-gradient(circle at 18% 8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 80% 88%, var(--ambient-glow-success), transparent 44%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 78%, transparent) 0%,
+      color-mix(in srgb, var(--surface) 70%, var(--theme-tint) 30%) 58%,
+      color-mix(in srgb, var(--surface-muted) 68%, transparent) 100%
+    );
+}
+
+body[data-theme] .bindings-card,
+body[data-theme] .target-panel-content,
+body[data-theme] .alert-panel-content,
+body[data-theme] .learn-panel-content {
+  background: var(--ambient-panel-background);
+  background-clip: padding-box;
+}
+
+body[data-theme="dark"] .alert-panel-content {
+  background:
+    radial-gradient(circle at 7% -8%, var(--ambient-glow-accent), transparent 38%),
+    radial-gradient(circle at 98% 108%, var(--ambient-glow-success), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 86%, transparent),
+      color-mix(in srgb, var(--surface) 86%, transparent)
+    );
+}
+
+body[data-theme] .alert-panel-content--midi-consent .alert-panel-actions .primary-button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+body[data-theme] .alert-panel-content--midi-consent .alert-panel-actions .primary-button:hover {
+  background: color-mix(in srgb, var(--accent) 86%, var(--text-primary) 14%);
+  border-color: color-mix(in srgb, var(--accent) 88%, var(--text-primary) 12%);
+  color: #fff;
+}
+
+body[data-theme] #target-panel {
+  --target-picker-border-soft: color-mix(in srgb, var(--control-border) 62%, transparent);
+  --target-picker-panel-bg:
+    radial-gradient(circle at 7% -8%, color-mix(in srgb, var(--ambient-glow-accent) 74%, transparent), transparent 38%),
+    radial-gradient(circle at 98% 108%, color-mix(in srgb, var(--ambient-glow-success) 64%, transparent), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 78%, transparent),
+      color-mix(in srgb, var(--surface) 72%, transparent)
+    );
+  --target-picker-header-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 76%, transparent),
+      color-mix(in srgb, var(--surface) 66%, transparent)
+    );
+  --target-picker-body-bg: color-mix(in srgb, var(--surface) 58%, transparent);
+  --target-picker-control-bg: color-mix(in srgb, var(--control-bg) 70%, transparent);
+  --target-picker-control-hover-bg: color-mix(in srgb, var(--control-bg-hover) 78%, transparent);
+  --target-picker-rail-bg: color-mix(in srgb, var(--surface) 48%, transparent);
+  --target-picker-row-bg: color-mix(in srgb, var(--surface) 68%, transparent);
+  --target-picker-row-hover-bg: color-mix(in srgb, var(--surface-muted) 78%, transparent);
+  --target-picker-chip-bg: color-mix(in srgb, var(--chip-bg) 72%, transparent);
+  --target-picker-selected-bg: color-mix(in srgb, var(--accent-soft) 64%, transparent);
+}
+
+body[data-theme] #target-panel .target-panel-content {
+  background: var(--target-picker-panel-bg);
+  border-color: var(--target-picker-border-soft);
+  border-radius: 16px;
+  background-clip: padding-box;
+  overflow: hidden;
+}
+
+body[data-theme] #target-panel .target-panel-header {
+  background: var(--target-picker-header-bg);
+  border-bottom-color: var(--target-picker-border-soft);
+}
+
+body[data-theme] #target-panel .target-panel-body {
+  background: var(--target-picker-body-bg);
+}
+
+body[data-theme] #target-panel .target-panel-search-shell {
+  background: var(--target-picker-body-bg);
+}
+
+body[data-theme] #target-panel .target-panel-search {
+  background: var(--target-picker-control-bg);
+  border-color: var(--target-picker-border-soft);
+}
+
+body[data-theme] #target-panel .target-panel-search:focus-within {
+  background: color-mix(in srgb, var(--control-bg) 78%, transparent);
+}
+
+body[data-theme] #target-panel .target-panel-categories {
+  background: var(--target-picker-rail-bg);
+  border-right-color: var(--target-picker-border-soft);
+}
+
+body[data-theme] #target-panel .target-panel-list {
+  background: var(--target-picker-body-bg);
+  scrollbar-gutter: stable;
+}
+
+body[data-theme] #target-panel .target-panel-list::-webkit-scrollbar-track {
+  background: var(--target-picker-body-bg);
+}
+
+body[data-theme] #target-panel .target-panel-list::-webkit-scrollbar-thumb {
+  border-color: var(--target-picker-body-bg);
+}
+
+body[data-theme] #target-panel .target-category:hover {
+  background: var(--target-picker-control-hover-bg);
+}
+
+body[data-theme] #target-panel .target-category-indicator {
+  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+  border-color: var(--target-picker-border-soft);
+}
+
+body[data-theme] #target-panel .target-card {
+  background: var(--target-picker-row-bg);
+  border-color: transparent;
+}
+
+body[data-theme] #target-panel .target-card:hover:not(:disabled) {
+  background: var(--target-picker-row-hover-bg);
+  border-color: var(--target-picker-border-soft);
+}
+
+body[data-theme] #target-panel .target-card.selected {
+  background: var(--target-picker-selected-bg);
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--control-border));
+}
+
+body[data-theme] #target-panel .target-card.selected:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-soft) 74%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--control-border));
+}
+
+body[data-theme] #target-panel .target-category-count,
+body[data-theme] #target-panel .target-card-tag,
+body[data-theme] #target-panel .target-card-kind-badge {
+  background: var(--target-picker-chip-bg);
+  border-color: color-mix(in srgb, var(--chip-border) 72%, transparent);
+}
+
+body[data-theme] #target-panel .target-category.active .target-category-count {
+  background: var(--target-picker-selected-bg);
+}
+
+body[data-theme="light"] #target-panel {
+  --target-picker-border-soft: color-mix(in srgb, var(--control-border) 68%, transparent);
+  --target-picker-panel-bg:
+    radial-gradient(circle at 7% -8%, color-mix(in srgb, var(--ambient-glow-accent) 54%, transparent), transparent 38%),
+    radial-gradient(circle at 98% 108%, color-mix(in srgb, var(--ambient-glow-success) 48%, transparent), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 76%, transparent),
+      color-mix(in srgb, var(--surface) 70%, transparent)
+    );
+  --target-picker-header-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 76%, transparent),
+      color-mix(in srgb, var(--surface) 68%, transparent)
+    );
+  --target-picker-body-bg: color-mix(in srgb, var(--surface) 60%, transparent);
+  --target-picker-control-bg: color-mix(in srgb, var(--control-bg) 74%, transparent);
+  --target-picker-control-hover-bg: color-mix(in srgb, var(--control-bg-hover) 82%, transparent);
+  --target-picker-rail-bg: color-mix(in srgb, var(--surface) 58%, transparent);
+  --target-picker-row-bg: color-mix(in srgb, var(--surface-raised) 68%, transparent);
+  --target-picker-row-hover-bg: color-mix(in srgb, var(--surface-muted) 80%, transparent);
+  --target-picker-chip-bg: color-mix(in srgb, var(--chip-bg) 72%, transparent);
+  --target-picker-selected-bg: color-mix(in srgb, var(--accent-soft) 74%, transparent);
+}
+
+body[data-theme] #binding-config-panel {
+  --binding-config-border-soft: color-mix(in srgb, var(--control-border) 72%, transparent);
+  --binding-config-panel-bg:
+    radial-gradient(circle at 7% -8%, color-mix(in srgb, var(--ambient-glow-accent) 46%, transparent), transparent 38%),
+    radial-gradient(circle at 98% 108%, color-mix(in srgb, var(--ambient-glow-success) 38%, transparent), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 82%, transparent),
+      color-mix(in srgb, var(--surface) 76%, transparent)
+    );
+  --binding-config-header-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 80%, transparent),
+      color-mix(in srgb, var(--surface) 70%, transparent)
+    );
+  --binding-config-body-bg: color-mix(in srgb, var(--surface) 64%, transparent);
+  --binding-config-card-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 82%, transparent),
+      color-mix(in srgb, var(--surface) 76%, transparent)
+    );
+  --binding-config-card-subtle-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-subtle) 80%, transparent),
+      color-mix(in srgb, var(--surface) 74%, transparent)
+    );
+  --binding-config-control-bg: color-mix(in srgb, var(--control-bg) 80%, transparent);
+}
+
+body[data-theme] #binding-config-panel .binding-config-content {
+  background: var(--binding-config-panel-bg);
+  border-color: var(--binding-config-border-soft);
+  border-radius: 16px;
+  background-clip: padding-box;
+  overflow: hidden;
+}
+
+body[data-theme] #binding-config-panel .target-panel-header {
+  background: var(--binding-config-header-bg);
+  border-bottom-color: var(--binding-config-border-soft);
+}
+
+body[data-theme] #binding-config-panel .binding-config-body,
+body[data-theme] #binding-config-panel .binding-config-layout {
+  background: var(--binding-config-body-bg);
+}
+
+body[data-theme] #binding-config-panel .binding-config-main-column,
+body[data-theme] #binding-config-panel .binding-config-footer {
+  border-color: var(--binding-config-border-soft);
+}
+
+body[data-theme] #binding-config-panel .binding-config-section,
+body[data-theme] #binding-config-panel .binding-config-preview-shell,
+body[data-theme] #binding-config-panel .binding-config-preview-meta {
+  background: var(--binding-config-card-bg);
+  border-color: var(--binding-config-border-soft);
+}
+
+body[data-theme] #binding-config-panel.binding-config-panel--fader .binding-config-preview-shell {
+  background: transparent;
+  border-color: transparent;
+}
+
+body[data-theme] #binding-config-panel.binding-config-panel--fader .binding-config-preview-card {
+  background: var(--binding-config-card-bg);
+  border-color: var(--binding-config-border-soft);
+}
+
+body[data-theme] #binding-config-panel .binding-config-preview-stage,
+body[data-theme] #binding-config-panel .binding-config-preview-learn-shell,
+body[data-theme] #binding-config-panel .binding-config-curve-card {
+  background: var(--binding-config-card-subtle-bg);
+  border-color: var(--binding-config-border-soft);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-search,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-dialog input {
+  background-color: var(--binding-config-control-bg);
+  border-color: var(--binding-config-border-soft);
+  color: var(--text-primary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button[aria-expanded="true"] {
+  background-color: var(--control-bg-hover);
+  border-color: var(--control-border-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button::after {
+  color: var(--text-secondary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button:hover::after,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-button[aria-expanded="true"]::after {
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-menu,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-dialog-card {
+  background: var(--surface-raised);
+  border-color: var(--binding-config-border-soft);
+  box-shadow: var(--shadow-raised);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-option,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-action {
+  color: var(--text-primary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-option:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-option.is-selected {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--control-border));
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row.is-selected {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--control-border));
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row:hover .binding-config-curve-preset-option,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row.is-selected .binding-config-curve-preset-option,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row .binding-config-curve-preset-option:hover,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row .binding-config-curve-preset-option.is-selected {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row:hover .binding-config-curve-preset-action,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-custom-row.is-selected .binding-config-curve-preset-action {
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-action:hover {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--control-border));
+  color: var(--accent-strong);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-preset-action--danger:hover {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--control-border));
+  color: var(--danger);
+}
+
+body[data-theme] #binding-config-panel .binding-config-curve-toolbar-label,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-heading,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-empty,
+body[data-theme] #binding-config-panel .binding-config-curve-preset-form-title {
+  color: var(--text-secondary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-button--danger {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--control-border));
+  color: var(--danger);
+}
+
+body[data-theme] #binding-config-panel .binding-config-button--danger:hover {
+  background: color-mix(in srgb, var(--danger-soft) 82%, var(--surface-raised) 18%);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+body[data-theme] #binding-config-panel .binding-config-label,
+body[data-theme] #binding-config-panel .binding-config-preview-summary-value,
+body[data-theme] #binding-config-panel .binding-config-preview-track,
+body[data-theme] #binding-config-panel .binding-config-stack input[type="text"] {
+  background: var(--binding-config-control-bg);
+  border-color: var(--binding-config-border-soft);
+}
+
+body[data-theme] #binding-config-panel.binding-config-panel--button .binding-config-preview-shell {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body[data-theme="light"] #binding-config-panel {
+  --binding-config-border-soft: color-mix(in srgb, var(--control-border) 78%, transparent);
+  --binding-config-panel-bg:
+    radial-gradient(circle at 7% -8%, color-mix(in srgb, var(--ambient-glow-accent) 34%, transparent), transparent 38%),
+    radial-gradient(circle at 98% 108%, color-mix(in srgb, var(--ambient-glow-success) 28%, transparent), transparent 46%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 82%, transparent),
+      color-mix(in srgb, var(--surface) 76%, transparent)
+    );
+  --binding-config-header-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 80%, transparent),
+      color-mix(in srgb, var(--surface) 72%, transparent)
+    );
+  --binding-config-body-bg: color-mix(in srgb, var(--surface) 64%, transparent);
+  --binding-config-card-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-raised) 82%, transparent),
+      color-mix(in srgb, var(--surface) 76%, transparent)
+    );
+  --binding-config-card-subtle-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-subtle) 82%, transparent),
+      color-mix(in srgb, var(--surface) 74%, transparent)
+    );
+  --binding-config-control-bg: color-mix(in srgb, var(--control-bg) 80%, transparent);
+}
+
+body[data-theme] #binding-config-panel.binding-config-panel--macro-page .binding-config-section--macro {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-theme="light"] #binding-config-panel.binding-config-panel--macro-page .binding-config-macro-steps-panel,
+body[data-theme="light"] #binding-config-panel.binding-config-panel--macro-page .binding-config-macro-properties-panel {
+  background: var(--binding-config-card-bg);
+  border-color: var(--binding-config-border-soft);
+}
+
+body.dark-mode:not([data-theme]) #target-panel {
+  background: rgba(7, 11, 24, 0.64);
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-panel-content {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(29, 39, 64, 0.88),
+      rgba(23, 32, 52, 0.84)
+    );
+  border-color: rgba(94, 125, 178, 0.46);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-panel-header {
+  background: linear-gradient(180deg, rgba(35, 47, 76, 0.86), rgba(29, 39, 64, 0.78));
+  border-bottom-color: rgba(94, 125, 178, 0.38);
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-panel-body,
+body.dark-mode:not([data-theme]) #target-panel .target-panel-search-shell,
+body.dark-mode:not([data-theme]) #target-panel .target-panel-list {
+  background: rgba(23, 32, 52, 0.72);
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-panel-search,
+body.dark-mode:not([data-theme]) #target-panel .target-card {
+  background: rgba(24, 34, 55, 0.82);
+  border-color: transparent;
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-panel-search {
+  border-color: rgba(94, 125, 178, 0.42);
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-panel-categories {
+  background: rgba(20, 29, 47, 0.62);
+  border-right-color: rgba(94, 125, 178, 0.36);
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-category-indicator {
+  background: rgba(31, 43, 68, 0.74);
+  border-color: rgba(94, 125, 178, 0.42);
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-card:hover:not(:disabled) {
+  background: rgba(35, 49, 77, 0.76);
+  border-color: rgba(94, 125, 178, 0.46);
+}
+
+body.dark-mode:not([data-theme]) #target-panel .target-card.selected {
+  background: rgba(90, 167, 255, 0.18);
+  border-color: rgba(90, 167, 255, 0.46);
+}
+
+body[data-theme] #main-screen {
+  background: var(--ambient-bindings-background);
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  background-clip: padding-box;
+  overflow: hidden;
+}
+
+body[data-theme] #main-screen > .page-heading-row,
+body[data-theme] #main-screen .bindings-card {
+  background: transparent;
+  border-color: transparent;
+}
+
+body[data-theme] #main-screen > .page-heading-row {
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--control-border) 44%, transparent);
+  border-radius: 0;
+}
+
+body[data-theme] #main-screen .bindings-card {
+  border: 0;
+  border-radius: 0;
+}
+
+body[data-theme] .settings-card,
+body[data-theme] .settings-list-card,
+body[data-theme] .inline-panel,
+body[data-theme] .modal-content,
+body[data-theme] .plugins-manager-row,
+body[data-theme] .plugins-store-row,
+body[data-theme] #plugins-page .plugins-browser-card,
+body[data-theme] .profile-page-row {
+  background: var(--ambient-card-background);
+  background-clip: padding-box;
+}
+
+body[data-theme] .settings-maintenance-section,
+body[data-theme] .settings-updates-section {
+  background: transparent;
+  border-color: transparent;
+}
+
+body[data-theme] .settings-maintenance-card--danger {
+  background: var(--ambient-danger-card-background);
+}
+
+body[data-theme] .bindings-empty,
+body[data-theme] .profile-page-empty,
+body[data-theme] .plugins-store-empty,
+body[data-theme] .plugins-manager-loading,
+body[data-theme] .settings-maintenance-inset,
+body[data-theme] .settings-update-summary {
+  background: var(--ambient-panel-background-subtle);
+  background-clip: padding-box;
+}
+
+body[data-theme] .binding-headers,
+body[data-theme] .settings-card-section-heading {
+  background: var(--ambient-header-background);
+}
+
+body[data-theme] .binding-headers {
+  background: var(--ambient-binding-header-background);
+}
+
+body[data-theme] .list-item.binding-item {
+  background: transparent;
+}
+
+body[data-theme] .binding-row {
+  background: var(--ambient-binding-row-background, var(--ambient-row-background));
+}
+
+body[data-theme] .list-item.binding-item:hover {
+  background: transparent;
+}
+
+body[data-theme] .binding-row:hover,
+body[data-theme] .list-item.binding-item:hover .binding-row {
+  background: var(--ambient-binding-row-hover-background, var(--ambient-row-hover-background));
+}
+
+body[data-theme] .settings-osd-section .settings-card {
+  background: var(--ambient-osd-card-background);
+  background-clip: padding-box;
+}
+
+body[data-theme] .settings-osd-preview-screen {
+  background: var(--ambient-osd-preview-background);
+}
+
+body[data-theme] .settings-action,
+body[data-theme] #plugins-page .plugins-browser-action {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--control-bg) 90%, var(--surface-raised) 10%),
+      color-mix(in srgb, var(--control-bg) 82%, var(--surface) 18%)
+    );
+  border-color: color-mix(in srgb, var(--control-border) 82%, var(--accent) 18%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+body[data-theme] .settings-action:hover,
+body[data-theme] #plugins-page .plugins-browser-action:hover {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--control-bg-hover) 88%, var(--surface-raised) 12%),
+      color-mix(in srgb, var(--control-bg-hover) 80%, var(--surface) 20%)
+    );
+  border-color: color-mix(in srgb, var(--control-border-strong) 72%, var(--accent) 28%);
+}
+
+body[data-theme] .settings-update-card > .settings-action {
+  background: color-mix(in srgb, var(--accent-soft) 28%, var(--control-bg));
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--control-border));
+  color: var(--text-primary);
+}
+
+body[data-theme] .settings-update-card > .settings-action:hover {
+  background: color-mix(in srgb, var(--accent-soft) 42%, var(--control-bg-hover));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--control-border-strong));
+}
+
+body[data-theme] :where(
+  .app-shell,
+  .topbar,
+  .settings-panel,
+  .target-panel,
+  .learn-panel,
+  .midi-routes-popover,
+  .dropdown,
+  .target-menu,
+  .connections-panel-body,
+  .binding-row
+) {
+  font-size: var(--app-font-size);
+}
+
+body[data-theme] :where(
+  button,
+  input,
+  select,
+  textarea,
+  .target-button,
+  .select-button,
+  .midi-device-status,
+  .settings-nav-label,
+  .settings-field-label,
+  .settings-appearance-control,
+  .appearance-control-label,
+  .settings-range-value,
+  .midi-route-badge,
+  .target-option,
+  .dropdown-item
+) {
+  font-size: var(--app-font-size);
+}
+
+body[data-theme] :where(
+  .settings-card-section-heading,
+  .appearance-subcard-title,
+  .settings-maintenance-title,
+  .midi-routes-title
+) {
+  font-size: calc(var(--app-font-size) + 1px);
+}
+
+body[data-theme] :where(
+  .settings-field-help,
+  .settings-card-description,
+  .settings-maintenance-description,
+  .midi-routes-empty
+) {
+  font-size: calc(var(--app-font-size) - 1px);
+}

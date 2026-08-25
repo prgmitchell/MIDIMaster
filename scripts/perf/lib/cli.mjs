@@ -1,4 +1,23 @@
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/**
+ * Runs a CLI entry point only when its module was invoked directly.
+ * Imported entry points remain inert and can be exercised by tests.
+ *
+ * @param {string} moduleUrl
+ * @param {() => void | Promise<void>} main
+ */
+export function runMain(moduleUrl, main) {
+  if (!process.argv[1] || resolve(process.argv[1]) !== fileURLToPath(moduleUrl)) return;
+
+  Promise.resolve()
+    .then(main)
+    .catch((error) => {
+      console.error(error.stack ?? error.message);
+      process.exitCode = 1;
+    });
+}
 
 export function parseArgs(argv, options = {}) {
   const aliases = options.aliases ?? {};

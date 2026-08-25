@@ -1,6 +1,6 @@
-export const APPEARANCE_THEME_FILE_KIND = "midimaster.appearance.theme.v1";
+import { HEX_COLOR_RE, hexToRgb, normalizeHexColor, rgbToHex } from "./color.js";
 
-const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+export const APPEARANCE_THEME_FILE_KIND = "midimaster.appearance.theme.v1";
 const BUILT_IN_IDS = new Set(["system", "dark", "light", "midnight", "ocean", "forest", "sunset"]);
 const DEFAULT_FONT_FAMILY = "bahnschrift";
 const DEFAULT_FONT_SIZE = 14;
@@ -367,31 +367,6 @@ function normalizeId(value, fallback = "system") {
 function normalizeName(value, fallback = "Custom Theme") {
   const name = String(value || fallback).replace(/\s+/g, " ").trim();
   return (name || fallback).slice(0, 64);
-}
-
-function normalizeHexColor(value, fallback) {
-  const raw = String(value || "").trim();
-  if (HEX_COLOR_RE.test(raw)) return raw.toLowerCase();
-  const short = raw.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
-  if (short) {
-    return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
-  }
-  return fallback;
-}
-
-function hexToRgb(hex) {
-  const normalized = normalizeHexColor(hex, "#000000").slice(1);
-  return {
-    r: parseInt(normalized.slice(0, 2), 16),
-    g: parseInt(normalized.slice(2, 4), 16),
-    b: parseInt(normalized.slice(4, 6), 16),
-  };
-}
-
-function rgbToHex({ r, g, b }) {
-  return `#${[r, g, b].map((part) => (
-    Math.round(Math.min(255, Math.max(0, part))).toString(16).padStart(2, "0")
-  )).join("")}`;
 }
 
 function mixHex(left, right, amount) {

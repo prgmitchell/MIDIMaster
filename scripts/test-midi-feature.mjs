@@ -1,37 +1,9 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-
-function dataModule(source) {
-  return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-}
-
-const preferenceUrl = new URL("../src/features/midi/device_preferences.js", import.meta.url).href;
-const midiPreferences = await import(preferenceUrl);
-const uiStubUrl = dataModule(`
-export function closeOpenDropdowns() {}
-export function positionFloatingDropdownMenu() {}
-export function renderLabelWithBadges(container, { text = "" } = {}) {
-  if (container) container.textContent = String(text);
-}
-export function wireDropdownToggle({ menu, trigger }) {
-  trigger?.addEventListener?.("click", (event) => {
-    event.preventDefault();
-    menu?.classList?.toggle("hidden");
-  });
-}
-`);
-
-let midiSource = await readFile(new URL("../src/features/midi/midi.js", import.meta.url), "utf8");
-midiSource = midiSource
-  .replace(
-    /import \{[\s\S]*?\} from "\.\.\/ui\/dropdown_badges\.js";/,
-    `import { closeOpenDropdowns, positionFloatingDropdownMenu, renderLabelWithBadges, wireDropdownToggle } from ${JSON.stringify(uiStubUrl)};`,
-  )
-  .replace(
-    /import \{\s*buildPersistedMidiRoutes,[\s\S]*?\} from "\.\/device_preferences\.js";/,
-    `import { buildPersistedMidiRoutes, createMidiRouteDraftController, findConnectedAliveDevice, findPreferredDevice, hasDuplicateInputRoute, normalizeMidiPreference, normalizeMidiRoute, normalizeMidiRoutes, orderMidiRoutesByPreference, resolvePreferredMidiDevicePair, resolvePreferredMidiDeviceRoutes, sharedOutputCounts, stripUnavailableSuffix, unavailableDeviceLabel } from ${JSON.stringify(preferenceUrl)};`,
-  );
-const { createMidiFeature, resolveMidiDeviceStatusPresentation } = await import(dataModule(midiSource));
+import * as midiPreferences from "../src/features/midi/device_preferences.js";
+import {
+  createMidiFeature,
+  resolveMidiDeviceStatusPresentation,
+} from "../src/features/midi/midi.js";
 globalThis.document = { hidden: false, addEventListener() {} };
 globalThis.window = { addEventListener() {} };
 

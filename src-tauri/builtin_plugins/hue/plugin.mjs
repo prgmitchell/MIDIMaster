@@ -581,13 +581,6 @@ export async function activate(ctx) {
     return hueTargetKey(kind, id);
   }
 
-  function bindingTargets(binding) {
-    if (Array.isArray(binding?.targets) && binding.targets.length > 0) {
-      return binding.targets;
-    }
-    return binding?.target ? [binding.target] : [];
-  }
-
   function rememberNonzeroBri(key, bri) {
     const next = clampHueBri(bri);
     if (next > 0) {
@@ -653,18 +646,14 @@ export async function activate(ctx) {
   }
 
   function normalizeIntegrationTarget(rawTarget) {
+    const normalized = hueTargetFromRawTarget(rawTarget);
+    if (!normalized) return null;
     const t = rawTarget?.Integration || rawTarget?.integration || rawTarget;
-    if (!t || t.integration_id !== "hue") return null;
     const data = t.data || {};
-    const kind = String(t.kind || "");
-    const id = String(data.id || "");
-    if (!id || (kind !== "light" && kind !== "group")) return null;
     return {
-      kind,
-      id,
-      name: String(data.name || data.label || `${kind} ${id}`),
+      ...normalized,
+      name: String(data.name || data.label || `${normalized.kind} ${normalized.id}`),
       icon_data: (typeof data.icon_data === "string" && data.icon_data.trim()) ? data.icon_data : (iconDataUrl || null),
-      button_action: normalizeHueButtonAction(data.button_action),
     };
   }
 
@@ -1011,7 +1000,7 @@ export async function activate(ctx) {
   }
 
   function firstHueTargetForBinding(binding) {
-    for (const rawTarget of bindingTargets(binding)) {
+    for (const rawTarget of hueBindingTargets(binding)) {
       const target = normalizeIntegrationTarget(rawTarget);
       if (target) return target;
     }

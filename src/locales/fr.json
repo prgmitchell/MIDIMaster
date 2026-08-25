@@ -634,6 +634,7 @@
   "midi.applyingChange": "Application du changement de périphérique MIDI...",
   "midi.connectFailed": "La connexion a échoué : {message}",
   "midi.disconnected": "Dispositif MIDI déconnecté.",
+  "midi.connected": "Connecté.",
   "midi.reconnectedProfile": "Reconnecté au périphérique MIDI de profil.",
   "midi.selectInputDevice": "Sélectionner le périphérique d'entrée",
   "midi.selectOutputDevice": "Sélectionner le périphérique de sortie",

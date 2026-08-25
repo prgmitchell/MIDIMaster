@@ -634,6 +634,7 @@
   "midi.applyingChange": "MIDI Gerätewechsel anwenden...",
   "midi.connectFailed": "Schließen fehlgeschlagen: {message}",
   "midi.disconnected": "MIDI Gerät getrennt.",
+  "midi.connected": "Verbunden.",
   "midi.reconnectedProfile": "Wieder mit dem Profil MIDI-Gerät verbunden.",
   "midi.selectInputDevice": "Eingabegerät auswählen",
   "midi.selectOutputDevice": "Ausgabegerät auswählen",

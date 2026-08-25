@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { DOM_REF_IDS } from "../src/app/dom_refs.js";
+import { readCssBundle } from "./css_bundle.mjs";
 
 const [source, html, domRefs, settingsSource, css, english, commandsSource, runtimeSource] = await Promise.all([
   readFile(new URL("../src/features/settings/virtual_audio.js", import.meta.url), "utf8"),
   readFile(new URL("../src/index.html", import.meta.url), "utf8"),
   readFile(new URL("../src/app/dom_refs.js", import.meta.url), "utf8"),
   readFile(new URL("../src/features/settings/settings.js", import.meta.url), "utf8"),
-  readFile(new URL("../src/styles/settings.css", import.meta.url), "utf8"),
+  readCssBundle(new URL("../src/styles/settings.css", import.meta.url)),
   readFile(new URL("../src/locales/en.json", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/src/commands/virtual_audio.rs", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/src/virtual_audio.rs", import.meta.url), "utf8"),
@@ -190,7 +192,7 @@ for (const id of [
 ]) {
   assert.match(html, new RegExp(`id="${id}"`), `${id} should exist`);
   const domName = id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()).replace(/^virtualAudio/, "virtualAudio");
-  assert.match(domRefs, new RegExp(`const ${domName} = document\\.getElementById\\("${id}"\\)`), `${id} should have a DOM reference`);
+  assert.equal(DOM_REF_IDS[domName], id, `${id} should have a DOM reference`);
 }
 
 for (const command of [

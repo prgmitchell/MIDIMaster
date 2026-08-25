@@ -46,6 +46,7 @@ export function createProfilesFeature({
   };
 
   let pendingProfileDeleteName = null;
+  let uiBound = false;
   let saveProfileTimer = null;
   let saveProfilePromise = null;
   let runningSaveProfilePromise = null;
@@ -789,6 +790,8 @@ export function createProfilesFeature({
   }
 
   function bindUi() {
+    if (uiBound) return;
+    uiBound = true;
     if (d.profileToggle) {
       d.profileToggle.addEventListener("click", async (event) => {
         event.preventDefault();

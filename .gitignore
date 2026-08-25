@@ -20,6 +20,11 @@ scripts/perf/.work/
 *.heapsnapshot
 *.devtools.json
 
+# Local codebase audit notes
+docs/ARCHITECTURE_GUARDRAILS.md
+docs/performance-audit.md
+docs/REFACTOR_AUDIT.md
+
 # Rust
 target/
 

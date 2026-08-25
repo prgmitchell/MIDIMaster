@@ -213,9 +213,6 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
         const code = await invoke("read_plugin_text", {
           pluginId,
           relPath: entry,
-          // Keep snake_case for compatibility (harmless if ignored)
-          plugin_id: pluginId,
-          rel_path: entry,
         });
         const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
         const mod = await import(url);
@@ -287,17 +284,11 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
             readBase64: (relPath) => invoke("read_plugin_base64", {
               pluginId,
               relPath,
-              // Compatibility
-              plugin_id: pluginId,
-              rel_path: relPath,
             }),
             readDataUrl: async (relPath, mime = null) => {
               const b64 = await invoke("read_plugin_base64", {
                 pluginId,
                 relPath,
-                // Compatibility
-                plugin_id: pluginId,
-                rel_path: relPath,
               });
               const safeMime = mime || "application/octet-stream";
               return `data:${safeMime};base64,${b64}`;

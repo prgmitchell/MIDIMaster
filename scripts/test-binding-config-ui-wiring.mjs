@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { DOM_REF_IDS } from "../src/app/dom_refs.js";
+import { readCssBundle } from "./css_bundle.mjs";
 
 const files = {
   html: await readFile(new URL("../src/index.html", import.meta.url), "utf8"),
   domRefs: await readFile(new URL("../src/app/dom_refs.js", import.meta.url), "utf8"),
   appEntry: await readFile(new URL("../src/app_entry.js", import.meta.url), "utf8"),
   bindings: await readFile(new URL("../src/features/bindings/bindings.js", import.meta.url), "utf8"),
-  css: await readFile(new URL("../src/styles/bindings/config-panel.css", import.meta.url), "utf8"),
+  css: await readCssBundle(new URL("../src/styles/bindings/config-panel.css", import.meta.url)),
   tauriConfig: await readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"),
 };
 const tauriConfig = JSON.parse(files.tauriConfig);
@@ -40,8 +42,7 @@ const assignModeControls = [
 
 for (const [elementId, refName] of [...indicatorControls, ...feedbackOutputControls, ...assignModeControls]) {
   assert.match(files.html, new RegExp(`id="${elementId}"`), `${elementId} should exist in index.html`);
-  assert.match(files.domRefs, new RegExp(`const ${refName} = document\\.getElementById\\("${elementId}"\\)`), `${refName} should be read from the DOM`);
-  assert.match(files.domRefs, new RegExp(`\\b${refName},`), `${refName} should be returned from createDomRefs`);
+  assert.equal(DOM_REF_IDS[refName], elementId, `${refName} should map to the expected DOM element`);
 }
 assert.match(files.appEntry, /createBindingsFeature\(\{[\s\S]*?dom: dom\.bindings,/, "bindings should receive its DOM namespace directly");
 

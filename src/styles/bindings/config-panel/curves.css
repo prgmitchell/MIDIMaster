@@ -1,0 +1,390 @@
+.binding-config-curve-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.binding-config-curve-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.binding-config-curve-toolbar-label {
+  color: #a9bad6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.binding-config-curve-preset-root {
+  position: relative;
+  min-width: 0;
+}
+
+.binding-config-curve-preset-button {
+  position: relative;
+  width: 100%;
+  height: 40px;
+  padding: 0 34px 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 144, 184, 0.24);
+  background: rgba(20, 29, 43, 0.82);
+  color: #e5efff;
+  font-weight: 700;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binding-config-curve-preset-button::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.74;
+  pointer-events: none;
+  transform: translateY(-65%) rotate(45deg);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.binding-config-curve-preset-button:hover,
+.binding-config-curve-preset-button[aria-expanded="true"] {
+  background-color: rgba(31, 43, 62, 0.94);
+  border-color: rgba(120, 144, 184, 0.38);
+}
+
+.binding-config-curve-preset-button:hover::after,
+.binding-config-curve-preset-button[aria-expanded="true"]::after {
+  opacity: 1;
+}
+
+.binding-config-curve-preset-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(280px, 78vw);
+  max-height: 380px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(120, 144, 184, 0.24);
+  border-radius: 12px;
+  background: rgba(13, 22, 35, 0.98);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.42);
+}
+
+.binding-config-curve-preset-menu.hidden {
+  display: none;
+}
+
+.binding-config-curve-preset-search {
+  height: 38px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 144, 184, 0.22);
+  background: rgba(8, 15, 25, 0.84);
+  color: #b8c7e4;
+}
+
+.binding-config-curve-preset-search svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.binding-config-curve-preset-search input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #e7f0ff;
+  font: inherit;
+}
+
+.binding-config-curve-preset-list {
+  max-height: 300px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.binding-config-curve-preset-group {
+  display: grid;
+  gap: 4px;
+}
+
+.binding-config-curve-preset-heading {
+  padding: 4px 2px;
+  color: #8fa1c0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.binding-config-curve-preset-option {
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #e2ecfb;
+  text-align: left;
+  font-weight: 650;
+}
+
+.binding-config-curve-preset-custom-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.binding-config-curve-preset-custom-row .binding-config-curve-preset-option {
+  width: 100%;
+}
+
+.binding-config-curve-preset-action {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #aebfde;
+}
+
+.binding-config-curve-preset-action:hover {
+  background: rgba(82, 173, 255, 0.14);
+  border-color: rgba(82, 173, 255, 0.24);
+  color: #eef6ff;
+}
+
+.binding-config-curve-preset-action--danger:hover {
+  background: rgba(255, 91, 103, 0.14);
+  border-color: rgba(255, 91, 103, 0.28);
+  color: #ff9ca5;
+}
+
+.binding-config-curve-preset-action svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.binding-config-curve-preset-option:hover,
+.binding-config-curve-preset-option.is-selected {
+  background: rgba(82, 173, 255, 0.16);
+  border-color: rgba(82, 173, 255, 0.28);
+  color: #f0f7ff;
+}
+
+.binding-config-curve-preset-custom-row:hover,
+.binding-config-curve-preset-custom-row.is-selected {
+  background: rgba(82, 173, 255, 0.16);
+  border-color: rgba(82, 173, 255, 0.28);
+}
+
+.binding-config-curve-preset-custom-row:hover .binding-config-curve-preset-option,
+.binding-config-curve-preset-custom-row.is-selected .binding-config-curve-preset-option {
+  background: transparent;
+  border-color: transparent;
+  color: #f0f7ff;
+}
+
+.binding-config-curve-preset-custom-row .binding-config-curve-preset-option:hover,
+.binding-config-curve-preset-custom-row .binding-config-curve-preset-option.is-selected {
+  background: transparent;
+  border-color: transparent;
+}
+
+.binding-config-curve-preset-custom-row:hover .binding-config-curve-preset-action,
+.binding-config-curve-preset-custom-row.is-selected .binding-config-curve-preset-action {
+  color: #d6e7ff;
+}
+
+.binding-config-curve-preset-empty {
+  padding: 7px 10px;
+  color: #8fa1c0;
+  font-size: 12px;
+}
+
+.binding-config-curve-preset-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 9, 16, 0.54);
+}
+
+.binding-config-curve-preset-dialog.hidden {
+  display: none;
+}
+
+.binding-config-curve-preset-dialog-card {
+  width: min(420px, 92vw);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(120, 144, 184, 0.28);
+  border-radius: 14px;
+  background: rgba(13, 22, 35, 0.98);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.binding-config-curve-preset-form-title {
+  color: #dce8fb;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.binding-config-curve-preset-dialog input {
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 144, 184, 0.22);
+  background: rgba(8, 15, 25, 0.84);
+  color: #e7f0ff;
+  font: inherit;
+}
+
+.binding-config-curve-preset-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.binding-config-curve-card {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  min-height: 94px;
+  border-radius: 12px;
+  border: 1px solid rgba(124, 151, 194, 0.18);
+  background: linear-gradient(180deg, rgba(15, 23, 34, 0.88), rgba(18, 28, 42, 0.78));
+  color: #dfe9fb;
+  text-align: left;
+}
+
+.binding-config-curve-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent, #53b2ff) 86%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #53b2ff) 32%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent, #53b2ff) 18%, transparent);
+}
+
+.binding-config-curve-card-title {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.binding-config-curve-card--custom .binding-config-curve-card-visual {
+  align-items: stretch;
+}
+
+.binding-config-curve-card-visual {
+  display: flex;
+  align-items: flex-end;
+  justify-content: stretch;
+  flex: 1;
+  border-radius: 12px;
+  background:
+    linear-gradient(rgba(136, 158, 195, 0.04), rgba(136, 158, 195, 0.04)),
+    linear-gradient(90deg, rgba(136, 158, 195, 0.05) 1px, transparent 1px),
+    linear-gradient(rgba(136, 158, 195, 0.05) 1px, transparent 1px);
+  background-size: auto, 16px 16px, 16px 16px;
+  padding: 8px;
+  touch-action: none;
+}
+
+.binding-config-curve-card-visual svg {
+  width: 100%;
+  height: 100%;
+}
+
+.binding-config-curve-card-visual[data-curve-editor-surface="custom"] {
+  cursor: crosshair;
+}
+
+.binding-config-curve-editor-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.binding-config-curve-card-visual path {
+  fill: none;
+  stroke: var(--accent, #53b2ff);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.binding-config-curve-card-visual polyline {
+  fill: none;
+  stroke: var(--accent, #53b2ff);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.binding-config-curve-card-point {
+  fill: #0e1725;
+  stroke: #dce8fb;
+  stroke-width: 1.4;
+  cursor: grab;
+  pointer-events: all;
+}
+
+.binding-config-curve-card-point:hover {
+  fill: var(--accent, #53b2ff);
+}
+
+.binding-config-curve-card-point:active {
+  cursor: grabbing;
+}
+
+.binding-config-curve-help {
+  margin: 0;
+  color: #98aac8;
+  line-height: 1.45;
+  height: 2.5em;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.binding-config-custom-editor {
+  display: none;
+}

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { parseArgs } from "./lib/cli.mjs";
+import { parseArgs, runMain } from "./lib/cli.mjs";
 import { listFilesRecursively, pathExists, readJson } from "./lib/files.mjs";
 
 function localReference(value) {
@@ -111,9 +110,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error(error.stack ?? error.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

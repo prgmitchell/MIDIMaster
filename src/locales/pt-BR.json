@@ -634,6 +634,7 @@
   "midi.applyingChange": "Aplicando mudança de dispositivo MIDI...",
   "midi.connectFailed": "A conexão falhou: {message}",
   "midi.disconnected": "Dispositivo MIDI desligado.",
+  "midi.connected": "Conectado.",
   "midi.reconnectedProfile": "Reconectado ao dispositivo MIDI de perfil.",
   "midi.selectInputDevice": "Selecione o dispositivo de entrada",
   "midi.selectOutputDevice": "Selecione o dispositivo de saída",
