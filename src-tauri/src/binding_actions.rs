@@ -165,16 +165,16 @@ pub fn finalize_grouped_integration_targets(grouped_targets: &mut [serde_json::V
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ActionExecutionOutcome {
-    pub applied_targets: usize,
+    pub applied_target_indices: Vec<usize>,
     pub value: Option<f32>,
     pub muted: Option<bool>,
 }
 
 impl ActionExecutionOutcome {
-    pub fn applied(self) -> bool {
-        self.applied_targets > 0
+    pub fn applied(&self) -> bool {
+        !self.applied_target_indices.is_empty()
     }
 }
 
@@ -339,7 +339,7 @@ pub fn execute_target_action(
                         "original_target_index": target_index,
                         "binding_target_count": targets.len(),
                     }));
-                outcome.applied_targets += 1;
+                outcome.applied_target_indices.push(target_index);
                 continue;
             }
         }
@@ -368,13 +368,13 @@ pub fn execute_target_action(
                         source_sequence,
                     },
                 );
-                outcome.applied_targets += 1;
+                outcome.applied_target_indices.push(target_index);
             }
             continue;
         }
 
         if execute_local_target_action(state, &binding.id, action, target, value, log_target) {
-            outcome.applied_targets += 1;
+            outcome.applied_target_indices.push(target_index);
         }
     }
 

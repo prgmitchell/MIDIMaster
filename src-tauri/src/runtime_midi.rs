@@ -621,8 +621,15 @@ pub(crate) fn apply_midi_event(
             .map(|settings| settings.enabled)
             .unwrap_or(true);
 
-        let binding_primary_target = targets.first().cloned();
-        for target in targets {
+        let binding_primary_target = outcome
+            .applied_target_indices
+            .first()
+            .and_then(|index| targets.get(*index))
+            .cloned();
+        for target_index in outcome.applied_target_indices {
+            let Some(target) = targets.get(target_index) else {
+                continue;
+            };
             let focus_session = if matches!(target, model::BindingTarget::Focus) {
                 state.audio.focused_session().ok().flatten()
             } else {

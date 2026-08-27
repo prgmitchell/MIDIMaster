@@ -1,7 +1,7 @@
 use crate::bindings::BindingKey;
 use crate::model::{self, MidiEvent, Profile};
 use crate::{app_state::focused_application_name, AppState};
-use crate::{feedback, run_logger};
+use crate::{binding_actions, feedback, run_logger};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
@@ -305,45 +305,21 @@ pub(super) fn handle_aux_or_unmatched(
                 inputs.insert(key.clone(), event.value > 0);
             }
         }
-        for (target_index, target) in targets.iter().enumerate() {
-            match target {
-                model::BindingTarget::Master => {
-                    let _ = state.audio.set_master_mute(next_muted);
-                }
-                model::BindingTarget::Focus => {
-                    let _ = state.audio.set_focused_session_mute(next_muted);
-                }
-                model::BindingTarget::Session { session_id } => {
-                    let _ = state.audio.set_session_mute(session_id, next_muted);
-                }
-                model::BindingTarget::Application { name, .. } => {
-                    let _ = state.audio.set_application_mute(name, next_muted);
-                }
-                model::BindingTarget::Device { device_id } => {
-                    let _ = state.audio.set_device_mute(device_id, next_muted);
-                }
-                model::BindingTarget::Integration {
-                    integration_id,
-                    kind,
-                    data,
-                } => {
-                    let payload = serde_json::json!({
-                      "binding_id": owner.id,
-                      "action": "ToggleMute",
-                      "value": if next_muted { 1.0 } else { 0.0 },
-                      "target_index": target_index,
-                      "target_count": targets.len(),
-                      "is_primary_target": target_index == 0,
-                      "target": {
-                        "integration_id": integration_id,
-                        "kind": kind,
-                        "data": data,
-                      }
-                    });
-                    let _ = app.emit("integration_binding_triggered", payload);
-                }
-                _ => {}
-            }
+        let outcome = binding_actions::execute_target_action(
+            app,
+            state,
+            &owner,
+            &model::BindingAction::ToggleMute,
+            if next_muted { 1.0 } else { 0.0 },
+            binding_actions::ActionExecutionContext::local("bindings"),
+        )?;
+        if !outcome.applied() {
+            run_logger::warn(
+                "bindings",
+                "aux_mute_no_target_applied",
+                &format!("binding_id={} targets={}", owner.id, targets.len()),
+            );
+            return Ok(());
         }
         if let Ok(mut feedback) = state.feedback_values.lock() {
             feedback.insert(key.clone(), if next_muted { 1.0 } else { 0.0 });
@@ -380,8 +356,16 @@ pub(super) fn handle_aux_or_unmatched(
             .map(|settings| settings.enabled)
             .unwrap_or(true);
 
-        let binding_primary_target = targets.first().cloned();
-        for target in &targets {
+        let owner_targets = owner.normalized_targets_ref();
+        let binding_primary_target = outcome
+            .applied_target_indices
+            .first()
+            .and_then(|index| owner_targets.get(*index))
+            .cloned();
+        for target_index in outcome.applied_target_indices {
+            let Some(target) = owner_targets.get(target_index) else {
+                continue;
+            };
             let focus_session = if matches!(target, model::BindingTarget::Focus) {
                 state.audio.focused_session().ok().flatten()
             } else {
