@@ -1,10 +1,9 @@
 #[cfg(test)]
 use crate::model::Profile;
-use crate::model::{Binding, FaderCurve, MidiEvent, MidiMode, RelativeFormat};
+use crate::model::{Binding, MidiEvent, MidiMode, RelativeFormat};
 use std::time::{Duration, Instant};
 
 const RELATIVE_STEP: f32 = 0.02;
-const MIN_CUSTOM_POINTS: usize = 2;
 const ABSOLUTE_CC_JITTER_STEP: i16 = 1;
 const ABSOLUTE_CC_MOTION_WINDOW: Duration = Duration::from_millis(120);
 
@@ -177,64 +176,15 @@ fn should_suppress_absolute_cc_jitter(
 fn absolute_value(binding: &Binding, event: &MidiEvent) -> Option<f32> {
     if binding.control.controller == 0xE0 {
         let value_14 = event.value_14?;
-        return Some(apply_fader_curve(binding, (value_14 as f32) / 16383.0));
+        return Some(crate::fader_curve::apply_fader_curve(
+            binding,
+            (value_14 as f32) / 16383.0,
+        ));
     }
-    Some(apply_fader_curve(binding, (event.value as f32) / 127.0))
-}
-
-fn apply_fader_curve(binding: &Binding, normalized: f32) -> f32 {
-    let clamped = normalized.clamp(0.0, 1.0);
-    match binding.fader_curve {
-        FaderCurve::Linear => clamped,
-        FaderCurve::Exponential => clamped.powf(0.55),
-        // Audio taper-style response for finer low-end control.
-        FaderCurve::Logarithmic => clamped.powf(2.2),
-        FaderCurve::SCurve => {
-            let x = clamped;
-            (x * x * (3.0 - (2.0 * x))).clamp(0.0, 1.0)
-        }
-        FaderCurve::Custom => interpolate_custom_curve(&binding.custom_curve, clamped),
-    }
-}
-
-fn interpolate_custom_curve(points: &[crate::model::FaderCurvePoint], normalized: f32) -> f32 {
-    if points.len() < MIN_CUSTOM_POINTS {
-        return normalized;
-    }
-
-    let mut sorted = points.to_vec();
-    sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
-
-    let input = normalized.clamp(0.0, 1.0);
-    if input <= sorted[0].x {
-        return sorted[0].y.clamp(0.0, 1.0);
-    }
-
-    for pair in sorted.windows(2) {
-        let start = &pair[0];
-        let end = &pair[1];
-        if input > end.x {
-            continue;
-        }
-
-        let x0 = start.x.clamp(0.0, 1.0);
-        let x1 = end.x.clamp(0.0, 1.0);
-        let y0 = start.y.clamp(0.0, 1.0);
-        let y1 = end.y.clamp(0.0, 1.0);
-        let span = (x1 - x0).abs();
-        if span < f32::EPSILON {
-            return y1;
-        }
-        let t = ((input - x0) / (x1 - x0)).clamp(0.0, 1.0);
-        let linear = y0 + ((y1 - y0) * t);
-        let curve_offset = start.curve.clamp(-1.0, 1.0) * 2.0 * (1.0 - t) * t;
-        return (linear + curve_offset).clamp(0.0, 1.0);
-    }
-
-    sorted
-        .last()
-        .map(|point| point.y.clamp(0.0, 1.0))
-        .unwrap_or(input)
+    Some(crate::fader_curve::apply_fader_curve(
+        binding,
+        (event.value as f32) / 127.0,
+    ))
 }
 
 fn relative_delta(binding: &Binding, value: u8, state: &mut BindingState) -> Option<i8> {

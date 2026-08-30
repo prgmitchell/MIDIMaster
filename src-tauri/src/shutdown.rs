@@ -196,7 +196,7 @@ fn stop_managed_resources(app: &AppHandle) {
                     if binding.is_button_binding() {
                         let _ = midi.send_binding_light_feedback(binding, 0.0);
                     } else {
-                        let _ = midi.send_binding_feedback(binding, 0.0);
+                        let _ = midi.send_binding_feedback_position(binding, 0.0);
                     }
                 }
             }
@@ -234,7 +234,7 @@ fn stop_managed_resources_best_effort(app: &AppHandle) {
                 if binding.is_button_binding() {
                     let _ = midi.send_binding_light_feedback(binding, 0.0);
                 } else {
-                    let _ = midi.send_binding_feedback(binding, 0.0);
+                    let _ = midi.send_binding_feedback_position(binding, 0.0);
                 }
             }
         }

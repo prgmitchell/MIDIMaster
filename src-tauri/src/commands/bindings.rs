@@ -132,7 +132,7 @@ fn clear_binding_feedback_output(state: &AppState, binding: &Binding, clear_hard
             if binding.is_button_binding() {
                 let _ = midi.send_binding_light_feedback(binding, 0.0);
             } else {
-                let _ = midi.send_binding_feedback(binding, 0.0);
+                let _ = midi.send_binding_feedback_position(binding, 0.0);
             }
         }
     }
@@ -676,7 +676,7 @@ pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Res
         if binding.is_button_binding() {
             let _ = midi.send_binding_light_feedback(&binding, 0.0);
         } else {
-            let _ = midi.send_binding_feedback(&binding, 0.0);
+            let _ = midi.send_binding_feedback_position(&binding, 0.0);
         }
     }
 

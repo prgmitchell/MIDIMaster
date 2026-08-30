@@ -11,6 +11,7 @@ mod builtin_plugins;
 mod commands;
 mod device_target;
 mod durable_json_store;
+mod fader_curve;
 mod feedback;
 mod midi;
 mod midi_event_queue;

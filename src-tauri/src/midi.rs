@@ -3,8 +3,9 @@ mod protocol;
 
 use self::ports::*;
 use self::protocol::{
-    binding_feedback_send, binding_light_feedback_sends, build_feedback_message,
-    parse_midi_message, send_feedback_messages, FeedbackMessage,
+    binding_feedback_position_send, binding_feedback_send, binding_light_feedback_sends,
+    build_feedback_message, parse_midi_message, send_feedback_messages, BindingLightFeedbackSend,
+    FeedbackMessage,
 };
 use crate::model::{Binding, DeviceInfo, MidiDeviceRoute, MidiEvent, MidiMessageType};
 use crate::run_logger;
@@ -859,8 +860,12 @@ impl MidiManager {
         Some(output_device_id)
     }
 
-    pub fn send_binding_feedback(&mut self, binding: &Binding, value: f32) -> Result<()> {
-        let Some(send) = binding_feedback_send(binding, value) else {
+    fn send_resolved_binding_feedback(
+        &mut self,
+        binding: &Binding,
+        send: Option<BindingLightFeedbackSend>,
+    ) -> Result<()> {
+        let Some(send) = send else {
             return Ok(());
         };
         let binding_context = if send.use_binding_protocol {
@@ -875,6 +880,21 @@ impl MidiManager {
             send.value,
             send.msg_type,
             binding_context,
+        )
+    }
+
+    pub fn send_binding_feedback(&mut self, binding: &Binding, logical_value: f32) -> Result<()> {
+        self.send_resolved_binding_feedback(binding, binding_feedback_send(binding, logical_value))
+    }
+
+    pub fn send_binding_feedback_position(
+        &mut self,
+        binding: &Binding,
+        physical_position: f32,
+    ) -> Result<()> {
+        self.send_resolved_binding_feedback(
+            binding,
+            binding_feedback_position_send(binding, physical_position),
         )
     }
 
@@ -1530,8 +1550,8 @@ mod tests {
     use super::*;
     use crate::model::{
         AssignMode, AuxiliaryControl, BindingAction, BindingControlKind, BindingTarget,
-        ButtonLightBehavior, ButtonLightMode, FaderCurve, MidiControl, MidiMode, MuteBehavior,
-        RelativeFormat,
+        ButtonLightBehavior, ButtonLightMode, FaderCurve, FaderCurvePoint, MidiControl, MidiMode,
+        MuteBehavior, RelativeFormat,
     };
 
     fn direct_feedback(
@@ -2136,6 +2156,100 @@ mod tests {
         assert_eq!(send.msg_type, MidiMessageType::PitchBend);
         assert_eq!(send.value, 0.5);
         assert!(send.use_binding_protocol);
+    }
+
+    #[test]
+    fn absolute_custom_curve_feedback_inverts_logical_volume_for_primary_output() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.mode = MidiMode::Absolute;
+        binding.fader_curve = FaderCurve::Custom;
+        binding.custom_curve = vec![
+            FaderCurvePoint {
+                x: 0.0,
+                y: 0.0,
+                curve: 0.0,
+            },
+            FaderCurvePoint {
+                x: 0.5,
+                y: 0.75,
+                curve: 0.0,
+            },
+            FaderCurvePoint {
+                x: 1.0,
+                y: 1.0,
+                curve: 0.0,
+            },
+        ];
+
+        let send =
+            binding_feedback_send(&binding, 0.75).expect("enabled fader should produce feedback");
+
+        assert!((send.value - 0.5).abs() < 1.0e-6);
+        assert!(send.use_binding_protocol);
+    }
+
+    #[test]
+    fn absolute_curve_feedback_inverts_logical_volume_for_custom_output() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.mode = MidiMode::Absolute;
+        binding.fader_curve = FaderCurve::Exponential;
+        binding.indicator_control = Some(AuxiliaryControl {
+            device_id: "midi:1".to_string(),
+            channel: 4,
+            controller: 7,
+            msg_type: MidiMessageType::ControlChange,
+            control_kind: BindingControlKind::Continuous,
+            mode: MidiMode::Absolute,
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: MuteBehavior::ToggleOnPress,
+        });
+        let logical = 0.5_f32.powf(0.55);
+
+        let send = binding_feedback_send(&binding, logical)
+            .expect("enabled fader should produce feedback");
+
+        assert_eq!(send.device_id, "midi:1");
+        assert_eq!(send.channel, 4);
+        assert_eq!(send.controller, 7);
+        assert!((send.value - 0.5).abs() < 1.0e-6);
+        assert!(!send.use_binding_protocol);
+    }
+
+    #[test]
+    fn relative_fader_feedback_does_not_apply_curve_inversion() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.mode = MidiMode::Relative;
+        binding.fader_curve = FaderCurve::Logarithmic;
+
+        let send =
+            binding_feedback_send(&binding, 0.75).expect("enabled fader should produce feedback");
+
+        assert_eq!(send.value, 0.75);
+    }
+
+    #[test]
+    fn raw_fader_position_feedback_bypasses_curve_inversion() {
+        let mut binding = xtouch_mini_mc_volume_binding(21);
+        binding.mode = MidiMode::Absolute;
+        binding.fader_curve = FaderCurve::Custom;
+        binding.custom_curve = vec![
+            FaderCurvePoint {
+                x: 0.0,
+                y: 0.25,
+                curve: 0.0,
+            },
+            FaderCurvePoint {
+                x: 1.0,
+                y: 1.0,
+                curve: 0.0,
+            },
+        ];
+
+        let send = binding_feedback_position_send(&binding, 0.0)
+            .expect("enabled fader should produce raw position feedback");
+
+        assert_eq!(send.value, 0.0);
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use crate::fader_curve;
 use crate::model::{
     AuxiliaryControl, Binding, BindingAction, MidiEvent, MidiMessageType, MidiMode,
 };
@@ -84,15 +85,31 @@ pub(super) fn binding_feedback_send(
     binding: &Binding,
     value: f32,
 ) -> Option<BindingLightFeedbackSend> {
+    let physical_position = if !binding.is_button_binding() && binding.mode == MidiMode::Absolute {
+        fader_curve::invert_fader_curve(binding, value)
+    } else {
+        value
+    };
+    binding_feedback_position_send(binding, physical_position)
+}
+
+pub(super) fn binding_feedback_position_send(
+    binding: &Binding,
+    physical_position: f32,
+) -> Option<BindingLightFeedbackSend> {
     if !binding.feedback_enabled {
         return None;
     }
     if !binding.is_button_binding() {
         if let Some(output) = binding.custom_feedback_output_control() {
-            return Some(indicator_light_feedback_send(output, value));
+            return Some(indicator_light_feedback_send(output, physical_position));
         }
     }
-    Some(primary_light_feedback_send(binding, value, true))
+    Some(primary_light_feedback_send(
+        binding,
+        physical_position,
+        true,
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq)]
