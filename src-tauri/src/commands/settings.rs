@@ -1027,6 +1027,54 @@ pub fn open_logs_folder(app: AppHandle) -> Result<String, String> {
     Ok(path)
 }
 
+/// Opens an http(s) URL in the user's default browser. Plugins need this for
+/// OAuth-style flows (e.g. Spotify's PKCE login) since the plugin WebView has
+/// no way to launch an external process itself. Scoped to http/https only -
+/// this must never become a generic "launch anything" primitive, since any
+/// installed plugin can call it.
+#[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        let msg = "Only http/https URLs may be opened".to_string();
+        run_logger::warn("settings", "open_external_url_rejected", &msg);
+        return Err(msg);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use windows::core::HSTRING;
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let operation = HSTRING::from("open");
+        let target = HSTRING::from(url.as_str());
+        let result = unsafe { ShellExecuteW(None, &operation, &target, None, None, SW_SHOWNORMAL) };
+
+        if (result.0 as isize) <= 32 {
+            return Err(format!("ShellExecuteW failed with code {}", result.0 as isize));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|err| err.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|err| err.to_string())?;
+    }
+
+    run_logger::info("settings", "open_external_url", &format!("url={}", url));
+    Ok(())
+}
+
 #[tauri::command]
 pub fn pick_executable_path() -> Result<Option<PickExecutableResult>, String> {
     #[cfg(target_os = "windows")]
