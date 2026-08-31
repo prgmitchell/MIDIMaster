@@ -52,6 +52,7 @@ macro_rules! command_registry {
             set_active_profile_preference,
             reset_app_data,
             open_logs_folder,
+            open_external_url,
             pick_executable_path,
             pick_autohotkey_script_path,
             submit_midi_device_inventory,
