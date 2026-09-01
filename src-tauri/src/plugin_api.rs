@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fs,
-    io::Cursor,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    io::{Cursor, Read, Write},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, TcpListener},
     path::{Path, PathBuf},
     process::Command,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::AppHandle;
 use url::Url;
@@ -452,6 +452,64 @@ pub fn plugin_http_post_json(
         Err(ureq::Error::Status(_, response)) => read_plugin_http_response(response),
         Err(error) => Err(error.to_string()),
     }
+}
+
+const OAUTH_LOOPBACK_MAX_TIMEOUT_SECS: u64 = 600;
+
+/// Waits for a single OAuth redirect on 127.0.0.1:<port> and returns its
+/// request path+query (e.g. "/callback?code=...&state=..."). Plugins doing
+/// an Authorization Code + PKCE flow (e.g. Spotify) need this since the
+/// plugin WebView can't listen on a socket itself - this is the native-side
+/// equivalent of the loopback HTTP server a Node-based OAuth client would
+/// normally run on its own. Responds with a plain "you can close this tab"
+/// page instead of leaving the browser on a connection-refused error.
+#[tauri::command]
+pub fn oauth_loopback_listen(port: u16, timeout_secs: u64) -> Result<String, String> {
+    let timeout_secs = timeout_secs.min(OAUTH_LOOPBACK_MAX_TIMEOUT_SECS);
+    let listener = TcpListener::bind(("127.0.0.1", port))
+        .map_err(|err| format!("Couldn't listen on 127.0.0.1:{}: {}", port, err))?;
+    listener
+        .set_nonblocking(true)
+        .map_err(|err| err.to_string())?;
+
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    let mut stream = loop {
+        match listener.accept() {
+            Ok((stream, _addr)) => break stream,
+            Err(ref err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                if Instant::now() >= deadline {
+                    return Err("Timed out waiting for the redirect".to_string());
+                }
+                std::thread::sleep(Duration::from_millis(150));
+            }
+            Err(err) => return Err(err.to_string()),
+        }
+    };
+    stream.set_nonblocking(false).ok();
+
+    let mut buf = [0u8; 8192];
+    let n = stream.read(&mut buf).map_err(|err| err.to_string())?;
+    let request = String::from_utf8_lossy(&buf[..n]);
+    let request_line = request.lines().next().unwrap_or("");
+    let path_and_query = request_line
+        .split_whitespace()
+        .nth(1)
+        .unwrap_or("")
+        .to_string();
+
+    let body = "<!doctype html><html><body style=\"font-family:sans-serif;text-align:center;padding-top:4rem\"><h2>You're all set</h2><p>You can close this tab and return to MIDIMaster.</p></body></html>";
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes());
+    let _ = stream.flush();
+
+    if path_and_query.is_empty() {
+        return Err("Received an empty redirect request".to_string());
+    }
+    Ok(path_and_query)
 }
 
 fn validate_hue_bridge_addr(addr: &str) -> Result<String, String> {

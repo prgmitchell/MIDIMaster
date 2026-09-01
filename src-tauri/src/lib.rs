@@ -61,8 +61,8 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 pub(crate) use monitors::collect_monitor_descriptors;
 use plugin_api::{
     get_plugins_dir, hue_api_get, hue_api_put, hue_discover_bridges, hue_pair_bridge,
-    install_plugin_package, list_plugins, plugin_http_post_json, read_plugin_base64,
-    read_plugin_text, set_plugin_enabled, uninstall_plugin,
+    install_plugin_package, list_plugins, oauth_loopback_listen, plugin_http_post_json,
+    read_plugin_base64, read_plugin_text, set_plugin_enabled, uninstall_plugin,
 };
 use store_api::{fetch_store_catalog, install_store_plugin, install_store_plugins};
 use voicemeeter::{

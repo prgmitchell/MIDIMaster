@@ -103,6 +103,7 @@ macro_rules! command_registry {
             read_plugin_text,
             read_plugin_base64,
             plugin_http_post_json,
+            oauth_loopback_listen,
             install_plugin_package,
             uninstall_plugin,
             set_plugin_enabled,
