@@ -1,3 +1,35 @@
+import {
+  normalizeHotkeyMapping,
+  normalizeOpenApplicationMapping,
+  normalizeAutoHotkeyScriptMapping,
+} from "./action_mappings.js";
+export {
+  normalizeHotkeyKeyFromEvent,
+  buildHotkeyMappingFromEvent,
+  normalizeHotkeyMapping,
+  normalizeOpenApplicationMapping,
+  normalizeAutoHotkeyScriptMapping,
+} from "./action_mappings.js";
+import { normalizeRelativeFormat } from "./relative_midi.js";
+export {
+  normalizeRelativeFormat,
+  decodeRelativeTwosComplement,
+  decodeRelativeBinaryOffset,
+  decodeRelativeSignMagnitude,
+  updateRelativeAutoDetection,
+  detectRelativeFormatAuto,
+  decodeRelativeDeltaAutoFallback,
+  decodeRelativeDelta,
+} from "./relative_midi.js";
+import { normalizeFaderCurve, presetCurvePoints, normalizeCustomCurvePoints } from "./fader_curves.js";
+export {
+  normalizeFaderCurve,
+  presetCurvePoints,
+  normalizeCustomCurvePoints,
+  applyCustomFaderCurve,
+  applyFaderCurve,
+} from "./fader_curves.js";
+import { ACTION_CATALOG } from "./target_model.js";
 import { MEDIA_ACTIONS, isTargetAssigned, isTargetComplete } from "./target_model.js";
 
 export const MACRO_MAX_TOP_LEVEL_STEPS = 25;
@@ -6,33 +38,23 @@ export const MACRO_MAX_WAIT_MS = 60000;
 
 const MACRO_ACTION_STATES = new Set(["Default", "Toggle", "On", "Off", "Mute", "Unmute"]);
 const MACRO_ACTION_ROLES = new Set(["value", "command", "state", "momentary"]);
-const MACRO_ACTIONS = new Set([
-  "Volume",
-  "ToggleMute",
-  "ToggleEffect",
-  "SetMainOutputDevice",
-  "SetDefaultDevice",
-  "FocusWindow",
-  "FullScreenshot",
-  "SnipScreenshot",
-  "ToggleScreenRecording",
-  "MediaPlayPause",
-  "MediaNextTrack",
-  "MediaPrevTrack",
-  "MediaStop",
-  "Hotkey",
-  "OpenApplication",
-  "RunAutoHotkeyScript",
-]);
+const MACRO_ACTIONS = new Set(
+  Object.keys(ACTION_CATALOG).filter((action) => ACTION_CATALOG[action].macroAllowed !== false),
+);
 
-function normalizeMacroName(raw) {
-  return String(raw || "").trim().slice(0, 80);
+export function normalizeMacroName(raw) {
+  return String(raw || "")
+    .trim()
+    .slice(0, 80);
 }
 
 export function getBindingTargets(binding) {
   if (!binding || typeof binding !== "object") return [];
   if (Array.isArray(binding.targets) && binding.targets.length > 0) {
-    const normalized = binding.targets.filter(Boolean).filter((t) => t !== "Unset").slice(0, 8);
+    const normalized = binding.targets
+      .filter(Boolean)
+      .filter((t) => t !== "Unset")
+      .slice(0, 8);
     if (normalized.length > 0) return normalized;
   }
   if (binding.target != null) {
@@ -60,7 +82,7 @@ export function bindingHasIntegrationTarget(binding) {
   });
 }
 
-function normalizeControlKind(raw) {
+export function normalizeControlKind(raw) {
   const value = String(raw || "Auto");
   return value === "Button" || value === "Continuous" ? value : "Auto";
 }
@@ -74,16 +96,15 @@ function normalizeMidiMapping(raw, { indicator = false, allowPitchBendIndicator 
   if (indicator && msgType !== "ControlChange" && msgType !== "Note" && !pitchBendAllowed) {
     return null;
   }
-  const safeMsgType = msgType === "Note" || msgType === "PitchBend" || msgType === "ProgramChange"
-    ? msgType
-    : "ControlChange";
+  const safeMsgType =
+    msgType === "Note" || msgType === "PitchBend" || msgType === "ProgramChange" ? msgType : "ControlChange";
   const channel = Math.min(15, Math.max(0, Math.trunc(Number(raw.channel) || 0)));
-  const controller = indicator && safeMsgType === "PitchBend"
-    ? 0
-    : Math.min(127, Math.max(0, Math.trunc(Number(raw.controller) || 0)));
-  const indicatorMsgType = safeMsgType === "Note" || safeMsgType === "PitchBend"
-    ? safeMsgType
-    : "ControlChange";
+  const controller =
+    indicator && safeMsgType === "PitchBend"
+      ? 0
+      : Math.min(127, Math.max(0, Math.trunc(Number(raw.controller) || 0)));
+  const indicatorMsgType =
+    safeMsgType === "Note" || safeMsgType === "PitchBend" ? safeMsgType : "ControlChange";
   return {
     ...raw,
     device_id: deviceId,
@@ -98,7 +119,7 @@ function normalizeMidiMapping(raw, { indicator = false, allowPitchBendIndicator 
   };
 }
 
-function bindingLooksLikeButton(binding) {
+export function bindingLooksLikeButton(binding) {
   const controlKind = normalizeControlKind(binding?.control_kind);
   if (controlKind === "Button") return true;
   if (controlKind === "Continuous") return false;
@@ -121,20 +142,25 @@ function mappedButtonLightTargetComplete(binding) {
   const targets = getBindingTargets(binding);
   const action = String(binding?.action || "");
   if (action === "OpenApplication") {
-    return targets.some((target) => target === "OpenApplication")
-      && Boolean(String(normalizeOpenApplicationMapping(binding?.open_application)?.path || "").trim());
+    return (
+      targets.some((target) => target === "OpenApplication") &&
+      Boolean(String(normalizeOpenApplicationMapping(binding?.open_application)?.path || "").trim())
+    );
   }
   if (action === "RunAutoHotkeyScript") {
-    return targets.some((target) => target === "AutoHotkeyScript")
-      && Boolean(String(normalizeAutoHotkeyScriptMapping(binding?.autohotkey_script)?.path || "").trim());
+    return (
+      targets.some((target) => target === "AutoHotkeyScript") &&
+      Boolean(String(normalizeAutoHotkeyScriptMapping(binding?.autohotkey_script)?.path || "").trim())
+    );
   }
   if (action === "Hotkey") {
-    return targets.some((target) => target === "Hotkey")
-      && Boolean(normalizeHotkeyMapping(binding?.hotkey)?.keys?.length);
+    return (
+      targets.some((target) => target === "Hotkey") &&
+      Boolean(normalizeHotkeyMapping(binding?.hotkey)?.keys?.length)
+    );
   }
   if (action === "Macro") {
-    return targets.some(isMacroTarget)
-      && normalizeMacroSteps(binding?.macro_steps).length > 0;
+    return targets.some(isMacroTarget) && normalizeMacroSteps(binding?.macro_steps).length > 0;
   }
   if (MEDIA_ACTIONS.includes(action)) {
     return targets.some((target) => target === "MediaControl");
@@ -145,19 +171,16 @@ function mappedButtonLightTargetComplete(binding) {
       return Boolean(String(app?.name || "").trim());
     });
   }
-  if (
-    action === "FullScreenshot"
-    || action === "SnipScreenshot"
-    || action === "ToggleScreenRecording"
-  ) {
+  if (action === "FullScreenshot" || action === "SnipScreenshot" || action === "ToggleScreenRecording") {
     return targets.some((target) => target === "CaptureControl");
   }
   if (action === "SetDefaultDevice") {
-    return targets.some((target) => Boolean(String((target?.Device || target?.device)?.device_id || "").trim()));
+    return targets.some((target) =>
+      Boolean(String((target?.Device || target?.device)?.device_id || "").trim()),
+    );
   }
   if (action === "Soundboard") {
-    return targets.some(isSoundboardTarget)
-      && Boolean(normalizeSoundboardMapping(binding?.soundboard));
+    return targets.some(isSoundboardTarget) && Boolean(normalizeSoundboardMapping(binding?.soundboard));
   }
   if (action === "SwitchProfile") {
     return targets.some((target) => Boolean(String((target?.Profile || target?.profile)?.name || "").trim()));
@@ -177,9 +200,9 @@ export function bindingFeedbackEnabled(binding) {
 
 export function mappedButtonLightFeedbackValue(binding) {
   if (
-    !bindingFeedbackEnabled(binding)
-    || !bindingLooksLikeButton(binding)
-    || effectiveButtonLightMode(binding) !== "MappedWhenAssigned"
+    !bindingFeedbackEnabled(binding) ||
+    !bindingLooksLikeButton(binding) ||
+    effectiveButtonLightMode(binding) !== "MappedWhenAssigned"
   ) {
     return null;
   }
@@ -255,11 +278,15 @@ export function resolveButtonVisualActive(binding, options = {}) {
 
   const inputActive = activeFromInputValue(options.inputValue) === true;
   const stateActive = behavior === "stateful" ? activeFromStateValue(options.stateValue) : null;
-  const muteState = typeof options.muted === "boolean"
-    ? options.muted
-    : (typeof options.fallbackMuted === "boolean" ? options.fallbackMuted : null);
-  const effectiveState = stateActive
-    ?? (behavior === "stateful" && String(binding?.action || "") === "ToggleMute" ? muteState : null);
+  const muteState =
+    typeof options.muted === "boolean"
+      ? options.muted
+      : typeof options.fallbackMuted === "boolean"
+        ? options.fallbackMuted
+        : null;
+  const effectiveState =
+    stateActive ??
+    (behavior === "stateful" && String(binding?.action || "") === "ToggleMute" ? muteState : null);
 
   if (lightMode === "Pressed") {
     return inputActive;
@@ -271,153 +298,15 @@ export function resolveButtonVisualActive(binding, options = {}) {
   return effectiveState != null ? effectiveState : inputActive;
 }
 
-const HOTKEY_MODIFIERS = new Set(["Ctrl", "Shift", "Alt", "Meta"]);
-const HOTKEY_CODE_KEYS = new Map(Object.entries({
-  Space: "Space",
-  Comma: "Comma",
-  Period: "Period",
-  Slash: "Slash",
-  Semicolon: "Semicolon",
-  Quote: "Quote",
-  Backquote: "Backquote",
-  Minus: "Minus",
-  Equal: "Equal",
-  BracketLeft: "BracketLeft",
-  BracketRight: "BracketRight",
-  Backslash: "Backslash",
-  NumpadDecimal: "NumpadDecimal",
-  NumpadAdd: "NumpadAdd",
-  NumpadSubtract: "NumpadSubtract",
-  NumpadMultiply: "NumpadMultiply",
-  NumpadDivide: "NumpadDivide",
-  NumpadEnter: "NumpadEnter",
-}));
-const HOTKEY_KEY_ALIASES = new Map(Object.entries({
-  " ": "Space",
-  ",": "Comma",
-  "<": "Comma",
-  ".": "Period",
-  ">": "Period",
-  "/": "Slash",
-  "?": "Slash",
-  ";": "Semicolon",
-  ":": "Semicolon",
-  "'": "Quote",
-  "\"": "Quote",
-  "`": "Backquote",
-  "~": "Backquote",
-  "-": "Minus",
-  "_": "Minus",
-  "=": "Equal",
-  "+": "Equal",
-  "[": "BracketLeft",
-  "{": "BracketLeft",
-  "]": "BracketRight",
-  "}": "BracketRight",
-  "\\": "Backslash",
-  "|": "Backslash",
-  "!": "1",
-  "@": "2",
-  "#": "3",
-  "$": "4",
-  "%": "5",
-  "^": "6",
-  "&": "7",
-  "*": "8",
-  "(": "9",
-  ")": "0",
-}));
-
-function normalizeHotkeyCode(code) {
-  const value = String(code || "").trim();
-  if (!value) return null;
-  const letterMatch = /^Key([A-Z])$/.exec(value);
-  if (letterMatch) return letterMatch[1];
-  const digitMatch = /^Digit([0-9])$/.exec(value);
-  if (digitMatch) return digitMatch[1];
-  const numpadDigitMatch = /^Numpad([0-9])$/.exec(value);
-  if (numpadDigitMatch) return `Numpad${numpadDigitMatch[1]}`;
-  return HOTKEY_CODE_KEYS.get(value) || null;
-}
-
-export function normalizeHotkeyKeyFromEvent(event) {
-  const key = String(event?.key || "").trim();
-  const lower = key.toLowerCase();
-  if (lower === "control") return "Ctrl";
-  if (lower === "shift") return "Shift";
-  if (lower === "alt") return "Alt";
-  if (lower === "meta") return "Meta";
-
-  const codeKey = normalizeHotkeyCode(event?.code);
-  if (codeKey) return codeKey;
-  if (!key) return null;
-
-  if (lower === "escape") return "Esc";
-  if (lower === "arrowup") return "Up";
-  if (lower === "arrowdown") return "Down";
-  if (lower === "arrowleft") return "Left";
-  if (lower === "arrowright") return "Right";
-  if (HOTKEY_KEY_ALIASES.has(key)) return HOTKEY_KEY_ALIASES.get(key);
-  if (key.length === 1) return key.toUpperCase();
-  if (/^f\d{1,2}$/i.test(key)) return key.toUpperCase();
-  return key.length <= 16 ? key[0].toUpperCase() + key.slice(1) : null;
-}
-
-function hotkeyKeyIsModifier(key) {
-  return HOTKEY_MODIFIERS.has(key);
-}
-
-export function buildHotkeyMappingFromEvent(event) {
-  const key = normalizeHotkeyKeyFromEvent(event);
-  if (!key || hotkeyKeyIsModifier(key)) return null;
-
-  const keys = [];
-  if (event?.ctrlKey) keys.push("Ctrl");
-  if (event?.shiftKey) keys.push("Shift");
-  if (event?.altKey) keys.push("Alt");
-  if (event?.metaKey) keys.push("Meta");
-  if (!keys.includes(key)) keys.push(key);
-
-  return {
-    keys,
-    display: keys.join("+"),
-  };
-}
-
-export function normalizeHotkeyMapping(rawHotkey) {
-  if (!rawHotkey || typeof rawHotkey !== "object") return null;
-  const keys = Array.isArray(rawHotkey.keys)
-    ? rawHotkey.keys.map((key) => String(key || "").trim()).filter(Boolean)
-    : [];
-  if (keys.length === 0) return null;
-  const display = String(rawHotkey.display || "").trim() || keys.join("+");
-  return { keys, display };
-}
-
-export function normalizeOpenApplicationMapping(rawOpenApplication) {
-  if (!rawOpenApplication || typeof rawOpenApplication !== "object") return null;
-  const path = String(rawOpenApplication.path || "").trim();
-  const display = String(rawOpenApplication.display || "").trim();
-  const icon_data = typeof rawOpenApplication.icon_data === "string" && rawOpenApplication.icon_data.trim()
-    ? rawOpenApplication.icon_data.trim()
-    : null;
-  return path ? { path, display: display || path, icon_data } : null;
-}
-
-export function normalizeAutoHotkeyScriptMapping(rawScript) {
-  if (!rawScript || typeof rawScript !== "object") return null;
-  const path = String(rawScript.path || "").trim();
-  const display = String(rawScript.display || "").trim();
-  return path ? { path, display: display || path } : null;
-}
-
 export function normalizeMacroActionState(raw) {
   const value = String(raw || "Default");
   return MACRO_ACTION_STATES.has(value) ? value : "Default";
 }
 
 function normalizeMacroActionRole(raw) {
-  const value = String(raw || "").trim().toLowerCase();
+  const value = String(raw || "")
+    .trim()
+    .toLowerCase();
   return MACRO_ACTION_ROLES.has(value) ? value : null;
 }
 
@@ -494,9 +383,7 @@ function normalizeMacroStepMode(step, { draft = false } = {}) {
       .slice(0, MACRO_MAX_PARALLEL_STEPS);
     return draft || steps.length > 0 ? { kind: "parallel", steps } : null;
   }
-  const actionStep = draft
-    ? normalizeMacroDraftActionStep(step)
-    : normalizeMacroActionStep(step);
+  const actionStep = draft ? normalizeMacroDraftActionStep(step) : normalizeMacroActionStep(step);
   return actionStep ? { kind: "action", ...actionStep } : null;
 }
 
@@ -542,7 +429,7 @@ export function normalizeBinding(binding) {
   }
   setBindingTargets(out, normalizedTargets);
   out.macro_name = normalizeMacroName(out.macro_name);
-  out.mode = (out.mode === "Relative") ? "Relative" : "Absolute";
+  out.mode = out.mode === "Relative" ? "Relative" : "Absolute";
   out.relative_format = normalizeRelativeFormat(out.relative_format);
   out.fader_curve = normalizeFaderCurve(out.fader_curve);
   out.custom_curve = normalizeCustomCurvePoints(out.custom_curve);
@@ -573,9 +460,10 @@ export function normalizeBinding(binding) {
     out.macro_name = "";
     out.macro_steps = [];
   }
-  out.macro_steps = out.action === "Macro" || getBindingTargets(out).some(isMacroTarget)
-    ? normalizeMacroDraftSteps(out.macro_steps)
-    : normalizeMacroSteps(out.macro_steps);
+  out.macro_steps =
+    out.action === "Macro" || getBindingTargets(out).some(isMacroTarget)
+      ? normalizeMacroDraftSteps(out.macro_steps)
+      : normalizeMacroSteps(out.macro_steps);
   return out;
 }
 
@@ -589,9 +477,7 @@ export function normalizeSoundboardMapping(raw) {
   const start = Math.max(0, Number.isFinite(startRaw) ? startRaw : 0);
   const endRaw = raw.trim_end_ms ?? raw.trimEndMs;
   const parsedEnd = endRaw == null ? null : Math.round(Number(endRaw));
-  const end = parsedEnd == null || !Number.isFinite(parsedEnd)
-    ? null
-    : Math.max(start + 1, parsedEnd);
+  const end = parsedEnd == null || !Number.isFinite(parsedEnd) ? null : Math.max(start + 1, parsedEnd);
   const volumeRaw = Number(raw.volume);
   const speedRaw = Number(raw.speed);
   const outputDeviceId = String(raw.output_device_id ?? raw.outputDeviceId ?? "").trim();
@@ -609,23 +495,10 @@ export function normalizeSoundboardMapping(raw) {
     volume: Number.isFinite(volumeRaw) ? Math.min(1, Math.max(0, volumeRaw)) : 1,
     speed: Number.isFinite(speedRaw) ? Math.min(2, Math.max(0.5, speedRaw)) : 1,
     output_device_id: outputDeviceId || null,
-    output_device_display: outputDeviceId ? (outputDeviceDisplay || null) : null,
+    output_device_display: outputDeviceId ? outputDeviceDisplay || null : null,
     send_to_monitor: sendToMonitor,
     send_to_virtual_mic: sendToVirtualMic,
   };
-}
-
-export function normalizeRelativeFormat(raw) {
-  const value = String(raw || "Auto");
-  if (
-    value === "Auto"
-    || value === "TwosComplement"
-    || value === "BinaryOffset"
-    || value === "SignMagnitude"
-  ) {
-    return value;
-  }
-  return "Auto";
 }
 
 export function normalizeButtonLightMode(raw) {
@@ -663,205 +536,4 @@ export function normalizeButtonLightFields(binding) {
     binding.button_light_behavior = normalizeButtonLightBehavior(binding.button_light_behavior);
   }
   return binding;
-}
-
-export function decodeRelativeTwosComplement(value) {
-  if (value === 0 || value === 64) return 0;
-  if (value >= 1 && value <= 63) return value;
-  if (value >= 65 && value <= 127) return value - 128;
-  return null;
-}
-
-export function decodeRelativeBinaryOffset(value) {
-  if (value === 0 || value === 64) return 0;
-  if (value >= 1 && value <= 63) return -(64 - value);
-  if (value >= 65 && value <= 127) return value - 64;
-  return null;
-}
-
-export function decodeRelativeSignMagnitude(value) {
-  if (value === 0 || value === 64) return 0;
-  if (value >= 1 && value <= 63) return value;
-  if (value >= 65 && value <= 127) return -(value - 64);
-  return null;
-}
-
-function coerceRelativeAutoState(previousState) {
-  if (previousState && typeof previousState === "object") {
-    const previousFormat = normalizeRelativeFormat(previousState.format);
-    return {
-      format: previousFormat === "Auto" ? null : previousFormat,
-      seenMidpoint: Boolean(previousState.seenMidpoint),
-      seenSignBand: Boolean(previousState.seenSignBand),
-      seenHighNegative: Boolean(previousState.seenHighNegative),
-      seenLowNegativeHint: Boolean(previousState.seenLowNegativeHint),
-    };
-  }
-  const previousFormat = normalizeRelativeFormat(previousState);
-  return {
-    format: previousFormat === "Auto" ? null : previousFormat,
-    seenMidpoint: false,
-    seenSignBand: false,
-    seenHighNegative: false,
-    seenLowNegativeHint: false,
-  };
-}
-
-export function updateRelativeAutoDetection(value, previousState = null) {
-  const state = coerceRelativeAutoState(previousState);
-  if (!state.format) {
-    if (value === 63) state.seenLowNegativeHint = true;
-    if (value === 64) state.seenMidpoint = true;
-    if (value >= 65 && value <= 95) state.seenSignBand = true;
-    if (value >= 96 && value <= 127) state.seenHighNegative = true;
-
-    if (state.seenHighNegative) {
-      state.format = "TwosComplement";
-    } else if (state.seenLowNegativeHint) {
-      state.format = "BinaryOffset";
-    } else if (state.seenMidpoint && state.seenSignBand) {
-      state.format = "BinaryOffset";
-    } else if (state.seenSignBand) {
-      state.format = "SignMagnitude";
-    }
-  }
-  return state;
-}
-
-export function detectRelativeFormatAuto(value, previousState) {
-  return updateRelativeAutoDetection(value, previousState).format;
-}
-
-export function decodeRelativeDeltaAutoFallback(value, sawMidpoint = false) {
-  if (value === 0 || value === 64) return 0;
-  if (value >= 1 && value <= 62) return value;
-  if (value === 63) return -1;
-  if (value >= 96 && value <= 127) return value - 128;
-  if (value >= 65 && value <= 95 && sawMidpoint) return value - 64;
-  if (value >= 65 && value <= 95) return -(value - 64);
-  return null;
-}
-
-export function decodeRelativeDelta(binding, value, autoFormatByBinding = null) {
-  const configured = normalizeRelativeFormat(binding?.relative_format);
-  let format = configured;
-  let autoState = null;
-  if (format === "Auto") {
-    const key = String(binding?.id || "");
-    const previousState = key && autoFormatByBinding ? autoFormatByBinding.get(key) : null;
-    autoState = updateRelativeAutoDetection(value, previousState);
-    if (key && autoFormatByBinding) {
-      autoFormatByBinding.set(key, autoState);
-    }
-    format = autoState.format || "Auto";
-  }
-
-  if (format === "TwosComplement") return decodeRelativeTwosComplement(value);
-  if (format === "BinaryOffset") return decodeRelativeBinaryOffset(value);
-  if (format === "SignMagnitude") return decodeRelativeSignMagnitude(value);
-  if (format === "Auto") return decodeRelativeDeltaAutoFallback(value, autoState?.seenMidpoint);
-  return null;
-}
-
-export function normalizeFaderCurve(raw) {
-  const value = String(raw || "Linear");
-  return ["Linear", "Exponential", "Logarithmic", "SCurve", "Custom"].includes(value)
-    ? value
-    : "Linear";
-}
-
-export function presetCurvePoints(curve) {
-  switch (normalizeFaderCurve(curve)) {
-    case "Exponential":
-      return [
-        { x: 0, y: 0 },
-        { x: 0.18, y: 0.04 },
-        { x: 0.42, y: 0.16 },
-        { x: 0.72, y: 0.5 },
-        { x: 1, y: 1 },
-      ];
-    case "Logarithmic":
-      return [
-        { x: 0, y: 0 },
-        { x: 0.08, y: 0.34 },
-        { x: 0.24, y: 0.58 },
-        { x: 0.52, y: 0.8 },
-        { x: 1, y: 1 },
-      ];
-    case "SCurve":
-      return [
-        { x: 0, y: 0 },
-        { x: 0.18, y: 0.06 },
-        { x: 0.5, y: 0.5 },
-        { x: 0.82, y: 0.94 },
-        { x: 1, y: 1 },
-      ];
-    case "Custom":
-      return [
-        { x: 0, y: 0 },
-        { x: 0.5, y: 0.5 },
-        { x: 1, y: 1 },
-      ];
-    case "Linear":
-    default:
-      return [
-        { x: 0, y: 0 },
-        { x: 1, y: 1 },
-      ];
-  }
-}
-
-export function normalizeCustomCurvePoints(points) {
-  const normalized = Array.isArray(points)
-    ? points
-        .map((point) => ({
-          x: Math.min(1, Math.max(0, Number(point?.x) || 0)),
-          y: Math.min(1, Math.max(0, Number(point?.y) || 0)),
-          curve: Math.min(1, Math.max(-1, Number(point?.curve) || 0)),
-        }))
-        .sort((a, b) => a.x - b.x)
-    : [];
-  if (normalized.length >= 2) {
-    normalized[0].x = 0;
-    normalized[normalized.length - 1].x = 1;
-    normalized[normalized.length - 1].curve = 0;
-  }
-  return normalized.map((point) => (
-    Math.abs(point.curve) < 0.0001
-      ? { x: point.x, y: point.y }
-      : point
-  ));
-}
-
-export function applyCustomFaderCurve(points, normalized) {
-  const clamped = Math.min(1, Math.max(0, Number(normalized) || 0));
-  const normalizedPoints = normalizeCustomCurvePoints(points);
-  if (normalizedPoints.length < 2) return clamped;
-  if (clamped <= normalizedPoints[0].x) return normalizedPoints[0].y;
-  for (let index = 0; index < normalizedPoints.length - 1; index += 1) {
-    const start = normalizedPoints[index];
-    const end = normalizedPoints[index + 1];
-    if (clamped > end.x) continue;
-    const span = end.x - start.x;
-    if (Math.abs(span) < 0.00001) return end.y;
-    const t = Math.min(1, Math.max(0, (clamped - start.x) / span));
-    const linear = start.y + ((end.y - start.y) * t);
-    const curveOffset = (Number(start.curve) || 0) * 2 * (1 - t) * t;
-    return Math.min(1, Math.max(0, linear + curveOffset));
-  }
-  return normalizedPoints[normalizedPoints.length - 1].y;
-}
-
-export function applyFaderCurve(curve, normalized) {
-  const clamped = Math.min(1, Math.max(0, Number(normalized) || 0));
-  switch (normalizeFaderCurve(curve)) {
-    case "Exponential":
-      return Math.pow(clamped, 0.55);
-    case "Logarithmic":
-      return Math.pow(clamped, 2.2);
-    case "SCurve":
-      return clamped * clamped * (3 - (2 * clamped));
-    default:
-      return clamped;
-  }
 }

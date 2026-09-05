@@ -1,3 +1,5 @@
+import { normalizeMacroName } from "../../core/binding_model.js";
+export { normalizeMacroName };
 import {
   MACRO_MAX_PARALLEL_STEPS,
   MACRO_MAX_TOP_LEVEL_STEPS,
@@ -14,10 +16,6 @@ import { isMacroTarget } from "./shape_helpers.js";
 
 export function clonePlain(value) {
   return JSON.parse(JSON.stringify(value));
-}
-
-export function normalizeMacroName(raw) {
-  return String(raw || "").trim().slice(0, 80);
 }
 
 export function defaultMacroName(binding) {
@@ -63,18 +61,16 @@ function macroDraftHasCommandMetadata(step) {
   return targets.some((target) => {
     const data = (target?.Integration || target?.integration)?.data || {};
     return Boolean(
-      data.action_label
-      || data.action_value
-      || data.action_kind
-      || data.button_action
-      || data.osd_value_text
+      data.action_label || data.action_value || data.action_kind || data.button_action || data.osd_value_text,
     );
   });
 }
 
 function macroDraftLooksLikeLegacyTriggerPlaceholder(step) {
   if (String(step?.action || "") !== "Volume") return false;
-  const role = String(step?.action_role || step?.actionRole || "").trim().toLowerCase();
+  const role = String(step?.action_role || step?.actionRole || "")
+    .trim()
+    .toLowerCase();
   return role !== "value" && !macroDraftHasCommandMetadata(step);
 }
 
@@ -154,8 +150,10 @@ export function clearMacroActionStep(step) {
 }
 
 export function macroActionHasTarget(step) {
-  return Array.isArray(step?.targets)
-    && step.targets.some((target) => target && target !== "Unset" && !isMacroTarget(target));
+  return (
+    Array.isArray(step?.targets) &&
+    step.targets.some((target) => target && target !== "Unset" && !isMacroTarget(target))
+  );
 }
 
 export function macroIntegrationTarget(step) {
@@ -177,20 +175,30 @@ export function macroIntegrationActionLabel(step) {
   if (normalized === "turn_on" || normalized === "on") return "Turn On";
   if (normalized === "turn_off" || normalized === "off") return "Turn Off";
   if (normalized === "toggle" || normalized === "toggle_on_off") return "Toggle";
-  const osdText = String(data.osd_value_text || "").trim().toUpperCase();
+  const osdText = String(data.osd_value_text || "")
+    .trim()
+    .toUpperCase();
   if (osdText === "ON") return "Turn On";
   if (osdText === "OFF") return "Turn Off";
   return "";
 }
 
 export function macroActionRole(step) {
-  const role = String(step?.action_role || step?.actionRole || "").trim().toLowerCase();
+  const role = String(step?.action_role || step?.actionRole || "")
+    .trim()
+    .toLowerCase();
   if (role) return role;
   if (String(step?.action || "") !== "Volume") return "";
   const integration = macroIntegrationTarget(step);
   if (!integration) return "value";
   const data = integration.data || {};
-  if (data.action_label || data.action_value || data.action_kind || data.button_action || data.osd_value_text) {
+  if (
+    data.action_label ||
+    data.action_value ||
+    data.action_kind ||
+    data.button_action ||
+    data.osd_value_text
+  ) {
     return "command";
   }
   return typeof step?.value === "number" ? "value" : "command";
@@ -201,7 +209,9 @@ export function macroActionUsesValue(step) {
 }
 
 export function macroActionIsLegacyTriggerPlaceholder(step) {
-  return String(step?.action || "") === "Volume"
-    && !macroActionUsesValue(step)
-    && !macroIntegrationActionLabel(step);
+  return (
+    String(step?.action || "") === "Volume" &&
+    !macroActionUsesValue(step) &&
+    !macroIntegrationActionLabel(step)
+  );
 }

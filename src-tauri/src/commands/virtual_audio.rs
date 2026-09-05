@@ -3,7 +3,7 @@ use crate::commands::settings::persist_app_settings_update;
 use crate::virtual_audio::{self, VirtualAudioInputDevice};
 use crate::AppState;
 use base64::Engine as _;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use std::ffi::OsStr;
 use std::fs::File;
@@ -14,11 +14,12 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager as _, State};
 
-const SUPPORTED_USBIP_VERSION: &str = "0.9.7.7";
+use midimaster_virtual_audio_protocol::{
+    StatusSnapshot as ServicePipeSnapshot, SERVICE_FILE_NAME,
+    SERVICE_NAME as VIRTUAL_AUDIO_SERVICE_NAME, SETUP_HELPER_NAME, STATUS_PIPE_PATH,
+    USBIP_VERSION as SUPPORTED_USBIP_VERSION,
+};
 const UNSAFE_USBIP_VERSION: &str = "0.9.7.8";
-const VIRTUAL_AUDIO_SERVICE_NAME: &str = "MIDIMasterVirtualAudio";
-const SETUP_HELPER_NAME: &str = "midimaster-virtual-audio-setup.exe";
-const SERVICE_FILE_NAME: &str = "midimaster-virtual-audio-service.exe";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -71,19 +72,6 @@ struct SystemComponentStatus {
 
 static COMPONENT_STATUS_CACHE: OnceLock<Mutex<Option<(Instant, SystemComponentStatus)>>> =
     OnceLock::new();
-
-#[derive(Debug, Deserialize)]
-struct ServicePipeSnapshot {
-    schema_version: u8,
-    service_running: bool,
-    usbip_attached: bool,
-    #[serde(default)]
-    attached_port_count: Option<u32>,
-    dropped_bytes: u64,
-    underrun_bytes: u64,
-    limiter_reduction_db: f32,
-    last_error: Option<String>,
-}
 
 impl SetupOperation {
     fn argument(self) -> &'static str {
@@ -362,7 +350,7 @@ fn reports_single_attached_port(
 fn read_service_pipe_snapshot() -> Option<ServicePipeSnapshot> {
     let file = std::fs::OpenOptions::new()
         .read(true)
-        .open(r"\\.\pipe\MIDIMaster.VirtualAudio.Status.v1")
+        .open(STATUS_PIPE_PATH)
         .ok()?;
     let mut payload = String::new();
     file.take(16 * 1024).read_to_string(&mut payload).ok()?;

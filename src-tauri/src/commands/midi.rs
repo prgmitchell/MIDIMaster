@@ -870,8 +870,8 @@ pub fn consume_learned_control(
 mod tests {
     use super::*;
     use crate::model::{
-        self, AssignMode, BindingAction, BindingControlKind, BindingTarget, FaderCurve,
-        MidiMessageType, MidiMode, MuteBehavior, RelativeFormat,
+        self, BindingAction, BindingControlKind, BindingTarget, MidiMessageType, MidiMode,
+        MuteBehavior,
     };
     use std::collections::HashMap;
 
@@ -894,7 +894,6 @@ mod tests {
         model::Binding {
             id: "binding-1".to_string(),
             name: "Binding 1".to_string(),
-            macro_name: String::new(),
             device_id: device_id.to_string(),
             control: model::MidiControl {
                 channel: 2,
@@ -906,24 +905,9 @@ mod tests {
             target: BindingTarget::Master,
             action: BindingAction::Volume,
             mode: MidiMode::Absolute,
-            relative_format: RelativeFormat::Auto,
-            fader_curve: FaderCurve::Linear,
-            custom_curve: Vec::new(),
-            deadzone: 0.0,
-            debounce_ms: 0,
-            mute_behavior: MuteBehavior::ToggleOnPress,
-            button_light_mode: model::ButtonLightMode::Activity,
-            button_light_behavior: model::ButtonLightBehavior::FollowState,
-            feedback_enabled: true,
-            indicator_control: None,
             mute_control: mute_device_id.map(|id| aux_control(id, 18)),
             assign_control: assign_device_id.map(|id| aux_control(id, 19)),
-            assign_mode: AssignMode::Add,
-            hotkey: None,
-            open_application: None,
-            autohotkey_script: None,
-            soundboard: None,
-            macro_steps: Vec::new(),
+            ..crate::test_support::binding()
         }
     }
 

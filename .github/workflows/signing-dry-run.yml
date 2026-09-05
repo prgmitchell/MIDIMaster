@@ -23,6 +23,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install development tools
+        run: npm.cmd ci
+
+      - name: Verify generated bundled plugins
+        run: npm.cmd run check:plugins
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 

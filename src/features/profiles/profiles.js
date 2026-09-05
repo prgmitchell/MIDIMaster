@@ -1,8 +1,11 @@
+import { createUiLifetime } from "../../app/ui_lifetime.js";
+import { createImportExport } from "./controllers/import_export.js";
+import { createProfileMenu } from "./controllers/profile_menu.js";
+import { createProfilePage } from "./controllers/profile_page.js";
+import { createProfileLoading } from "./controllers/profile_loading.js";
+import { createPersistence } from "./controllers/persistence.js";
+import { DEFAULT_OSD_SETTINGS, toPersistedOsdSettings } from "../../core/osd_settings.js";
 import { closeAllDropdowns } from "../ui/dropdown_badges.js";
-import {
-  buildPersistedMidiPreference as buildPersistedMidiDevicePreference,
-  normalizeMidiPreference as toClientMidiDevicePreference,
-} from "../../core/midi_preferences.js";
 
 export function createProfilesFeature({
   invoke,
@@ -33,25 +36,24 @@ export function createProfilesFeature({
   if (typeof invoke !== "function") {
     throw new Error("createProfilesFeature: invoke is required");
   }
-  const d = (dom && typeof dom === "object") ? dom : {};
-  const t = (key, params = {}) => (i18n && typeof i18n.t === "function") ? i18n.t(key, params) : String(key || "");
-  const defaults = (defaultOsdSettings && typeof defaultOsdSettings === "object") ? defaultOsdSettings : {
-    enabled: true,
-    monitorIndex: 0,
-    anchor: "top-right",
-    showBindingName: false,
-    style: "midnight",
-    opacity: 0.96,
-    scale: 1,
-  };
+  const d = dom && typeof dom === "object" ? dom : {};
+  const t = (key, params = {}) =>
+    i18n && typeof i18n.t === "function" ? i18n.t(key, params) : String(key || "");
+  const defaults =
+    defaultOsdSettings && typeof defaultOsdSettings === "object" ? defaultOsdSettings : DEFAULT_OSD_SETTINGS;
 
-  let pendingProfileDeleteName = null;
+  const viewState = {
+    pendingDeleteName: null,
+  };
+  const lifetime = createUiLifetime();
   let uiBound = false;
-  let saveProfileTimer = null;
-  let saveProfilePromise = null;
-  let runningSaveProfilePromise = null;
-  let resolveSaveProfile = null;
-  let rejectSaveProfile = null;
+  const saveState = {
+    timer: null,
+    promise: null,
+    running: null,
+    resolve: null,
+    reject: null,
+  };
 
   function normalizeProfileName(name) {
     return String(name || "").trim();
@@ -75,18 +77,7 @@ export function createProfilesFeature({
   }
 
   function buildPersistedOsdSettings(source) {
-    const current = (source && typeof source === "object") ? source : {};
-    return {
-      enabled: Boolean(current.enabled ?? defaults.enabled),
-      monitor_index: Number(current.monitorIndex ?? defaults.monitorIndex ?? 0),
-      monitor_name: current.monitorName || null,
-      monitor_id: current.monitorId || null,
-      anchor: current.anchor || defaults.anchor || "top-right",
-      show_binding_name: Boolean(current.showBindingName ?? defaults.showBindingName ?? false),
-      style: current.style || defaults.style || "midnight",
-      opacity: Number(current.opacity ?? defaults.opacity ?? 0.96),
-      scale: Number(current.scale ?? defaults.scale ?? 1),
-    };
+    return toPersistedOsdSettings(source || {}, defaults);
   }
 
   function setProfileSelection(name) {
@@ -96,10 +87,10 @@ export function createProfilesFeature({
 
   function currentProfileSelection(fallback = "Default") {
     return (
-      (typeof getActiveProfileName === "function" ? (getActiveProfileName() || "") : "")
-      || localStorage.getItem("activeProfileName")
-      || fallback
-      || "Default"
+      (typeof getActiveProfileName === "function" ? getActiveProfileName() || "" : "") ||
+      localStorage.getItem("activeProfileName") ||
+      fallback ||
+      "Default"
     );
   }
 
@@ -122,678 +113,14 @@ export function createProfilesFeature({
     if (d.profileToggle) {
       d.profileToggle.setAttribute("aria-expanded", "false");
     }
-    pendingProfileDeleteName = null;
-  }
-
-  async function loadProfileByName(name, options = {}) {
-    const {
-      applyOsd = true,
-      persistActiveProfile = true,
-      render = true,
-      startPlugins = true,
-      syncMidi = true,
-    } = (options && typeof options === "object") ? options : {};
-    const n = String(name || "").trim();
-    if (!n) return;
-    await flushProfileSave();
-    const profile = await invoke("load_profile", { name: n });
-
-    if (typeof setActiveProfileName === "function") {
-      setActiveProfileName(profile.name);
-    }
-    try {
-      localStorage.setItem("activeProfileName", profile.name);
-    } catch { }
-    if (persistActiveProfile) {
-      await invoke("set_active_profile_preference", { profileName: profile.name }).catch(() => { });
-    }
-
-    const pps = (profile.plugin_settings && typeof profile.plugin_settings === "object")
-      ? profile.plugin_settings
-      : {};
-    if (typeof setProfilePluginSettings === "function") {
-      setProfilePluginSettings(pps);
-    }
-    const midiPref = toClientMidiDevicePreference({
-      ...(profile.midi_device_preference || {}),
-      midi_device_preference_set: profile.midi_device_preference_set,
-    });
-    if (typeof setActiveProfileMidiPreference === "function") {
-      setActiveProfileMidiPreference(midiPref);
-    }
-
-    const nextBindings = (profile.bindings || []).map((binding, index) => {
-      const normalized = typeof normalizeBinding === "function"
-        ? normalizeBinding(binding)
-        : { ...binding };
-      normalized.name = normalized.name?.trim()
-        || (typeof bindingFallbackName === "function" ? bindingFallbackName(normalized, index) : (normalized.name || "Binding"));
-      return normalized;
-    });
-    if (typeof setBindings === "function") {
-      setBindings(nextBindings);
-    }
-
-    const host = (typeof getPluginHost === "function") ? getPluginHost() : null;
-    if (host) {
-      try { host.setBindings(nextBindings); } catch { }
-      try { host.setProfileState({ name: profile.name, plugin_settings: pps }); } catch { }
-    }
-    if (startPlugins && typeof startPluginHostIfNeeded === "function") {
-      await startPluginHostIfNeeded().catch(() => { });
-    }
-
-    if (profile.osd_settings) {
-      const nextOsd = {
-        enabled: Boolean(profile.osd_settings.enabled),
-        monitorIndex: Number(profile.osd_settings.monitor_index ?? 0),
-        monitorName: profile.osd_settings.monitor_name || null,
-        monitorId: profile.osd_settings.monitor_id || null,
-        anchor: profile.osd_settings.anchor || "top-right",
-        showBindingName: Boolean(profile.osd_settings.show_binding_name),
-        style: profile.osd_settings.style || defaults.style || "midnight",
-        opacity: Number(profile.osd_settings.opacity ?? defaults.opacity ?? 0.96),
-        scale: Number(profile.osd_settings.scale ?? defaults.scale ?? 1),
-      };
-      if (typeof setOsdSettings === "function") {
-        setOsdSettings(nextOsd);
-      }
-      if (applyOsd && typeof applyOsdSettings === "function") {
-        await applyOsdSettings(nextOsd);
-      }
-    }
-
-    if (render && typeof renderBindings === "function") {
-      renderBindings();
-    }
-    setProfileSelection(profile.name);
-    if (syncMidi && typeof onProfileLoaded === "function") {
-      await onProfileLoaded({
-        name: profile.name,
-        midiDevicePreference: midiPref,
-        midiDevicePreferenceSet: Boolean(profile.midi_device_preference_set || midiPref.configured),
-      });
-    }
-    return profile;
-  }
-
-  async function deleteProfileByName(name) {
-    const n = String(name || "").trim();
-    if (!n || n === "Default") return;
-    await invoke("delete_profile", { name: n });
-
-    const current = (typeof getActiveProfileName === "function") ? (getActiveProfileName() || "") : "";
-    if (n === current) {
-      let profiles = [];
-      try {
-        profiles = await invoke("list_profiles");
-      } catch {
-        profiles = [];
-      }
-
-      const hasDefault = profiles.some((p) => p && p.name === "Default");
-      if (!hasDefault) {
-        await invoke("save_profile", {
-          profile: {
-            name: "Default",
-            bindings: [],
-            osd_settings: buildPersistedOsdSettings(
-              (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
-            ),
-            plugin_settings: {},
-            midi_device_preference: buildPersistedMidiDevicePreference(
-              (typeof getCurrentMidiPreference === "function") ? getCurrentMidiPreference() : null
-            ),
-            midi_device_preference_set: true,
-          },
-        });
-        try {
-          profiles = await invoke("list_profiles");
-        } catch {
-          profiles = [{ name: "Default" }];
-        }
-      }
-
-      const fallbackName = (
-        profiles.find((p) => p && p.name === "Default")?.name
-        || profiles[0]?.name
-        || "Default"
-      );
-
-      await loadProfileByName(fallbackName);
-      await refreshProfiles(fallbackName);
-      return;
-    }
-    await refreshProfiles((typeof getActiveProfileName === "function") ? (getActiveProfileName() || "Default") : "Default");
-  }
-
-  async function createProfileByName(rawName) {
-    const name = normalizeProfileName(rawName);
-    if (!name) return;
-    await invoke("save_profile", {
-      profile: {
-        name,
-        bindings: [],
-        osd_settings: buildPersistedOsdSettings(
-          (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
-        ),
-        plugin_settings: {},
-        midi_device_preference: buildPersistedMidiDevicePreference({ routes: [] }),
-        midi_device_preference_set: true,
-      },
-    });
-    await loadProfileByName(name);
-    await refreshProfiles(name);
-    closeProfileDropdown();
-  }
-
-  function renderProfilePage(profiles, currentSelection) {
-    if (!d.profilePageList) return;
-    d.profilePageList.innerHTML = "";
-
-    const safeProfiles = Array.isArray(profiles) ? profiles : [];
-    if (!safeProfiles.length) {
-      const empty = document.createElement("div");
-      empty.className = "profile-page-empty";
-      empty.textContent = t("profiles.noProfiles");
-      d.profilePageList.appendChild(empty);
-      return;
-    }
-
-    safeProfiles.forEach((profile) => {
-      if (!profile || !profile.name) return;
-      const row = document.createElement("div");
-      row.className = "profile-page-row";
-      row.classList.toggle("active", profile.name === currentSelection);
-      if (pendingProfileDeleteName === profile.name) row.classList.add("confirming");
-
-      const details = document.createElement("button");
-      details.type = "button";
-      details.className = "profile-page-select";
-      details.innerHTML = `
-        <span class="profile-page-name"></span>
-        <span class="profile-page-meta">${profile.name === currentSelection ? t("profiles.activeProfile") : t("profiles.savedProfile")}</span>
-      `;
-      details.querySelector(".profile-page-name").textContent = profile.name;
-      details.addEventListener("click", async () => {
-        pendingProfileDeleteName = null;
-        await loadProfileByName(profile.name);
-        await refreshProfiles(profile.name);
-      });
-
-      const actions = document.createElement("div");
-      actions.className = "profile-page-row-actions";
-
-      const exportButton = document.createElement("button");
-      exportButton.type = "button";
-      exportButton.className = "secondary-action";
-      exportButton.textContent = t("profiles.export");
-      exportButton.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        await exportProfileByName(profile.name);
-      });
-
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.className = "danger-action";
-      deleteButton.textContent = profile.name === "Default" ? t("profiles.locked") : t("common.delete");
-      deleteButton.disabled = profile.name === "Default";
-      deleteButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (profile.name === "Default") return;
-        pendingProfileDeleteName = profile.name;
-        refreshProfiles(currentSelection || "Default");
-      });
-
-      if (pendingProfileDeleteName === profile.name && profile.name !== "Default") {
-        const cancelButton = document.createElement("button");
-        cancelButton.type = "button";
-        cancelButton.className = "secondary-action";
-        cancelButton.textContent = t("common.cancel");
-        cancelButton.addEventListener("click", (event) => {
-          event.stopPropagation();
-          pendingProfileDeleteName = null;
-          refreshProfiles(currentSelection || "Default");
-        });
-
-        const confirmButton = document.createElement("button");
-        confirmButton.type = "button";
-        confirmButton.className = "danger-action";
-        confirmButton.textContent = t("common.confirm");
-        confirmButton.addEventListener("click", async (event) => {
-          event.stopPropagation();
-          pendingProfileDeleteName = null;
-          await deleteProfileByName(profile.name);
-        });
-
-        actions.appendChild(cancelButton);
-        actions.appendChild(confirmButton);
-      } else {
-        actions.appendChild(exportButton);
-        actions.appendChild(deleteButton);
-      }
-
-      row.appendChild(details);
-      row.appendChild(actions);
-      d.profilePageList.appendChild(row);
-    });
-  }
-
-  async function refreshProfiles(preferredName = "") {
-    let profiles = [];
-    try {
-      profiles = await invoke("list_profiles");
-    } catch {
-      profiles = [];
-    }
-
-    const hasDefault = profiles.some((p) => p && p.name === "Default");
-    if (!hasDefault) {
-      await invoke("save_profile", {
-        profile: {
-          name: "Default",
-          bindings: [],
-          osd_settings: buildPersistedOsdSettings(
-            (typeof getOsdSettings === "function") ? (getOsdSettings() || defaults) : defaults
-          ),
-          plugin_settings: {},
-          midi_device_preference: buildPersistedMidiDevicePreference(
-            (typeof getCurrentMidiPreference === "function") ? getCurrentMidiPreference() : null
-          ),
-          midi_device_preference_set: true,
-        },
-      });
-      profiles = await invoke("list_profiles");
-    }
-
-    const currentSelection = preferredName
-      || (typeof getActiveProfileName === "function" ? (getActiveProfileName() || "") : "")
-      || "Default";
-
-    if (!d.profileList) return;
-    d.profileList.innerHTML = "";
-
-    const createItem = document.createElement("div");
-    createItem.className = "dropdown-item create profile-menu-tools";
-
-    const createInput = document.createElement("input");
-    createInput.type = "text";
-    createInput.placeholder = t("profiles.newProfileName");
-    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
-      createInput.addEventListener(eventName, (event) => {
-        event.stopPropagation();
-      });
-    });
-
-    const createButton = document.createElement("button");
-    createButton.type = "button";
-    createButton.textContent = t("profiles.create");
-    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
-      createButton.addEventListener(eventName, (event) => {
-        event.stopPropagation();
-      });
-    });
-
-    const importButton = document.createElement("button");
-    importButton.type = "button";
-    importButton.className = "icon-action";
-    importButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
-    importButton.title = t("profiles.importJson");
-    importButton.setAttribute("aria-label", t("profiles.importProfile"));
-    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
-      importButton.addEventListener(eventName, (event) => {
-        event.stopPropagation();
-      });
-    });
-    importButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      await importProfileFromFile();
-    });
-
-    const exportCurrentButton = document.createElement("button");
-    exportCurrentButton.type = "button";
-    exportCurrentButton.className = "icon-action";
-    exportCurrentButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg>';
-    exportCurrentButton.title = t("profiles.exportNamed", { name: currentSelection || "Default" });
-    exportCurrentButton.setAttribute("aria-label", t("profiles.exportCurrentNamed", { name: currentSelection || "Default" }));
-    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
-      exportCurrentButton.addEventListener(eventName, (event) => {
-        event.stopPropagation();
-      });
-    });
-    exportCurrentButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      await exportProfileByName(currentSelection || "Default");
-    });
-
-    const createProfile = async () => {
-      await createProfileByName(createInput.value);
-      createInput.value = "";
-      if (d.profilePageCreateInput) d.profilePageCreateInput.value = "";
-    };
-
-    createInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        createProfile();
-      }
-    });
-    createButton.addEventListener("click", createProfile);
-
-    const createRow = document.createElement("div");
-    createRow.className = "profile-menu-create-row";
-    ["pointerdown", "mousedown", "click"].forEach((eventName) => {
-      createRow.addEventListener(eventName, (event) => {
-        event.stopPropagation();
-      });
-    });
-    createRow.appendChild(createInput);
-    createRow.appendChild(createButton);
-    createRow.appendChild(importButton);
-    createRow.appendChild(exportCurrentButton);
-
-    createItem.appendChild(createRow);
-    d.profileList.appendChild(createItem);
-
-    profiles.forEach((profile) => {
-      const item = document.createElement("div");
-      item.className = "dropdown-item";
-      item.dataset.profileName = profile.name;
-      if (profile.name === currentSelection) {
-        item.classList.add("selected");
-      }
-
-      if (pendingProfileDeleteName === profile.name) {
-        item.classList.add("confirming");
-      }
-
-      const selectButton = document.createElement("button");
-      selectButton.type = "button";
-      selectButton.textContent = profile.name;
-      selectButton.addEventListener("click", async () => {
-        pendingProfileDeleteName = null;
-        await loadProfileByName(profile.name);
-        closeProfileDropdown();
-      });
-
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.className = "delete";
-      deleteButton.textContent = "x";
-      if (profile.name === "Default") {
-        deleteButton.disabled = true;
-      }
-      deleteButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (profile.name === "Default") return;
-        pendingProfileDeleteName = profile.name;
-        refreshProfiles(currentSelection || "Default");
-      });
-
-      item.appendChild(selectButton);
-
-      if (pendingProfileDeleteName === profile.name && profile.name !== "Default") {
-        const confirmButton = document.createElement("button");
-        confirmButton.type = "button";
-        confirmButton.className = "delete confirm";
-        confirmButton.textContent = t("common.delete");
-        confirmButton.addEventListener("click", async (event) => {
-          event.stopPropagation();
-          pendingProfileDeleteName = null;
-          await deleteProfileByName(profile.name);
-        });
-
-        const cancelButton = document.createElement("button");
-        cancelButton.type = "button";
-        cancelButton.className = "secondary";
-        cancelButton.textContent = t("common.cancel");
-        cancelButton.addEventListener("click", (event) => {
-          event.stopPropagation();
-          pendingProfileDeleteName = null;
-          refreshProfiles(currentSelection || "Default");
-        });
-
-        item.appendChild(cancelButton);
-        item.appendChild(confirmButton);
-      } else {
-        item.appendChild(deleteButton);
-      }
-
-      d.profileList.appendChild(item);
-    });
-
-    setProfileSelection(currentSelection || "Default");
-    updateProfileMenuSelection(currentSelection || "Default");
-    renderProfilePage(profiles, currentSelection || "Default");
-  }
-
-  function getProfileNameForSave() {
-    const current = (typeof getActiveProfileName === "function") ? (getActiveProfileName() || "") : "";
-    if (current) return current;
-    return currentProfileSelection("Default");
-  }
-
-  function ensureSaveProfilePromise() {
-    if (!saveProfilePromise) {
-      saveProfilePromise = new Promise((resolve, reject) => {
-        resolveSaveProfile = resolve;
-        rejectSaveProfile = reject;
-      });
-    }
-    return saveProfilePromise;
-  }
-
-  async function persistCurrentProfile() {
-    const name = getProfileNameForSave();
-    if (!name) return;
-
-    if (typeof setActiveProfileName === "function") {
-      setActiveProfileName(name);
-    }
-    try { localStorage.setItem("activeProfileName", name); } catch { }
-    await invoke("set_active_profile_preference", { profileName: name }).catch(() => { });
-    setProfileSelection(name);
-
-    const bindings = (typeof getBindings === "function") ? (getBindings() || []) : [];
-    const osd = (typeof getOsdSettings === "function") ? (getOsdSettings() || {}) : {};
-    const plugin_settings = (typeof getProfilePluginSettings === "function") ? (getProfilePluginSettings() || {}) : {};
-
-    const host = (typeof getPluginHost === "function") ? getPluginHost() : null;
-    if (host) {
-      try { host.setBindings(bindings); } catch { }
-    }
-
-    await invoke("save_profile", {
-      profile: {
-        name,
-        bindings,
-        osd_settings: buildPersistedOsdSettings(osd),
-        plugin_settings,
-        midi_device_preference: buildPersistedMidiDevicePreference(
-          (typeof getActiveProfileMidiPreference === "function") ? getActiveProfileMidiPreference() : null
-        ),
-        midi_device_preference_set: true,
-      },
-    });
-  }
-
-  async function settleScheduledProfileSave() {
-    const resolve = resolveSaveProfile;
-    const reject = rejectSaveProfile;
-    const promise = saveProfilePromise;
-    if (!promise) return;
-
-    saveProfilePromise = null;
-    resolveSaveProfile = null;
-    rejectSaveProfile = null;
-
-    try {
-      if (runningSaveProfilePromise) {
-        await runningSaveProfilePromise;
-      }
-      runningSaveProfilePromise = persistCurrentProfile();
-      await runningSaveProfilePromise;
-      if (typeof resolve === "function") resolve();
-    } catch (error) {
-      if (typeof reject === "function") reject(error);
-      throw error;
-    } finally {
-      runningSaveProfilePromise = null;
-    }
-  }
-
-  function saveBindingsForProfile() {
-    const promise = ensureSaveProfilePromise();
-    if (saveProfileTimer) {
-      clearTimeout(saveProfileTimer);
-    }
-
-    saveProfileTimer = setTimeout(() => {
-      saveProfileTimer = null;
-      settleScheduledProfileSave().catch(() => { });
-    }, 500);
-    return promise;
-  }
-
-  async function flushProfileSave() {
-    if (saveProfilePromise) {
-      if (saveProfileTimer) {
-        clearTimeout(saveProfileTimer);
-        saveProfileTimer = null;
-      }
-      await settleScheduledProfileSave();
-    }
-    if (runningSaveProfilePromise) {
-      await runningSaveProfilePromise;
-    }
-  }
-
-  async function updateProfilePluginSettings(pluginId, nextSettings) {
-    if (!pluginId || typeof pluginId !== "string") return;
-    const safe = (nextSettings && typeof nextSettings === "object") ? nextSettings : {};
-    const current = (typeof getProfilePluginSettings === "function") ? (getProfilePluginSettings() || {}) : {};
-    const merged = { ...current, [pluginId]: safe };
-    if (typeof setProfilePluginSettings === "function") {
-      setProfilePluginSettings(merged);
-    }
-
-    const name = (typeof getActiveProfileName === "function")
-      ? (getActiveProfileName() || localStorage.getItem("activeProfileName") || "Default")
-      : (localStorage.getItem("activeProfileName") || "Default");
-    if (typeof setActiveProfileName === "function") {
-      setActiveProfileName(name);
-    }
-    const host = (typeof getPluginHost === "function") ? getPluginHost() : null;
-    if (host) {
-      try { host.setProfileState({ name, plugin_settings: merged }); } catch { }
-    }
-    await saveBindingsForProfile();
-  }
-
-  async function updateProfileMidiPreference(nextPreference) {
-    const next = toClientMidiDevicePreference(nextPreference);
-    if (typeof setActiveProfileMidiPreference === "function") {
-      setActiveProfileMidiPreference(next);
-    }
-    await saveBindingsForProfile();
-  }
-
-  async function exportProfileByName(name) {
-    const profileName = normalizeProfileName(name);
-    if (!profileName) return;
-
-    try {
-      const savedPath = await invoke("export_current_profile", { profileName });
-      if (savedPath && typeof showAlert === "function") {
-        showAlert(t("profiles.exportedTitle"), t("profiles.exportedMessage", { path: savedPath }));
-      }
-    } catch (error) {
-      if (typeof showAlert === "function") {
-        showAlert(t("profiles.exportFailedTitle"), String(error));
-      }
-    }
-  }
-
-  async function importProfileFromFile() {
-    try {
-      const importedProfile = await invoke("import_profile_from_file");
-      if (!importedProfile) return;
-
-      const baseName = normalizeProfileName(importedProfile.name) || "Imported Profile";
-      let nextName = baseName;
-
-      let profiles = [];
-      try {
-        profiles = await invoke("list_profiles");
-      } catch {
-        profiles = [];
-      }
-      const existingNames = new Set(
-        (profiles || [])
-          .map((profile) => normalizeProfileName(profile?.name))
-          .filter(Boolean)
-      );
-
-      if (existingNames.has(baseName)) {
-        let choice = "replace";
-        if (typeof showChoices === "function") {
-          choice = await showChoices({
-            title: t("profiles.alreadyExistsTitle"),
-            message: t("profiles.alreadyExistsMessage", { name: baseName }),
-            options: [
-              { id: "replace", label: t("profiles.replace"), variant: "primary" },
-              { id: "keep_both", label: t("profiles.keepBoth"), variant: "secondary" },
-              { id: "cancel", label: t("common.cancel"), variant: "secondary" },
-            ],
-          });
-        } else if (typeof window !== "undefined" && typeof window.confirm === "function") {
-          const replace = window.confirm(t("profiles.replaceConfirm", { name: baseName }));
-          choice = replace ? "replace" : "keep_both";
-        }
-
-        if (choice === "cancel" || choice === "close") return;
-        if (choice === "keep_both") {
-          nextName = buildImportedProfileName(baseName, existingNames);
-        }
-      }
-
-      const profileToSave = {
-        ...importedProfile,
-        name: nextName,
-      };
-
-      await invoke("save_profile", { profile: profileToSave });
-      await loadProfileByName(nextName);
-      await refreshProfiles(nextName);
-      closeProfileDropdown();
-
-      if (typeof showAlert === "function") {
-        if (nextName !== baseName) {
-          showAlert(t("profiles.importedTitle"), t("profiles.importedAsMessage", { name: nextName }));
-        } else {
-          showAlert(t("profiles.importedTitle"), t("profiles.importedMessage", { name: nextName }));
-        }
-      }
-    } catch (error) {
-      if (typeof showAlert === "function") {
-        showAlert(t("profiles.importFailedTitle"), String(error));
-      }
-    }
-  }
-
-  async function exportCurrentProfile() {
-    const name = (typeof getActiveProfileName === "function")
-      ? (getActiveProfileName() || localStorage.getItem("activeProfileName") || "Default")
-      : (localStorage.getItem("activeProfileName") || "Default");
-    const profileName = String(name || "").trim() || "Default";
-    await exportProfileByName(profileName);
+    viewState.pendingDeleteName = null;
   }
 
   function bindUi() {
     if (uiBound) return;
     uiBound = true;
     if (d.profileToggle) {
-      d.profileToggle.addEventListener("click", async (event) => {
+      lifetime.listen(d.profileToggle, "click", async (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (d.profileList) {
@@ -813,7 +140,7 @@ export function createProfilesFeature({
       });
     }
 
-    document.addEventListener("click", (event) => {
+    lifetime.listen(document, "click", (event) => {
       if (!d.profileDropdown) return;
       if (!d.profileDropdown.contains(event.target)) {
         closeProfileDropdown();
@@ -821,7 +148,7 @@ export function createProfilesFeature({
     });
 
     if (d.profilePageCreateInput) {
-      d.profilePageCreateInput.addEventListener("keydown", (event) => {
+      lifetime.listen(d.profilePageCreateInput, "keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
           createProfileByName(d.profilePageCreateInput.value).then(() => {
@@ -831,28 +158,128 @@ export function createProfilesFeature({
       });
     }
     if (d.profilePageCreateButton) {
-      d.profilePageCreateButton.addEventListener("click", () => {
+      lifetime.listen(d.profilePageCreateButton, "click", () => {
         createProfileByName(d.profilePageCreateInput?.value || "").then(() => {
           if (d.profilePageCreateInput) d.profilePageCreateInput.value = "";
         });
       });
     }
     if (d.profilePageImportButton) {
-      d.profilePageImportButton.addEventListener("click", () => {
+      lifetime.listen(d.profilePageImportButton, "click", () => {
         importProfileFromFile();
       });
     }
     if (d.profilePageExportCurrentButton) {
-      d.profilePageExportCurrentButton.addEventListener("click", () => {
+      lifetime.listen(d.profilePageExportCurrentButton, "click", () => {
         exportCurrentProfile();
       });
     }
-    window.addEventListener("midimaster:locale-changed", () => {
+    lifetime.listen(window, "midimaster:locale-changed", () => {
       refreshProfiles(currentProfileSelection()).catch(() => {});
     });
   }
 
+  const {
+    getProfileNameForSave,
+    ensureSaveProfilePromise,
+    persistCurrentProfile,
+    settleScheduledProfileSave,
+    saveBindingsForProfile,
+    flushProfileSave,
+    updateProfilePluginSettings,
+    updateProfileMidiPreference,
+  } = createPersistence({
+    buildPersistedOsdSettings: (...args) => buildPersistedOsdSettings(...args),
+    currentProfileSelection: (...args) => currentProfileSelection(...args),
+    getActiveProfileMidiPreference,
+    getActiveProfileName,
+    getBindings,
+    getOsdSettings,
+    getPluginHost,
+    getProfilePluginSettings,
+    invoke,
+    saveState,
+    setActiveProfileMidiPreference,
+    setActiveProfileName,
+    setProfilePluginSettings,
+    setProfileSelection: (...args) => setProfileSelection(...args),
+  });
+
+  const { loadProfileByName, deleteProfileByName, createProfileByName } = createProfileLoading({
+    applyOsdSettings,
+    bindingFallbackName,
+    buildPersistedOsdSettings: (...args) => buildPersistedOsdSettings(...args),
+    closeProfileDropdown: (...args) => closeProfileDropdown(...args),
+    defaults,
+    flushProfileSave: (...args) => flushProfileSave(...args),
+    getActiveProfileName,
+    getCurrentMidiPreference,
+    getOsdSettings,
+    getPluginHost,
+    invoke,
+    normalizeBinding,
+    normalizeProfileName: (...args) => normalizeProfileName(...args),
+    onProfileLoaded,
+    refreshProfiles: (...args) => refreshProfiles(...args),
+    renderBindings,
+    setActiveProfileMidiPreference,
+    setActiveProfileName,
+    setBindings,
+    setOsdSettings,
+    setProfilePluginSettings,
+    setProfileSelection: (...args) => setProfileSelection(...args),
+    startPluginHostIfNeeded,
+  });
+
+  const { renderProfilePage } = createProfilePage({
+    d,
+    deleteProfileByName: (...args) => deleteProfileByName(...args),
+    exportProfileByName: (...args) => exportProfileByName(...args),
+    loadProfileByName: (...args) => loadProfileByName(...args),
+    refreshProfiles: (...args) => refreshProfiles(...args),
+    t: (...args) => t(...args),
+    viewState,
+  });
+
+  const { refreshProfiles } = createProfileMenu({
+    buildPersistedOsdSettings: (...args) => buildPersistedOsdSettings(...args),
+    closeProfileDropdown: (...args) => closeProfileDropdown(...args),
+    createProfileByName: (...args) => createProfileByName(...args),
+    d,
+    defaults,
+    deleteProfileByName: (...args) => deleteProfileByName(...args),
+    exportProfileByName: (...args) => exportProfileByName(...args),
+    getActiveProfileName,
+    getCurrentMidiPreference,
+    getOsdSettings,
+    importProfileFromFile: (...args) => importProfileFromFile(...args),
+    invoke,
+    loadProfileByName: (...args) => loadProfileByName(...args),
+    renderProfilePage: (...args) => renderProfilePage(...args),
+    setProfileSelection: (...args) => setProfileSelection(...args),
+    t: (...args) => t(...args),
+    updateProfileMenuSelection: (...args) => updateProfileMenuSelection(...args),
+    viewState,
+  });
+
+  const { exportProfileByName, importProfileFromFile, exportCurrentProfile } = createImportExport({
+    buildImportedProfileName: (...args) => buildImportedProfileName(...args),
+    closeProfileDropdown: (...args) => closeProfileDropdown(...args),
+    getActiveProfileName,
+    invoke,
+    loadProfileByName: (...args) => loadProfileByName(...args),
+    normalizeProfileName: (...args) => normalizeProfileName(...args),
+    refreshProfiles: (...args) => refreshProfiles(...args),
+    showAlert,
+    showChoices,
+    t: (...args) => t(...args),
+  });
+
   return {
+    dispose: () => {
+      lifetime.dispose();
+      return flushProfileSave();
+    },
     bindUi,
     refreshProfiles,
     loadProfileByName,

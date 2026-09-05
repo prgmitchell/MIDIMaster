@@ -2598,6 +2598,7 @@ dependencies = [
  "hex",
  "image",
  "libloading 0.8.9",
+ "midimaster-virtual-audio-protocol",
  "midir",
  "rand 0.8.5",
  "rfd",
@@ -2622,6 +2623,14 @@ dependencies = [
  "windows-core 0.61.2",
  "winreg",
  "zip 2.4.2",
+]
+
+[[package]]
+name = "midimaster-virtual-audio-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

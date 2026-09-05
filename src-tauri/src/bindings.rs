@@ -289,7 +289,6 @@ mod tests {
         Binding {
             id: "test-binding".to_string(),
             name: "Test".to_string(),
-            macro_name: String::new(),
             device_id: "midi:0".to_string(),
             control: MidiControl {
                 channel: 0,
@@ -303,22 +302,11 @@ mod tests {
             mode,
             relative_format,
             fader_curve: crate::model::FaderCurve::Linear,
-            custom_curve: Vec::new(),
-            deadzone: 0.0,
-            debounce_ms: 0,
             mute_behavior: crate::model::MuteBehavior::ToggleOnPress,
             button_light_mode: crate::model::ButtonLightMode::Activity,
             button_light_behavior: crate::model::ButtonLightBehavior::FollowState,
-            feedback_enabled: true,
-            indicator_control: None,
-            mute_control: None,
-            assign_control: None,
             assign_mode: crate::model::AssignMode::Add,
-            hotkey: None,
-            open_application: None,
-            autohotkey_script: None,
-            soundboard: None,
-            macro_steps: Vec::new(),
+            ..crate::test_support::binding()
         }
     }
 

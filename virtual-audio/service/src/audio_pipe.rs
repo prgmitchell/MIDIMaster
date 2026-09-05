@@ -61,7 +61,7 @@ impl Drop for LocalAudioPipeSecurity {
 pub fn serve_audio_pipe(device: Arc<Device>, status: Arc<ServiceStatus>, stop: Arc<AtomicBool>) {
     use std::thread;
     use std::time::Duration;
-    use windows::core::{w, HRESULT};
+    use windows::core::HRESULT;
     use windows::Win32::Foundation::{
         CloseHandle, ERROR_BROKEN_PIPE, ERROR_NO_DATA, ERROR_PIPE_CONNECTED, ERROR_PIPE_LISTENING,
         ERROR_PIPE_NOT_CONNECTED, INVALID_HANDLE_VALUE,
@@ -82,7 +82,7 @@ pub fn serve_audio_pipe(device: Arc<Device>, status: Arc<ServiceStatus>, stop: A
     while !stop.load(Ordering::Acquire) {
         let pipe = unsafe {
             CreateNamedPipeW(
-                w!(r"\\.\pipe\MIDIMaster.VirtualAudio.Audio.v1"),
+                &windows::core::HSTRING::from(midimaster_virtual_audio_protocol::AUDIO_PIPE_PATH),
                 PIPE_ACCESS_INBOUND,
                 PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS | PIPE_NOWAIT,
                 1,

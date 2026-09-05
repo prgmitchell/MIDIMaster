@@ -165,7 +165,6 @@ fn serialize_binding_uses_targets_not_target() {
     let binding = Binding {
         id: "b2".to_string(),
         name: "Binding 2".to_string(),
-        macro_name: String::new(),
         device_id: "midi-dev".to_string(),
         control: MidiControl {
             channel: 0,
@@ -177,24 +176,7 @@ fn serialize_binding_uses_targets_not_target() {
         target: BindingTarget::Master,
         action: BindingAction::Volume,
         mode: MidiMode::Absolute,
-        relative_format: RelativeFormat::Auto,
-        fader_curve: FaderCurve::Linear,
-        custom_curve: Vec::new(),
-        deadzone: 0.0,
-        debounce_ms: 0,
-        mute_behavior: MuteBehavior::ToggleOnPress,
-        button_light_mode: ButtonLightMode::Activity,
-        button_light_behavior: ButtonLightBehavior::FollowState,
-        feedback_enabled: true,
-        indicator_control: None,
-        mute_control: None,
-        assign_control: None,
-        assign_mode: AssignMode::Add,
-        hotkey: None,
-        open_application: None,
-        autohotkey_script: None,
-        soundboard: None,
-        macro_steps: Vec::new(),
+        ..crate::test_support::binding()
     };
 
     let json = serde_json::to_value(binding).expect("binding should serialize");

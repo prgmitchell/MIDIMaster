@@ -235,6 +235,21 @@ pub struct Profile {
 }
 
 impl Profile {
+    /// Normalize current and legacy bindings at profile import/load boundaries.
+    pub(crate) fn normalize_bindings(&mut self) -> bool {
+        let mut changed = false;
+        for binding in &mut self.bindings {
+            let before_targets = binding.targets.clone();
+            let before_target = binding.target.clone();
+            binding.ensure_targets();
+            changed |= binding.normalize_button_light_serialization();
+            if binding.targets != before_targets || binding.target != before_target {
+                changed = true;
+            }
+        }
+        changed
+    }
+
     pub(crate) fn strip_derived_integration_icons(&mut self) -> bool {
         let mut changed = false;
         for binding in &mut self.bindings {

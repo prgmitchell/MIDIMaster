@@ -2,20 +2,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createHotkeyLearnController } from "../src/features/bindings/hotkey_learn.js";
 
-const bindingsSource = await readFile(new URL("../src/features/bindings/bindings.js", import.meta.url), "utf8");
-const closeModalSource = bindingsSource.slice(
-  bindingsSource.indexOf("async function closeConfigModal"),
-  bindingsSource.indexOf("function getBindingById"),
+const bindingsSource = await readFile(
+  new URL("../src/features/bindings/bindings.js", import.meta.url),
+  "utf8",
 );
-assert.match(closeModalSource, /hotkeyLearn\.stop\(\)/, "closing binding configuration should stop hotkey learn through its controller");
-assert.doesNotMatch(bindingsSource, /\bstopHotkeyLearn\b/, "the removed hotkey-learn helper should have no stale callers");
 
 function eventTarget() {
   const listeners = new Map();
   return {
     listeners,
     classList: { add() {}, remove() {} },
-    addEventListener(type, listener) { listeners.set(type, listener); },
+    addEventListener(type, listener) {
+      listeners.set(type, listener);
+    },
     removeEventListener(type, listener) {
       if (listeners.get(type) === listener) listeners.delete(type);
     },

@@ -11,26 +11,17 @@ function testMatchingLocalMuteEchoIsIgnored() {
   const intents = new Map();
   obsTestUtils.rememberLocalMuteIntent(intents, "Mic/Aux", true, 1000);
 
-  assert.equal(
-    obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Mic/Aux", true, 1100),
-    true,
-  );
+  assert.equal(obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Mic/Aux", true, 1100), true);
 }
 
 function testOppositeMuteEventPassesImmediately() {
   const intents = new Map();
   obsTestUtils.rememberLocalMuteIntent(intents, "Mic/Aux", true, 1000);
 
-  assert.equal(
-    obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Mic/Aux", false, 1100),
-    false,
-  );
+  assert.equal(obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Mic/Aux", false, 1100), false);
   assert.equal(intents.has("Mic/Aux"), false);
 
-  assert.equal(
-    obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Mic/Aux", true, 1110),
-    false,
-  );
+  assert.equal(obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Mic/Aux", true, 1110), false);
 }
 
 function testExpiredMuteIntentPasses() {
@@ -53,20 +44,13 @@ function testMuteIntentsAreScopedByInput() {
   const intents = new Map();
   obsTestUtils.rememberLocalMuteIntent(intents, "Mic/Aux", true, 1000);
 
-  assert.equal(
-    obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Desktop Audio", true, 1100),
-    false,
-  );
+  assert.equal(obsTestUtils.shouldIgnoreLocalMuteEcho(intents, "Desktop Audio", true, 1100), false);
   assert.equal(intents.has("Mic/Aux"), true);
 }
 
 function testInputMuteFeedbackIncludesVolumeAndMuteBindings() {
-  const volumeBindings = new Map([
-    ["Mic/Aux", new Set(["fader-1", "shared-binding"])],
-  ]);
-  const muteBindings = new Map([
-    ["Mic/Aux", new Set(["mute-button-1", "shared-binding"])],
-  ]);
+  const volumeBindings = new Map([["Mic/Aux", new Set(["fader-1", "shared-binding"])]]);
+  const muteBindings = new Map([["Mic/Aux", new Set(["mute-button-1", "shared-binding"])]]);
 
   assert.deepEqual(
     [...obsTestUtils.inputMuteFeedbackBindingIds(volumeBindings, muteBindings, "Mic/Aux")],
@@ -99,20 +83,17 @@ function testSourceFilterActionTargetsFilterInsteadOfVisibility() {
   assert.equal(action.value, "ToggleEffect");
   assert.equal(action.behavior, "stateful");
   assert.equal(action.targetOption.label, "Video Capture Device - Chroma Key");
-  assert.deepEqual(
-    action.targetOption.target,
-    {
-      Integration: {
-        integration_id: "obs",
-        kind: "source_filter",
-        data: {
-          source_name: "Video Capture Device",
-          filter_name: "Chroma Key",
-          action_kind: "stateful",
-        },
+  assert.deepEqual(action.targetOption.target, {
+    Integration: {
+      integration_id: "obs",
+      kind: "source_filter",
+      data: {
+        source_name: "Video Capture Device",
+        filter_name: "Chroma Key",
+        action_kind: "stateful",
       },
     },
-  );
+  });
 }
 
 function testSourceFilterKeysUseSourceAndFilterNames() {
@@ -132,7 +113,9 @@ function testDisconnectFeedbackClearsObsMuteAndStatefulLights() {
     {
       id: "obs-mute",
       action: "ToggleMute",
-      target: { Integration: { integration_id: "obs", kind: "input", data: { input_name: "Desktop Audio" } } },
+      target: {
+        Integration: { integration_id: "obs", kind: "input", data: { input_name: "Desktop Audio" } },
+      },
     },
     {
       id: "obs-source",
@@ -142,7 +125,9 @@ function testDisconnectFeedbackClearsObsMuteAndStatefulLights() {
     {
       id: "obs-filter",
       action: "ToggleEffect",
-      target: { Integration: { integration_id: "obs", kind: "source_filter", data: { filter_name: "Chroma Key" } } },
+      target: {
+        Integration: { integration_id: "obs", kind: "source_filter", data: { filter_name: "Chroma Key" } },
+      },
     },
   ];
 
@@ -171,12 +156,7 @@ function testDisconnectFeedbackIgnoresUnrelatedAndMomentaryBindings() {
   assert.deepEqual(obsTestUtils.obsDisconnectedFeedbackUpdates(bindings), []);
 }
 
-function testDisconnectFeedbackDoesNotOpenTheOsd() {
-  assert.match(
-    obsPluginSource,
-    /queueDisconnectedFeedbackClear\(\)[\s\S]*?ctx\.feedback\.set\(bindingId, 0\.0, action, \{[\s\S]*?silent: true,/,
-  );
-}
+// The emitted-package runtime test verifies silent disconnect feedback.
 
 testMatchingLocalMuteEchoIsIgnored();
 testOppositeMuteEventPassesImmediately();
@@ -188,6 +168,5 @@ testSourceFilterActionTargetsFilterInsteadOfVisibility();
 testSourceFilterKeysUseSourceAndFilterNames();
 testDisconnectFeedbackClearsObsMuteAndStatefulLights();
 testDisconnectFeedbackIgnoresUnrelatedAndMomentaryBindings();
-testDisconnectFeedbackDoesNotOpenTheOsd();
 
 console.log("OBS plugin tests passed");

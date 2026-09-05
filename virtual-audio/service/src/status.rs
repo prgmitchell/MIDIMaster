@@ -1,4 +1,5 @@
-use serde::Serialize;
+pub use midimaster_virtual_audio_protocol::StatusSnapshot;
+use midimaster_virtual_audio_protocol::STATUS_PIPE_PATH;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -13,21 +14,6 @@ pub struct ServiceStatus {
     limited_frames: AtomicU64,
     limiter_reduction_millidb: AtomicU32,
     last_error: Mutex<Option<String>>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct StatusSnapshot {
-    pub schema_version: u8,
-    pub service_running: bool,
-    pub usbip_attached: bool,
-    pub attached_port_count: u32,
-    pub active_sessions: u32,
-    pub dropped_bytes: u64,
-    pub underrun_bytes: u64,
-    pub limited_frames: u64,
-    pub limiter_reduction_db: f32,
-    pub last_error: Option<String>,
-    pub timestamp_unix_ms: u128,
 }
 
 impl ServiceStatus {
@@ -66,7 +52,7 @@ impl ServiceStatus {
             // it from the same atomic value so a snapshot can never report the
             // contradictory `false` + `1 port` state.
             usbip_attached: attached_port_count == 1,
-            attached_port_count,
+            attached_port_count: Some(attached_port_count),
             active_sessions: self.sessions.load(Ordering::Relaxed),
             dropped_bytes: self.dropped_bytes.load(Ordering::Relaxed),
             underrun_bytes: self.underrun_bytes.load(Ordering::Relaxed),
@@ -88,7 +74,7 @@ impl ServiceStatus {
 
 #[cfg(windows)]
 pub fn serve_named_pipe(status: std::sync::Arc<ServiceStatus>, stop: std::sync::Arc<AtomicBool>) {
-    serve_named_pipe_at(status, stop, r"\\.\pipe\MIDIMaster.VirtualAudio.Status.v1");
+    serve_named_pipe_at(status, stop, STATUS_PIPE_PATH);
 }
 
 #[cfg(windows)]
@@ -205,16 +191,16 @@ mod status_tests {
         let status = ServiceStatus::default();
         let empty = status.snapshot();
         assert!(!empty.usbip_attached);
-        assert_eq!(empty.attached_port_count, 0);
+        assert_eq!(empty.attached_port_count, Some(0));
 
         status.set_attached_port_count(2);
         let duplicate = status.snapshot();
         assert!(!duplicate.usbip_attached);
-        assert_eq!(duplicate.attached_port_count, 2);
+        assert_eq!(duplicate.attached_port_count, Some(2));
 
         status.set_attached_port_count(1);
         let healthy = status.snapshot();
         assert!(healthy.usbip_attached);
-        assert_eq!(healthy.attached_port_count, 1);
+        assert_eq!(healthy.attached_port_count, Some(1));
     }
 }

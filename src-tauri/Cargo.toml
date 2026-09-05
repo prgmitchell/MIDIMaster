@@ -16,8 +16,10 @@ perf-audit = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+serde_json = "1"
 
 [dependencies]
+midimaster-virtual-audio-protocol = { path = "../virtual-audio/protocol" }
 tauri = { version = "2", features = ["tray-icon", "devtools"] }
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2.0.0"

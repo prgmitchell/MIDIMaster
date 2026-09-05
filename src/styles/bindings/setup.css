@@ -125,15 +125,6 @@ body[data-theme] .target-icon--device {
   background: #e6eaf4;
 }
 
-
-
-.binding-actions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  justify-self: start;
-}
-
 .binding-item:hover {
   background: #eceef7;
 }
@@ -218,7 +209,6 @@ body.dragging-binding {
 .binding-drag:active {
   cursor: grabbing;
 }
-
 
 .binding-action {
   padding: 4px 8px;

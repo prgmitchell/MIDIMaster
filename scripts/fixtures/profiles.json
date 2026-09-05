@@ -1,0 +1,88 @@
+[
+  {
+    "name": "Legacy profile",
+    "bindings": [
+      {
+        "id": "legacy-master",
+        "name": "Music",
+        "device_id": "midi-0",
+        "control": {
+          "channel": 0,
+          "controller": 7,
+          "msg_type": "ControlChange"
+        },
+        "target": "Master",
+        "mode": "Absolute",
+        "deadzone": 0,
+        "debounce_ms": 0
+      }
+    ],
+    "plugin_settings": {
+      "obs": {
+        "host": "localhost",
+        "port": 4455,
+        "auto_connect": false,
+        "legacy_extension": {
+          "retained": true
+        }
+      }
+    }
+  },
+  {
+    "name": "Current profile",
+    "bindings": [
+      {
+        "id": "current-button",
+        "name": "Music",
+        "device_id": "midi-0",
+        "control": {
+          "channel": 1,
+          "controller": 60,
+          "msg_type": "Note"
+        },
+        "mode": "Absolute",
+        "deadzone": 0,
+        "debounce_ms": 0,
+        "control_kind": "Button",
+        "action": "ToggleMute",
+        "targets": [
+          "Master",
+          "Focus"
+        ],
+        "feedback_enabled": false,
+        "assign_mode": "Clear"
+      }
+    ],
+    "plugin_settings": {
+      "obs": {
+        "host": "localhost",
+        "port": 4455,
+        "auto_connect": false,
+        "legacy_extension": {
+          "retained": true
+        }
+      }
+    },
+    "osd_settings": {
+      "enabled": true,
+      "monitor_index": 1,
+      "anchor": "bottom-right",
+      "show_binding_name": true,
+      "style": "glass",
+      "opacity": 0.8,
+      "scale": 1.2
+    },
+    "midi_device_preference": {
+      "routes": [
+        {
+          "input_device_id": "midi-2",
+          "output_device_id": "midi-out-3",
+          "input_device_name": "Surface In",
+          "output_device_name": "Surface Out",
+          "enabled": true
+        }
+      ]
+    },
+    "midi_device_preference_set": true
+  }
+]

@@ -6,6 +6,8 @@ mod app_state;
 mod audio;
 mod background_tasks;
 mod binding_actions;
+mod binding_events;
+mod binding_services;
 mod bindings;
 mod builtin_plugins;
 mod commands;
@@ -27,10 +29,13 @@ mod profile_store;
 mod run_logger;
 mod runtime_helpers;
 mod runtime_midi;
+mod settings_services;
 mod shutdown;
 mod soundboard;
 mod store_api;
 mod telemetry;
+#[cfg(test)]
+mod test_support;
 mod virtual_audio;
 mod voicemeeter;
 mod windows_autostart;
@@ -610,7 +615,6 @@ mod tests {
         model::Binding {
             id: "binding-relative-app".to_string(),
             name: "Relative App".to_string(),
-            macro_name: String::new(),
             device_id: "device".to_string(),
             control: model::MidiControl {
                 channel: 0,
@@ -630,24 +634,7 @@ mod tests {
             },
             action: model::BindingAction::Volume,
             mode: model::MidiMode::Relative,
-            relative_format: model::RelativeFormat::Auto,
-            fader_curve: model::FaderCurve::Linear,
-            custom_curve: Vec::new(),
-            deadzone: 0.0,
-            debounce_ms: 0,
-            mute_behavior: model::MuteBehavior::ToggleOnPress,
-            button_light_mode: model::ButtonLightMode::Activity,
-            button_light_behavior: model::ButtonLightBehavior::FollowState,
-            feedback_enabled: true,
-            indicator_control: None,
-            mute_control: None,
-            assign_control: None,
-            assign_mode: model::AssignMode::Add,
-            hotkey: None,
-            open_application: None,
-            autohotkey_script: None,
-            soundboard: None,
-            macro_steps: Vec::new(),
+            ..crate::test_support::binding()
         }
     }
 
@@ -655,7 +642,6 @@ mod tests {
         model::Binding {
             id: "binding-focus".to_string(),
             name: "Focused App".to_string(),
-            macro_name: String::new(),
             device_id: "device".to_string(),
             control: model::MidiControl {
                 channel: 0,
@@ -667,24 +653,7 @@ mod tests {
             target: model::BindingTarget::Focus,
             action: model::BindingAction::Volume,
             mode,
-            relative_format: model::RelativeFormat::Auto,
-            fader_curve: model::FaderCurve::Linear,
-            custom_curve: Vec::new(),
-            deadzone: 0.0,
-            debounce_ms: 0,
-            mute_behavior: model::MuteBehavior::ToggleOnPress,
-            button_light_mode: model::ButtonLightMode::Activity,
-            button_light_behavior: model::ButtonLightBehavior::FollowState,
-            feedback_enabled: true,
-            indicator_control: None,
-            mute_control: None,
-            assign_control: None,
-            assign_mode: model::AssignMode::Add,
-            hotkey: None,
-            open_application: None,
-            autohotkey_script: None,
-            soundboard: None,
-            macro_steps: Vec::new(),
+            ..crate::test_support::binding()
         }
     }
 
@@ -1216,7 +1185,7 @@ mod tests {
             .profile_store
             .set_failure_point(crate::durable_json_store::FailurePoint::BeforePrimaryReplace);
 
-        let result = crate::commands::bindings::add_binding_to_active_profile(
+        let result = crate::binding_services::add_binding_to_active_profile(
             &state,
             focus_volume_binding(model::MidiMode::Absolute),
         );
@@ -1238,3 +1207,6 @@ mod tests {
             .is_empty());
     }
 }
+
+#[cfg(test)]
+mod compatibility_tests;

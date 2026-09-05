@@ -1,0 +1,186 @@
+{
+  "revision": "070156071b01b28b3b7a897e90f3d913b31a606a",
+  "totalLines": 96638,
+  "oversized": [
+    {
+      "file": "scripts/test-binding-model.mjs",
+      "lines": 988
+    },
+    {
+      "file": "src-tauri/builtin_plugins/hue/plugin.mjs",
+      "lines": 1882
+    },
+    {
+      "file": "src-tauri/builtin_plugins/obs/plugin.mjs",
+      "lines": 1697
+    },
+    {
+      "file": "src-tauri/builtin_plugins/voicemeeter/plugin.mjs",
+      "lines": 877
+    },
+    {
+      "file": "src-tauri/builtin_plugins/wavelink/plugin.mjs",
+      "lines": 1753
+    },
+    {
+      "file": "src-tauri/src/app_settings.rs",
+      "lines": 612
+    },
+    {
+      "file": "src-tauri/src/app_state.rs",
+      "lines": 854
+    },
+    {
+      "file": "src-tauri/src/audio/windows.rs",
+      "lines": 1099
+    },
+    {
+      "file": "src-tauri/src/audio/windows/process_helpers.rs",
+      "lines": 1458
+    },
+    {
+      "file": "src-tauri/src/binding_actions.rs",
+      "lines": 888
+    },
+    {
+      "file": "src-tauri/src/commands/bindings.rs",
+      "lines": 1485
+    },
+    {
+      "file": "src-tauri/src/commands/midi.rs",
+      "lines": 1282
+    },
+    {
+      "file": "src-tauri/src/commands/settings.rs",
+      "lines": 1247
+    },
+    {
+      "file": "src-tauri/src/commands/virtual_audio.rs",
+      "lines": 753
+    },
+    {
+      "file": "src-tauri/src/lib.rs",
+      "lines": 1240
+    },
+    {
+      "file": "src-tauri/src/midi.rs",
+      "lines": 2637
+    },
+    {
+      "file": "src-tauri/src/model/binding_types.rs",
+      "lines": 1371
+    },
+    {
+      "file": "src-tauri/src/model/tests.rs",
+      "lines": 1254
+    },
+    {
+      "file": "src-tauri/src/plugin_api.rs",
+      "lines": 1048
+    },
+    {
+      "file": "src-tauri/src/run_logger.rs",
+      "lines": 877
+    },
+    {
+      "file": "src-tauri/src/runtime_midi.rs",
+      "lines": 1011
+    },
+    {
+      "file": "src-tauri/src/soundboard.rs",
+      "lines": 821
+    },
+    {
+      "file": "src-tauri/src/virtual_audio.rs",
+      "lines": 836
+    },
+    {
+      "file": "src-tauri/src/voicemeeter.rs",
+      "lines": 1291
+    },
+    {
+      "file": "src/app/appearance.js",
+      "lines": 1047
+    },
+    {
+      "file": "src/app_entry.js",
+      "lines": 2271
+    },
+    {
+      "file": "src/core/binding_model.js",
+      "lines": 867
+    },
+    {
+      "file": "src/features/bindings/bindings.js",
+      "lines": 6144
+    },
+    {
+      "file": "src/features/midi/midi.js",
+      "lines": 1998
+    },
+    {
+      "file": "src/features/plugins/tabs.js",
+      "lines": 813
+    },
+    {
+      "file": "src/features/profiles/profiles.js",
+      "lines": 870
+    },
+    {
+      "file": "src/features/settings/settings.js",
+      "lines": 1697
+    },
+    {
+      "file": "src/features/targets/targets.js",
+      "lines": 2515
+    },
+    {
+      "file": "src/index.html",
+      "lines": 1291
+    },
+    {
+      "file": "src/styles/base/app-shell.css",
+      "lines": 825
+    },
+    {
+      "file": "src/styles/bindings/config-panel/base-and-macro.css",
+      "lines": 875
+    },
+    {
+      "file": "src/styles/bindings/config-panel/preview-and-layout.css",
+      "lines": 772
+    },
+    {
+      "file": "src/styles/bindings/setup.css",
+      "lines": 649
+    },
+    {
+      "file": "src/styles/bindings/table.css",
+      "lines": 1699
+    },
+    {
+      "file": "src/styles/connections/plugins-page.css",
+      "lines": 1187
+    },
+    {
+      "file": "src/styles/settings/appearance.css",
+      "lines": 951
+    },
+    {
+      "file": "src/styles/settings/controls-and-osd.css",
+      "lines": 1390
+    },
+    {
+      "file": "src/styles/settings/theme-overrides.css",
+      "lines": 816
+    },
+    {
+      "file": "virtual-audio/service/src/usbip.rs",
+      "lines": 833
+    },
+    {
+      "file": "virtual-audio/setup-helper/src/main.rs",
+      "lines": 669
+    }
+  ]
+}

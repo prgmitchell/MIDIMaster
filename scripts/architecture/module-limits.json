@@ -1,0 +1,61 @@
+{
+  "defaultMaxLines": 600,
+  "exceptions": {
+    "src/app/application.js": {
+      "maxLines": 986,
+      "reason": "Composition root explicitly wires existing feature contracts and cross-feature callbacks. State and workflows are separate modules. Avoid hiding this wiring in a generic service locator; new business rules belong in the owning controller."
+    },
+    "src-tauri/src/app_state.rs": {
+      "maxLines": 854,
+      "reason": "Existing application state owns shared locks and coordinated runtime state. Keep synchronization ownership visible in one place; domain operations belong in binding/settings services and MIDI modules."
+    },
+    "src-tauri/src/audio/windows.rs": {
+      "maxLines": 1099,
+      "reason": "Existing Windows audio backend owns COM interfaces and audio-session locking. Process identity, package metadata and icon extraction have separate modules; the COM owner remains together to preserve apartment and lifetime boundaries."
+    },
+    "src-tauri/src/commands/midi.rs": {
+      "maxLines": 868,
+      "reason": "Existing MIDI route commands preserve preflight, transaction, rollback and disconnect ordering. Connection management and feedback transport are separate midi modules; route transaction extraction needs its own installed-device validation."
+    },
+    "src-tauri/src/commands/virtual_audio.rs": {
+      "maxLines": 656,
+      "reason": "Existing installation and elevation adapter remains together to keep consent, helper result files and restart behavior reviewable. Shared service/payload identifiers now come from protocol."
+    },
+    "src-tauri/src/plugin_api.rs": {
+      "maxLines": 941,
+      "reason": "Existing Tauri plugin API v1 command surface and wire structures remain together for compatibility review. New plugin-specific behavior belongs in authored plugin modules, not this adapter."
+    },
+    "src-tauri/src/run_logger.rs": {
+      "maxLines": 626,
+      "reason": "Existing logger writer, rotation and retention stay together to preserve operator-tool and diagnostics contracts. Inline tests are counted separately and do not inflate this ceiling."
+    },
+    "src-tauri/src/soundboard.rs": {
+      "maxLines": 631,
+      "reason": "Existing decoding, playback and waveform-analysis service retains audio ownership and timing. UI editing and preview coordination are separate controllers; tests are counted separately."
+    },
+    "src-tauri/src/virtual_audio.rs": {
+      "maxLines": 745,
+      "reason": "Desktop virtual-audio stream and status lifecycle retain their current lock and thread boundaries. Service identifiers and wire contracts moved to the shared protocol crate."
+    },
+    "src-tauri/src/voicemeeter.rs": {
+      "maxLines": 1206,
+      "reason": "Existing native Voicemeeter FFI, edition capability tables and parameter API stay together; plugin UI/protocol scheduling is now separate. Keep this module bounded until a dedicated FFI split can preserve DLL lifetime ownership."
+    },
+    "src/features/bindings/bindings.js": {
+      "maxLines": 825,
+      "reason": "Feature composition and compatibility adapter for current callers. List rendering, persistence, edit sessions, learning, macros, curves, feedback and soundboard behavior live in controllers. Explicit callback wiring accounts for most remaining lines."
+    },
+    "src/features/plugins/tabs.js": {
+      "maxLines": 813,
+      "reason": "Existing plugin-store browsing, installation and connection-tab UI remain a bounded feature. Bundled-plugin authoring and runtime policy are separate; store/operator contracts are preserved."
+    },
+    "virtual-audio/service/src/usbip.rs": {
+      "maxLines": 650,
+      "reason": "Existing USB/IP framing and request dispatch form one protocol implementation. Tests are counted separately; protocol crate shares cross-process contracts without exposing service implementation."
+    },
+    "virtual-audio/setup-helper/src/main.rs": {
+      "maxLines": 614,
+      "reason": "Existing install/uninstall sequence and numeric result-file contract stay together. Approved payload metadata and service identifiers now come from the shared protocol crate."
+    }
+  }
+}

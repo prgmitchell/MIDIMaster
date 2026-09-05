@@ -6,13 +6,10 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const SERVICE_NAME: &str = "MIDIMasterVirtualAudio";
-const SERVICE_DISPLAY_NAME: &str = "MIDIMaster Virtual Audio";
-const SERVICE_FILE: &str = "midimaster-virtual-audio-service.exe";
-const USBIP_FILE: &str = "USBip-0.9.7.7-x64.exe";
-const USBIP_VERSION: &str = "0.9.7.7";
-const USBIP_SIZE: u64 = 33_226_344;
-const USBIP_SHA256: &str = "51620fa5f9f8be5932bc9d786deee557ce06d5407a99cab490dcfac71f185fea";
+use midimaster_virtual_audio_protocol::{
+    SERVICE_DISPLAY_NAME, SERVICE_FILE_NAME as SERVICE_FILE, SERVICE_NAME, USBIP_FILE,
+    USBIP_SHA256, USBIP_SIZE, USBIP_VERSION,
+};
 const RESTART_REQUIRED: i32 = 3010;
 
 #[derive(Debug)]

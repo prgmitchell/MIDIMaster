@@ -1,0 +1,14 @@
+{
+  "bindings": {
+    "id": "binding-config-panel",
+    "sha256": "921f89d94f8468419201f1535bfb608f393acb9b9e2d56aa8d119865e07a70dd"
+  },
+  "settings": {
+    "id": "settings-panel",
+    "sha256": "af979324386c1f1bbdd1f317015d8576906a19c477f30fa27ac660f27c0e5cf8"
+  },
+  "targets": {
+    "id": "target-panel",
+    "sha256": "90e512793a6619677e83a12461e184993e91e741f1c5251521a12959b43eae32"
+  }
+}

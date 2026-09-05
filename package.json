@@ -12,14 +12,24 @@
     "perf:midi": "node scripts/perf/run-midi-cdp.mjs",
     "perf:webdriver": "wdio run scripts/perf/webdriver/wdio.perf.conf.mjs",
     "perf:guard": "node scripts/perf/check-static-budgets.mjs",
-    "perf:test": "node --test scripts/perf/tests/*.test.mjs"
+    "perf:test": "node --test scripts/perf/tests/*.test.mjs",
+    "build:plugins": "node scripts/build-plugins.mjs",
+    "check:plugins": "node scripts/build-plugins.mjs --check",
+    "check:architecture": "node scripts/architecture/check.mjs",
+    "report:architecture": "node scripts/architecture/report.mjs --write",
+    "check:visual": "node scripts/architecture/visual-equivalence.mjs"
   },
   "devDependencies": {
     "@wdio/cli": "9.29.1",
     "@wdio/local-runner": "9.29.1",
     "@wdio/mocha-framework": "9.29.1",
     "@wdio/spec-reporter": "9.29.1",
-    "@wdio/tauri-service": "1.2.0"
+    "@wdio/tauri-service": "1.2.0",
+    "acorn": "8.15.0",
+    "esbuild": "0.28.1",
+    "eslint-scope": "8.4.0",
+    "linkedom": "0.18.12",
+    "prettier": "3.6.2"
   },
   "engines": {
     "node": ">=20"

@@ -1,9 +1,11 @@
-use crate::binding_actions::{self, IntegrationBatchTrigger, IntegrationTrigger};
+mod button_state;
+use crate::binding_actions;
 use crate::bindings::{apply_midi_event as apply_binding_midi_event, BindingKey, BindingState};
 use crate::feedback::{self, FeedbackControlKey, FeedbackSendOptions};
 use crate::model::{self, MidiEvent};
 use crate::run_logger;
 use crate::AppState;
+use button_state::*;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
@@ -14,15 +16,6 @@ mod actions;
 mod aux_controls;
 #[path = "runtime_midi/learn.rs"]
 mod learn;
-
-fn binding_is_button(binding: &model::Binding) -> bool {
-    matches!(binding.control_kind, model::BindingControlKind::Button)
-        || (matches!(binding.control_kind, model::BindingControlKind::Auto)
-            && matches!(
-                binding.control.msg_type,
-                model::MidiMessageType::Note | model::MidiMessageType::ProgramChange
-            ))
-}
 
 fn send_immediate_button_light_feedback(
     state: &AppState,
@@ -106,309 +99,6 @@ fn resolve_integration_button_event(
     }
 }
 
-const ACTIVITY_BUTTON_LIGHT_HOLD_RETRY_DELAYS_MS: [u64; 3] = [10, 35, 75];
-const ACTIVITY_BUTTON_LIGHT_HOLD_INTERVAL_MS: u64 = 100;
-
-struct ActivityButtonLightHoldContext {
-    generations: std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, u64>>>,
-    binding_state: std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, BindingState>>>,
-    feedback_values: std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, f32>>>,
-    midi: std::sync::Arc<std::sync::Mutex<crate::midi::MidiManager>>,
-    key: BindingKey,
-    generation: u64,
-    output_key: BindingKey,
-    binding: model::Binding,
-}
-
-fn start_activity_button_light_generation(
-    generations: &mut HashMap<BindingKey, u64>,
-    key: &BindingKey,
-) -> u64 {
-    let generation = generations.get(key).copied().unwrap_or(0).wrapping_add(1);
-    generations.insert(key.clone(), generation);
-    generation
-}
-
-fn cancel_activity_button_light_generation(
-    generations: &mut HashMap<BindingKey, u64>,
-    key: &BindingKey,
-) {
-    generations.remove(key);
-}
-
-fn activity_button_light_generation_is_current(
-    generations: &HashMap<BindingKey, u64>,
-    key: &BindingKey,
-    generation: u64,
-) -> bool {
-    generations.get(key).copied() == Some(generation)
-}
-
-#[cfg(test)]
-fn activity_button_light_hold_should_continue(
-    generations: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, u64>>>,
-    binding_state: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, BindingState>>>,
-    key: &BindingKey,
-    generation: u64,
-) -> bool {
-    let generation_current = generations
-        .lock()
-        .ok()
-        .map(|generations| {
-            activity_button_light_generation_is_current(&generations, key, generation)
-        })
-        .unwrap_or(false);
-    if !generation_current {
-        return false;
-    }
-
-    binding_state
-        .lock()
-        .ok()
-        .and_then(|states| states.get(key).map(|state| state.last_value > 0.0))
-        .unwrap_or(false)
-}
-
-fn send_activity_button_light_hold_feedback(
-    feedback_values: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, f32>>>,
-    midi: &std::sync::Arc<std::sync::Mutex<crate::midi::MidiManager>>,
-    key: &BindingKey,
-    output_key: &BindingKey,
-    binding: &model::Binding,
-) {
-    if let Ok(mut feedback) = feedback_values.lock() {
-        feedback.insert(key.clone(), 1.0);
-        if output_key != key {
-            feedback.insert(output_key.clone(), 1.0);
-        }
-    }
-    if let Ok(mut midi) = midi.lock() {
-        let _ = midi.send_binding_light_feedback(binding, 1.0);
-    }
-}
-
-fn send_activity_button_light_hold_feedback_if_current(
-    context: &ActivityButtonLightHoldContext,
-) -> bool {
-    let Ok(generations_guard) = context.generations.lock() else {
-        return false;
-    };
-    if !activity_button_light_generation_is_current(
-        &generations_guard,
-        &context.key,
-        context.generation,
-    ) {
-        return false;
-    }
-
-    let still_pressed = context
-        .binding_state
-        .lock()
-        .ok()
-        .and_then(|states| states.get(&context.key).map(|state| state.last_value > 0.0))
-        .unwrap_or(false);
-    if !still_pressed {
-        return false;
-    }
-
-    send_activity_button_light_hold_feedback(
-        &context.feedback_values,
-        &context.midi,
-        &context.key,
-        &context.output_key,
-        &context.binding,
-    );
-    true
-}
-
-pub(super) fn update_activity_button_light_hold_feedback(
-    state: &AppState,
-    binding: &model::Binding,
-    key: BindingKey,
-    input_active: bool,
-) {
-    if !binding.feedback_enabled {
-        if let Ok(mut generations) = state.activity_button_light_generations.lock() {
-            cancel_activity_button_light_generation(&mut generations, &key);
-        }
-        return;
-    }
-    if matches!(
-        binding.control.msg_type,
-        model::MidiMessageType::ProgramChange
-    ) && binding.indicator_feedback_control().is_none()
-    {
-        if let Ok(mut generations) = state.activity_button_light_generations.lock() {
-            cancel_activity_button_light_generation(&mut generations, &key);
-        }
-        return;
-    }
-
-    if state
-        .button_light_hold_feedback_value(binding, input_active)
-        .is_none()
-        || !input_active
-    {
-        if let Ok(mut generations) = state.activity_button_light_generations.lock() {
-            cancel_activity_button_light_generation(&mut generations, &key);
-        }
-        return;
-    }
-
-    let generation = match state.activity_button_light_generations.lock() {
-        Ok(mut generations) => start_activity_button_light_generation(&mut generations, &key),
-        Err(_) => return,
-    };
-
-    let output_control = binding
-        .indicator_feedback_control()
-        .map(FeedbackControlKey::from_aux)
-        .unwrap_or_else(|| FeedbackControlKey::from_binding(binding));
-    let hold_context = ActivityButtonLightHoldContext {
-        generations: state.activity_button_light_generations.clone(),
-        binding_state: state.binding_state.clone(),
-        feedback_values: state.feedback_values.clone(),
-        midi: state.midi.clone(),
-        key,
-        generation,
-        output_key: output_control.to_binding_key(),
-        binding: binding.clone(),
-    };
-
-    tauri::async_runtime::spawn(async move {
-        let mut previous_delay = 0;
-        for delay in ACTIVITY_BUTTON_LIGHT_HOLD_RETRY_DELAYS_MS {
-            tokio::time::sleep(Duration::from_millis(delay - previous_delay)).await;
-            previous_delay = delay;
-
-            if !send_activity_button_light_hold_feedback_if_current(&hold_context) {
-                return;
-            }
-        }
-
-        loop {
-            tokio::time::sleep(Duration::from_millis(
-                ACTIVITY_BUTTON_LIGHT_HOLD_INTERVAL_MS,
-            ))
-            .await;
-
-            if !send_activity_button_light_hold_feedback_if_current(&hold_context) {
-                return;
-            }
-        }
-    });
-}
-
-fn mark_binding_user_activity(state: &AppState, key: &BindingKey) {
-    if let Ok(mut states) = state.binding_state.lock() {
-        if let Some(binding_state) = states.get_mut(key) {
-            binding_state.last_update = Instant::now();
-        }
-    }
-}
-
-fn schedule_latched_button_feedback_resend(
-    state: &AppState,
-    binding: &model::Binding,
-    key: &BindingKey,
-) {
-    let key = key.clone();
-    let feedback_values = state.feedback_values.clone();
-    let midi = state.midi.clone();
-    let binding = binding.clone();
-
-    tauri::async_runtime::spawn(async move {
-        // Let the controller finish processing Note Off before restoring its latched LED.
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        if let Ok(feedback) = feedback_values.lock() {
-            let current_value = feedback.get(&key).copied().unwrap_or(0.0);
-            if let Ok(mut midi) = midi.lock() {
-                let _ = midi.send_binding_light_feedback(&binding, current_value);
-            }
-        }
-    });
-}
-
-fn handle_latched_button_release(
-    state: &AppState,
-    binding: &model::Binding,
-    key: &BindingKey,
-    event: &MidiEvent,
-) -> bool {
-    if event.value != 0 || binding.mute_behavior != model::MuteBehavior::ToggleOnPress {
-        return false;
-    }
-    schedule_latched_button_feedback_resend(state, binding, key);
-    true
-}
-
-fn resolve_stateful_button_transition(
-    state: &AppState,
-    binding: &model::Binding,
-    key: &BindingKey,
-    event: &MidiEvent,
-    current_state: bool,
-) -> Option<bool> {
-    let tracks_input_edges = binding.mute_behavior == model::MuteBehavior::SetFromValue;
-    let previous_input_active = if tracks_input_edges {
-        state
-            .last_mute_input_active
-            .lock()
-            .ok()
-            .and_then(|inputs| inputs.get(key).copied())
-    } else {
-        None
-    };
-    let next_state = AppState::resolve_target_mute_state(
-        event.value,
-        current_state,
-        binding.mute_behavior.clone(),
-        previous_input_active,
-    );
-
-    if tracks_input_edges {
-        if let Ok(mut inputs) = state.last_mute_input_active.lock() {
-            inputs.insert(key.clone(), event.value > 0);
-        }
-    }
-    next_state
-}
-
-fn emit_integration_targets(
-    app: &AppHandle,
-    binding: &model::Binding,
-    targets: &[model::BindingTarget],
-    value: f32,
-) -> bool {
-    let mut any_applied = false;
-    for (target_index, target) in targets.iter().enumerate() {
-        if let model::BindingTarget::Integration {
-            integration_id,
-            kind,
-            data,
-        } = target
-        {
-            binding_actions::emit_integration_binding_triggered(
-                app,
-                IntegrationTrigger {
-                    binding_id: &binding.id,
-                    action: &binding.action,
-                    value,
-                    target_index,
-                    target_count: targets.len(),
-                    integration_id,
-                    kind,
-                    data,
-                    source: None,
-                    source_sequence: None,
-                },
-            );
-            any_applied = true;
-        }
-    }
-    any_applied
-}
-
 pub(crate) fn apply_midi_event(
     state: &AppState,
     app: &AppHandle,
@@ -450,7 +140,7 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
     if !state.binding_has_available_target(binding) {
-        if binding_is_button(binding) {
+        if binding.is_button_binding() {
             state.set_binding_action_value(&key, 0.0);
             send_immediate_button_light_feedback(state, binding, 0.0, "integration_unavailable");
         }
@@ -504,7 +194,7 @@ pub(crate) fn apply_midi_event(
         None => return Ok(()),
     };
 
-    if binding_is_button(binding)
+    if binding.is_button_binding()
         && targets
             .iter()
             .all(|target| matches!(target, model::BindingTarget::Unset))
@@ -526,7 +216,7 @@ pub(crate) fn apply_midi_event(
         .iter()
         .any(|target| matches!(target, model::BindingTarget::Macro));
     if has_macro_target {
-        if !binding_is_button(binding) {
+        if !binding.is_button_binding() {
             run_logger::warn(
                 "bindings",
                 "macro_non_button_ignored",
@@ -540,7 +230,7 @@ pub(crate) fn apply_midi_event(
             emit_macro_button_feedback(state, app, binding, &key, input_active);
         }
         if input_active {
-            crate::commands::bindings::spawn_macro_binding(app.clone(), binding.id.clone(), false);
+            crate::binding_services::spawn_macro_binding(app.clone(), binding.id.clone(), false);
         }
         if matches!(binding.action, model::BindingAction::Macro) {
             if !input_active {
@@ -635,15 +325,16 @@ pub(crate) fn apply_midi_event(
             } else {
                 None
             };
-            let payload = serde_json::json!({
-              "target": target,
-              "muted": muted,
-              "action": "toggle_mute",
-              "focus_session": focus_session,
-              "binding_id": binding.id,
-              "binding_name": binding.name,
-              "binding_primary_target": binding_primary_target
-            });
+            let payload = crate::binding_events::binding_event_payload(
+                binding,
+                &binding_primary_target,
+                serde_json::json!({
+                  "target": target,
+                  "muted": muted,
+                  "action": "toggle_mute",
+                  "focus_session": focus_session,
+                }),
+            );
             let _ = app.emit("mute_update", payload.clone());
 
             if settings_enabled {
@@ -671,8 +362,18 @@ pub(crate) fn apply_midi_event(
             return Ok(());
         };
 
-        let any_applied =
-            emit_integration_targets(app, binding, targets, if next_enabled { 1.0 } else { 0.0 });
+        let any_applied = binding_actions::execute_target_action(
+            app,
+            state,
+            binding,
+            &binding.action,
+            if next_enabled { 1.0 } else { 0.0 },
+            binding_actions::ActionExecutionContext {
+                integrations_only: true,
+                ..binding_actions::ActionExecutionContext::local("bindings")
+            },
+        )?
+        .applied();
 
         if !any_applied {
             run_logger::warn(
@@ -711,7 +412,18 @@ pub(crate) fn apply_midi_event(
             return Ok(());
         }
 
-        let any_applied = emit_integration_targets(app, binding, targets, 1.0);
+        let any_applied = binding_actions::execute_target_action(
+            app,
+            state,
+            binding,
+            &binding.action,
+            1.0,
+            binding_actions::ActionExecutionContext {
+                integrations_only: true,
+                ..binding_actions::ActionExecutionContext::local("bindings")
+            },
+        )?
+        .applied();
 
         if !any_applied {
             run_logger::warn(
@@ -735,90 +447,53 @@ pub(crate) fn apply_midi_event(
         return Ok(());
     }
 
-    let mut applied_targets = Vec::new();
-    let mut integration_volume_batches: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
-    let mut button_event_for_event: Option<Option<&'static str>> = None;
-    let mut skipped_button_integration_event = false;
-    let mut integration_button_feedback_owned = false;
-    for (target_index, target) in targets.iter().enumerate() {
-        if let model::BindingTarget::Integration {
-            integration_id,
-            kind,
-            data,
-        } = target
-        {
-            let integration_button_kind = if binding_is_button(binding) {
+    let integration_button_feedback_owned = binding.is_button_binding()
+        && targets.iter().any(|target| {
+            if let model::BindingTarget::Integration {
+                integration_id,
+                kind,
+                data,
+            } = target
+            {
                 binding_actions::integration_volume_button_action_kind(integration_id, kind, data)
+                    .is_some()
             } else {
-                None
-            };
-            let button_event = if integration_button_kind.is_some() {
-                integration_button_feedback_owned = true;
-                let resolved_event = *button_event_for_event.get_or_insert_with(|| {
-                    resolve_integration_button_event(state, &key, binding, &event)
-                });
-                if resolved_event.is_none() {
-                    skipped_button_integration_event = true;
-                    continue;
-                }
-                resolved_event
+                false
+            }
+        });
+    let button_event = if integration_button_feedback_owned {
+        resolve_integration_button_event(state, &key, binding, &event)
+    } else {
+        None
+    };
+    let outcome = binding_actions::execute_target_action(
+        app,
+        state,
+        binding,
+        &model::BindingAction::Volume,
+        volume,
+        binding_actions::ActionExecutionContext {
+            integrations_only: false,
+            source: Some(if integration_button_feedback_owned {
+                "midi_button"
             } else {
-                None
-            };
-            let group_index = integration_volume_batches
-                .get(integration_id)
-                .map(Vec::len)
-                .unwrap_or(0);
-            integration_volume_batches
-                .entry(integration_id.clone())
-                .or_default()
-                .push(serde_json::json!({
-                  "target": {
-                    "integration_id": integration_id,
-                    "kind": kind,
-                    "data": data,
-                  },
-                  "button_event": button_event,
-                  "button_action_kind": integration_button_kind.map(|kind| kind.as_str()),
-                  "button_input_active": event.value > 0,
-                  "target_index": group_index,
-                  "target_count": 0,
-                  "is_primary_target": target_index == 0,
-                  "original_target_index": target_index,
-                  "binding_target_count": targets.len(),
-                }));
-            applied_targets.push(target);
-        } else if binding_actions::execute_local_target_action(
-            state,
-            &binding.id,
-            &model::BindingAction::Volume,
-            target,
-            volume,
-            "bindings",
-        ) {
-            applied_targets.push(target);
-        }
-    }
-
-    for (integration_id, mut grouped_targets) in integration_volume_batches {
-        binding_actions::finalize_grouped_integration_targets(&mut grouped_targets);
-        binding_actions::emit_integration_binding_triggered_batch(
-            app,
-            IntegrationBatchTrigger {
-                binding_id: &binding.id,
-                action: &model::BindingAction::Volume,
-                value: volume,
-                integration_id: &integration_id,
-                targets: grouped_targets,
-                source: Some(if integration_button_feedback_owned {
-                    "midi_button"
-                } else {
-                    "midi_fader"
-                }),
-                source_sequence: None,
-            },
-        );
-    }
+                "midi_fader"
+            }),
+            source_sequence: None,
+            log_target: "bindings",
+            midi_input: Some(binding_actions::MidiActionInput {
+                active: event.value > 0,
+                button_event,
+            }),
+        },
+    )?;
+    let integration_button_feedback_owned = outcome.integration_button_feedback_owned;
+    let skipped_button_integration_event = outcome.skipped_button_integration_event;
+    let applied_targets: Vec<_> = outcome
+        .applied_target_indices
+        .iter()
+        .map(|index| &targets[*index])
+        .collect();
 
     if applied_targets.is_empty() {
         if skipped_button_integration_event {
@@ -863,7 +538,7 @@ pub(crate) fn apply_midi_event(
                 primary_feedback_value,
                 "button_volume",
             );
-        } else if binding_is_button(binding) {
+        } else if binding.is_button_binding() {
             send_immediate_button_light_feedback(
                 state,
                 binding,
@@ -890,14 +565,15 @@ pub(crate) fn apply_midi_event(
         } else {
             None
         };
-        let payload = serde_json::json!({
-          "target": target,
-          "volume": volume,
-          "focus_session": focus_session,
-          "binding_id": binding.id,
-          "binding_name": binding.name,
-          "binding_primary_target": binding_primary_target
-        });
+        let payload = crate::binding_events::binding_event_payload(
+            binding,
+            &binding_primary_target,
+            serde_json::json!({
+              "target": target,
+              "volume": volume,
+              "focus_session": focus_session,
+            }),
+        );
         if !integration_button_feedback_owned {
             let _ = app.emit("volume_update", payload.clone());
 
@@ -911,101 +587,4 @@ pub(crate) fn apply_midi_event(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn key(controller: u8) -> BindingKey {
-        BindingKey {
-            device_id: "device".to_string(),
-            channel: 0,
-            controller,
-            msg_type: model::MidiMessageType::Note,
-        }
-    }
-
-    #[test]
-    fn activity_button_light_generation_refresh_invalidates_old_task() {
-        let key = key(23);
-        let mut generations = HashMap::new();
-
-        let first = start_activity_button_light_generation(&mut generations, &key);
-        assert!(activity_button_light_generation_is_current(
-            &generations,
-            &key,
-            first
-        ));
-
-        let second = start_activity_button_light_generation(&mut generations, &key);
-        assert!(!activity_button_light_generation_is_current(
-            &generations,
-            &key,
-            first
-        ));
-        assert!(activity_button_light_generation_is_current(
-            &generations,
-            &key,
-            second
-        ));
-    }
-
-    #[test]
-    fn activity_button_light_generation_cancel_invalidates_task() {
-        let key = key(23);
-        let mut generations = HashMap::new();
-
-        let generation = start_activity_button_light_generation(&mut generations, &key);
-        cancel_activity_button_light_generation(&mut generations, &key);
-
-        assert!(!activity_button_light_generation_is_current(
-            &generations,
-            &key,
-            generation
-        ));
-    }
-
-    #[test]
-    fn note_button_hold_detection_uses_last_input_value() {
-        let key = key(23);
-        let generations = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
-        let binding_state = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
-        let generation = {
-            let mut generations = generations.lock().unwrap();
-            start_activity_button_light_generation(&mut generations, &key)
-        };
-
-        {
-            let mut states = binding_state.lock().unwrap();
-            states.insert(
-                key.clone(),
-                BindingState {
-                    last_value: 63.0 / 127.0,
-                    last_update: Instant::now(),
-                    last_absolute_input: None,
-                    absolute_input_direction: 0,
-                    relative_auto_format: None,
-                    relative_seen_midpoint: false,
-                    relative_seen_sign_band: false,
-                    relative_seen_high_negative: false,
-                    relative_seen_low_negative_hint: false,
-                },
-            );
-        }
-        assert!(activity_button_light_hold_should_continue(
-            &generations,
-            &binding_state,
-            &key,
-            generation
-        ));
-
-        {
-            let mut states = binding_state.lock().unwrap();
-            states.get_mut(&key).unwrap().last_value = 0.0;
-        }
-        assert!(!activity_button_light_hold_should_continue(
-            &generations,
-            &binding_state,
-            &key,
-            generation
-        ));
-    }
-}
+mod tests;

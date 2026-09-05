@@ -12,13 +12,11 @@ pub mod usbip;
 
 use std::sync::Arc;
 
-pub const SERVICE_NAME: &str = "MIDIMasterVirtualAudio";
-pub const SERVICE_DISPLAY_NAME: &str = "MIDIMaster Virtual Audio";
+pub use midimaster_virtual_audio_protocol::{
+    BYTES_PER_SAMPLE, CHANNELS, SAMPLE_RATE, SERVICE_DISPLAY_NAME, SERVICE_NAME,
+};
 pub const USBIP_ADDRESS: &str = "127.0.0.1:34240";
 pub const BUS_ID: &str = "1-1";
-pub const SAMPLE_RATE: usize = 48_000;
-pub const CHANNELS: usize = 2;
-pub const BYTES_PER_SAMPLE: usize = 2;
 
 pub fn development_identity() -> bool {
     option_env!("MIDIMASTER_USB_VID") == Some("FFFF")

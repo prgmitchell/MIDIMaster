@@ -371,15 +371,16 @@ pub(super) fn handle_aux_or_unmatched(
             } else {
                 None
             };
-            let payload = serde_json::json!({
-              "target": target,
-              "muted": next_muted,
-              "action": "toggle_mute",
-              "focus_session": focus_session,
-              "binding_id": owner.id,
-              "binding_name": owner.name,
-              "binding_primary_target": binding_primary_target
-            });
+            let payload = crate::binding_events::binding_event_payload(
+                &owner,
+                &binding_primary_target,
+                serde_json::json!({
+                  "target": target,
+                  "muted": next_muted,
+                  "action": "toggle_mute",
+                  "focus_session": focus_session,
+                }),
+            );
             let _ = app.emit("mute_update", payload.clone());
 
             if settings_enabled {

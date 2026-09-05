@@ -33,20 +33,6 @@ fn heal_legacy_osd_monitor_id(app: &AppHandle, profile: &mut Profile) -> bool {
     true
 }
 
-fn normalize_profile_bindings(profile: &mut Profile) -> bool {
-    let mut changed = false;
-    for binding in &mut profile.bindings {
-        let before_targets = binding.targets.clone();
-        let before_target = binding.target.clone();
-        binding.ensure_targets();
-        changed |= binding.normalize_button_light_serialization();
-        if binding.targets != before_targets || binding.target != before_target {
-            changed = true;
-        }
-    }
-    changed
-}
-
 fn normalize_profile_midi_preference(profile: &mut Profile) -> bool {
     if profile.midi_device_preference_set {
         return false;
@@ -141,7 +127,7 @@ pub fn load_profile(
         .map_err(|err| err.to_string())?
         .ok_or_else(|| "Profile not found".to_string())?;
 
-    let bindings_changed = normalize_profile_bindings(&mut profile);
+    let bindings_changed = profile.normalize_bindings();
     let midi_preference_changed = normalize_profile_midi_preference(&mut profile);
 
     if heal_legacy_osd_monitor_id(&app, &mut profile) {
@@ -166,7 +152,7 @@ pub fn save_profile(
     state: State<AppState>,
     mut profile: Profile,
 ) -> Result<(), String> {
-    normalize_profile_bindings(&mut profile);
+    profile.normalize_bindings();
     normalize_profile_midi_preference(&mut profile);
     state
         .profile_store
@@ -209,7 +195,7 @@ pub fn export_current_profile(
         .load_profile(trimmed_name)
         .map_err(|err| err.to_string())?
         .ok_or_else(|| "Profile not found".to_string())?;
-    normalize_profile_bindings(&mut profile);
+    profile.normalize_bindings();
 
     let suggested_file_name = safe_export_file_name(&profile.name);
     let Some(path) = rfd::FileDialog::new()
@@ -246,13 +232,13 @@ pub fn import_profile_from_file() -> Result<Option<Profile>, String> {
         return Err("Imported profile is missing a name".to_string());
     }
 
-    normalize_profile_bindings(&mut profile);
+    profile.normalize_bindings();
     Ok(Some(profile))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_profile_bindings;
+
     use crate::model::{Binding, ButtonLightBehavior, ButtonLightMode, Profile};
 
     fn profile_with_button_light_mode(mode: &str) -> Profile {
@@ -289,7 +275,7 @@ mod tests {
     fn normalize_profile_bindings_repairs_unsafe_button_light_mode() {
         let mut profile = profile_with_button_light_mode("InvertState");
 
-        assert!(normalize_profile_bindings(&mut profile));
+        assert!(profile.normalize_bindings());
         assert_eq!(
             profile.bindings[0].button_light_mode,
             ButtonLightMode::Activity

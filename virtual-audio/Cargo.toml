@@ -1,5 +1,5 @@
 [workspace]
-members = ["service", "setup-helper"]
+members = ["service", "setup-helper", "protocol"]
 resolver = "2"
 
 [workspace.package]

@@ -1,3 +1,4 @@
+import { createUiLifetime } from "../../app/ui_lifetime.js";
 const INSTALL_STATES = new Set([
   "not_installed",
   "installing",
@@ -33,19 +34,32 @@ function firstDefined(source, keys, fallback = undefined) {
 }
 
 export function normalizeVirtualAudioSettings(raw = {}) {
-  const inputDeviceId = String(firstDefined(raw, ["input_device_id", "physical_input_device_id"], "") || "").trim();
-  const followDefault = firstDefined(raw, ["follow_default_input", "follow_default_microphone"], !inputDeviceId);
+  const inputDeviceId = String(
+    firstDefined(raw, ["input_device_id", "physical_input_device_id"], "") || "",
+  ).trim();
+  const followDefault = firstDefined(
+    raw,
+    ["follow_default_input", "follow_default_microphone"],
+    !inputDeviceId,
+  );
   return {
     enabled: Boolean(raw?.enabled),
     follow_default_input: Boolean(followDefault),
     input_device_id: inputDeviceId || null,
     microphone_gain_db: clamp(firstDefined(raw, ["microphone_gain_db", "mic_gain_db"]), -24, 24, 0),
-    soundboard_gain_db: clamp(firstDefined(raw, ["soundboard_gain_db", "soundboard_bus_gain_db"]), -24, 12, -6),
+    soundboard_gain_db: clamp(
+      firstDefined(raw, ["soundboard_gain_db", "soundboard_bus_gain_db"]),
+      -24,
+      12,
+      -6,
+    ),
   };
 }
 
 export function normalizeVirtualAudioStatus(raw = {}) {
-  let installState = String(firstDefined(raw, ["install_state", "state"], "not_installed") || "not_installed").trim();
+  let installState = String(
+    firstDefined(raw, ["install_state", "state"], "not_installed") || "not_installed",
+  ).trim();
   if (!INSTALL_STATES.has(installState)) installState = "service_error";
   if (raw?.restart_required) installState = "restart_required";
   return {
@@ -55,7 +69,9 @@ export function normalizeVirtualAudioStatus(raw = {}) {
     endpoint_present: Boolean(firstDefined(raw, ["endpoint_present", "virtual_endpoint_present"], false)),
     attached_port_count: Math.max(0, Math.round(Number(raw?.attached_port_count) || 0)),
     routing_running: Boolean(firstDefined(raw, ["routing_running", "route_running"], false)),
-    service_update_available: Boolean(firstDefined(raw, ["service_update_available", "service_update_required"], false)),
+    service_update_available: Boolean(
+      firstDefined(raw, ["service_update_available", "service_update_required"], false),
+    ),
     restart_required: Boolean(raw?.restart_required || installState === "restart_required"),
     mic_level: clamp(firstDefined(raw, ["mic_level", "microphone_level", "mic_peak"]), 0, 1, 0),
     soundboard_level: clamp(firstDefined(raw, ["soundboard_level", "soundboard_peak"]), 0, 1, 0),
@@ -88,8 +104,9 @@ export function virtualAudioStatusRefreshInterval(status) {
 }
 
 export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAlert, renderSelectDropdown }) {
-  if (typeof invoke !== "function") throw new Error("createVirtualAudioSettingsController: invoke is required");
-  const d = dom && typeof dom === "object" ? dom : {};
+  if (typeof invoke !== "function")
+    throw new Error("createVirtualAudioSettingsController: invoke is required");
+  const elements = dom && typeof dom === "object" ? dom : {};
   const t = (key, params = {}) => i18n?.t?.(key, params) ?? String(key || "");
   let settings = normalizeVirtualAudioSettings();
   let status = normalizeVirtualAudioStatus();
@@ -97,6 +114,7 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
   let loaded = false;
   let busy = false;
   let loadPromise = null;
+  const lifetime = createUiLifetime();
   let active = false;
   let meterTimer = 0;
   let meterRefreshPending = false;
@@ -115,17 +133,17 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
 
   function renderMeter(element, value, logarithmic = true) {
     if (!element) return;
-    const percent = logarithmic
-      ? virtualAudioMeterPercent(value)
-      : Math.round(clamp(value, 0, 1, 0) * 100);
+    const percent = logarithmic ? virtualAudioMeterPercent(value) : Math.round(clamp(value, 0, 1, 0) * 100);
     element.style.setProperty("--meter-level", `${percent}%`);
     element.setAttribute("aria-valuenow", String(percent));
   }
 
   function renderInputDevices() {
-    const select = d.virtualAudioInputDevice;
+    const select = elements.virtualAudioInputDevice;
     if (!select) return;
-    const selectedId = settings.follow_default_input ? "__default__" : (settings.input_device_id || "__default__");
+    const selectedId = settings.follow_default_input
+      ? "__default__"
+      : settings.input_device_id || "__default__";
     const signature = JSON.stringify({
       selectedId,
       defaultLabel: t("virtualAudio.followSystemDefault"),
@@ -165,50 +183,70 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
 
   function render() {
     const view = loaded ? virtualAudioViewForStatus(status) : "loading";
-    if (d.virtualAudioPanel) d.virtualAudioPanel.dataset.virtualAudioState = view;
-    d.virtualAudioPanel?.querySelectorAll?.("[data-virtual-audio-view]").forEach((element) => {
+    if (elements.virtualAudioPanel) elements.virtualAudioPanel.dataset.virtualAudioState = view;
+    elements.virtualAudioPanel?.querySelectorAll?.("[data-virtual-audio-view]").forEach((element) => {
       element.classList.toggle("hidden", element.dataset.virtualAudioView !== view);
     });
-    if (d.virtualAudioInstall) d.virtualAudioInstall.disabled = busy;
-    if (d.virtualAudioRepair) d.virtualAudioRepair.disabled = busy;
-    if (d.virtualAudioUpdate) d.virtualAudioUpdate.disabled = busy;
-    d.virtualAudioUpdateNotice?.classList.toggle("hidden", !status.service_update_available);
-    if (d.virtualAudioProblemRepair) {
-      d.virtualAudioProblemRepair.disabled = busy || status.install_state.startsWith("blocked_");
-      d.virtualAudioProblemRepair.classList.toggle("hidden", status.install_state.startsWith("blocked_"));
+    if (elements.virtualAudioInstall) elements.virtualAudioInstall.disabled = busy;
+    if (elements.virtualAudioRepair) elements.virtualAudioRepair.disabled = busy;
+    if (elements.virtualAudioUpdate) elements.virtualAudioUpdate.disabled = busy;
+    elements.virtualAudioUpdateNotice?.classList.toggle("hidden", !status.service_update_available);
+    if (elements.virtualAudioProblemRepair) {
+      elements.virtualAudioProblemRepair.disabled = busy || status.install_state.startsWith("blocked_");
+      elements.virtualAudioProblemRepair.classList.toggle(
+        "hidden",
+        status.install_state.startsWith("blocked_"),
+      );
     }
-    if (d.virtualAudioRemove) d.virtualAudioRemove.disabled = busy;
-    if (d.virtualAudioEnabled) {
-      d.virtualAudioEnabled.checked = settings.enabled;
-      d.virtualAudioEnabled.disabled = busy;
+    if (elements.virtualAudioRemove) elements.virtualAudioRemove.disabled = busy;
+    if (elements.virtualAudioEnabled) {
+      elements.virtualAudioEnabled.checked = settings.enabled;
+      elements.virtualAudioEnabled.disabled = busy;
     }
-    const routingError = settings.enabled && !status.routing_running
-      ? (status.error || t("virtualAudio.routingUnavailable"))
-      : "";
-    setText(d.virtualAudioRoutingError, routingError);
-    d.virtualAudioRoutingError?.classList.toggle("hidden", !routingError);
-    if (d.virtualAudioInputDevice) d.virtualAudioInputDevice.disabled = busy;
-    if (d.virtualAudioMicrophoneGain) {
-      d.virtualAudioMicrophoneGain.value = String(settings.microphone_gain_db);
-      d.virtualAudioMicrophoneGain.disabled = busy;
-      d.virtualAudioMicrophoneGain.style.setProperty("--range-fill", `${((settings.microphone_gain_db + 24) / 48) * 100}%`);
+    const routingError =
+      settings.enabled && !status.routing_running ? status.error || t("virtualAudio.routingUnavailable") : "";
+    setText(elements.virtualAudioRoutingError, routingError);
+    elements.virtualAudioRoutingError?.classList.toggle("hidden", !routingError);
+    if (elements.virtualAudioInputDevice) elements.virtualAudioInputDevice.disabled = busy;
+    if (elements.virtualAudioMicrophoneGain) {
+      elements.virtualAudioMicrophoneGain.value = String(settings.microphone_gain_db);
+      elements.virtualAudioMicrophoneGain.disabled = busy;
+      elements.virtualAudioMicrophoneGain.style.setProperty(
+        "--range-fill",
+        `${((settings.microphone_gain_db + 24) / 48) * 100}%`,
+      );
     }
-    if (d.virtualAudioSoundboardGain) {
-      d.virtualAudioSoundboardGain.value = String(settings.soundboard_gain_db);
-      d.virtualAudioSoundboardGain.disabled = busy;
-      d.virtualAudioSoundboardGain.style.setProperty("--range-fill", `${((settings.soundboard_gain_db + 24) / 36) * 100}%`);
+    if (elements.virtualAudioSoundboardGain) {
+      elements.virtualAudioSoundboardGain.value = String(settings.soundboard_gain_db);
+      elements.virtualAudioSoundboardGain.disabled = busy;
+      elements.virtualAudioSoundboardGain.style.setProperty(
+        "--range-fill",
+        `${((settings.soundboard_gain_db + 24) / 36) * 100}%`,
+      );
     }
-    setText(d.virtualAudioMicrophoneGainValue, `${settings.microphone_gain_db > 0 ? "+" : ""}${settings.microphone_gain_db} dB`);
-    setText(d.virtualAudioSoundboardGainValue, `${settings.soundboard_gain_db > 0 ? "+" : ""}${settings.soundboard_gain_db} dB`);
-    setText(d.virtualAudioDriverVersion, status.usbip_version || t("common.notAvailable"));
-    setText(d.virtualAudioServiceStatus, status.service_running ? t("virtualAudio.running") : t("virtualAudio.stopped"));
-    setText(d.virtualAudioEndpointStatus, status.endpoint_present ? t("virtualAudio.available") : t("virtualAudio.unavailable"));
-    setText(d.virtualAudioProblemMessage, statusSummary(status));
-    setText(d.virtualAudioLimiterValue, `${status.limiter_reduction_db.toFixed(1)} dB`);
-    renderMeter(d.virtualAudioMicrophoneMeter, status.mic_level);
-    renderMeter(d.virtualAudioSoundboardMeter, status.soundboard_level);
-    renderMeter(d.virtualAudioOutputMeter, status.output_level);
-    renderMeter(d.virtualAudioLimiterMeter, Math.min(1, status.limiter_reduction_db / 12), false);
+    setText(
+      elements.virtualAudioMicrophoneGainValue,
+      `${settings.microphone_gain_db > 0 ? "+" : ""}${settings.microphone_gain_db} dB`,
+    );
+    setText(
+      elements.virtualAudioSoundboardGainValue,
+      `${settings.soundboard_gain_db > 0 ? "+" : ""}${settings.soundboard_gain_db} dB`,
+    );
+    setText(elements.virtualAudioDriverVersion, status.usbip_version || t("common.notAvailable"));
+    setText(
+      elements.virtualAudioServiceStatus,
+      status.service_running ? t("virtualAudio.running") : t("virtualAudio.stopped"),
+    );
+    setText(
+      elements.virtualAudioEndpointStatus,
+      status.endpoint_present ? t("virtualAudio.available") : t("virtualAudio.unavailable"),
+    );
+    setText(elements.virtualAudioProblemMessage, statusSummary(status));
+    setText(elements.virtualAudioLimiterValue, `${status.limiter_reduction_db.toFixed(1)} dB`);
+    renderMeter(elements.virtualAudioMicrophoneMeter, status.mic_level);
+    renderMeter(elements.virtualAudioSoundboardMeter, status.soundboard_level);
+    renderMeter(elements.virtualAudioOutputMeter, status.output_level);
+    renderMeter(elements.virtualAudioLimiterMeter, Math.min(1, status.limiter_reduction_db / 12), false);
     renderInputDevices();
   }
 
@@ -228,9 +266,11 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
 
   function actionStatusIsSettled(command, current) {
     if (command === "remove_virtual_audio") return current.install_state === "not_installed";
-    return current.install_state === "ready"
-      || current.install_state === "restart_required"
-      || current.install_state.startsWith("blocked_");
+    return (
+      current.install_state === "ready" ||
+      current.install_state === "restart_required" ||
+      current.install_state.startsWith("blocked_")
+    );
   }
 
   async function settleStatusAfterAction(command) {
@@ -253,7 +293,8 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
     meterTimer = window.setInterval(async () => {
       if (!active || busy || loadPromise || meterRefreshPending) return;
       const now = Date.now();
-      if (lastStatusRefreshAt && now - lastStatusRefreshAt < virtualAudioStatusRefreshInterval(status)) return;
+      if (lastStatusRefreshAt && now - lastStatusRefreshAt < virtualAudioStatusRefreshInterval(status))
+        return;
       lastStatusRefreshAt = now;
       meterRefreshPending = true;
       try {
@@ -285,15 +326,22 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
         invoke("get_virtual_audio_settings"),
         invoke("list_virtual_audio_input_devices"),
       ]);
-      status = nextStatus.status === "fulfilled"
-        ? normalizeVirtualAudioStatus(nextStatus.value)
-        : normalizeVirtualAudioStatus({ install_state: "service_error", error: String(nextStatus.reason || "") });
+      status =
+        nextStatus.status === "fulfilled"
+          ? normalizeVirtualAudioStatus(nextStatus.value)
+          : normalizeVirtualAudioStatus({
+              install_state: "service_error",
+              error: String(nextStatus.reason || ""),
+            });
       if (nextSettings.status === "fulfilled") settings = normalizeVirtualAudioSettings(nextSettings.value);
-      devices = nextDevices.status === "fulfilled" && Array.isArray(nextDevices.value) ? nextDevices.value : [];
+      devices =
+        nextDevices.status === "fulfilled" && Array.isArray(nextDevices.value) ? nextDevices.value : [];
       loaded = true;
       render();
       return { settings, status, devices };
-    })().finally(() => { loadPromise = null; });
+    })().finally(() => {
+      loadPromise = null;
+    });
     return loadPromise;
   }
 
@@ -335,44 +383,58 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
   }
 
   function bindUi() {
-    d.virtualAudioInstall?.addEventListener("click", () => runAction("install_virtual_audio"));
-    d.virtualAudioUpdate?.addEventListener("click", () => runAction("repair_virtual_audio"));
-    d.virtualAudioRepair?.addEventListener("click", () => runAction("repair_virtual_audio"));
-    d.virtualAudioProblemRepair?.addEventListener("click", () => runAction("repair_virtual_audio"));
-    d.virtualAudioRemove?.addEventListener("click", () => runAction("remove_virtual_audio"));
-    d.virtualAudioRestart?.addEventListener("click", () => invoke("restart_system").catch((error) => {
-      showAlert?.(t("dialogs.actionFailedTitle"), String(error || t("dialogs.actionFailedMessage")));
-    }));
-    d.virtualAudioRestartLater?.addEventListener("click", () => {
-      d.settingsPanel?.querySelector?.('[data-settings-section="startup"]')?.click?.();
+    lifetime.listen(elements.virtualAudioInstall, "click", () => runAction("install_virtual_audio"));
+    lifetime.listen(elements.virtualAudioUpdate, "click", () => runAction("repair_virtual_audio"));
+    lifetime.listen(elements.virtualAudioRepair, "click", () => runAction("repair_virtual_audio"));
+    lifetime.listen(elements.virtualAudioProblemRepair, "click", () => runAction("repair_virtual_audio"));
+    lifetime.listen(elements.virtualAudioRemove, "click", () => runAction("remove_virtual_audio"));
+    lifetime.listen(elements.virtualAudioRestart, "click", () =>
+      invoke("restart_system").catch((error) => {
+        showAlert?.(t("dialogs.actionFailedTitle"), String(error || t("dialogs.actionFailedMessage")));
+      }),
+    );
+    lifetime.listen(elements.virtualAudioRestartLater, "click", () => {
+      elements.settingsPanel?.querySelector?.('[data-settings-section="startup"]')?.click?.();
     });
-    d.virtualAudioCopyDiagnostics?.addEventListener("click", async () => {
+    lifetime.listen(elements.virtualAudioCopyDiagnostics, "click", async () => {
       try {
         await invoke("copy_virtual_audio_diagnostics");
-        setText(d.virtualAudioCopyDiagnostics, t("virtualAudio.diagnosticsCopied"));
+        setText(elements.virtualAudioCopyDiagnostics, t("virtualAudio.diagnosticsCopied"));
       } catch (error) {
         showAlert?.(t("dialogs.actionFailedTitle"), String(error || t("dialogs.actionFailedMessage")));
       }
     });
-    d.virtualAudioEnabled?.addEventListener("change", () => persistSettings({ enabled: d.virtualAudioEnabled.checked }));
-    d.virtualAudioInputDevice?.addEventListener("change", () => {
-      const value = String(d.virtualAudioInputDevice.value || "__default__");
+    lifetime.listen(elements.virtualAudioEnabled, "change", () =>
+      persistSettings({ enabled: elements.virtualAudioEnabled.checked }),
+    );
+    lifetime.listen(elements.virtualAudioInputDevice, "change", () => {
+      const value = String(elements.virtualAudioInputDevice.value || "__default__");
       persistSettings({
         follow_default_input: value === "__default__",
         input_device_id: value === "__default__" ? null : value,
       });
     });
-    d.virtualAudioMicrophoneGain?.addEventListener("input", () => {
-      settings = normalizeVirtualAudioSettings({ ...settings, microphone_gain_db: d.virtualAudioMicrophoneGain.value });
+    lifetime.listen(elements.virtualAudioMicrophoneGain, "input", () => {
+      settings = normalizeVirtualAudioSettings({
+        ...settings,
+        microphone_gain_db: elements.virtualAudioMicrophoneGain.value,
+      });
       render();
     });
-    d.virtualAudioMicrophoneGain?.addEventListener("change", () => persistSettings({ microphone_gain_db: d.virtualAudioMicrophoneGain.value }));
-    d.virtualAudioSoundboardGain?.addEventListener("input", () => {
-      settings = normalizeVirtualAudioSettings({ ...settings, soundboard_gain_db: d.virtualAudioSoundboardGain.value });
+    lifetime.listen(elements.virtualAudioMicrophoneGain, "change", () =>
+      persistSettings({ microphone_gain_db: elements.virtualAudioMicrophoneGain.value }),
+    );
+    lifetime.listen(elements.virtualAudioSoundboardGain, "input", () => {
+      settings = normalizeVirtualAudioSettings({
+        ...settings,
+        soundboard_gain_db: elements.virtualAudioSoundboardGain.value,
+      });
       render();
     });
-    d.virtualAudioSoundboardGain?.addEventListener("change", () => persistSettings({ soundboard_gain_db: d.virtualAudioSoundboardGain.value }));
-    window.addEventListener("midimaster:locale-changed", render);
+    lifetime.listen(elements.virtualAudioSoundboardGain, "change", () =>
+      persistSettings({ soundboard_gain_db: elements.virtualAudioSoundboardGain.value }),
+    );
+    lifetime.listen(window, "midimaster:locale-changed", render);
     render();
   }
 
@@ -383,6 +445,10 @@ export function createVirtualAudioSettingsController({ invoke, dom, i18n, showAl
     render,
     activate: () => setActive(true),
     setActive,
+    dispose: () => {
+      setActive(false);
+      lifetime.dispose();
+    },
     getState: () => ({ settings, status, devices: [...devices] }),
   };
 }

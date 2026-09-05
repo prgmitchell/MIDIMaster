@@ -878,10 +878,6 @@ body.osd-only.dark-mode {
   background: transparent !important;
 }
 
-body.osd-only .app-shell {
-  display: none !important;
-}
-
 body.dark-mode:not([data-theme]) .profile-select .select-button,
 body.dark-mode:not([data-theme]) .topbar .midi-device-dropdown .target-button,
 body.dark-mode:not([data-theme]) .topbar .midi-device-status {

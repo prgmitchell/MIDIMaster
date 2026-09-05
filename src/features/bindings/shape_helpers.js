@@ -1,3 +1,6 @@
+import { bindingLooksLikeButton as effectiveIsButton } from "../../core/binding_model.js";
+export { effectiveIsButton };
+import { normalizeControlKind } from "../../core/binding_model.js";
 import {
   applyCustomFaderCurve,
   applyFaderCurve,
@@ -12,13 +15,7 @@ import {
   setBindingTargets,
 } from "../../core/binding_model.js";
 
-export function normalizeControlKind(raw) {
-  const value = String(raw || "Auto");
-  if (value === "Button" || value === "Continuous" || value === "Auto") {
-    return value;
-  }
-  return "Auto";
-}
+export { normalizeControlKind } from "../../core/binding_model.js";
 
 export function normalizeMuteBehavior(raw) {
   return raw === "SetFromValue" ? "SetFromValue" : "ToggleOnPress";
@@ -35,9 +32,7 @@ export function muteBehaviorTooltip(raw) {
 }
 
 export function buttonModeValue(binding) {
-  return normalizeMuteBehavior(binding?.mute_behavior) === "SetFromValue"
-    ? "button_match"
-    : "button_toggle";
+  return normalizeMuteBehavior(binding?.mute_behavior) === "SetFromValue" ? "button_match" : "button_toggle";
 }
 
 export function modeTooltip(raw) {
@@ -127,7 +122,9 @@ export function applyCurveToNormalized(binding, normalized) {
 export function ensureBindingShape(binding) {
   if (!binding || typeof binding !== "object") return;
   binding.feedback_enabled = binding.feedback_enabled !== false;
-  binding.macro_name = String(binding.macro_name || "").trim().slice(0, 80);
+  binding.macro_name = String(binding.macro_name || "")
+    .trim()
+    .slice(0, 80);
   if (!binding.mode || (binding.mode !== "Absolute" && binding.mode !== "Relative")) {
     binding.mode = "Absolute";
   }
@@ -143,21 +140,31 @@ export function ensureBindingShape(binding) {
   if (binding.indicator_control && typeof binding.indicator_control === "object") {
     const isFeedbackOutput = !effectiveIsButton(binding);
     const rawMsgType = binding.indicator_control.msg_type;
-    const msgType = rawMsgType === "Note"
-      ? "Note"
-      : (isFeedbackOutput && rawMsgType === "PitchBend" ? "PitchBend" : "ControlChange");
+    const msgType =
+      rawMsgType === "Note"
+        ? "Note"
+        : isFeedbackOutput && rawMsgType === "PitchBend"
+          ? "PitchBend"
+          : "ControlChange";
     binding.indicator_control = {
       ...binding.indicator_control,
       device_id: String(binding.indicator_control.device_id || "").trim(),
       channel: Math.min(15, Math.max(0, Math.trunc(Number(binding.indicator_control.channel) || 0))),
-      controller: msgType === "PitchBend"
-        ? 0
-        : Math.min(127, Math.max(0, Math.trunc(Number(binding.indicator_control.controller) || 0))),
+      controller:
+        msgType === "PitchBend"
+          ? 0
+          : Math.min(127, Math.max(0, Math.trunc(Number(binding.indicator_control.controller) || 0))),
       msg_type: msgType,
-      control_kind: isFeedbackOutput ? "Continuous" : normalizeControlKind(binding.indicator_control.control_kind),
+      control_kind: isFeedbackOutput
+        ? "Continuous"
+        : normalizeControlKind(binding.indicator_control.control_kind),
       mode: binding.indicator_control.mode === "Relative" ? "Relative" : "Absolute",
-      deadzone: Number.isFinite(Number(binding.indicator_control.deadzone)) ? Number(binding.indicator_control.deadzone) : 0,
-      debounce_ms: Number.isFinite(Number(binding.indicator_control.debounce_ms)) ? Number(binding.indicator_control.debounce_ms) : 0,
+      deadzone: Number.isFinite(Number(binding.indicator_control.deadzone))
+        ? Number(binding.indicator_control.deadzone)
+        : 0,
+      debounce_ms: Number.isFinite(Number(binding.indicator_control.debounce_ms))
+        ? Number(binding.indicator_control.debounce_ms)
+        : 0,
       mute_behavior: normalizeMuteBehavior(binding.indicator_control.mute_behavior),
     };
     if (!binding.indicator_control.device_id) binding.indicator_control = null;
@@ -170,14 +177,18 @@ export function ensureBindingShape(binding) {
   if (binding.action === "Soundboard" && !getBindingTargets(binding).some(isSoundboardTarget)) {
     setBindingTargets(binding, [...getBindingTargets(binding), "Soundboard"]);
   }
-  const specialTargets = getBindingTargets(binding).filter((target) => isMacroTarget(target) || isSoundboardTarget(target));
+  const specialTargets = getBindingTargets(binding).filter(
+    (target) => isMacroTarget(target) || isSoundboardTarget(target),
+  );
   if (specialTargets.length > 1) {
-    const preferred = binding.action === "Macro" || binding.action === "Soundboard"
-      ? binding.action
-      : specialTargets[0];
-    setBindingTargets(binding, getBindingTargets(binding).filter((target) => (
-      (!isMacroTarget(target) && !isSoundboardTarget(target)) || target === preferred
-    )));
+    const preferred =
+      binding.action === "Macro" || binding.action === "Soundboard" ? binding.action : specialTargets[0];
+    setBindingTargets(
+      binding,
+      getBindingTargets(binding).filter(
+        (target) => (!isMacroTarget(target) && !isSoundboardTarget(target)) || target === preferred,
+      ),
+    );
     if (preferred !== "Macro") {
       binding.macro_name = "";
       binding.macro_steps = [];
@@ -185,16 +196,10 @@ export function ensureBindingShape(binding) {
     if (preferred !== "Soundboard") binding.soundboard = null;
   }
   binding.soundboard = normalizeSoundboardMapping(binding.soundboard);
-  binding.macro_steps = binding.action === "Macro" || getBindingTargets(binding).some(isMacroTarget)
-    ? normalizeMacroDraftSteps(binding.macro_steps)
-    : normalizeMacroSteps(binding.macro_steps);
-}
-
-export function effectiveIsButton(binding) {
-  const controlKind = normalizeControlKind(binding?.control_kind);
-  if (controlKind === "Button") return true;
-  if (controlKind === "Continuous") return false;
-  return binding?.control?.msg_type === "Note" || binding?.control?.msg_type === "ProgramChange";
+  binding.macro_steps =
+    binding.action === "Macro" || getBindingTargets(binding).some(isMacroTarget)
+      ? normalizeMacroDraftSteps(binding.macro_steps)
+      : normalizeMacroSteps(binding.macro_steps);
 }
 
 export function isHotkeyTarget(target) {
@@ -229,4 +234,3 @@ export function ensureAuxShape(binding) {
     binding.assign_mode = "Add";
   }
 }
-

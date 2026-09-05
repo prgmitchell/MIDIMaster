@@ -1,7 +1,11 @@
+mod action_mappings;
 mod binding_types;
+mod control_types;
+mod macro_types;
 mod midi_types;
 mod osd_types;
 mod profile_types;
+mod target_types;
 
 #[allow(unused_imports)]
 pub use binding_types::{

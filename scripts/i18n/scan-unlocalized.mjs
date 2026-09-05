@@ -1,12 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { readAppHtml } from "../lib/app_html.mjs";
 
 const root = process.cwd();
-const scanRoots = [
-  path.join(root, "src", "app"),
-  path.join(root, "src", "features"),
-];
+const scanRoots = [path.join(root, "src", "app"), path.join(root, "src", "features")];
 const htmlFiles = [path.join(root, "src", "index.html")];
 const jsFiles = [];
 
@@ -40,14 +38,16 @@ const ignoredLinePatterns = [
 
 async function collectFiles(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
-  await Promise.all(entries.map(async (entry) => {
-    const filePath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await collectFiles(filePath);
-    } else if (entry.name.endsWith(".js")) {
-      jsFiles.push(filePath);
-    }
-  }));
+  await Promise.all(
+    entries.map(async (entry) => {
+      const filePath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await collectFiles(filePath);
+      } else if (entry.name.endsWith(".js")) {
+        jsFiles.push(filePath);
+      }
+    }),
+  );
 }
 
 function relative(filePath) {
@@ -58,15 +58,17 @@ function shouldIgnoreLiteral(value) {
   const text = String(value || "").trim();
   const withoutTemplates = text.replace(/\$\{[^}]*\}/g, "");
   const withoutEscapes = withoutTemplates.replace(/\\u[0-9a-f]{4}/gi, "");
-  return !text
-    || !/[A-Za-z]/.test(withoutEscapes)
-    || ignoredLiteralPatterns.some((pattern) => pattern.test(text));
+  return (
+    !text || !/[A-Za-z]/.test(withoutEscapes) || ignoredLiteralPatterns.some((pattern) => pattern.test(text))
+  );
 }
 
 function shouldIgnoreLine(line) {
-  return ignoredLinePatterns.some((pattern) => pattern.test(line))
-    || /\bt\(\s*["']/.test(line)
-    || /data-i18n/.test(line);
+  return (
+    ignoredLinePatterns.some((pattern) => pattern.test(line)) ||
+    /\bt\(\s*["']/.test(line) ||
+    /data-i18n/.test(line)
+  );
 }
 
 function lineNumberForOffset(source, offset) {
@@ -92,7 +94,8 @@ function scanJs(filePath, source) {
     });
   }
 
-  const attributePattern = /setAttribute\(\s*(["'])(title|aria-label|placeholder)\1\s*,\s*(["'`])([\s\S]*?)\3/g;
+  const attributePattern =
+    /setAttribute\(\s*(["'])(title|aria-label|placeholder)\1\s*,\s*(["'`])([\s\S]*?)\3/g;
   while ((match = attributePattern.exec(source))) {
     const value = match[4];
     const lineStart = source.lastIndexOf("\n", match.index) + 1;
@@ -115,9 +118,7 @@ function scanHtml(filePath, source) {
     if (!/[A-Za-z]/.test(line)) return;
     const visible = line.match(/>([^<>{}]*[A-Za-z][^<>{}]*)</);
     const visibleTagStart = visible ? line.lastIndexOf("<", visible.index) : -1;
-    const visibleTag = visibleTagStart >= 0
-      ? line.slice(visibleTagStart, visible.index + 1)
-      : "";
+    const visibleTag = visibleTagStart >= 0 ? line.slice(visibleTagStart, visible.index + 1) : "";
     const hasDataI18n = /data-i18n(?:\s|=|>)/.test(visibleTag);
     if (visible && !hasDataI18n && !shouldIgnoreLiteral(visible[1])) {
       findings.push({ file: relative(filePath), line: index + 1, value: visible[1].trim().slice(0, 120) });
@@ -126,7 +127,10 @@ function scanHtml(filePath, source) {
     const currentTag = tagTail.split(">")[0] || line;
     for (const attr of ["placeholder", "title", "aria-label"]) {
       const attrMatch = line.match(new RegExp(`${attr}="([^"]*[A-Za-z][^"]*)"`));
-      if (attrMatch && !new RegExp(`data-i18n-${attr.replace("aria-label", "aria-label")}`).test(currentTag)) {
+      if (
+        attrMatch &&
+        !new RegExp(`data-i18n-${attr.replace("aria-label", "aria-label")}`).test(currentTag)
+      ) {
         findings.push({ file: relative(filePath), line: index + 1, value: `${attr}="${attrMatch[1]}"` });
       }
     }
@@ -138,10 +142,12 @@ await Promise.all(scanRoots.map(collectFiles));
 
 const findings = [];
 for (const filePath of jsFiles) {
-  findings.push(...scanJs(filePath, await fs.readFile(filePath, "utf8")));
+  // Feature templates remain HTML and must use HTML's data-i18n attribute rules.
+  if (!filePath.endsWith(`${path.sep}template.js`))
+    findings.push(...scanJs(filePath, await fs.readFile(filePath, "utf8")));
 }
 for (const filePath of htmlFiles) {
-  findings.push(...scanHtml(filePath, await fs.readFile(filePath, "utf8")));
+  findings.push(...scanHtml(filePath, await readAppHtml()));
 }
 
 if (findings.length > 0) {

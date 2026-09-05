@@ -1,8 +1,9 @@
+import { readAppHtml } from "./lib/app_html.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createBindingsFeature } from "../src/features/bindings/bindings.js";
 
-const htmlSource = await readFile(new URL("../src/index.html", import.meta.url), "utf8");
+const htmlSource = await readAppHtml();
 const cssSource = await readFile(new URL("../src/styles/bindings/table.css", import.meta.url), "utf8");
 const profileCssSource = await readFile(new URL("../src/styles/profiles.css", import.meta.url), "utf8");
 
@@ -75,10 +76,19 @@ assert.match(densityMarkup(), /data-i18n-aria-label="bindings\.comfortableView"/
 assert.match(densityMarkup(), /data-i18n-aria-label="bindings\.compactView"/);
 assert.match(cssSource, /\[data-bindings-density="compact"\] \.binding-row\s*\{\s*min-height: 45px;/);
 assert.match(cssSource, /\[data-bindings-density="compact"\][\s\S]*?min-height: 30px;[\s\S]*?height: 30px;/);
-assert.match(cssSource, /\.binding-row\s*\{[\s\S]*?transition: min-height var\(--motion-normal, 180ms\) cubic-bezier/);
+assert.match(
+  cssSource,
+  /\.binding-row\s*\{[\s\S]*?transition: min-height var\(--motion-normal, 180ms\) cubic-bezier/,
+);
 assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition-duration: 0ms;/);
-assert.match(profileCssSource, /\.bindings-toolbar\s*\{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\) auto auto;/);
-assert.match(profileCssSource, /\.binding-add-button\s*\{\s*grid-column: 3;[\s\S]*?\.binding-density-toggle\s*\{\s*grid-column: 4;/);
+assert.match(
+  profileCssSource,
+  /\.bindings-toolbar\s*\{[\s\S]*?grid-template-columns: auto minmax\(0, 1fr\) auto auto;/,
+);
+assert.match(
+  profileCssSource,
+  /\.binding-add-button\s*\{\s*grid-column: 3;[\s\S]*?\.binding-density-toggle\s*\{\s*grid-column: 4;/,
+);
 {
   const calls = [];
   const { feature, mainScreen, comfortableButton, compactButton } = createHarness(async (command, args) => {

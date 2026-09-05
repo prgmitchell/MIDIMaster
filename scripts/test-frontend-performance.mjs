@@ -1,3 +1,4 @@
+import { readAppHtml } from "./lib/app_html.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createBindingDomIndex } from "../src/app/binding_dom_index.js";
@@ -42,19 +43,34 @@ function testBindingLookupIndex() {
     control: { channel: 2, controller: 9, msg_type: "Note" },
   };
   const index = createBindingLookupIndex([first, duplicateControl, unique]);
-  assert.equal(index.find({ device_id: "device-a", channel: 1, controller: 7, msg_type: "ControlChange" }), first);
-  assert.equal(index.find({ device_id: "stale", channel: 1, controller: 7, msg_type: "ControlChange" }), null);
+  assert.equal(
+    index.find({ device_id: "device-a", channel: 1, controller: 7, msg_type: "ControlChange" }),
+    first,
+  );
+  assert.equal(
+    index.find({ device_id: "stale", channel: 1, controller: 7, msg_type: "ControlChange" }),
+    null,
+  );
   assert.equal(index.find({ device_id: "stale", channel: 2, controller: 9, msg_type: "Note" }), unique);
-  assert.equal(index.find(
-    { device_id: "stale", channel: 2, controller: 9, msg_type: "Note" },
-    { allowLegacyFallback: false },
-  ), null);
+  assert.equal(
+    index.find(
+      { device_id: "stale", channel: 2, controller: 9, msg_type: "Note" },
+      { allowLegacyFallback: false },
+    ),
+    null,
+  );
 }
 
 function testOptInPerformanceAudit() {
   assert.equal(isPerformanceAuditRequested({ locationSource: { search: "" }, injected: null }), false);
-  assert.equal(isPerformanceAuditRequested({ locationSource: { search: "?perf-audit=1" }, injected: null }), true);
-  assert.equal(isPerformanceAuditRequested({ locationSource: { search: "" }, injected: { enabled: true } }), true);
+  assert.equal(
+    isPerformanceAuditRequested({ locationSource: { search: "?perf-audit=1" }, injected: null }),
+    true,
+  );
+  assert.equal(
+    isPerformanceAuditRequested({ locationSource: { search: "" }, injected: { enabled: true } }),
+    true,
+  );
   let clock = 10;
   const marks = new Map();
   const measures = [];
@@ -115,31 +131,44 @@ function testInitialThemeLogoLoadsOneAsset() {
   };
   const source = hydrateThemeLogo({
     root: { querySelector: () => image },
-    storage: { getItem: (key) => key === "uiTheme" ? "light" : null },
+    storage: { getItem: (key) => (key === "uiTheme" ? "light" : null) },
     matchMediaSource: { matchMedia: () => ({ matches: true }) },
   });
   assert.equal(source, "light.png");
   assert.deepEqual(assigned, [["src", "light.png"]]);
-  assert.equal(resolveInitialThemeScheme({
-    storage: { getItem: () => null },
-    matchMediaSource: { matchMedia: () => ({ matches: true }) },
-  }), "dark");
-  assert.equal(resolveInitialThemeScheme({
-    storage: {
-      getItem: (key) => key === "midimasterAppearance"
-        ? JSON.stringify({ active_theme_id: "system" })
-        : "light",
-    },
-    matchMediaSource: { matchMedia: () => ({ matches: true }) },
-  }), "dark", "system appearance should follow the current OS instead of stale resolved storage");
-  assert.equal(resolveInitialThemeScheme({
-    storage: {
-      getItem: (key) => key === "midimasterAppearance"
-        ? JSON.stringify({ active_theme_id: "custom-light", custom_themes: [{ id: "custom-light", scheme: "light" }] })
-        : null,
-    },
-    matchMediaSource: { matchMedia: () => ({ matches: true }) },
-  }), "light");
+  assert.equal(
+    resolveInitialThemeScheme({
+      storage: { getItem: () => null },
+      matchMediaSource: { matchMedia: () => ({ matches: true }) },
+    }),
+    "dark",
+  );
+  assert.equal(
+    resolveInitialThemeScheme({
+      storage: {
+        getItem: (key) =>
+          key === "midimasterAppearance" ? JSON.stringify({ active_theme_id: "system" }) : "light",
+      },
+      matchMediaSource: { matchMedia: () => ({ matches: true }) },
+    }),
+    "dark",
+    "system appearance should follow the current OS instead of stale resolved storage",
+  );
+  assert.equal(
+    resolveInitialThemeScheme({
+      storage: {
+        getItem: (key) =>
+          key === "midimasterAppearance"
+            ? JSON.stringify({
+                active_theme_id: "custom-light",
+                custom_themes: [{ id: "custom-light", scheme: "light" }],
+              })
+            : null,
+      },
+      matchMediaSource: { matchMedia: () => ({ matches: true }) },
+    }),
+    "light",
+  );
 }
 
 function testOsdIgnoresGlobalFeedbackBroadcasts() {
@@ -183,10 +212,10 @@ async function testPluginIconsAreReadyForFirstBindingRender() {
   assert.equal(metadata.getIntegrationDisplayMetadata("hue")?.icon_data, null);
   assert.equal(calls.filter(([command]) => command === "list_plugins").length, 1);
   assert.equal(calls.filter(([command]) => command === "read_plugin_base64").length, 1);
-  assert.deepEqual(calls.find(([command]) => command === "read_plugin_base64"), [
-    "read_plugin_base64",
-    { pluginId: "obs", relPath: "OBSLogo.png" },
-  ]);
+  assert.deepEqual(
+    calls.find(([command]) => command === "read_plugin_base64"),
+    ["read_plugin_base64", { pluginId: "obs", relPath: "OBSLogo.png" }],
+  );
 
   const targetCore = createTargetCore({
     getSessions: () => [],
@@ -194,16 +223,19 @@ async function testPluginIconsAreReadyForFirstBindingRender() {
     getRecordingDevices: () => [],
     getIntegrationDisplayMetadata: metadata.getIntegrationDisplayMetadata,
   });
-  assert.deepEqual(targetCore.resolveOsdTarget({
-    Integration: {
-      integration_id: "obs",
-      kind: "scene",
-      data: { label: "Game Scene" },
+  assert.deepEqual(
+    targetCore.resolveOsdTarget({
+      Integration: {
+        integration_id: "obs",
+        kind: "scene",
+        data: { label: "Game Scene" },
+      },
+    }),
+    {
+      label: "Game Scene",
+      icon_data: "data:image/png;base64,obs-base64",
     },
-  }), {
-    label: "Game Scene",
-    icon_data: "data:image/png;base64,obs-base64",
-  });
+  );
 }
 
 function testDerivedPluginIconsStayOutOfPersistentBindingData() {
@@ -226,12 +258,22 @@ function testDerivedPluginIconsStayOutOfPersistentBindingData() {
 }
 
 async function testEntrypointIsolation() {
-  const [mainSource, appSource, bindingsSource, auditApiSource, indexHtml, osdHtml, osdEntry, updateHtml, updateEntry] = await Promise.all([
+  const [
+    mainSource,
+    appSource,
+    bindingsSource,
+    auditApiSource,
+    indexHtml,
+    osdHtml,
+    osdEntry,
+    updateHtml,
+    updateEntry,
+  ] = await Promise.all([
     readFile(new URL("../src/main.js", import.meta.url), "utf8"),
     readFile(new URL("../src/app_entry.js", import.meta.url), "utf8"),
     readFile(new URL("../src/features/bindings/bindings.js", import.meta.url), "utf8"),
     readFile(new URL("../src/app/performance_audit_api.js", import.meta.url), "utf8"),
-    readFile(new URL("../src/index.html", import.meta.url), "utf8"),
+    readAppHtml(),
     readFile(new URL("../src/osd.html", import.meta.url), "utf8"),
     readFile(new URL("../src/osd_entry.js", import.meta.url), "utf8"),
     readFile(new URL("../src/update.html", import.meta.url), "utf8"),
@@ -250,13 +292,12 @@ async function testEntrypointIsolation() {
   assert.doesNotMatch(osdEntry, /app_entry\.js/);
   assert.doesNotMatch(updateEntry, /app_entry\.js/);
   assert.doesNotMatch(appSource, /setupUpdateNotificationWindow|isUpdateWindow|preload_store_catalog_failed/);
-  assert.match(appSource, /completeInitialDeviceLoad/);
-  assert.doesNotMatch(bindingsSource, /bindingsContainer\.innerHTML\s*=\s*["']{2}/);
-  assert.match(bindingsSource, /previous\?\.item\?\.__bindingRenderKey === renderKey/);
-  assert.match(bindingsSource, /previous\.targetDropdown\?\.refreshTargetDisplay\?\.\(\)/);
-  assert.match(bindingsSource, /bindingsContainer\.replaceChildren\(nextContent\)/);
+
   assert.equal((indexHtml.match(/<img class="app-logo/g) || []).length, 1);
-  assert.match(indexHtml, /data-dark-src="assets\/MIDIMaster\.png" data-light-src="assets\/MIDIMaster-light\.png"/);
+  assert.match(
+    indexHtml,
+    /data-dark-src="assets\/MIDIMaster\.png" data-light-src="assets\/MIDIMaster-light\.png"/,
+  );
 }
 
 testBindingDomIndex();

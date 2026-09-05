@@ -5,7 +5,9 @@ import { join, resolve } from "node:path";
 import { parseArgs, parsePositiveIntegers, runMain, splitCsv } from "./lib/cli.mjs";
 import { writeJson } from "./lib/files.mjs";
 
-export const BUNDLED_PLUGIN_IDS = ["hue", "obs", "voicemeeter", "wavelink"];
+import { bundledPlugins } from "../lib/bundled_plugins.mjs";
+
+export const BUNDLED_PLUGIN_IDS = (await bundledPlugins()).map((plugin) => plugin.id);
 export const SHAPE_TARGET_BYTES = Object.freeze({
   light: null,
   "0.6mb": 600 * 1024,
@@ -43,16 +45,18 @@ function makeBinding(index, iconData = null) {
     control: {
       channel: index % 16,
       controller,
-      msg_type: isAction ? "ProgramChange" : (isButton ? "Note" : "ControlChange"),
+      msg_type: isAction ? "ProgramChange" : isButton ? "Note" : "ControlChange",
     },
     control_kind: isButton ? "Button" : "Continuous",
-    targets: [{
-      Integration: {
-        integration_id: "perf-plugin",
-        kind: "channel",
-        data,
+    targets: [
+      {
+        Integration: {
+          integration_id: "perf-plugin",
+          kind: "channel",
+          data,
+        },
       },
-    }],
+    ],
     action: isButton ? "ToggleEffect" : "Volume",
     mode: "Absolute",
     deadzone: 0,
@@ -93,7 +97,8 @@ function applyIconToAllBindings(profiles, iconData) {
 export function createProfilesFixture({ bindingCount, profileCount, shape }) {
   if (!Object.hasOwn(SHAPE_TARGET_BYTES, shape)) throw new Error(`Unknown fixture shape '${shape}'`);
   const profiles = Array.from({ length: profileCount }, (_, index) =>
-    makeProfile(index === 0 ? "Performance Default" : `Performance ${index + 1}`, bindingCount));
+    makeProfile(index === 0 ? "Performance Default" : `Performance ${index + 1}`, bindingCount),
+  );
   const targetBytes = SHAPE_TARGET_BYTES[shape];
 
   if (targetBytes && bindingCount > 0 && profileCount > 0) {
@@ -129,7 +134,14 @@ function disabledPlugins(mode) {
   throw new Error(`Unknown plugin mode '${mode}'`);
 }
 
-export async function generateFixtureMatrix({ output, bindingCounts, profileCounts, shapes, pluginModes, clean = false }) {
+export async function generateFixtureMatrix({
+  output,
+  bindingCounts,
+  profileCounts,
+  shapes,
+  pluginModes,
+  clean = false,
+}) {
   const outputRoot = resolve(output);
   if (clean) await rm(outputRoot, { recursive: true, force: true });
   await mkdir(outputRoot, { recursive: true });
@@ -146,7 +158,9 @@ export async function generateFixtureMatrix({ output, bindingCounts, profileCoun
           await mkdir(appData, { recursive: true });
           await mkdir(webviewData, { recursive: true });
           const generated = createProfilesFixture({ bindingCount, profileCount, shape });
-          await import("node:fs/promises").then(({ writeFile }) => writeFile(join(appData, "profiles.json"), generated.text));
+          await import("node:fs/promises").then(({ writeFile }) =>
+            writeFile(join(appData, "profiles.json"), generated.text),
+          );
           await writeJson(join(appData, "app_settings.json"), {
             active_profile_name: "Performance Default",
             auto_check_updates: false,
@@ -181,7 +195,9 @@ export async function generateFixtureMatrix({ output, bindingCounts, profileCoun
 async function main() {
   const args = parseArgs(process.argv.slice(2), { booleans: ["clean", "help"] });
   if (args.help) {
-    console.log("Usage: node scripts/perf/generate-fixtures.mjs [--output DIR] [--bindings 0,50,250,500] [--profiles 1,10] [--shapes light,0.6mb,5mb] [--plugins zero,one,all] [--clean]");
+    console.log(
+      "Usage: node scripts/perf/generate-fixtures.mjs [--output DIR] [--bindings 0,50,250,500] [--profiles 1,10] [--shapes light,0.6mb,5mb] [--plugins zero,one,all] [--clean]",
+    );
     return;
   }
   const defaultOutput = join(tmpdir(), "MIDIMaster-perf-fixtures");

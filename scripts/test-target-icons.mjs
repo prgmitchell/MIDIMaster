@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createTargetsFeature } from "../src/features/targets/targets.js";
 
-const source = await readFile(new URL("../src/features/targets/targets.js", import.meta.url), "utf8");
-const hotkeyIconMatch = source.match(/const HOTKEY_ICON_DATA = ("[^"]+");/);
-assert.ok(hotkeyIconMatch, "the built-in hotkey icon should be defined");
-const hotkeyIconData = JSON.parse(hotkeyIconMatch[1]);
+import { HOTKEY_ICON_DATA as hotkeyIconData } from "../src/features/targets/catalog_presentation.js";
 
 class FakeClassList {
   constructor() {
@@ -78,37 +75,49 @@ assert.equal(brightness.classList.contains("target-icon--monitor-brightness"), t
 
 const faderOptions = feature.buildTargetOptions("MonitorBrightness", false);
 assert.equal(faderOptions.options.filter((option) => option.kind === "monitor-brightness-root").length, 1);
-assert.equal(faderOptions.options.some((option) => option.kind === "monitor-brightness"), false);
+assert.equal(
+  faderOptions.options.some((option) => option.kind === "monitor-brightness"),
+  false,
+);
 assert.equal(faderOptions.selectedKind, "monitor-brightness");
 const buttonOptions = feature.buildTargetOptions("Master", true);
-assert.equal(buttonOptions.options.some((option) => option.kind === "monitor-brightness-root"), false);
+assert.equal(
+  buttonOptions.options.some((option) => option.kind === "monitor-brightness-root"),
+  false,
+);
 
 const monitorFeature = createTargetsFeature({
-  invoke: async (command) => command === "list_monitors" ? [
-    { stable_id: "DISPLAY\\ACR073A\\1", name: "XZ322QU", is_primary: true },
-    { stable_id: "DISPLAY\\SAM7058\\2", name: "LC32G7xT", is_primary: false },
-  ] : null,
+  invoke: async (command) =>
+    command === "list_monitors"
+      ? [
+          { stable_id: "DISPLAY\\ACR073A\\1", name: "XZ322QU", is_primary: true },
+          { stable_id: "DISPLAY\\SAM7058\\2", name: "LC32G7xT", is_primary: false },
+        ]
+      : null,
 });
 await monitorFeature.start();
-const individualOptions = monitorFeature.buildTargetOptions({
-  MonitorBrightness: {
-    monitor_id: "DISPLAY\\SAM7058\\2",
-    display_name: "LC32G7xT",
-  },
-}, false);
-assert.equal(individualOptions.options.filter((option) => option.kind === "monitor-brightness-root").length, 1);
-assert.equal(individualOptions.selectedValue, "monitor-brightness:DISPLAY\\SAM7058\\2");
-const monitorOptions = monitorFeature.buildMonitorBrightnessOptions();
-assert.equal(monitorOptions.length, 3);
-assert.deepEqual(
-  monitorOptions.find((option) => option.value === individualOptions.selectedValue).target,
+const individualOptions = monitorFeature.buildTargetOptions(
   {
     MonitorBrightness: {
       monitor_id: "DISPLAY\\SAM7058\\2",
       display_name: "LC32G7xT",
     },
   },
+  false,
 );
+assert.equal(
+  individualOptions.options.filter((option) => option.kind === "monitor-brightness-root").length,
+  1,
+);
+assert.equal(individualOptions.selectedValue, "monitor-brightness:DISPLAY\\SAM7058\\2");
+const monitorOptions = monitorFeature.buildMonitorBrightnessOptions();
+assert.equal(monitorOptions.length, 3);
+assert.deepEqual(monitorOptions.find((option) => option.value === individualOptions.selectedValue).target, {
+  MonitorBrightness: {
+    monitor_id: "DISPLAY\\SAM7058\\2",
+    display_name: "LC32G7xT",
+  },
+});
 assert.deepEqual(
   monitorOptions.find((option) => option.value === "monitor-brightness:DISPLAY\\ACR073A\\1").title_tags,
   ["settings.primaryBadge"],
@@ -125,7 +134,11 @@ const suppliedDeviceIcon = feature.createTargetIcon({
   icon_kind: "playback-device",
   kind: "device",
 });
-assert.equal(suppliedDeviceIcon.tagName, "img", "a supplied Windows device icon should win over the fallback");
+assert.equal(
+  suppliedDeviceIcon.tagName,
+  "img",
+  "a supplied Windows device icon should win over the fallback",
+);
 
 const playbackFallback = feature.createTargetIcon({
   label: "Voicemeeter Input",

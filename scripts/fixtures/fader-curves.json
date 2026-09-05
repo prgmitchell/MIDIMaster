@@ -1,0 +1,513 @@
+[
+  {
+    "name": "Linear -0.2",
+    "curve": "Linear",
+    "input": -0.2,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "Linear 0",
+    "curve": "Linear",
+    "input": 0,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "Linear 0.1",
+    "curve": "Linear",
+    "input": 0.1,
+    "points": [],
+    "expected": 0.1
+  },
+  {
+    "name": "Linear 0.25",
+    "curve": "Linear",
+    "input": 0.25,
+    "points": [],
+    "expected": 0.25
+  },
+  {
+    "name": "Linear 0.5",
+    "curve": "Linear",
+    "input": 0.5,
+    "points": [],
+    "expected": 0.5
+  },
+  {
+    "name": "Linear 0.75",
+    "curve": "Linear",
+    "input": 0.75,
+    "points": [],
+    "expected": 0.75
+  },
+  {
+    "name": "Linear 0.9",
+    "curve": "Linear",
+    "input": 0.9,
+    "points": [],
+    "expected": 0.9
+  },
+  {
+    "name": "Linear 1",
+    "curve": "Linear",
+    "input": 1,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "Linear 1.2",
+    "curve": "Linear",
+    "input": 1.2,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "Exponential -0.2",
+    "curve": "Exponential",
+    "input": -0.2,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "Exponential 0",
+    "curve": "Exponential",
+    "input": 0,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "Exponential 0.1",
+    "curve": "Exponential",
+    "input": 0.1,
+    "points": [],
+    "expected": 0.28183829312644537
+  },
+  {
+    "name": "Exponential 0.25",
+    "curve": "Exponential",
+    "input": 0.25,
+    "points": [],
+    "expected": 0.4665164957684037
+  },
+  {
+    "name": "Exponential 0.5",
+    "curve": "Exponential",
+    "input": 0.5,
+    "points": [],
+    "expected": 0.6830201283771977
+  },
+  {
+    "name": "Exponential 0.75",
+    "curve": "Exponential",
+    "input": 0.75,
+    "points": [],
+    "expected": 0.8536575679962692
+  },
+  {
+    "name": "Exponential 0.9",
+    "curve": "Exponential",
+    "input": 0.9,
+    "points": [],
+    "expected": 0.9436987508657585
+  },
+  {
+    "name": "Exponential 1",
+    "curve": "Exponential",
+    "input": 1,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "Exponential 1.2",
+    "curve": "Exponential",
+    "input": 1.2,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "Logarithmic -0.2",
+    "curve": "Logarithmic",
+    "input": -0.2,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "Logarithmic 0",
+    "curve": "Logarithmic",
+    "input": 0,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "Logarithmic 0.1",
+    "curve": "Logarithmic",
+    "input": 0.1,
+    "points": [],
+    "expected": 0.00630957344480193
+  },
+  {
+    "name": "Logarithmic 0.25",
+    "curve": "Logarithmic",
+    "input": 0.25,
+    "points": [],
+    "expected": 0.04736614270344993
+  },
+  {
+    "name": "Logarithmic 0.5",
+    "curve": "Logarithmic",
+    "input": 0.5,
+    "points": [],
+    "expected": 0.217637640824031
+  },
+  {
+    "name": "Logarithmic 0.75",
+    "curve": "Logarithmic",
+    "input": 0.75,
+    "points": [],
+    "expected": 0.5310492251033824
+  },
+  {
+    "name": "Logarithmic 0.9",
+    "curve": "Logarithmic",
+    "input": 0.9,
+    "points": [],
+    "expected": 0.7931101735123912
+  },
+  {
+    "name": "Logarithmic 1",
+    "curve": "Logarithmic",
+    "input": 1,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "Logarithmic 1.2",
+    "curve": "Logarithmic",
+    "input": 1.2,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "SCurve -0.2",
+    "curve": "SCurve",
+    "input": -0.2,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "SCurve 0",
+    "curve": "SCurve",
+    "input": 0,
+    "points": [],
+    "expected": 0
+  },
+  {
+    "name": "SCurve 0.1",
+    "curve": "SCurve",
+    "input": 0.1,
+    "points": [],
+    "expected": 0.028000000000000004
+  },
+  {
+    "name": "SCurve 0.25",
+    "curve": "SCurve",
+    "input": 0.25,
+    "points": [],
+    "expected": 0.15625
+  },
+  {
+    "name": "SCurve 0.5",
+    "curve": "SCurve",
+    "input": 0.5,
+    "points": [],
+    "expected": 0.5
+  },
+  {
+    "name": "SCurve 0.75",
+    "curve": "SCurve",
+    "input": 0.75,
+    "points": [],
+    "expected": 0.84375
+  },
+  {
+    "name": "SCurve 0.9",
+    "curve": "SCurve",
+    "input": 0.9,
+    "points": [],
+    "expected": 0.972
+  },
+  {
+    "name": "SCurve 1",
+    "curve": "SCurve",
+    "input": 1,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "SCurve 1.2",
+    "curve": "SCurve",
+    "input": 1.2,
+    "points": [],
+    "expected": 1
+  },
+  {
+    "name": "Custom 0",
+    "curve": "Custom",
+    "input": 0,
+    "points": [
+      {
+        "x": 0,
+        "y": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0
+  },
+  {
+    "name": "Custom 0.1",
+    "curve": "Custom",
+    "input": 0.1,
+    "points": [
+      {
+        "x": 0,
+        "y": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.05
+  },
+  {
+    "name": "Custom 0.25",
+    "curve": "Custom",
+    "input": 0.25,
+    "points": [
+      {
+        "x": 0,
+        "y": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.125
+  },
+  {
+    "name": "Custom 0.5",
+    "curve": "Custom",
+    "input": 0.5,
+    "points": [
+      {
+        "x": 0,
+        "y": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.3333333333333333
+  },
+  {
+    "name": "Custom 0.75",
+    "curve": "Custom",
+    "input": 0.75,
+    "points": [
+      {
+        "x": 0,
+        "y": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.6666666666666667
+  },
+  {
+    "name": "Custom 0.9",
+    "curve": "Custom",
+    "input": 0.9,
+    "points": [
+      {
+        "x": 0,
+        "y": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.8666666666666667
+  },
+  {
+    "name": "Custom 1",
+    "curve": "Custom",
+    "input": 1,
+    "points": [
+      {
+        "x": 0,
+        "y": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 1
+  },
+  {
+    "name": "Custom 0",
+    "curve": "Custom",
+    "input": 0,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0
+  },
+  {
+    "name": "Custom 0.1",
+    "curve": "Custom",
+    "input": 0.1,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.136
+  },
+  {
+    "name": "Custom 0.25",
+    "curve": "Custom",
+    "input": 0.25,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.325
+  },
+  {
+    "name": "Custom 0.5",
+    "curve": "Custom",
+    "input": 0.5,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.6
+  },
+  {
+    "name": "Custom 0.75",
+    "curve": "Custom",
+    "input": 0.75,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.825
+  },
+  {
+    "name": "Custom 0.9",
+    "curve": "Custom",
+    "input": 0.9,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 0.936
+  },
+  {
+    "name": "Custom 1",
+    "curve": "Custom",
+    "input": 1,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0.2
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "expected": 1
+  }
+]

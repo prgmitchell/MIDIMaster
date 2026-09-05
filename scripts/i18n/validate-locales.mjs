@@ -6,14 +6,8 @@ import { localeCodes, targetLocales } from "../../src/app/locales.js";
 const root = process.cwd();
 const localeDir = path.join(root, "src", "locales");
 const locales = targetLocales.map((locale) => locale.code);
-const sourceScanRoots = [
-  path.join(root, "src", "app"),
-  path.join(root, "src", "features"),
-];
-const sourceScanFiles = [
-  path.join(root, "src", "app_entry.js"),
-  path.join(root, "src", "index.html"),
-];
+const sourceScanRoots = [path.join(root, "src", "app"), path.join(root, "src", "features")];
+const sourceScanFiles = [path.join(root, "src", "app_entry.js"), path.join(root, "src", "index.html")];
 
 function placeholders(value) {
   return Array.from(String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g))
@@ -27,14 +21,16 @@ async function readJson(filePath) {
 
 async function collectFiles(dir, files = []) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
-  await Promise.all(entries.map(async (entry) => {
-    const filePath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await collectFiles(filePath, files);
-    } else if (entry.name.endsWith(".js") || entry.name.endsWith(".html")) {
-      files.push(filePath);
-    }
-  }));
+  await Promise.all(
+    entries.map(async (entry) => {
+      const filePath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await collectFiles(filePath, files);
+      } else if (entry.name.endsWith(".js") || entry.name.endsWith(".html")) {
+        files.push(filePath);
+      }
+    }),
+  );
   return files;
 }
 
@@ -54,7 +50,7 @@ function isAllowedIdenticalEnglish(key, value) {
 
 async function validateLocaleSync() {
   const i18n = await fs.readFile(path.join(root, "src", "app", "locales.js"), "utf8");
-  const rust = await fs.readFile(path.join(root, "src-tauri", "src", "commands", "settings.rs"), "utf8");
+  const rust = await fs.readFile(path.join(root, "src-tauri", "src", "settings_services", "mod.rs"), "utf8");
   const frontendCodes = Array.from(i18n.matchAll(/code:\s*"([^"]+)"/g)).map((match) => match[1]);
   const rustCodes = Array.from(rust.matchAll(/"([^"]+)"/g))
     .map((match) => match[1])
@@ -62,11 +58,15 @@ async function validateLocaleSync() {
   const expected = localeCodes();
   const uniqueRustCodes = Array.from(new Set(rustCodes));
   if (JSON.stringify(frontendCodes) !== JSON.stringify(expected)) {
-    console.error(`[i18n] frontend locale list is out of sync: expected ${expected.join(", ")}, got ${frontendCodes.join(", ")}`);
+    console.error(
+      `[i18n] frontend locale list is out of sync: expected ${expected.join(", ")}, got ${frontendCodes.join(", ")}`,
+    );
     return false;
   }
   if (JSON.stringify(uniqueRustCodes) !== JSON.stringify(expected)) {
-    console.error(`[i18n] Rust language normalization is out of sync: expected ${expected.join(", ")}, got ${uniqueRustCodes.join(", ")}`);
+    console.error(
+      `[i18n] Rust language normalization is out of sync: expected ${expected.join(", ")}, got ${uniqueRustCodes.join(", ")}`,
+    );
     return false;
   }
   return true;
@@ -86,10 +86,7 @@ async function findUsedTranslationKeys() {
     } catch {
       continue;
     }
-    const patterns = [
-      /\bt\(\s*["']([^"']+)["']/g,
-      /data-i18n(?:-[\w-]+)?=["']([^"']+)["']/g,
-    ];
+    const patterns = [/\bt\(\s*["']([^"']+)["']/g, /data-i18n(?:-[\w-]+)?=["']([^"']+)["']/g];
     for (const pattern of patterns) {
       let match;
       while ((match = pattern.exec(source))) {
@@ -149,22 +146,25 @@ for (const locale of locales) {
     const expected = placeholders(english[key]);
     const actual = placeholders(catalog[key]);
     if (!sameArray(expected, actual)) {
-      console.error(`[i18n] ${locale}: placeholder mismatch for ${key}: expected {${expected.join(",")}}, got {${actual.join(",")}}`);
+      console.error(
+        `[i18n] ${locale}: placeholder mismatch for ${key}: expected {${expected.join(",")}}, got {${actual.join(",")}}`,
+      );
       failed = true;
     }
-    if (
-      String(catalog[key]) === String(english[key])
-      && !isAllowedIdenticalEnglish(key, english[key])
-    ) {
+    if (String(catalog[key]) === String(english[key]) && !isAllowedIdenticalEnglish(key, english[key])) {
       untranslatedFallbacks.push(key);
     }
   }
   const fallbackRatio = untranslatedFallbacks.length / Math.max(1, keys.length);
   if (fallbackRatio > 0.2) {
-    console.error(`[i18n] ${locale}: too many untranslated English fallbacks (${untranslatedFallbacks.length}/${englishKeys.length}): ${untranslatedFallbacks.join(", ")}`);
+    console.error(
+      `[i18n] ${locale}: too many untranslated English fallbacks (${untranslatedFallbacks.length}/${englishKeys.length}): ${untranslatedFallbacks.join(", ")}`,
+    );
     failed = true;
   } else if (untranslatedFallbacks.length > 0) {
-    console.warn(`[i18n] ${locale}: ${untranslatedFallbacks.length} strings are identical to English; below failure threshold.`);
+    console.warn(
+      `[i18n] ${locale}: ${untranslatedFallbacks.length} strings are identical to English; below failure threshold.`,
+    );
   }
 }
 

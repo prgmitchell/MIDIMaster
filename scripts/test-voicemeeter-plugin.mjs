@@ -17,19 +17,33 @@ function testGainTaper() {
 
 function testEditionCapabilitiesAndRoutes() {
   assert.deepEqual(utils.capabilitiesForEdition(1), {
-    strip_count: 3, physical_strip_count: 2, bus_count: 2, physical_bus_count: 1,
+    strip_count: 3,
+    physical_strip_count: 2,
+    bus_count: 2,
+    physical_bus_count: 1,
   });
   assert.equal(utils.routeProperties(1).length, 2);
-  assert.deepEqual(utils.routeProperties(2).map((entry) => entry[0]), ["a1", "b1", "a2", "a3", "b2"]);
-  assert.deepEqual(utils.routeProperties(3).slice(-3).map((entry) => entry[0]), ["a4", "a5", "b3"]);
+  assert.deepEqual(
+    utils.routeProperties(2).map((entry) => entry[0]),
+    ["a1", "b1", "a2", "a3", "b2"],
+  );
+  assert.deepEqual(
+    utils
+      .routeProperties(3)
+      .slice(-3)
+      .map((entry) => entry[0]),
+    ["a4", "a5", "b3"],
+  );
 }
 
 function testProfileTextParsing() {
   assert.deepEqual(utils.parseNumberedAliases("1: Stream mute\n 12: Cough \n81: Ignored"), {
-    0: "Stream mute", 11: "Cough",
+    0: "Stream mute",
+    11: "Cough",
   });
   assert.deepEqual(utils.parsePresetLines("1: Streaming\n256: Last\n257: Invalid"), [
-    { slot: 0, label: "Streaming" }, { slot: 255, label: "Last" },
+    { slot: 0, label: "Streaming" },
+    { slot: 255, label: "Last" },
   ]);
 }
 
@@ -49,8 +63,12 @@ function testParameterIdentity() {
 function testMeterChangesDoNotInvalidateBindingUi() {
   const state = {
     status: { connected: true, edition: "banana" },
-    stripLabels: ["Mic"], busLabels: ["Speakers"], inputDevices: ["Input"], outputDevices: ["Output"],
-    settings: { macro_aliases: {}, presets: [] }, meters: [{ scope: "strip", index: 0, level: 0.1 }],
+    stripLabels: ["Mic"],
+    busLabels: ["Speakers"],
+    inputDevices: ["Input"],
+    outputDevices: ["Output"],
+    settings: { macro_aliases: {}, presets: [] },
+    meters: [{ scope: "strip", index: 0, level: 0.1 }],
   };
   const before = utils.bindingUiSignature(state);
   state.meters = [{ scope: "strip", index: 0, level: 0.9 }];
@@ -68,9 +86,18 @@ function testMetersOnlyPollOnVisibleDashboard() {
   assert.equal(utils.shouldPollMeters({ ...visible, documentHidden: true }), false);
   assert.equal(utils.pollingInterval({ dashboardVisible: false, needsLiveFeedback: false }), 500);
   assert.equal(utils.pollingInterval({ dashboardVisible: false, needsLiveFeedback: true }), 100);
-  assert.equal(utils.meterPollDue({ dashboardVisible: false, force: true, now: 1000, lastMeterPollAt: 0 }), false);
-  assert.equal(utils.meterPollDue({ dashboardVisible: true, force: false, now: 1200, lastMeterPollAt: 1000 }), false);
-  assert.equal(utils.meterPollDue({ dashboardVisible: true, force: false, now: 1250, lastMeterPollAt: 1000 }), true);
+  assert.equal(
+    utils.meterPollDue({ dashboardVisible: false, force: true, now: 1000, lastMeterPollAt: 0 }),
+    false,
+  );
+  assert.equal(
+    utils.meterPollDue({ dashboardVisible: true, force: false, now: 1200, lastMeterPollAt: 1000 }),
+    false,
+  );
+  assert.equal(
+    utils.meterPollDue({ dashboardVisible: true, force: false, now: 1250, lastMeterPollAt: 1000 }),
+    true,
+  );
 }
 
 function testTransientFailuresDoNotFlapConnection() {
@@ -86,34 +113,68 @@ function testDisconnectedRetriesDoNotRebuildDashboard() {
 }
 
 function testProfileChangeEnvelopePreservesAutoConnect() {
-  assert.deepEqual(utils.profileSettingsFromEvent({ settings: { auto_connect: false } }), { auto_connect: false });
+  assert.deepEqual(utils.profileSettingsFromEvent({ settings: { auto_connect: false } }), {
+    auto_connect: false,
+  });
   assert.deepEqual(utils.profileSettingsFromEvent({ auto_connect: true }), { auto_connect: true });
 }
 
 function testButtonActionSemantics() {
   assert.deepEqual(utils.buttonAction("Mute", "stateful"), {
-    label: "Mute", value: "ToggleEffect", behavior: "stateful",
+    label: "Mute",
+    value: "ToggleEffect",
+    behavior: "stateful",
   });
   assert.deepEqual(utils.buttonAction("Select Device", "momentary"), {
-    label: "Select Device", value: "SetMainOutputDevice", behavior: "momentary",
+    label: "Select Device",
+    value: "SetMainOutputDevice",
+    behavior: "momentary",
   });
   for (const property of ["mode.normal", "mode.amix", "mode.tvmix", "sel"]) {
     assert.equal(utils.parameterButtonBehavior("bus", property), "momentary");
-    assert.equal(utils.isOneShotVoicemeeterTarget({ kind: "parameter", data: { scope: "bus", property } }), true);
+    assert.equal(
+      utils.isOneShotVoicemeeterTarget({ kind: "parameter", data: { scope: "bus", property } }),
+      true,
+    );
   }
-  for (const [scope, property] of [["strip", "mute"], ["strip", "a1"], ["bus", "mute"], ["bus", "monitor"], ["bus", "eq.on"]]) {
+  for (const [scope, property] of [
+    ["strip", "mute"],
+    ["strip", "a1"],
+    ["bus", "mute"],
+    ["bus", "monitor"],
+    ["bus", "eq.on"],
+  ]) {
     assert.equal(utils.parameterButtonBehavior(scope, property), "stateful");
     assert.equal(utils.isOneShotVoicemeeterTarget({ kind: "parameter", data: { scope, property } }), false);
   }
   for (const kind of ["device_assignment", "preset", "command"]) {
     assert.equal(utils.isOneShotVoicemeeterTarget({ kind, data: { action_kind: "stateful" } }), true);
   }
-  assert.equal(utils.targetUsesPersistentFeedback({ kind: "parameter", data: { scope: "macro", property: "state", action_kind: "stateful" } }), true);
-  assert.equal(utils.targetUsesPersistentFeedback({ kind: "parameter", data: { scope: "macro", property: "state", action_kind: "momentary" } }), false);
+  assert.equal(
+    utils.targetUsesPersistentFeedback({
+      kind: "parameter",
+      data: { scope: "macro", property: "state", action_kind: "stateful" },
+    }),
+    true,
+  );
+  assert.equal(
+    utils.targetUsesPersistentFeedback({
+      kind: "parameter",
+      data: { scope: "macro", property: "state", action_kind: "momentary" },
+    }),
+    false,
+  );
 
-  const state = { icon: null, busLabels: ["Speakers"], stripLabels: [], status: { capabilities: { physical_bus_count: 1 } } };
+  const state = {
+    icon: null,
+    busLabels: ["Speakers"],
+    stripLabels: [],
+    status: { capabilities: { physical_bus_count: 1 } },
+  };
   const mode = utils.parameterOption("bus", 0, ["mode.normal", "Normal Mode", 1], state, true);
-  assert.deepEqual(mode.buttonActions, [{ label: "Normal Mode", value: "SetMainOutputDevice", behavior: "momentary" }]);
+  assert.deepEqual(mode.buttonActions, [
+    { label: "Normal Mode", value: "SetMainOutputDevice", behavior: "momentary" },
+  ]);
   assert.equal(mode.target.Integration.data.action_kind, "momentary");
   const mute = utils.parameterOption("bus", 0, ["mute", "Mute", 1], state, true);
   assert.deepEqual(mute.buttonActions, [{ label: "Mute", value: "ToggleEffect", behavior: "stateful" }]);
@@ -138,10 +199,24 @@ function testDeviceFeedbackHandlesDuplicateDriverNames() {
     { driver_type: "wdm", name: "Interface" },
   ];
   assert.equal(utils.deviceFeedbackMatches(data, "Interface", null, duplicateDevices), false);
-  assert.equal(utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "wdm" }, duplicateDevices), true);
-  assert.equal(utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "asio" }, duplicateDevices), false);
-  assert.equal(utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "" }, [{ driver_type: "wdm", name: "Interface" }]), false);
-  assert.equal(utils.deviceFeedbackMatches(data, "Other", { name: "Interface", driver: "wdm" }, duplicateDevices), false);
+  assert.equal(
+    utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "wdm" }, duplicateDevices),
+    true,
+  );
+  assert.equal(
+    utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "asio" }, duplicateDevices),
+    false,
+  );
+  assert.equal(
+    utils.deviceFeedbackMatches(data, "Interface", { name: "Interface", driver: "" }, [
+      { driver_type: "wdm", name: "Interface" },
+    ]),
+    false,
+  );
+  assert.equal(
+    utils.deviceFeedbackMatches(data, "Other", { name: "Interface", driver: "wdm" }, duplicateDevices),
+    false,
+  );
 }
 
 async function testDeviceVerification() {
@@ -150,11 +225,12 @@ async function testDeviceVerification() {
   const success = await utils.verifyDeviceAssignment({
     expectedName: "Speakers",
     delays: [100, 250, 500],
-    wait: async (ms) => { waits.push(ms); },
+    wait: async (ms) => {
+      waits.push(ms);
+    },
     isCurrent: () => true,
-    readState: async () => (++reads === 1
-      ? { name: "Speakers", sample_rate: 0 }
-      : { name: "Speakers", sample_rate: 48000 }),
+    readState: async () =>
+      ++reads === 1 ? { name: "Speakers", sample_rate: 0 } : { name: "Speakers", sample_rate: 48000 },
   });
   assert.equal(success.status, "success");
   assert.equal(success.sampleRate, 48000);
@@ -179,13 +255,18 @@ async function testDeviceVerification() {
     delays: [100],
     wait: async () => {},
     isCurrent: () => false,
-    readState: async () => { throw new Error("must not read"); },
+    readState: async () => {
+      throw new Error("must not read");
+    },
   });
   assert.equal(superseded.status, "superseded");
 }
 
 function testOnlyCoreBindingActionsAreEmitted() {
-  const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
+  const source = readFileSync(
+    new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url),
+    "utf8",
+  );
   for (const unsupported of [
     "SetVoicemeeterState",
     "PushVoicemeeterMacro",
@@ -198,27 +279,24 @@ function testOnlyCoreBindingActionsAreEmitted() {
 }
 
 function testDashboardUsesOneContentScrollbar() {
-  const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
+  const source = readFileSync(
+    new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url),
+    "utf8",
+  );
   assert.equal(source.includes("grid-template-columns:repeat(auto-fit,minmax(250px,1fr))"), true);
   assert.equal(source.includes("max-height:330px;overflow:auto"), false);
 }
 
 function testDashboardUsesMidimasterConfirmation() {
-  const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
+  const source = readFileSync(
+    new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url),
+    "utf8",
+  );
   assert.equal(source.includes("window.confirm"), false);
   assert.equal(source.includes("ctx.app.showConfirm"), true);
   assert.equal(source.includes("ctx.app.showAlert"), true);
   assert.equal(source.includes("window.alert"), false);
   assert.equal(source.includes('state.lastStatusUiSignature = ""'), true);
-}
-
-function testOneShotTargetsDoNotUsePersistentFeedback() {
-  const source = readFileSync(new URL("../src-tauri/builtin_plugins/voicemeeter/plugin.mjs", import.meta.url), "utf8");
-  assert.equal(source.includes('buttonActions: [buttonAction("Select Device", "momentary")]'), true);
-  assert.equal(source.includes('device_name: device.name, label:'), true);
-  assert.equal(source.includes('action_kind: "momentary"'), true);
-  assert.equal(source.includes("deviceFeedbackCache"), false);
-  assert.equal(source.includes("resetLegacyOneShotFeedback(payload)"), true);
 }
 
 testGainTaper();
@@ -238,5 +316,5 @@ await testDeviceVerification();
 testOnlyCoreBindingActionsAreEmitted();
 testDashboardUsesOneContentScrollbar();
 testDashboardUsesMidimasterConfirmation();
-testOneShotTargetsDoNotUsePersistentFeedback();
+// One-shot options and feedback are exercised through the generated loader in test-bundled-plugin-runtime.
 console.log("Voicemeeter plugin tests passed");

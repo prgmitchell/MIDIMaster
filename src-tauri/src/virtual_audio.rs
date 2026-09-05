@@ -15,13 +15,13 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-pub const VIRTUAL_AUDIO_DEVICE_NAME: &str = "MIDIMaster Virtual Audio";
+use midimaster_virtual_audio_protocol::AUDIO_PIPE_PATH;
+pub use midimaster_virtual_audio_protocol::SERVICE_DISPLAY_NAME as VIRTUAL_AUDIO_DEVICE_NAME;
 const INPUT_RING_FRAMES: usize = 48_000;
 const OUTPUT_RING_FRAMES: usize = 12_000;
 const RESAMPLER_LOCAL_FRAMES: usize = 16_384;
 const OUTPUT_TARGET_LATENCY: Duration = Duration::from_millis(20);
 const OUTPUT_PREFILL_WAIT: Duration = Duration::from_millis(25);
-const AUDIO_PIPE_PATH: &str = r"\\.\pipe\MIDIMaster.VirtualAudio.Audio.v1";
 const PIPE_BATCH_FRAMES: usize = 480;
 
 #[derive(Clone, Copy, Default)]

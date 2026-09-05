@@ -121,14 +121,19 @@ const descriptorList = [
   },
 ];
 
-export const BUILT_IN_TARGETS = Object.freeze(Object.fromEntries(
-  descriptorList.map((descriptor) => [descriptor.type, Object.freeze({
-    ...descriptor,
-    controls: Object.freeze([...descriptor.controls]),
-    actions: Object.freeze([...descriptor.actions]),
-    capabilities: Object.freeze({ ...descriptor.capabilities }),
-  })]),
-));
+export const BUILT_IN_TARGETS = Object.freeze(
+  Object.fromEntries(
+    descriptorList.map((descriptor) => [
+      descriptor.type,
+      Object.freeze({
+        ...descriptor,
+        controls: Object.freeze([...descriptor.controls]),
+        actions: Object.freeze([...descriptor.actions]),
+        capabilities: Object.freeze({ ...descriptor.capabilities }),
+      }),
+    ]),
+  ),
+);
 
 const descriptorByPickerKind = new Map(
   Object.values(BUILT_IN_TARGETS).map((descriptor) => [descriptor.pickerKind, descriptor]),
@@ -151,17 +156,12 @@ export const ACTION_CATALOG = Object.freeze({
   MediaStop: { labelKey: "targets.action.mediaStop", role: "command" },
   Hotkey: { labelKey: "targets.hotkey", role: "command" },
   RunAutoHotkeyScript: { labelKey: "targets.autoHotkeyScript", role: "command" },
-  SwitchProfile: { labelKey: "targets.switchProfile", role: "command" },
-  Macro: { labelKey: "macro.title", role: "command" },
-  Soundboard: { labelKey: "soundboard.title", role: "command" },
+  SwitchProfile: { macroAllowed: false, labelKey: "targets.switchProfile", role: "command" },
+  Macro: { macroAllowed: false, labelKey: "macro.title", role: "command" },
+  Soundboard: { macroAllowed: false, labelKey: "soundboard.title", role: "command" },
 });
 
-export const MEDIA_ACTIONS = Object.freeze([
-  "MediaPlayPause",
-  "MediaNextTrack",
-  "MediaPrevTrack",
-  "MediaStop",
-]);
+export const MEDIA_ACTIONS = BUILT_IN_TARGETS.MediaControl.actions;
 
 export function targetType(target) {
   if (!target) return null;
@@ -252,4 +252,65 @@ function lowerFirst(value) {
 
 function hasText(value) {
   return Boolean(String(value ?? "").trim());
+}
+
+/** Navigation entries are distinct from assignable targets; order is part of the picker UI. */
+const PICKER_ROOTS = [
+  { type: "Master" },
+  { type: "Focus" },
+  { type: "MonitorBrightness", value: "monitor-brightness-root", kind: "monitor-brightness-root" },
+  { type: "Macro" },
+  { type: "Soundboard" },
+  { type: "MediaControl" },
+  {
+    value: "window-focus",
+    kind: "action-root",
+    labelKey: "targets.windowFocus",
+    iconKind: "window-focus",
+    controls: ["button"],
+  },
+  { type: "CaptureControl", value: "capture", kind: "action-root" },
+  { type: "Hotkey" },
+  { type: "OpenApplication" },
+  { type: "AutoHotkeyScript" },
+  {
+    value: "profile-switch-root",
+    kind: "profile-switch-root",
+    labelKey: "targets.switchProfile",
+    iconKind: "profile-switch",
+    controls: ["button"],
+  },
+];
+
+/** @returns {Array<object>} Built-in picker roots, before discovered applications/devices/plugins. */
+export function builtInPickerOptions(isButton, translate, icons = {}) {
+  const control = isButton ? "button" : "continuous";
+  return PICKER_ROOTS.flatMap((entry) => {
+    const descriptor = entry.type ? BUILT_IN_TARGETS[entry.type] : entry;
+    if (!descriptor.controls.includes(control)) return [];
+    const icon = icons[descriptor.iconKind];
+    return [
+      {
+        value: entry.value ?? descriptor.pickerValue,
+        label: translate(descriptor.labelKey),
+        ...(descriptor.type === "MonitorBrightness"
+          ? { icon_kind: descriptor.iconKind }
+          : { icon_data: icon }),
+        kind: entry.kind ?? descriptor.pickerKind,
+      },
+    ];
+  });
+}
+
+/** Shared labels and roles; context may override a label without redefining the action. */
+export function actionPickerOption(action, translate, iconData, overrides = {}) {
+  const definition = actionDefinition(action);
+  return {
+    value: action,
+    label: translate(definition?.labelKey || action),
+    kind: "action",
+    icon_data: iconData,
+    role: definition?.role || "command",
+    ...overrides,
+  };
 }

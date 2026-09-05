@@ -1,0 +1,365 @@
+{
+  "bindings": [
+    {
+      "input": {
+        "id": "legacy-defaults",
+        "target": "Master"
+      },
+      "expected": {
+        "id": "legacy-defaults",
+        "target": "Master",
+        "feedback_enabled": true,
+        "targets": [
+          "Master"
+        ],
+        "macro_name": "",
+        "mode": "Absolute",
+        "relative_format": "Auto",
+        "fader_curve": "Linear",
+        "custom_curve": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "mute_behavior": "ToggleOnPress",
+        "indicator_control": null,
+        "assign_mode": "Add",
+        "button_light_mode": "Activity",
+        "button_light_behavior": "FollowState",
+        "hotkey": null,
+        "open_application": null,
+        "autohotkey_script": null,
+        "soundboard": null,
+        "macro_steps": []
+      }
+    },
+    {
+      "input": {
+        "id": "feedback-disabled",
+        "targets": [
+          "Master"
+        ],
+        "feedback_enabled": false,
+        "control_kind": "Continuous",
+        "action": "Volume"
+      },
+      "expected": {
+        "id": "feedback-disabled",
+        "targets": [
+          "Master"
+        ],
+        "feedback_enabled": false,
+        "control_kind": "Continuous",
+        "action": "Volume",
+        "target": "Master",
+        "macro_name": "",
+        "mode": "Absolute",
+        "relative_format": "Auto",
+        "fader_curve": "Linear",
+        "custom_curve": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "mute_behavior": "ToggleOnPress",
+        "indicator_control": null,
+        "assign_mode": "Add",
+        "button_light_mode": "Activity",
+        "button_light_behavior": "FollowState",
+        "hotkey": null,
+        "open_application": null,
+        "autohotkey_script": null,
+        "soundboard": null,
+        "macro_steps": []
+      }
+    },
+    {
+      "input": {
+        "id": "legacy-light",
+        "target": "Focus",
+        "control_kind": "Button",
+        "button_light_behavior": "Toggle",
+        "action": "ToggleMute"
+      },
+      "expected": {
+        "id": "legacy-light",
+        "target": "Focus",
+        "control_kind": "Button",
+        "button_light_behavior": "FollowState",
+        "action": "ToggleMute",
+        "feedback_enabled": true,
+        "targets": [
+          "Focus"
+        ],
+        "macro_name": "",
+        "mode": "Absolute",
+        "relative_format": "Auto",
+        "fader_curve": "Linear",
+        "custom_curve": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "mute_behavior": "ToggleOnPress",
+        "indicator_control": null,
+        "assign_mode": "Add",
+        "button_light_mode": "Activity",
+        "hotkey": null,
+        "open_application": null,
+        "autohotkey_script": null,
+        "soundboard": null,
+        "macro_steps": []
+      }
+    },
+    {
+      "input": {
+        "id": "multi-target",
+        "targets": [
+          "Master",
+          {
+            "Application": {
+              "name": "player.exe"
+            }
+          }
+        ],
+        "action": "Volume",
+        "fader_curve": "Exponential"
+      },
+      "expected": {
+        "id": "multi-target",
+        "targets": [
+          "Master",
+          {
+            "Application": {
+              "name": "player.exe"
+            }
+          }
+        ],
+        "action": "Volume",
+        "fader_curve": "Exponential",
+        "feedback_enabled": true,
+        "target": "Master",
+        "macro_name": "",
+        "mode": "Absolute",
+        "relative_format": "Auto",
+        "custom_curve": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 0.18,
+            "y": 0.04
+          },
+          {
+            "x": 0.42,
+            "y": 0.16
+          },
+          {
+            "x": 0.72,
+            "y": 0.5
+          },
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "mute_behavior": "ToggleOnPress",
+        "indicator_control": null,
+        "assign_mode": "Add",
+        "button_light_mode": "Activity",
+        "button_light_behavior": "FollowState",
+        "hotkey": null,
+        "open_application": null,
+        "autohotkey_script": null,
+        "soundboard": null,
+        "macro_steps": []
+      }
+    },
+    {
+      "input": {
+        "id": "macro",
+        "targets": [
+          "Macro"
+        ],
+        "action": "Macro",
+        "macro_steps": [
+          {
+            "kind": "wait",
+            "duration_ms": 250
+          },
+          {
+            "kind": "parallel",
+            "steps": [
+              {
+                "action": "ToggleMute",
+                "targets": [
+                  "Master"
+                ],
+                "state": "Mute"
+              },
+              {
+                "action": "Volume",
+                "targets": [
+                  "Focus"
+                ],
+                "value": 0.3
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "id": "macro",
+        "targets": [
+          "Macro"
+        ],
+        "action": "Macro",
+        "macro_steps": [
+          {
+            "kind": "wait",
+            "duration_ms": 250
+          },
+          {
+            "kind": "parallel",
+            "steps": [
+              {
+                "action": "ToggleMute",
+                "targets": [
+                  "Master"
+                ],
+                "state": "Mute"
+              },
+              {
+                "action": "Volume",
+                "targets": [
+                  "Focus"
+                ],
+                "value": 0.3,
+                "state": "Default"
+              }
+            ]
+          }
+        ],
+        "feedback_enabled": true,
+        "target": "Macro",
+        "macro_name": "",
+        "mode": "Absolute",
+        "relative_format": "Auto",
+        "fader_curve": "Linear",
+        "custom_curve": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "mute_behavior": "ToggleOnPress",
+        "indicator_control": null,
+        "assign_mode": "Add",
+        "button_light_mode": "Activity",
+        "button_light_behavior": "FollowState",
+        "hotkey": null,
+        "open_application": null,
+        "autohotkey_script": null,
+        "soundboard": null
+      }
+    }
+  ],
+  "macroDrafts": [
+    {
+      "input": [],
+      "expected": []
+    },
+    {
+      "input": [
+        {
+          "kind": "action",
+          "action": "",
+          "targets": []
+        }
+      ],
+      "expected": [
+        {
+          "kind": "action",
+          "action": "",
+          "targets": [],
+          "state": "Default"
+        }
+      ]
+    },
+    {
+      "input": [
+        {
+          "kind": "parallel",
+          "steps": []
+        }
+      ],
+      "expected": [
+        {
+          "kind": "parallel",
+          "steps": [
+            {
+              "action": "",
+              "targets": [],
+              "state": "Default"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "input": [
+        {
+          "kind": "wait",
+          "duration_ms": 999999
+        }
+      ],
+      "expected": [
+        {
+          "kind": "wait",
+          "duration_ms": 60000
+        }
+      ]
+    },
+    {
+      "input": [
+        {
+          "kind": "action",
+          "action": "Volume",
+          "targets": [
+            "Master"
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "kind": "action",
+          "action": "",
+          "targets": [
+            "Master"
+          ],
+          "state": "Default"
+        }
+      ]
+    }
+  ]
+}
