@@ -39,6 +39,8 @@ export function createSelectionDisplay({
   targetDisplayCache,
   targetIdentity,
 }) {
+  let renderedDisplayKeys = null;
+
   function actionLabel(action, target = null) {
     if (target === "Macro") return t("macro.title");
     if (target === "Soundboard") return t("soundboard.title");
@@ -242,17 +244,25 @@ export function createSelectionDisplay({
     return null;
   }
 
-  function renderChip(target, index) {
+  function describeChip(target) {
     const displayOption = cachedDisplayForTarget(target);
+    const unavailable = Boolean(
+      displayOption?.ghost ||
+        hasUnavailableSuffix(displayOption?.label) ||
+        String(displayOption?.label || "").includes(t("targets.unavailable")),
+    );
+    const actionTag =
+      isBindingButton && selection.selectedAction && !suppressActionTags
+        ? actionLabel(selection.selectedAction, target)
+        : "";
+    return { displayOption, unavailable, actionTag, removeLabel: t("targets.removeTarget") };
+  }
+
+  function renderChip(target, index, model = describeChip(target)) {
+    const { displayOption, unavailable, actionTag, removeLabel } = model;
     const chip = document.createElement("span");
     chip.className = "target-chip";
-    if (
-      displayOption?.ghost ||
-      hasUnavailableSuffix(displayOption?.label) ||
-      String(displayOption?.label || "").includes(t("targets.unavailable"))
-    ) {
-      chip.classList.add("unavailable");
-    }
+    if (unavailable) chip.classList.add("unavailable");
     chip.dataset.index = String(index);
 
     const icon = createTargetIcon(displayOption);
@@ -261,13 +271,9 @@ export function createSelectionDisplay({
 
     const label = document.createElement("span");
     label.className = "target-chip-label";
-    const actionTags =
-      isBindingButton && selection.selectedAction && !suppressActionTags
-        ? [actionLabel(selection.selectedAction, target)]
-        : [];
     renderLabelFromRawWithTags(label, {
       rawLabel: stripUnavailableSuffix(displayOption.label),
-      extraTags: actionTags.filter(Boolean),
+      extraTags: actionTag ? [actionTag] : [],
       truncateMain: true,
       collapseTags: false,
     });
@@ -276,8 +282,8 @@ export function createSelectionDisplay({
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "target-chip-remove";
-    remove.title = t("targets.removeTarget");
-    remove.setAttribute("aria-label", t("targets.removeTarget"));
+    remove.title = removeLabel;
+    remove.setAttribute("aria-label", removeLabel);
     remove.textContent = "×";
     remove.addEventListener("click", (event) => {
       event.preventDefault();
@@ -293,6 +299,30 @@ export function createSelectionDisplay({
   }
 
   function setDisplay() {
+    // Resolve current output before comparing so discovery, plugin actions and
+    // locale updates invalidate the chips even when the selected target is stable.
+    const models = selection.selectedTargets.map(describeChip);
+    const keys = models.length
+      ? models.map(({ displayOption, unavailable, actionTag, removeLabel }, index) => [
+          targetIdentity(selection.selectedTargets[index]),
+          displayOption.label,
+          displayOption.icon_data,
+          displayOption.icon_kind,
+          unavailable,
+          actionTag,
+          removeLabel,
+        ])
+      : [[placeholderOption.label]];
+    if (
+      renderedDisplayKeys?.length === keys.length &&
+      keys.every(
+        (key, index) =>
+          key.length === renderedDisplayKeys[index].length &&
+          key.every((value, field) => value === renderedDisplayKeys[index][field]),
+      )
+    )
+      return;
+    renderedDisplayKeys = keys;
     display.innerHTML = "";
     if (selection.selectedTargets.length === 0) {
       const label = document.createElement("span");
@@ -307,7 +337,7 @@ export function createSelectionDisplay({
       chipsWrap.classList.add("is-scrollable");
     }
     selection.selectedTargets.forEach((target, index) => {
-      chipsWrap.appendChild(renderChip(target, index));
+      chipsWrap.appendChild(renderChip(target, index, models[index]));
     });
     display.appendChild(chipsWrap);
   }

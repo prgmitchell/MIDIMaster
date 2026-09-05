@@ -2,8 +2,8 @@
   "defaultMaxLines": 600,
   "exceptions": {
     "src/app/application.js": {
-      "maxLines": 986,
-      "reason": "Composition root explicitly wires existing feature contracts and cross-feature callbacks. State and workflows are separate modules. Avoid hiding this wiring in a generic service locator; new business rules belong in the owning controller."
+      "maxLines": 993,
+      "reason": "Composition root explicitly wires existing feature contracts and cross-feature callbacks. Seven audit lines record completion of profile MIDI synchronization, including its pending save. State and workflows are separate modules. Avoid hiding this wiring in a generic service locator; new business rules belong in the owning controller."
     },
     "src-tauri/src/app_state.rs": {
       "maxLines": 854,
@@ -50,8 +50,8 @@
       "reason": "Existing plugin-store browsing, installation and connection-tab UI remain a bounded feature. Bundled-plugin authoring and runtime policy are separate; store/operator contracts are preserved."
     },
     "virtual-audio/service/src/usbip.rs": {
-      "maxLines": 650,
-      "reason": "Existing USB/IP framing and request dispatch form one protocol implementation. Tests are counted separately; protocol crate shares cross-process contracts without exposing service implementation."
+      "maxLines": 656,
+      "reason": "Existing USB/IP framing and request dispatch form one protocol implementation. Six optional perf-audit hook lines measure worker creation and wake deadlines without changing scheduling. Tests are counted separately; protocol crate shares cross-process contracts without exposing service implementation."
     },
     "virtual-audio/setup-helper/src/main.rs": {
       "maxLines": 614,

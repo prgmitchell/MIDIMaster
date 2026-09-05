@@ -557,7 +557,7 @@ fn destination_player_key(binding_id: &str, destination: &str) -> String {
     format!("{binding_id}:{destination}")
 }
 
-fn prepare_playback_source(
+pub(crate) fn prepare_playback_source(
     mapping: &SoundboardMapping,
 ) -> Result<impl Source + Send + 'static, String> {
     let path = validate_audio_path(Path::new(&mapping.path))?;

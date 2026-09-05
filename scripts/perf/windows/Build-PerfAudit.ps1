@@ -37,13 +37,15 @@ finally {
     $env:CARGO_PROFILE_RELEASE_OPT_LEVEL = $oldOptLevel
 }
 
-Write-Host "Audit executable: $(Join-Path $tauriRoot 'target/release/midimaster.exe')"
+Write-Host "Audit executable: $(Join-Path $tauriRoot 'target/release/midimaster-perf-audit.exe')"
 Write-Host "Audit symbols: $(Join-Path $tauriRoot 'target/release/midimaster.pdb')"
-$auditExecutable = Join-Path $tauriRoot "target/release/midimaster.exe"
-$auditMarker = Join-Path $tauriRoot "target/release/midimaster.perf-audit.json"
+$auditExecutable = Join-Path $tauriRoot "target/release/midimaster-perf-audit.exe"
+Copy-Item -LiteralPath (Join-Path $tauriRoot "target/release/midimaster.exe") -Destination $auditExecutable -Force
+$auditMarker = Join-Path $tauriRoot "target/release/midimaster-perf-audit.perf-audit.json"
 $marker = [ordered]@{
     schema_version = "1.0.0"
     feature = "perf-audit"
+    application_identifier = "com.midimaster.performance-audit"
     executable_sha256 = (Get-FileHash -LiteralPath $auditExecutable -Algorithm SHA256).Hash.ToLowerInvariant()
     built_at = [DateTime]::UtcNow.ToString("o")
     optimization_level = $OptimizationLevel

@@ -26,18 +26,30 @@ export class CdpSession {
         const pending = this.pending.get(message.id);
         if (!pending) return;
         this.pending.delete(message.id);
+        clearTimeout(pending.timer);
         if (message.error) pending.reject(new Error(`${pending.method}: ${message.error.message}`));
         else pending.resolve(message.result ?? {});
         return;
       }
       for (const listener of this.listeners.get(message.method) ?? []) listener(message.params ?? {});
     });
+    this.socket.addEventListener("close", () => {
+      for (const pending of this.pending.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error(`${pending.method}: CDP connection closed`));
+      }
+      this.pending.clear();
+    });
   }
 
   send(method, params = {}) {
     const id = this.nextId++;
     return new Promise((resolvePromise, reject) => {
-      this.pending.set(id, { resolve: resolvePromise, reject, method });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`${method}: CDP response timed out`));
+      }, 60000);
+      this.pending.set(id, { resolve: resolvePromise, reject, method, timer });
       this.socket.send(JSON.stringify({ id, method, params }));
     });
   }

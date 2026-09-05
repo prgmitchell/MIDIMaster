@@ -110,10 +110,30 @@ pub fn integration_trigger_payload(trigger: IntegrationTrigger<'_>) -> serde_jso
 }
 
 pub fn emit_integration_binding_triggered(app: &AppHandle, trigger: IntegrationTrigger<'_>) {
-    let _ = app.emit(
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::apply_synthetic_integration(
+        trigger.binding_id,
+        trigger.integration_id,
+        &format!("{:?}", trigger.action),
+        trigger.value,
+        std::iter::once(
+            trigger
+                .data
+                .get("identifier")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(trigger.kind)
+                .to_string(),
+        ),
+    ) {
+        return;
+    }
+    let result = app.emit(
         "integration_binding_triggered",
         integration_trigger_payload(trigger),
     );
+    #[cfg(feature = "perf-audit")]
+    crate::perf_audit::record_integration_dispatch(1, result.is_ok());
+    let _ = result;
 }
 
 pub struct IntegrationBatchTrigger<'a> {
@@ -147,10 +167,30 @@ pub fn emit_integration_binding_triggered_batch(
     app: &AppHandle,
     batch: IntegrationBatchTrigger<'_>,
 ) {
-    let _ = app.emit(
+    #[cfg(feature = "perf-audit")]
+    let target_count = batch.targets.len();
+    #[cfg(feature = "perf-audit")]
+    if crate::perf_audit::apply_synthetic_integration(
+        batch.binding_id,
+        batch.integration_id,
+        &format!("{:?}", batch.action),
+        batch.value,
+        batch.targets.iter().map(|target| {
+            target["target"]["data"]["identifier"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string()
+        }),
+    ) {
+        return;
+    }
+    let result = app.emit(
         "integration_binding_triggered_batch",
         integration_batch_payload(batch),
     );
+    #[cfg(feature = "perf-audit")]
+    crate::perf_audit::record_integration_dispatch(target_count, result.is_ok());
+    let _ = result;
 }
 
 pub fn finalize_grouped_integration_targets(grouped_targets: &mut [serde_json::Value]) {

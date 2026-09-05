@@ -1,4 +1,5 @@
 import { performanceAudit } from "../performance_audit_api.js";
+import { readRenderedBindingValue } from "../performance_rendered_value.js";
 import { parseEventPayload } from "../event_payload.js";
 import { t } from "../i18n.js";
 import { fromOsdSettings } from "../../core/osd_settings.js";
@@ -193,19 +194,8 @@ export function createBackendEvents({
       if (!payload || typeof payload !== "object") {
         return;
       }
-      const perfDispatch = performanceAudit.enabled ? takePerfMidiDispatch(payload) : null;
-      const rendererReceivedAt = performanceAudit.enabled ? performanceAudit.now() : 0;
+      if (performanceAudit.enabled) takePerfMidiDispatch(payload);
       queueMidiUiEvent(payload);
-      if (perfDispatch && typeof requestAnimationFrame === "function") {
-        requestAnimationFrame(() => {
-          const nativeDurationMs = Number(perfDispatch.enqueue_to_dispatch_us || 0) / 1000;
-          const rendererDurationMs = performanceAudit.now() - rendererReceivedAt;
-          performanceAudit.recordDuration("midi-visible-update", nativeDurationMs + rendererDurationMs, {
-            controller: Number(payload.controller),
-            msgType: String(payload.msg_type || payload.msgType || "ControlChange"),
-          });
-        });
-      }
     });
 
     await eventSubscriptions.subscribe("midi_connection_status", (event) => {
@@ -238,7 +228,7 @@ export function createBackendEvents({
 
       // Update inline mute buttons.
       // Prefer exact binding-id match first; fall back to target match for mirrored bindings.
-      const indexedButtons = features.bindings?.getRenderedBindingEntries?.();
+      const indexedButtons = features.bindings?.getRenderedBindingIndex?.()?.values();
       const buttons = Array.isArray(indexedButtons)
         ? indexedButtons.filter((entry) => entry.muteButton)
         : Array.from(document.querySelectorAll(".binding-mute-button")).map((muteButton) => ({
@@ -260,6 +250,7 @@ export function createBackendEvents({
         if (!shouldUpdate) return;
         setInlineMuteButtonState(btn, payload.muted);
       });
+      recordRenderedResult(payload);
     });
 
     await eventSubscriptions.subscribe("volume_update", (event) => {
@@ -268,9 +259,18 @@ export function createBackendEvents({
         return;
       }
       queueVolumeUpdatePayload(payload);
+      recordRenderedResult(payload);
     });
 
     // Plugin host starts after the active profile loads (see startMainApp).
+  }
+
+  function recordRenderedResult(payload) {
+    if (!performanceAudit.enabled || !payload?.perf_audit?.applied) return;
+    performanceAudit.recordMidiResult(payload, () => {
+      const refs = features.bindings?.getRenderedBindingRefs?.(payload.binding_id);
+      return readRenderedBindingValue(refs, payload);
+    });
   }
 
   return { setupListeners };

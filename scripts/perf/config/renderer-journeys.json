@@ -1,0 +1,13 @@
+{
+  "search-filter": {"start":{"event":"input","selector":"#binding-search","value":"Performance binding 499"},"completion":[{"kind":"count","selector":"#bindings .binding-item","expected":1},{"kind":"visible","selector":"[data-binding-id='perf-binding-499']"}]},
+  "search-retain-most": {"start":{"event":"input","selector":"#binding-search","value":"Performance binding"},"completion":[{"kind":"count","selector":"#bindings .binding-item","expected":"$initialCount"}]},
+  "configure-binding": {"start":{"event":"click","selector":"[data-binding-id='perf-binding-0'] .binding-actions .binding-action:not(.delete)"},"completion":[{"kind":"visible","selector":"#binding-config-panel"}]},
+  "edit-save": {"start":{"event":"click","selector":"#binding-config-save"},"completion":[{"kind":"hidden","selector":"#binding-config-panel"},{"kind":"text","selector":"[data-binding-id='perf-binding-0'] .binding-name","expected":"Performance binding edited"}]},
+  "reorder": {"start":{"event":"pointerup"},"completion":[{"kind":"attribute","selector":"[data-binding-id='perf-binding-0']","name":"data-visible-index","expected":"4"}]},
+  "density": {"start":{"event":"click","selector":"#binding-density-toggle [data-density='compact']"},"completion":[{"kind":"attribute","selector":"#main-screen","name":"data-bindings-density","expected":"compact"}]},
+  "profile-switch": {"start":{"event":"click","selector":"#profile-list [data-profile-name='Performance 2'] > button:first-child"},"completion":[{"kind":"text","selector":"#profile-current","expected":"Performance 2"},{"kind":"visible","selector":"#bindings .binding-item"},{"kind":"hidden","selector":"#profile-list"}]},
+  "plugins-navigation-first": {"start":{"event":"click","selector":"[data-page='plugins']"},"completion":[{"kind":"visible","selector":"#plugins-page"}]},
+  "plugins-navigation-repeat": {"start":{"event":"click","selector":"[data-page='plugins']"},"completion":[{"kind":"visible","selector":"#plugins-page"}]},
+  "settings-navigation-first": {"start":{"event":"click","selector":"[data-page='settings']"},"completion":[{"kind":"visible","selector":"[data-page-panel='settings']"}]},
+  "settings-navigation-repeat": {"start":{"event":"click","selector":"[data-page='settings']"},"completion":[{"kind":"visible","selector":"[data-page-panel='settings']"}]}
+}

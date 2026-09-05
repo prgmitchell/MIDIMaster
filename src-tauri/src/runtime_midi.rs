@@ -230,6 +230,8 @@ pub(crate) fn apply_midi_event(
             emit_macro_button_feedback(state, app, binding, &key, input_active);
         }
         if input_active {
+            #[cfg(feature = "perf-audit")]
+            crate::perf_audit::record_unverified_action();
             crate::binding_services::spawn_macro_binding(app.clone(), binding.id.clone(), false);
         }
         if matches!(binding.action, model::BindingAction::Macro) {

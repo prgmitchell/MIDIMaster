@@ -7,6 +7,25 @@ import {
 import { effectiveIsButton, applyCurveToNormalized, curveDisplayName } from "../shape_helpers.js";
 import { resolveBindingVolumeValue } from "../value_sync.js";
 
+function setText(element, value) {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+
+function toggleClass(element, name, enabled) {
+  if (element && element.classList.contains(name) !== enabled) element.classList.toggle(name, enabled);
+}
+
+function setHidden(element, hidden) {
+  toggleClass(element, "hidden", hidden);
+  if (element && element.getAttribute("aria-hidden") !== String(hidden)) {
+    element.setAttribute("aria-hidden", String(hidden));
+  }
+}
+
+function setStyle(element, property, value) {
+  if (element && element.style[property] !== value) element.style[property] = value;
+}
+
 /** config preview workflow. */
 export function createConfigPreview({
   bindingInteractionTimes,
@@ -27,14 +46,21 @@ export function createConfigPreview({
   resolveTargetDisplay,
   t,
 }) {
+  let targetDisplayKey = null;
+
   function renderPreviewTarget(binding) {
     const target = getPrimaryTarget(binding);
     const display = resolveTargetDisplay(target) || { label: "Target", icon_data: null };
+    // Resolve on every refresh so asynchronous target discovery and locale changes
+    // remain visible, but only recreate metadata nodes when their output changes.
+    const displayKey = [display.label, display.icon_data, display.icon_kind, display.kind, display.value];
+    if (targetDisplayKey?.every((value, index) => value === displayKey[index])) return;
+    targetDisplayKey = displayKey;
     if (elements.bindingConfigPreviewTargetLabel) {
       const baseLabel = String(display.label || "Target")
         .replace(/\s*\([^()]+\)/g, "")
         .trim();
-      elements.bindingConfigPreviewTargetLabel.textContent = baseLabel || "Target";
+      setText(elements.bindingConfigPreviewTargetLabel, baseLabel || "Target");
     }
     if (elements.bindingConfigPreviewTargetTags) {
       elements.bindingConfigPreviewTargetTags.innerHTML = "";
@@ -50,6 +76,39 @@ export function createConfigPreview({
       const icon = iconForTarget(display);
       if (icon) elements.bindingConfigPreviewTargetIcon.appendChild(icon);
     }
+  }
+
+  function renderPreviewMetadata(binding, isButton) {
+    renderPreviewTarget(binding);
+    const faderPreview = elements.bindingConfigPreviewFill?.closest?.(".binding-config-preview-fader");
+    setHidden(faderPreview, isButton);
+    setHidden(elements.bindingConfigPreviewButton, !isButton);
+    for (const row of [
+      elements.bindingConfigPreviewMuteRow,
+      elements.bindingConfigPreviewAssignRow,
+      elements.bindingConfigPreviewCurveRow,
+    ]) {
+      toggleClass(row, "hidden", isButton);
+    }
+    renderMidiMappingSummary(
+      elements.bindingConfigPreviewMainMidi,
+      binding.device_id,
+      binding.control,
+      labelForControl(binding.control || {}),
+    );
+    renderMidiMappingSummary(
+      elements.bindingConfigPreviewMute,
+      binding.mute_control?.device_id,
+      binding.mute_control,
+      formatMidiControlLabel(binding.mute_control),
+    );
+    renderMidiMappingSummary(
+      elements.bindingConfigPreviewAssign,
+      binding.assign_control?.device_id,
+      binding.assign_control,
+      formatMidiControlLabel(binding.assign_control),
+    );
+    setText(elements.bindingConfigPreviewCurve, curveDisplayName(binding.fader_curve));
   }
 
   function renderConfigPreview() {
@@ -96,100 +155,45 @@ export function createConfigPreview({
     const fillPercent = Math.round(Math.min(1, Math.max(0, previewValue)) * 100);
     const learningPrimary = editorState.learnField === "control";
 
-    renderPreviewTarget(binding);
-    const faderPreview = elements.bindingConfigPreviewFill?.closest?.(".binding-config-preview-fader");
-    if (faderPreview) {
-      faderPreview.classList.toggle("hidden", isButton);
-      faderPreview.setAttribute("aria-hidden", String(isButton));
-    }
-    if (elements.bindingConfigPreviewButton) {
-      elements.bindingConfigPreviewButton.classList.toggle("hidden", !isButton);
-      elements.bindingConfigPreviewButton.setAttribute("aria-hidden", String(!isButton));
-    }
-    if (elements.bindingConfigPreviewButtonFace) {
-      elements.bindingConfigPreviewButtonFace.classList.toggle("is-active", buttonActive);
-      elements.bindingConfigPreviewButtonFace.classList.toggle(
-        "is-mapped",
-        mappedLightValue != null && mappedLightValue > 0.5,
-      );
-    }
-    if (elements.bindingConfigPreviewButtonLabel) {
-      elements.bindingConfigPreviewButtonLabel.textContent = buttonActive
-        ? t("bindings.on")
-        : t("bindings.off");
-    }
-    if (elements.bindingConfigPreviewValue) {
-      elements.bindingConfigPreviewValue.textContent = isButton
-        ? buttonActive
-          ? t("bindings.on")
-          : t("bindings.off")
-        : `${fillPercent}%`;
-    }
-    if (elements.bindingConfigPreviewFill) elements.bindingConfigPreviewFill.style.height = `${fillPercent}%`;
-    if (elements.bindingConfigPreviewThumb)
-      elements.bindingConfigPreviewThumb.style.bottom = `calc(${fillPercent}% - 18px)`;
-    renderMidiMappingSummary(
-      elements.bindingConfigPreviewMainMidi,
-      binding.device_id,
-      binding.control,
-      labelForControl(binding.control || {}),
+    renderPreviewMetadata(binding, isButton);
+    toggleClass(elements.bindingConfigPreviewButtonFace, "is-active", buttonActive);
+    toggleClass(
+      elements.bindingConfigPreviewButtonFace,
+      "is-mapped",
+      mappedLightValue != null && mappedLightValue > 0.5,
     );
-    if (elements.bindingConfigPreviewMuteRow)
-      elements.bindingConfigPreviewMuteRow.classList.toggle("hidden", isButton);
-    if (elements.bindingConfigPreviewAssignRow)
-      elements.bindingConfigPreviewAssignRow.classList.toggle("hidden", isButton);
-    if (elements.bindingConfigPreviewCurveRow)
-      elements.bindingConfigPreviewCurveRow.classList.toggle("hidden", isButton);
-    renderMidiMappingSummary(
-      elements.bindingConfigPreviewMute,
-      binding.mute_control?.device_id,
-      binding.mute_control,
-      formatMidiControlLabel(binding.mute_control),
+    const buttonLabel = buttonActive ? t("bindings.on") : t("bindings.off");
+    setText(elements.bindingConfigPreviewButtonLabel, buttonLabel);
+    setText(elements.bindingConfigPreviewValue, isButton ? buttonLabel : `${fillPercent}%`);
+    setStyle(elements.bindingConfigPreviewFill, "height", `${fillPercent}%`);
+    setStyle(elements.bindingConfigPreviewThumb, "bottom", `calc(${fillPercent}% - 18px)`);
+    setText(
+      elements.bindingConfigPreviewMidiValue,
+      formatPreviewMidiValue(binding, previewValue, liveMidiValue),
     );
-    renderMidiMappingSummary(
-      elements.bindingConfigPreviewAssign,
-      binding.assign_control?.device_id,
-      binding.assign_control,
-      formatMidiControlLabel(binding.assign_control),
-    );
-    if (elements.bindingConfigPreviewCurve)
-      elements.bindingConfigPreviewCurve.textContent = curveDisplayName(binding.fader_curve);
-    if (elements.bindingConfigPreviewMidiValue) {
-      elements.bindingConfigPreviewMidiValue.textContent = formatPreviewMidiValue(
-        binding,
-        previewValue,
-        liveMidiValue,
-      );
+
+    let statusKey;
+    if (learningPrimary) {
+      statusKey = isButton ? "bindings.waitingForNewButtonInput" : "bindings.waitingForNewFaderInput";
+    } else if (isButton && mappedLightValue != null && mappedLightValue > 0.5) {
+      statusKey = "bindings.mappedLightOn";
+    } else if (muted) {
+      statusKey = "bindings.targetMuted";
+    } else if ((bindingId != null && bindingLastValues[bindingId] != null) || liveMidiValue != null) {
+      statusKey = "bindings.receivingLiveFeedback";
+    } else {
+      statusKey = "bindings.waitingForLiveInput";
     }
-    if (elements.bindingConfigPreviewStatus) {
-      if (learningPrimary) {
-        elements.bindingConfigPreviewStatus.textContent = isButton
-          ? t("bindings.waitingForNewButtonInput")
-          : t("bindings.waitingForNewFaderInput");
-      } else if (isButton && mappedLightValue != null && mappedLightValue > 0.5) {
-        elements.bindingConfigPreviewStatus.textContent = t("bindings.mappedLightOn");
-      } else if (muted) {
-        elements.bindingConfigPreviewStatus.textContent = t("bindings.targetMuted");
-      } else if ((bindingId != null && bindingLastValues[bindingId] != null) || liveMidiValue != null) {
-        elements.bindingConfigPreviewStatus.textContent = t("bindings.receivingLiveFeedback");
-      } else {
-        elements.bindingConfigPreviewStatus.textContent = t("bindings.waitingForLiveInput");
-      }
+    setText(elements.bindingConfigPreviewStatus, t(statusKey));
+    for (const indicator of [
+      elements.bindingConfigPreviewLearnIndicator,
+      elements.bindingConfigButtonLearnIndicator,
+    ]) {
+      toggleClass(indicator, "hidden", true);
+      toggleClass(indicator, "is-learning", false);
     }
-    if (elements.bindingConfigPreviewLearnIndicator) {
-      elements.bindingConfigPreviewLearnIndicator.classList.add("hidden");
-      elements.bindingConfigPreviewLearnIndicator.classList.remove("is-learning");
-    }
-    if (elements.bindingConfigPreviewLearnStatus) {
-      elements.bindingConfigPreviewLearnStatus.textContent = t("bindings.waitingMidiInput");
-    }
-    if (elements.bindingConfigButtonLearnIndicator) {
-      elements.bindingConfigButtonLearnIndicator.classList.add("hidden");
-      elements.bindingConfigButtonLearnIndicator.classList.remove("is-learning");
-    }
-    if (elements.bindingConfigButtonLearnStatus) {
-      elements.bindingConfigButtonLearnStatus.textContent = t("bindings.waitingMidiInput");
-    }
+    setText(elements.bindingConfigPreviewLearnStatus, t("bindings.waitingMidiInput"));
+    setText(elements.bindingConfigButtonLearnStatus, t("bindings.waitingMidiInput"));
   }
 
   return { renderPreviewTarget, renderConfigPreview };

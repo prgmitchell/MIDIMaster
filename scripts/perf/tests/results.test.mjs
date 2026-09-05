@@ -79,6 +79,7 @@ test("MIDI results include enqueue-to-visible frontend samples", () => {
   const records = midiRecords(
     {
       run_id: "native-midi",
+      schema_version: 2,
       scenario_id: "midi-continuous-500hz-16controls",
       variant: "current",
       queue: { enqueued: 2, drained: 2, coalesced: 0, dropped: 0 },

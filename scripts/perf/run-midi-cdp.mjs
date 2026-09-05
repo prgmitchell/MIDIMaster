@@ -4,6 +4,12 @@ import { join, resolve } from "node:path";
 import { CdpSession, findTarget } from "./capture-cdp.mjs";
 import { parseArgs, runMain } from "./lib/cli.mjs";
 import { writeJson } from "./lib/files.mjs";
+import { midiCollectionExpression } from "./lib/midi-collection.mjs";
+import { validateMidiResult } from "./lib/midi-validation.mjs";
+
+export { midiCollectionExpression, validateMidiResult };
+
+const milliseconds = value => Number.isFinite(value) ? value / 1000 : null;
 
 function metricRecord(identity, metric, value, unit, kind = "operation", dimensions = {}) {
   return {
@@ -14,7 +20,7 @@ function metricRecord(identity, metric, value, unit, kind = "operation", dimensi
     timestamp: new Date().toISOString(),
     kind,
     metric,
-    value: Number(value),
+    value,
     unit,
     commit: null,
     build: "renderer-cdp-midi",
@@ -22,7 +28,7 @@ function metricRecord(identity, metric, value, unit, kind = "operation", dimensi
   };
 }
 
-export function normalizedRecords(snapshot, injection, frontend, fallback) {
+export function normalizedRecords(snapshot, injection, frontend, fallback = {}) {
   const identity = {
     run_id: snapshot?.run_id || fallback.runId,
     scenario_id: snapshot?.scenario_id || fallback.scenarioId,
@@ -36,26 +42,43 @@ export function normalizedRecords(snapshot, injection, frontend, fallback) {
   };
   const queue = snapshot.queue ?? injection.queue ?? {};
   const native = snapshot.native_action ?? {};
+  const verified = snapshot.schema_version === 2;
   const latestValue = snapshot.latest_value ?? {};
   const records = [
-    metricRecord(identity, "midi.injection_duration", injection.scheduled_duration_us / 1000, "ms", "operation", dimensions),
-    metricRecord(identity, "midi.native_action_p50", native.p50_us / 1000, "ms", "operation", dimensions),
-    metricRecord(identity, "midi.native_action_p95", native.p95_us / 1000, "ms", "operation", dimensions),
-    metricRecord(identity, "midi.native_action_p99", native.p99_us / 1000, "ms", "operation", dimensions),
-    metricRecord(identity, "midi.native_action_samples", native.samples, "count", "counter", dimensions),
+    metricRecord(identity, "midi.injection_duration", milliseconds(injection.scheduled_duration_us), "ms", "operation", dimensions),
     metricRecord(identity, "midi.events_enqueued", queue.enqueued, "count", "counter", dimensions),
     metricRecord(identity, "midi.events_drained", queue.drained, "count", "counter", dimensions),
     metricRecord(identity, "midi.events_coalesced", queue.coalesced, "count", "counter", dimensions),
     metricRecord(identity, "midi.events_dropped", queue.dropped, "count", "counter", dimensions),
-    metricRecord(identity, "midi.queue_depth", Number(queue.pending_continuous || 0) + Number(queue.pending_preserved || 0), "count", "resource", dimensions),
-    metricRecord(identity, "midi.latest_value_mismatches", latestValue.mismatches, "count", "counter", dimensions),
+    metricRecord(identity, "midi.queue_depth", Number.isFinite(queue.pending_continuous) && Number.isFinite(queue.pending_preserved)
+      ? queue.pending_continuous + queue.pending_preserved : null, "count", "resource", dimensions),
   ];
+  for (const [prefix, sample] of [["native_action", native], ["queue_dispatch", snapshot.queue_dispatch], ["native_processing", snapshot.native_processing]]) {
+    const metric = `${verified ? "" : "legacy."}midi.${prefix}`;
+    records.push(metricRecord(identity, `${metric}_samples`, sample?.samples, "count", "counter", dimensions));
+    if (!Number.isSafeInteger(sample?.samples) || sample.samples < 1) continue;
+    for (const percentile of ["p50", "p95", "p99", "max"]) {
+      records.push(metricRecord(identity, `${metric}_${percentile}`, milliseconds(sample[`${percentile}_us`]), "ms", "operation", dimensions));
+    }
+  }
+  if (verified) {
+    records.push(metricRecord(identity, "midi.latest_value_mismatches", latestValue.mismatches, "count", "counter", dimensions));
+    records.push(metricRecord(identity, "midi.expected_controls", latestValue.controls, "count", "counter", dimensions));
+    if (Number.isSafeInteger(latestValue.controls) && Number.isSafeInteger(latestValue.mismatches)
+      && latestValue.mismatches >= 0 && latestValue.mismatches <= latestValue.controls) {
+      records.push(metricRecord(identity, "midi.latest_applied_controls", latestValue.controls - latestValue.mismatches, "count", "counter", dimensions));
+    }
+    for (const [outcome, count] of Object.entries(snapshot.action_outcomes || {})) {
+      if (typeof count === "number") records.push(metricRecord(identity, `midi.outcome.${outcome}`, count, "count", "counter", dimensions));
+    }
+  }
   if (["button", "action"].includes(injection.message_kind)) {
     records.push(metricRecord(identity, "midi.button_events_dropped", queue.dropped, "count", "counter", dimensions));
   }
   for (const entry of frontend?.entries ?? []) {
-    if (entry?.kind === "operation" && entry?.name === "midi-visible-update" && Number.isFinite(entry.durationMs)) {
-      records.push(metricRecord(identity, "midi.visible_update", entry.durationMs, "ms", "operation", {
+    const metric = { "midi-visible-update": "midi.visible_update", "midi-renderer-completion": "midi.renderer_completion" }[entry?.name];
+    if (verified && entry?.kind === "operation" && metric && Number.isFinite(entry.durationMs)) {
+      records.push(metricRecord(identity, metric, entry.durationMs, "ms", "operation", {
         ...dimensions,
         ...(entry.detail && typeof entry.detail === "object" ? entry.detail : {}),
       }));
@@ -64,38 +87,42 @@ export function normalizedRecords(snapshot, injection, frontend, fallback) {
   return records.filter((record) => Number.isFinite(record.value));
 }
 
-export async function runMidiJourney({ endpoint, output, urlPattern, messageCount, ratePerSecond, controlCount, messageKind, runId, scenarioId, variant, timeoutMs = 30000 }) {
+export async function runMidiJourney({ endpoint, output, urlPattern, messageCount, ratePerSecond, controlCount, messageKind, runId, scenarioId, variant, timeoutMs = 30000 }, { locateTarget = findTarget, Session = CdpSession } = {}) {
   if (!Number.isInteger(messageCount) || messageCount < 1 || messageCount > 1_000_000) throw new Error("messageCount must be between 1 and 1,000,000");
   if (!Number.isInteger(ratePerSecond) || ratePerSecond < 1 || ratePerSecond > 10_000) throw new Error("ratePerSecond must be between 1 and 10,000");
   if (!Number.isInteger(controlCount) || controlCount < 1 || controlCount > 16) throw new Error("controlCount must be between 1 and 16");
   if (!["continuous", "button", "action"].includes(messageKind)) throw new Error("messageKind must be continuous, button, or action");
+  const startedAt = Date.now();
+  const identity = { run_id: runId, scenario_id: scenarioId };
   await mkdir(output, { recursive: true });
-  const target = await findTarget(endpoint, urlPattern, timeoutMs);
-  const session = new CdpSession(target.webSocketDebuggerUrl);
-  await session.open();
+  // Reusing an output directory must not leave an older successful sample behind.
+  await writeFile(join(output, "midi.ndjson"), "", "utf8");
+  await writeJson(join(output, "midi-validation.json"), { valid: false, status: "collecting", ...identity });
+  let session;
   try {
-    const expression = `(async () => {
-      const invoke = window.__TAURI__?.core?.invoke;
-      if (!invoke) throw new Error("Tauri invoke bridge unavailable");
-      await invoke("perf_audit_reset");
-      const injection = await invoke("perf_audit_inject_midi", ${JSON.stringify({ messageCount, ratePerSecond, controlCount, messageKind })});
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const snapshot = await invoke("perf_audit_snapshot");
-      const frontend = window.__MIDIMASTER_PERF__?.snapshot?.() ?? null;
-      return { injection, snapshot, frontend };
-    })()`;
+    const target = await locateTarget(endpoint, urlPattern, timeoutMs);
+    session = new Session(target.webSocketDebuggerUrl);
+    await session.open();
+    const expression = midiCollectionExpression({ messageCount, ratePerSecond, controlCount, messageKind, timeoutMs });
     const response = await session.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
-    if (response.exceptionDetails) throw new Error(response.exceptionDetails.text || "MIDI audit evaluation failed");
+    if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || response.exceptionDetails.text || "MIDI audit evaluation failed");
     const result = response.result?.value;
     if (!result?.injection || !result?.snapshot) throw new Error("MIDI audit commands returned no result; use a perf-audit build");
     await writeJson(join(output, "midi-injection.json"), result.injection);
     await writeJson(join(output, "native-snapshot.json"), result.snapshot);
     await writeJson(join(output, "frontend-snapshot.json"), result.frontend);
+    await writeJson(join(output, "midi-collection.json"), { renderer_frames_completed: result.renderer_frames_completed });
+    const checked = validateMidiResult(result, { requireRenderer: messageKind === "continuous" && result.snapshot.synthetic_targets_enabled === true });
     const records = normalizedRecords(result.snapshot, result.injection, result.frontend, { runId, scenarioId, variant });
     await writeFile(join(output, "midi.ndjson"), `${records.map((record) => JSON.stringify(record)).join("\n")}\n`, "utf8");
-    return { records, injection: result.injection, snapshot: result.snapshot };
+    const validation = { valid: true, status: "success", elapsed_ms: Date.now() - startedAt, ...identity, ...checked };
+    await writeJson(join(output, "midi-validation.json"), validation);
+    return { records, ...result, validation };
+  } catch (error) {
+    await writeJson(join(output, "midi-validation.json"), { valid: false, status: "failed", elapsed_ms: Date.now() - startedAt, ...identity, error: String(error?.message || error) });
+    throw error;
   } finally {
-    session.close();
+    session?.close();
   }
 }
 

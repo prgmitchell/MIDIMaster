@@ -366,6 +366,7 @@ function createIntegration({
   flushVolumeWrites,
   getChannelEffects,
   iconDataUrl,
+  invalidateFeedback,
   localVolumeIntentByEndpoint,
   pendingVolumeWrites,
   primaryFeedbackIntentByBinding,
@@ -636,6 +637,7 @@ function createIntegration({
         return groups;
       },
       onBindingTriggered: async (payload) => {
+        invalidateFeedback({ retryInterrupted: true });
         const bindingId = payload?.binding_id;
         const action = payload?.action;
         const value = payload?.value;
@@ -762,6 +764,7 @@ function createIntegration({
 function createConnection({
   ctx,
   iconDataUrl,
+  invalidateFeedback,
   pendingAppInfoByWsId,
   pendingRpcById,
   scheduleChannelsRefresh,
@@ -949,7 +952,7 @@ function createConnection({
       const payload = result?.mixes ?? result;
       if (Array.isArray(payload)) {
         state.mixes = payload;
-        syncAllFeedback().catch(() => {
+        syncAllFeedback("mixes").catch(() => {
         });
       }
       return;
@@ -959,7 +962,7 @@ function createConnection({
       const payload = result?.channels ?? result;
       if (Array.isArray(payload)) {
         state.channels = payload;
-        syncAllFeedback().catch(() => {
+        syncAllFeedback("channels").catch(() => {
         });
       }
       return;
@@ -971,7 +974,7 @@ function createConnection({
           mainOutput: result.mainOutput || null,
           outputDevices: Array.isArray(result.outputDevices) ? result.outputDevices : []
         };
-        syncAllFeedback().catch(() => {
+        syncAllFeedback("outputs").catch(() => {
         });
       }
       return;
@@ -1075,6 +1078,7 @@ function createConnection({
     state.disconnectedByUser = false;
     state.wasConnected = true;
     state.offlineFeedbackSent = false;
+    invalidateFeedback();
     setStatus(true, `Connected (:${state.connectedPort})`);
     await requestFullState();
     return true;
@@ -1089,6 +1093,67 @@ function createConnection({
     clearAllPendingAppInfo,
     connectOnce
   };
+}
+
+// src-tauri/builtin_plugins/wavelink/src/feedback_queue.js
+var DOMAINS = ["mixes", "channels", "outputs"];
+function createFeedbackQueue({ ctx, state, reconcile }) {
+  const dirty = /* @__PURE__ */ new Set();
+  const interrupted = /* @__PURE__ */ new Set();
+  const sent = /* @__PURE__ */ new Map();
+  let generation = 0;
+  let running = null;
+  let activeDomains = null;
+  function invalidate({ retryInterrupted = false } = {}) {
+    generation += 1;
+    sent.clear();
+    if (retryInterrupted) {
+      for (const domain of activeDomains || []) interrupted.add(domain);
+      for (const domain of dirty) interrupted.add(domain);
+    } else {
+      interrupted.clear();
+    }
+    dirty.clear();
+  }
+  async function flush() {
+    while (dirty.size && !state.disposed) {
+      const domains = new Set(dirty);
+      dirty.clear();
+      activeDomains = domains;
+      const currentGeneration = generation;
+      const isCurrent = () => !state.disposed && generation === currentGeneration;
+      const forget = (bindingId, action) => sent.delete(JSON.stringify([bindingId, action]));
+      const send = async (bindingId, value, action) => {
+        if (!isCurrent()) return;
+        const key = JSON.stringify([bindingId, action]);
+        const previous = sent.get(key);
+        const age = previous ? Date.now() - previous.at : Infinity;
+        if (previous?.value === value && age >= 0 && age < STATE_REFRESH_DEBOUNCE_MS) return;
+        await ctx.feedback.set(bindingId, value, action, { silent: true });
+        if (isCurrent()) sent.set(key, { value, at: Date.now() });
+      };
+      try {
+        await reconcile(domains, { send, forget, isCurrent });
+      } finally {
+        activeDomains = null;
+      }
+    }
+    dirty.clear();
+  }
+  function sync(domain = null) {
+    if (state.disposed) return Promise.resolve();
+    for (const item of interrupted) dirty.add(item);
+    interrupted.clear();
+    for (const item of domain ? [domain] : DOMAINS) dirty.add(item);
+    if (!running) {
+      running = Promise.resolve().then(flush).finally(() => {
+        running = null;
+        if (dirty.size && !state.disposed) return sync();
+      });
+    }
+    return running;
+  }
+  return { sync, invalidate };
 }
 
 // src-tauri/builtin_plugins/wavelink/src/feedback.js
@@ -1111,8 +1176,32 @@ function createFeedback({
       return [];
     }
   }
+  const feedbackQueue = createFeedbackQueue({ ctx, state, reconcile: syncFeedbackDomains });
+  let indexedBindings = null;
+  let bindingsByDomain = /* @__PURE__ */ new Map();
+  function feedbackDomain(target) {
+    if (target.kind === "main_output_device" || target.kind === "main_output_cycle") return "outputs";
+    if (target.kind === "mix" || target.kind === "endpoint" && !target.data?.identifier) return "mixes";
+    return "channels";
+  }
+  function bindingDomains() {
+    if (indexedBindings === state.bindings) return bindingsByDomain;
+    indexedBindings = state.bindings;
+    bindingsByDomain = /* @__PURE__ */ new Map();
+    let order = 0;
+    for (const binding of state.bindings || []) {
+      const target = integrationFromBindingTarget(binding?.target);
+      if (target?.integration_id !== "wavelink") continue;
+      const domain = feedbackDomain(target);
+      if (!bindingsByDomain.has(domain)) bindingsByDomain.set(domain, []);
+      bindingsByDomain.get(domain).push({ binding, target, order: order++ });
+    }
+    return bindingsByDomain;
+  }
   function setBindings(next) {
     state.bindings = Array.isArray(next) ? next : [];
+    indexedBindings = null;
+    feedbackQueue.invalidate();
   }
   function formatApplicationInfo() {
     if (!state.applicationInfo || typeof state.applicationInfo !== "object") {
@@ -1142,6 +1231,7 @@ function createFeedback({
     return null;
   }
   async function syncOfflineFeedback() {
+    feedbackQueue.invalidate();
     if (state.offlineFeedbackSent) return;
     const current = state.bindings;
     if (!Array.isArray(current) || current.length === 0) {
@@ -1317,38 +1407,47 @@ function createFeedback({
     if (!nextDevice) return false;
     return setMainOutputDevice(nextDevice);
   }
-  async function syncAllFeedback() {
-    const current = state.bindings;
-    if (!Array.isArray(current) || current.length === 0) return;
-    for (const b of current) {
-      const t = integrationFromBindingTarget(b?.target);
-      if (!t || t.integration_id !== "wavelink") continue;
+  async function syncFeedbackDomains(domains, { send, forget, isCurrent }) {
+    const indexed = bindingDomains();
+    const current = Array.from(domains).flatMap((domain) => indexed.get(domain) || []);
+    if (domains.size > 1) current.sort((a, b) => a.order - b.order);
+    const indexById = (items) => {
+      const result = /* @__PURE__ */ new Map();
+      for (const item of items) {
+        if (item && !result.has(String(item.id))) result.set(String(item.id), item);
+      }
+      return result;
+    };
+    const mixes = indexById(state.mixes);
+    const channels = indexById(state.channels);
+    for (const { binding: b, target: t } of current) {
+      if (!isCurrent()) return;
       const action = b?.action || "Volume";
       const data = t.data || {};
       try {
         if (action === "Volume") {
           let value = null;
           if (t.kind === "mix") {
-            const mix = state.mixes.find((m) => m && String(m.id) === String(data.mixer_id));
+            const mix = mixes.get(String(data.mixer_id));
             value = getLevelFromMix(mix);
           } else if (t.kind === "channel") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             value = getLevelFromChannel(ch);
           } else if (t.kind === "channel_mix") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             const entry = getMixEntry(ch, data.mixer_id);
             value = getLevelFromMixEntry(entry);
           } else if (t.kind === "endpoint") {
             const identifier = data.identifier || "";
             const mixerId = data.mixer_id || "";
             if (!identifier) {
-              const mix = state.mixes.find((m) => m && String(m.id) === String(mixerId));
+              const mix = mixes.get(String(mixerId));
               value = getLevelFromMix(mix);
             } else if (!mixerId) {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               value = getLevelFromChannel(ch);
             } else {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               const entry = getMixEntry(ch, mixerId);
               value = getLevelFromMixEntry(entry);
             }
@@ -1361,49 +1460,51 @@ function createFeedback({
               if (intent) {
                 primaryFeedbackIntentByBinding.delete(b.id);
               }
-              await ctx.feedback.set(b.id, value, "Volume", { silent: true });
+              await send(b.id, value, "Volume");
+            } else {
+              forget(b.id, "Volume");
             }
           }
         }
         if (shouldSyncMuteFeedback(action)) {
           let muted = null;
           if (t.kind === "mix") {
-            const mix = state.mixes.find((m) => m && String(m.id) === String(data.mixer_id));
+            const mix = mixes.get(String(data.mixer_id));
             muted = getMutedFromMix(mix);
           } else if (t.kind === "channel") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             muted = getMutedFromChannel(ch);
           } else if (t.kind === "channel_mix") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             const entry = getMixEntry(ch, data.mixer_id);
             muted = getMutedFromMixEntry(entry);
           } else if (t.kind === "endpoint") {
             const identifier = data.identifier || "";
             const mixerId = data.mixer_id || "";
             if (!identifier) {
-              const mix = state.mixes.find((m) => m && String(m.id) === String(mixerId));
+              const mix = mixes.get(String(mixerId));
               muted = getMutedFromMix(mix);
             } else if (!mixerId) {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               muted = getMutedFromChannel(ch);
             } else {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               const entry = getMixEntry(ch, mixerId);
               muted = getMutedFromMixEntry(entry);
             }
           }
           if (typeof muted === "boolean") {
-            await ctx.feedback.set(b.id, muted ? 1 : 0, "ToggleMute", { silent: true });
+            await send(b.id, muted ? 1 : 0, "ToggleMute");
           }
         } else if (action === "ToggleEffect") {
           const state2 = findEffectState(data);
           if (state2 && typeof state2.enabled === "boolean") {
-            await ctx.feedback.set(b.id, state2.enabled ? 1 : 0, action, { silent: true });
+            await send(b.id, state2.enabled ? 1 : 0, action);
           }
         } else if (action === "SetMainOutputDevice" && t.kind === "main_output_device") {
-          await ctx.feedback.set(b.id, targetIsMainOutputDevice(data) ? 1 : 0, action, { silent: true });
+          await send(b.id, targetIsMainOutputDevice(data) ? 1 : 0, action);
         } else if (action === "SetMainOutputDevice" && t.kind === "main_output_cycle") {
-          await ctx.feedback.set(b.id, 0, action, { silent: true });
+          await send(b.id, 0, action);
         }
       } catch {
       }
@@ -1418,7 +1519,8 @@ function createFeedback({
     setChannelEffectEnabled,
     setMainOutputDevice,
     cycleMainOutputDevice,
-    syncAllFeedback
+    syncAllFeedback: feedbackQueue.sync,
+    invalidateFeedback: feedbackQueue.invalidate
   };
 }
 
@@ -1731,7 +1833,8 @@ async function activate(ctx) {
     setChannelEffectEnabled,
     setMainOutputDevice,
     cycleMainOutputDevice,
-    syncAllFeedback
+    syncAllFeedback,
+    invalidateFeedback
   } = createFeedback({
     ctx,
     primaryFeedbackIntentByBinding,
@@ -1755,6 +1858,7 @@ async function activate(ctx) {
   } = createConnection({
     ctx,
     iconDataUrl,
+    invalidateFeedback,
     pendingAppInfoByWsId,
     pendingRpcById,
     scheduleChannelsRefresh,
@@ -1815,6 +1919,7 @@ async function activate(ctx) {
     flushVolumeWrites,
     getChannelEffects,
     iconDataUrl,
+    invalidateFeedback,
     localVolumeIntentByEndpoint,
     pendingVolumeWrites,
     primaryFeedbackIntentByBinding,

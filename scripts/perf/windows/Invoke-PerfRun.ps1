@@ -23,6 +23,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "ProcessOwnership.ps1")
+$script:auditProcess = $null
+$script:ownedAuditProcesses = @{}
 $application = (Resolve-Path -LiteralPath $ApplicationPath).Path
 if ([System.IO.Path]::GetExtension($application) -ne ".exe") {
     throw "ApplicationPath must identify a Windows .exe: $application"
@@ -34,7 +37,7 @@ if (Test-Path -LiteralPath $auditMarkerPath -PathType Leaf) {
         $auditMarker = Get-Content -LiteralPath $auditMarkerPath -Raw | ConvertFrom-Json
         $actualHash = (Get-FileHash -LiteralPath $application -Algorithm SHA256).Hash.ToLowerInvariant()
         $verifiedAuditBuild = $auditMarker.feature -eq "perf-audit" -and $auditMarker.executable_sha256 -eq $actualHash
-    } catch { $verifiedAuditBuild = $false }
+    } catch { throw "Could not verify audit executable marker: $($_.Exception.Message)" }
 }
 if (-not $verifiedAuditBuild -and -not $AllowUnverifiedExecutable) {
     throw "The executable does not have a matching perf-audit safety marker. Build it with Build-PerfAudit.ps1. Use -AllowUnverifiedExecutable only inside a disposable Windows user account or VM; production builds may ignore the audit app-data override."
@@ -46,7 +49,11 @@ if ($existingInstances.Count -gt 0 -and -not $AllowExistingInstance) {
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "../../..")).Path
-$outputRoot = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $OutputDirectory))
+$outputRoot = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
+    [System.IO.Path]::GetFullPath($OutputDirectory)
+} else {
+    [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $OutputDirectory))
+}
 [System.IO.Directory]::CreateDirectory($outputRoot) | Out-Null
 $runId = if ([string]::IsNullOrWhiteSpace($RunId)) { [Guid]::NewGuid().ToString("N") } else { $RunId.Trim() }
 if ($runId -notmatch '^[A-Za-z0-9._-]{1,80}$') { throw "RunId may contain only letters, numbers, dot, underscore, and hyphen (maximum 80 characters)." }
@@ -86,18 +93,6 @@ function Add-ResultRecord([hashtable]$Record) {
     [System.IO.File]::AppendAllText((Join-Path $runOutput "process.ndjson"), "$line`n", [System.Text.UTF8Encoding]::new($false))
 }
 
-function Get-ProcessTreeIds([int]$RootProcessId, $ProcessTable) {
-    $ids = [System.Collections.Generic.HashSet[int]]::new()
-    [void]$ids.Add($RootProcessId)
-    do {
-        $before = $ids.Count
-        foreach ($entry in $ProcessTable) {
-            if ($ids.Contains([int]$entry.ParentProcessId)) { [void]$ids.Add([int]$entry.ProcessId) }
-        }
-    } while ($ids.Count -gt $before)
-    return @($ids)
-}
-
 function Get-NetworkByteTotal {
     try {
         $statistics = @(Get-NetAdapterStatistics -ErrorAction Stop)
@@ -108,6 +103,21 @@ function Get-NetworkByteTotal {
     catch {
         return $null
     }
+}
+
+function Stop-OwnedAuditProcess {
+    if (-not $script:auditProcess) { return }
+    if (-not $script:auditProcess.HasExited) {
+        try {
+            $remainingTable = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, CreationDate)
+            $ownedRows = @(Get-OwnedProcessRows $script:auditProcess.Id $script:rootStartTime $remainingTable)
+            Get-VerifiedProcessSamples $ownedRows $script:ownedAuditProcesses | Out-Null
+        } catch { Write-Warning "Could not refresh audit process ownership; cleanup will use captured handles only." }
+        [void]$script:auditProcess.CloseMainWindow()
+        [void]$script:auditProcess.WaitForExit(3000)
+    }
+    # WebView children can outlive the main process briefly and still lock its data.
+    Stop-CapturedAuditProcesses $script:ownedAuditProcesses
 }
 
 try {
@@ -130,6 +140,8 @@ try {
     $isolatedAppData = Join-Path $sandboxRoot "app-data/MIDIMaster"
     $isolatedWebView = if ([string]::IsNullOrWhiteSpace($ReusableWebViewDataDirectory)) {
         Join-Path $sandboxRoot "webview2-data"
+    } elseif ([System.IO.Path]::IsPathRooted($ReusableWebViewDataDirectory)) {
+        [System.IO.Path]::GetFullPath($ReusableWebViewDataDirectory)
     } else {
         [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $ReusableWebViewDataDirectory))
     }
@@ -142,6 +154,7 @@ try {
     Get-ChildItem -LiteralPath $fixtureAppData -Force | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $isolatedAppData -Recurse -Force
     }
+    Copy-Item -LiteralPath $fixtureManifest -Destination (Join-Path $sandboxRoot 'fixture.json')
 
     $script:commit = $null
     try { $script:commit = (& git -C $repoRoot rev-parse HEAD 2>$null).Trim() } catch {}
@@ -166,14 +179,15 @@ try {
     $startInfo.EnvironmentVariables["MIDIMASTER_PERF_SCENARIO_ID"] = $ScenarioId
     $startInfo.EnvironmentVariables["MIDIMASTER_PERF_VARIANT"] = $Variant
     $startInfo.EnvironmentVariables["MIDIMASTER_PERF_NETWORK_MODE"] = $NetworkMode.ToLowerInvariant()
+    $startInfo.EnvironmentVariables["MIDIMASTER_PERF_SYNTHETIC_TARGETS"] = "1"
     $startInfo.EnvironmentVariables["APPDATA"] = $isolatedRoaming
     $startInfo.EnvironmentVariables["LOCALAPPDATA"] = $isolatedLocal
     $startInfo.EnvironmentVariables["TEMP"] = $isolatedTemp
     $startInfo.EnvironmentVariables["TMP"] = $isolatedTemp
     $startInfo.EnvironmentVariables["WEBVIEW2_USER_DATA_FOLDER"] = $isolatedWebView
-    if ($CdpPort -gt 0) {
-        $startInfo.EnvironmentVariables["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--remote-debugging-port=$CdpPort"
-    }
+    $browserArguments = "--disable-component-update --disable-background-networking --no-first-run"
+    if ($CdpPort -gt 0) { $browserArguments += " --remote-debugging-port=$CdpPort" }
+    $startInfo.EnvironmentVariables["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = $browserArguments
 
     $runManifest = [ordered]@{
         schema_version = "1.0.0"
@@ -187,39 +201,52 @@ try {
         created_at = [DateTime]::UtcNow.ToString("o")
         local_only = $true
         verified_audit_build = $verifiedAuditBuild
+        process_identity_verified = $true
+        process_sampling_method = "cim-parent-and-creation-time-pinned-handles-v2"
+        process_cpu_method = "pinned-process-lifetime-deltas-v1"
     }
     $runManifestJson = $runManifest | ConvertTo-Json -Depth 10
     [System.IO.File]::WriteAllText((Join-Path $runOutput "run.json"), "$runManifestJson`n", [System.Text.UTF8Encoding]::new($false))
 
     $process = [System.Diagnostics.Process]::Start($startInfo)
     if (-not $process) { throw "Failed to start $application" }
+    $script:auditProcess = $process
     $rootPid = $process.Id
-    Add-ResultRecord @{ kind = "milestone"; metric = "process.started"; value = 0; unit = "ms"; dimensions = @{ root_pid_recorded = $true } }
+    [void]$process.Handle
+    $script:rootStartTime = $process.StartTime
+    $rootBirth = Get-ProcessBirthTicks $script:rootStartTime
+    $script:ownedAuditProcesses["${rootPid}:$rootBirth"] = $process
+    Add-ResultRecord @{ kind = "milestone"; metric = "process.started"; value = 0; unit = "ms"; dimensions = @{ root_pid_recorded = $true; root_pid = $rootPid; root_created_at = $script:rootStartTime.ToUniversalTime().ToString("o") } }
 
-    $previousCpuSeconds = 0.0
+    $previousCpu = @{}
     $previousNetworkBytes = Get-NetworkByteTotal
     $previousReadBytes = $null
     $previousWriteBytes = $null
     $previousTimestamp = [DateTime]::UtcNow
     $deadline = $previousTimestamp.AddSeconds($DurationSeconds)
-    while ([DateTime]::UtcNow -lt $deadline -and -not $process.HasExited) {
+    $stopRequest = Join-Path $runOutput 'stop.request'
+    while ([DateTime]::UtcNow -lt $deadline -and -not $process.HasExited -and -not (Test-Path -LiteralPath $stopRequest)) {
         Start-Sleep -Milliseconds $SampleIntervalMilliseconds
-        $processTable = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, ReadTransferCount, WriteTransferCount)
-        $ids = @(Get-ProcessTreeIds $rootPid $processTable)
-        $live = @(Get-Process -Id $ids -ErrorAction SilentlyContinue)
+        $processTable = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, CreationDate, ReadTransferCount, WriteTransferCount)
+        $ownedRows = @(Get-OwnedProcessRows $rootPid $script:rootStartTime $processTable $script:ownedAuditProcesses)
+        $samples = @(Get-VerifiedProcessSamples $ownedRows $script:ownedAuditProcesses)
+        $live = @($samples | ForEach-Object { $_.Process })
         if (-not $live.Count) { break }
         $now = [DateTime]::UtcNow
-        $cpuSeconds = [double](($live | Measure-Object CPU -Sum).Sum)
+        $cpuSecondsDelta = Get-OwnedCpuSecondsDelta $script:ownedAuditProcesses $previousCpu
         $wallSeconds = [Math]::Max(0.001, ($now - $previousTimestamp).TotalSeconds)
-        $cpuPercent = [Math]::Max(0, ($cpuSeconds - $previousCpuSeconds) / $wallSeconds / [System.Environment]::ProcessorCount * 100)
-        $previousCpuSeconds = $cpuSeconds
+        $cpuPercent = $cpuSecondsDelta / $wallSeconds / [System.Environment]::ProcessorCount * 100
         $previousTimestamp = $now
         $workingSet = [int64](($live | Measure-Object WorkingSet64 -Sum).Sum)
         $handles = [int64](($live | Measure-Object Handles -Sum).Sum)
-        $treeRows = @($processTable | Where-Object { $ids -contains [int]$_.ProcessId })
+        $treeRows = @($samples | ForEach-Object { $_.Row })
         $readBytes = [int64](($treeRows | Measure-Object ReadTransferCount -Sum).Sum)
         $writeBytes = [int64](($treeRows | Measure-Object WriteTransferCount -Sum).Sum)
-        $dimensions = @{ process_count = $live.Count }
+        $dimensions = @{ process_count = $live.Count; ownership = "creation-time-verified" }
+        $ownershipRecord = @{ timestamp = $now.ToString("o"); processes = @($treeRows | ForEach-Object {
+            @{ pid = [int]$_.ProcessId; parent_pid = [int]$_.ParentProcessId; created_at = ([DateTime]$_.CreationDate).ToUniversalTime().ToString("o") }
+        }) } | ConvertTo-Json -Depth 4 -Compress
+        [System.IO.File]::AppendAllText((Join-Path $runOutput "process-tree.cim"), "$ownershipRecord`n", [System.Text.UTF8Encoding]::new($false))
         Add-ResultRecord @{ kind = "resource"; metric = "process.cpu"; value = $cpuPercent; unit = "percent"; dimensions = $dimensions }
         Add-ResultRecord @{ kind = "resource"; metric = "process.working_set"; value = $workingSet; unit = "bytes"; dimensions = $dimensions }
         Add-ResultRecord @{ kind = "resource"; metric = "process.handles"; value = $handles; unit = "count"; dimensions = $dimensions }
@@ -241,26 +268,34 @@ try {
         $previousNetworkBytes = $networkBytes
     }
 
-    if (-not $process.HasExited) {
-        [void]$process.CloseMainWindow()
-        if (-not $process.WaitForExit(3000)) {
-            $remainingTable = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId)
-            $remaining = @(Get-ProcessTreeIds $rootPid $remainingTable)
-            [array]::Reverse($remaining)
-            foreach ($id in $remaining) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
-            [void]$process.WaitForExit(3000)
-        }
-    }
+    Stop-OwnedAuditProcess
     $exitCode = if ($process.HasExited) { $process.ExitCode } else { -1 }
     Add-ResultRecord @{ kind = "counter"; metric = "process.exit_code"; value = $exitCode; unit = "count"; dimensions = @{} }
     Write-Host "Performance run $runId completed. Results: $runOutput"
 }
 finally {
+    Stop-OwnedAuditProcess
     if (-not $PreserveSandbox -and (Test-Path -LiteralPath $sandboxRoot)) {
         Assert-ChildPath $sandboxParent $sandboxRoot
-        Remove-Item -LiteralPath $sandboxRoot -Recurse -Force
+        for ($cleanupAttempt = 0; $cleanupAttempt -lt 10; $cleanupAttempt++) {
+            try {
+                Remove-Item -LiteralPath $sandboxRoot -Recurse -Force
+                break
+            } catch {
+                if ($cleanupAttempt -eq 9) {
+                    # Windows services can retain a WebView temporary download
+                    # after every owned process exits. Preserve that local residue.
+                    $cleanupResult = @{ completed = $false; retained_path = $sandboxRoot; error = $_.Exception.Message }
+                    $cleanupResult | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runOutput 'cleanup.json')
+                    Write-Warning "A locked temporary audit file was retained. Details: $(Join-Path $runOutput 'cleanup.json')"
+                    break
+                }
+                Start-Sleep -Milliseconds 250
+            }
+        }
     }
     elseif ($PreserveSandbox) {
         Write-Host "Preserved disposable sandbox: $sandboxRoot"
     }
+    foreach ($owned in $script:ownedAuditProcesses.Values) { $owned.Dispose() }
 }

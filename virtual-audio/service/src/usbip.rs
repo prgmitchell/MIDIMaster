@@ -386,7 +386,11 @@ fn handle_urbs(
                     state.add_pending(basic.sequence, cancelled.clone())?;
                     let worker_state = state.clone();
                     let worker_device = device.clone();
+                    #[cfg(feature = "perf-audit")]
+                    let requested = Instant::now();
                     thread::spawn(move || {
+                        #[cfg(feature = "perf-audit")]
+                        let _worker = crate::perf_audit::UrbWorker::started(requested);
                         let _ =
                             process_submit(&worker_state, &worker_device, submit, Some(cancelled));
                         worker_state.remove_pending(basic.sequence);
@@ -479,6 +483,8 @@ fn wait_until(deadline: Option<Instant>, cancelled: Option<&AtomicBool>) -> Resu
         }
         let now = Instant::now();
         if now >= deadline {
+            #[cfg(feature = "perf-audit")]
+            crate::perf_audit::completed_wait(deadline, now);
             return Ok(());
         }
         thread::sleep((deadline - now).min(Duration::from_millis(2)));

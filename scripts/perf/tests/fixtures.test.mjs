@@ -33,6 +33,10 @@ test("MIDI fixtures expose deterministic continuous, button, and action controls
   assert.equal(bindings[120].control.controller, 120);
   assert.equal(bindings[124].control.controller, 124);
   assert.equal(bindings[121].control.controller, 121);
+  assert.ok(bindings.every(binding => binding.debounce_ms === 0));
+  assert.equal(bindings[4].mute_behavior, "ToggleOnPress");
+  assert.equal(bindings[1].deadzone, 0.0001);
+  assert.ok(bindings[1].deadzone < 1 / 127);
 });
 
 test("matrix generation writes isolated app-data fixtures and disables online startup work", async () => {

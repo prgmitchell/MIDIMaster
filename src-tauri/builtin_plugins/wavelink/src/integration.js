@@ -20,6 +20,7 @@ export function createIntegration({
   flushVolumeWrites,
   getChannelEffects,
   iconDataUrl,
+  invalidateFeedback,
   localVolumeIntentByEndpoint,
   pendingVolumeWrites,
   primaryFeedbackIntentByBinding,
@@ -310,6 +311,9 @@ export function createIntegration({
         return groups;
       },
       onBindingTriggered: async (payload) => {
+        // Local actions may change native/optimistic feedback before the next
+        // state response, including momentary press/release feedback.
+        invalidateFeedback({ retryInterrupted: true });
         const bindingId = payload?.binding_id;
         const action = payload?.action;
         const value = payload?.value;

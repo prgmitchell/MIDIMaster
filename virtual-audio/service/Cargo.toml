@@ -14,6 +14,14 @@ path = "src/lib.rs"
 name = "midimaster-virtual-audio-service"
 path = "src/main.rs"
 
+[features]
+perf-audit = []
+
+[[bench]]
+name = "audio_pipeline"
+harness = false
+required-features = ["perf-audit"]
+
 [dependencies]
 midimaster-virtual-audio-protocol = { path = "../protocol" }
 serde.workspace = true

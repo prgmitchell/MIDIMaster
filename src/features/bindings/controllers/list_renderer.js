@@ -66,14 +66,32 @@ export function createListRenderer({
   t,
   updateSliderFill,
 }) {
+  // Row listeners survive filtering; read the current ordering when a drag starts.
+  let visibleBindingIds = [];
+
+  function reconcileRows(rows) {
+    const container = elements.bindingsContainer;
+    const wanted = new Set(rows);
+    for (const child of Array.from(container.childNodes)) {
+      if (!wanted.has(child)) child.remove();
+    }
+    let cursor = container.firstChild;
+    for (const row of rows) {
+      if (row === cursor) {
+        cursor = cursor.nextSibling;
+      } else {
+        container.insertBefore(row, cursor);
+      }
+    }
+  }
+
   function renderBindings() {
     if (isBindingDragActive()) {
       listState.pendingRerender = true;
       return;
     }
 
-    // Keyed rows are temporarily moved into a fragment below. That can shrink
-    // the live scroll container enough for WebView2 to clamp scrollTop to zero.
+    // Filtering/removing rows can clamp the scroll position in WebView2.
     const scrollPosition = captureElementScroll(elements.bindingsContainer);
 
     const editingIdAtRenderStart = getEditingId();
@@ -94,11 +112,11 @@ export function createListRenderer({
         previousRendered.set(bindingId, renderedBindings.get(bindingId) || { item });
       }
     });
-    const nextContent = document.createDocumentFragment();
+    const nextRows = [];
     renderedBindings.clear();
     const searchQuery = getSearchQuery();
     const typeFilter = getBindingTypeFilter();
-    const visibleBindingIds = [];
+    visibleBindingIds = [];
     let renderedCount = 0;
 
     if (!Array.isArray(bindings) || bindings.length === 0) {
@@ -129,14 +147,16 @@ export function createListRenderer({
         const bindingId = String(binding.id || "");
         visibleBindingIds.push(bindingId);
         renderedCount += 1;
-        const renderKey = bindingRenderKey(binding, index, visibleIndex, searchQuery, typeFilter);
+        const renderKey = bindingRenderKey(binding, index);
         const previous = previousRendered.get(bindingId);
         if (previous?.item?.__bindingRenderKey === renderKey) {
-          previous.item.dataset.index = String(index);
-          previous.item.dataset.visibleIndex = String(visibleIndex);
+          if (previous.item.dataset.index !== String(index)) previous.item.dataset.index = String(index);
+          if (previous.item.dataset.visibleIndex !== String(visibleIndex)) {
+            previous.item.dataset.visibleIndex = String(visibleIndex);
+          }
           previous.targetDropdown?.refreshTargetDisplay?.();
           renderedBindings.register(bindingId, previous);
-          nextContent.appendChild(previous.item);
+          nextRows.push(previous.item);
           return;
         }
         const item = document.createElement("div");
@@ -169,7 +189,7 @@ export function createListRenderer({
             item,
             {
               bindingId,
-              visibleIndex,
+              visibleIndex: Number(item.dataset.visibleIndex),
               visibleBindingIds: visibleBindingIds.slice(),
             },
             event,
@@ -300,7 +320,8 @@ export function createListRenderer({
           try {
             await invoke("remove_binding", { binding });
             const next = getBindings();
-            next.splice(index, 1);
+            const currentIndex = next.findIndex((candidate) => candidate.id === binding.id);
+            if (currentIndex >= 0) next.splice(currentIndex, 1);
             setBindings(next);
             renderBindings();
             finishBindingUiMutation("delete binding");
@@ -328,7 +349,7 @@ export function createListRenderer({
         row.appendChild(valueGroup);
         row.appendChild(actions);
         item.appendChild(row);
-        nextContent.appendChild(item);
+        nextRows.push(item);
 
         if (nameInput && shouldRestoreEditingFocus && String(binding.id) === String(editingIdAtRenderStart)) {
           focusBindingNameInput(nameInput, binding.id);
@@ -372,9 +393,13 @@ export function createListRenderer({
         };
         errorItem.appendChild(delBtn);
 
-        nextContent.appendChild(errorItem);
+        nextRows.push(errorItem);
       }
     });
+
+    // Row event handlers retain this render's closure context. Release the
+    // temporary lookup so current rows cannot retain earlier row generations.
+    previousRendered.clear();
 
     if (renderedCount === 0) {
       const empty = document.createElement("div");
@@ -384,10 +409,12 @@ export function createListRenderer({
         : typeFilter === "all"
           ? t("bindings.noSearchResults")
           : t("bindings.noFilterResults");
-      nextContent.appendChild(empty);
+      nextRows.push(empty);
     }
 
-    elements.bindingsContainer.replaceChildren(nextContent);
+    reconcileRows(nextRows);
+    // A reused row can also retain this array and its now-replaced siblings.
+    nextRows.length = 0;
     restoreElementScroll(elements.bindingsContainer, scrollPosition);
 
     queueBindingsScrollLayoutSync();

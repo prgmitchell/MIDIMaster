@@ -98,6 +98,8 @@ pub(super) fn trigger_supplemental_soundboard(
     {
         return;
     }
+    #[cfg(feature = "perf-audit")]
+    crate::perf_audit::record_unverified_action();
     let result = binding
         .soundboard
         .as_ref()
@@ -130,6 +132,8 @@ pub(super) fn handle_special_action(
     if binding.action == model::BindingAction::SwitchProfile {
         clear_profile_switch_button_feedback(state, app, binding, event, targets);
         if event.value > 0 {
+            #[cfg(feature = "perf-audit")]
+            crate::perf_audit::record_unverified_action();
             binding_actions::request_profile_switch(app, binding, "bindings");
         }
         return Ok(true);
@@ -148,6 +152,8 @@ pub(super) fn handle_special_action(
         if !input_active {
             return Ok(true);
         }
+        #[cfg(feature = "perf-audit")]
+        crate::perf_audit::record_unverified_action();
         let result = binding
             .soundboard
             .as_ref()
@@ -188,6 +194,10 @@ pub(super) fn handle_special_action(
             | model::BindingAction::ToggleScreenRecording
     );
     if shared_button_action {
+        #[cfg(feature = "perf-audit")]
+        if event.value > 0 {
+            crate::perf_audit::record_unverified_action();
+        }
         let is_capture_action = matches!(
             binding.action,
             model::BindingAction::FullScreenshot

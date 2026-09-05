@@ -79,6 +79,11 @@ name = "performance"
 harness = false
 required-features = ["perf-audit"]
 
+[[bench]]
+name = "audio_preparation"
+harness = false
+required-features = ["perf-audit"]
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

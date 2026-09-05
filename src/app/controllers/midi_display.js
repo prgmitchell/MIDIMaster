@@ -22,10 +22,13 @@ export function createMidiDisplay({
   findInlineMuteButton,
   flashBindingTrigger,
   knownMidiRouteCount,
+  getTargetMetadata = () => [],
   liveState,
   midiControlSignature,
   profileState,
   resolveTargetVolume,
+  resolveTargetKey,
+  targetsMatch,
   setBindingSliderVolume,
   setInlineMuteButtonState,
 }) {
@@ -184,17 +187,8 @@ export function createMidiDisplay({
   }
 
   function volumeSliderEntries() {
-    const indexed = features.bindings?.getRenderedBindingEntries?.();
-    if (Array.isArray(indexed)) {
-      return indexed
-        .filter((entry) => entry.slider)
-        .map(({ slider, target }) => ({
-          slider,
-          bindingId: String(slider.dataset.bindingId || ""),
-          target,
-          lastMidiUpdate: Number(slider.dataset.lastMidiUpdate || 0),
-        }));
-    }
+    const index = features.bindings?.getRenderedBindingIndex?.();
+    if (index) return index.volumeEntries();
     return Array.from(document.querySelectorAll(".binding-volume-slider")).map((slider) => {
       let target = null;
       try {
@@ -206,7 +200,6 @@ export function createMidiDisplay({
         slider,
         bindingId: String(slider.dataset.bindingId || ""),
         target,
-        lastMidiUpdate: Number(slider.dataset.lastMidiUpdate || 0),
       };
     });
   }
@@ -214,25 +207,30 @@ export function createMidiDisplay({
   function flushVolumeUpdatePayloads(payloads) {
     if (!Array.isArray(payloads) || payloads.length === 0) return;
     const now = Date.now();
-    const sliderEntries = volumeSliderEntries();
-    const slidersByBinding = new Map();
-    sliderEntries.forEach((entry) => {
-      if (entry.bindingId && !slidersByBinding.has(entry.bindingId)) {
-        slidersByBinding.set(entry.bindingId, entry);
+    const index = features.bindings?.getRenderedBindingIndex?.();
+    const sliderEntries = index ? null : volumeSliderEntries();
+    const slidersByBinding = index ? { get: (id) => index.volumeEntry(id) } : new Map();
+    if (!index) {
+      for (const entry of sliderEntries) {
+        if (entry.bindingId && !slidersByBinding.has(entry.bindingId)) {
+          slidersByBinding.set(entry.bindingId, entry);
+        }
       }
-    });
-    const bindingsById = new Map(profileState.bindings.map((binding) => [String(binding.id), binding]));
+    }
+    const bindingsById = profileState.bindingLookupIndex;
     const shouldSuppressIntegrationEcho = (entry) => {
       const bindingId = entry.bindingId;
       if (!bindingId) return false;
-      const binding = bindingsById.get(bindingId);
+      const binding = bindingsById?.findLastById
+        ? bindingsById.findLastById(bindingId)
+        : profileState.bindings.findLast((binding) => String(binding.id) === bindingId);
       if (!binding || !bindingHasIntegrationTarget(binding)) return false;
       const lastInteraction = Number(liveState.bindingInteractionTimes[bindingId] || 0);
       return lastInteraction > 0 && now - lastInteraction < INTEGRATION_ACTIVE_ECHO_SUPPRESSION_MS;
     };
     const canAcceptBackendVolume = (entry) =>
       entry &&
-      now - entry.lastMidiUpdate > BACKEND_ECHO_SUPPRESSION_MS &&
+      now - Number(entry.slider.dataset.lastMidiUpdate || 0) > BACKEND_ECHO_SUPPRESSION_MS &&
       !shouldSuppressIntegrationEcho(entry);
 
     for (const payload of payloads) {
@@ -240,6 +238,9 @@ export function createMidiDisplay({
         sliderEntries,
         slidersByBinding,
         canAcceptBackendVolume,
+        matchingSliders: index ? (target) => index.matchVolumeTargets(target, {
+          targetsMatch, resolveTargetKey, metadata: getTargetMetadata(),
+        }) : null,
       });
     }
   }

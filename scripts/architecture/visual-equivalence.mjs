@@ -9,7 +9,9 @@ import { ROOT } from "./inventory.mjs";
 
 // A local, isolated Edge profile exercises both revisions in the same renderer.
 // This is a manual Windows check; it never starts Tauri or accesses connected devices.
-const baseline = JSON.parse(await readFile(new URL("./baseline.json", import.meta.url), "utf8")).revision;
+const baseline =
+  process.env.MIDIMASTER_VISUAL_BASELINE ||
+  JSON.parse(await readFile(new URL("./baseline.json", import.meta.url), "utf8")).revision;
 const output = resolve(process.env.MIDIMASTER_VISUAL_OUTPUT || "scripts/perf/.work/visual-equivalence");
 const browserPath =
   process.env.MIDIMASTER_EDGE_PATH || "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";

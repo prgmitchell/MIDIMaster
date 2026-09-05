@@ -168,6 +168,7 @@ export async function activate(ctx) {
     setMainOutputDevice,
     cycleMainOutputDevice,
     syncAllFeedback,
+    invalidateFeedback,
   } = createFeedback({
     ctx,
     primaryFeedbackIntentByBinding,
@@ -192,6 +193,7 @@ export async function activate(ctx) {
   } = createConnection({
     ctx,
     iconDataUrl,
+    invalidateFeedback,
     pendingAppInfoByWsId,
     pendingRpcById,
     scheduleChannelsRefresh,
@@ -260,6 +262,7 @@ export async function activate(ctx) {
     flushVolumeWrites,
     getChannelEffects,
     iconDataUrl,
+    invalidateFeedback,
     localVolumeIntentByEndpoint,
     pendingVolumeWrites,
     primaryFeedbackIntentByBinding,

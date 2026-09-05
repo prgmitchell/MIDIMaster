@@ -10,6 +10,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
+pub fn prepare_soundboard_source(
+    mapping: &crate::model::SoundboardMapping,
+) -> Result<Option<f32>, String> {
+    crate::soundboard::prepare_playback_source(mapping).map(|mut source| source.next())
+}
+
 pub struct DurableProfileBench {
     store: DurableJsonStore,
 }

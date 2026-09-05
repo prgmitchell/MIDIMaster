@@ -1,7 +1,5 @@
 use crate::model::OsdSettings;
 use crate::windows_display::{display_device_id, monitor_display_name};
-use std::thread::sleep as thread_sleep;
-use std::time::Duration as StdDuration;
 use tauri::AppHandle;
 
 #[derive(Clone)]
@@ -55,39 +53,74 @@ pub(crate) fn resolve_monitor_for_osd(
     app: &AppHandle,
     settings: &OsdSettings,
 ) -> Option<tauri::Monitor> {
-    let requested_id = settings.monitor_id.as_ref().and_then(|id| {
-        let trimmed = id.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
-    });
-
-    let max_attempts = if requested_id.is_some() { 7 } else { 1 };
-
-    for attempt in 0..max_attempts {
-        let descriptors = collect_monitor_descriptors(app).ok()?;
-
-        if let Some(ref id) = requested_id {
-            if let Some(found) = descriptors.iter().find(|m| m.stable_id == *id) {
-                return Some(found.monitor.clone());
-            }
-
-            if attempt + 1 < max_attempts {
-                thread_sleep(StdDuration::from_millis(250));
-                continue;
-            }
-        }
-
-        if let Some(primary) = descriptors
+    // Never wait for a disconnected display on the MIDI/OSD path. Resolve a
+    // fresh snapshot each time so the saved stable ID wins as soon as it returns.
+    let descriptors = collect_monitor_descriptors(app).ok()?;
+    let index = select_monitor_index(
+        settings.monitor_id.as_deref(),
+        descriptors
             .iter()
-            .find(|m| m.is_primary)
-            .or_else(|| descriptors.first())
-        {
-            return Some(primary.monitor.clone());
+            .map(|monitor| (monitor.stable_id.as_str(), monitor.is_primary)),
+    )?;
+    descriptors
+        .into_iter()
+        .nth(index)
+        .map(|entry| entry.monitor)
+}
+
+fn select_monitor_index<'a>(
+    requested_id: Option<&str>,
+    monitors: impl IntoIterator<Item = (&'a str, bool)>,
+) -> Option<usize> {
+    let requested_id = requested_id.map(str::trim).filter(|id| !id.is_empty());
+    let mut first = None;
+    let mut primary = None;
+    for (index, (stable_id, is_primary)) in monitors.into_iter().enumerate() {
+        if requested_id == Some(stable_id) {
+            return Some(index);
+        }
+        first.get_or_insert(index);
+        if is_primary {
+            primary.get_or_insert(index);
         }
     }
+    primary.or(first)
+}
 
-    None
+#[cfg(test)]
+mod tests {
+    use super::select_monitor_index;
+
+    #[test]
+    fn saved_monitor_wins_over_primary_and_enumeration_order() {
+        let monitors = [("first", false), ("primary", true), ("saved", false)];
+        assert_eq!(select_monitor_index(Some(" saved "), monitors), Some(2));
+    }
+
+    #[test]
+    fn missing_or_empty_selection_uses_primary_then_first_available() {
+        let monitors = [("secondary", false), ("primary", true)];
+        for requested in [None, Some(""), Some("  "), Some("disconnected")] {
+            assert_eq!(select_monitor_index(requested, monitors), Some(1));
+        }
+        assert_eq!(
+            select_monitor_index(Some("missing"), [("only", false)]),
+            Some(0)
+        );
+        assert_eq!(select_monitor_index(Some("missing"), []), None);
+    }
+
+    #[test]
+    fn saved_monitor_returns_after_disconnection_without_changing_preference() {
+        let requested = Some("saved");
+        let disconnected = [("primary", true)];
+        let reconnected = [("saved", false), ("primary", true)];
+        assert_eq!(select_monitor_index(requested, disconnected), Some(0));
+        assert_eq!(select_monitor_index(requested, reconnected), Some(0));
+        assert_eq!(
+            select_monitor_index(requested, [("primary", true), ("saved", false)]),
+            Some(1)
+        );
+        assert_eq!(requested, Some("saved"));
+    }
 }

@@ -4,7 +4,9 @@ use crate::run_logger;
 use crate::AppState;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager};
+use tauri::{
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize,
+};
 
 pub(crate) fn apply_osd_settings(app: &AppHandle, settings: &OsdSettings) {
     apply_osd_settings_if_needed(app, settings, false);
@@ -30,8 +32,37 @@ pub(crate) fn emit_osd_settings_update(app: &AppHandle, settings: &OsdSettings) 
 
 #[derive(Default)]
 struct OsdWindowCache {
-    placement_signature: Option<String>,
+    placement_signature: Option<OsdPlacementSignature>,
     topmost_applied: bool,
+}
+
+#[derive(Debug, PartialEq)]
+struct OsdPlacementSignature {
+    anchor: String,
+    scale: f64,
+    requested_monitor_id: Option<String>,
+    monitor_name: String,
+    position: PhysicalPosition<i32>,
+    size: PhysicalSize<u32>,
+    scale_factor: f64,
+}
+
+fn placement_signature(
+    settings: &OsdSettings,
+    monitor_name: &str,
+    position: PhysicalPosition<i32>,
+    size: PhysicalSize<u32>,
+    scale_factor: f64,
+) -> OsdPlacementSignature {
+    OsdPlacementSignature {
+        anchor: settings.anchor.clone(),
+        scale: settings.scale.clamp(0.75, 1.5),
+        requested_monitor_id: settings.monitor_id.clone(),
+        monitor_name: monitor_name.to_string(),
+        position,
+        size,
+        scale_factor,
+    }
 }
 
 fn osd_window_cache() -> &'static Mutex<OsdWindowCache> {
@@ -77,20 +108,10 @@ fn apply_osd_settings_if_needed(app: &AppHandle, settings: &OsdSettings, force: 
         let position = monitor.position();
         let scale = settings.scale.clamp(0.75, 1.5);
         let monitor_name = monitor.name().map(String::as_str).unwrap_or_default();
-        let signature = format!(
-            "anchor={} scale={:.3} monitor={} pos={}x{} size={}x{} sf={:.3}",
-            settings.anchor,
-            scale,
-            monitor_name,
-            position.x,
-            position.y,
-            size.width,
-            size.height,
-            scale_factor
-        );
+        let signature = placement_signature(settings, monitor_name, *position, *size, scale_factor);
         let placement_needed = osd_window_cache()
             .lock()
-            .map(|cache| force || cache.placement_signature.as_deref() != Some(signature.as_str()))
+            .map(|cache| force || cache.placement_signature.as_ref() != Some(&signature))
             .unwrap_or(true);
         if !placement_needed {
             return;
@@ -261,8 +282,84 @@ fn force_topmost(_window: &tauri::WebviewWindow) {}
 
 #[cfg(test)]
 mod tests {
-    use super::osd_settings_update_payload;
+    use super::{osd_settings_update_payload, placement_signature};
     use crate::model::OsdSettings;
+    use tauri::{PhysicalPosition, PhysicalSize};
+
+    #[test]
+    fn placement_cache_tracks_topology_dpi_and_layout_preferences() {
+        let settings = OsdSettings::default();
+        let position = PhysicalPosition::new(0, 0);
+        let size = PhysicalSize::new(1920, 1080);
+        let original = placement_signature(&settings, "primary", position, size, 1.0);
+        assert_eq!(
+            original,
+            placement_signature(&settings, "primary", position, size, 1.0)
+        );
+        assert_ne!(
+            original,
+            placement_signature(&settings, "reconnected", position, size, 1.0)
+        );
+        assert_ne!(
+            original,
+            placement_signature(
+                &settings,
+                "primary",
+                PhysicalPosition::new(-1920, 0),
+                size,
+                1.0
+            )
+        );
+        assert_ne!(
+            original,
+            placement_signature(
+                &settings,
+                "primary",
+                position,
+                PhysicalSize::new(2560, 1440),
+                1.0
+            )
+        );
+        assert_ne!(
+            original,
+            placement_signature(&settings, "primary", position, size, 1.0001)
+        );
+
+        let mut updated = settings.clone();
+        updated.anchor = "bottom-left".to_string();
+        assert_ne!(
+            original,
+            placement_signature(&updated, "primary", position, size, 1.0)
+        );
+        updated = settings.clone();
+        updated.scale += 0.0001;
+        assert_ne!(
+            original,
+            placement_signature(&updated, "primary", position, size, 1.0)
+        );
+        updated = settings;
+        updated.monitor_id = Some("saved-monitor".to_string());
+        assert_ne!(
+            original,
+            placement_signature(&updated, "primary", position, size, 1.0)
+        );
+    }
+
+    #[test]
+    fn appearance_only_changes_do_not_reposition_the_window() {
+        let settings = OsdSettings::default();
+        let position = PhysicalPosition::new(0, 0);
+        let size = PhysicalSize::new(1920, 1080);
+        let original = placement_signature(&settings, "primary", position, size, 1.0);
+        let mut updated = settings;
+        updated.opacity = 0.5;
+        updated.style = "glass".to_string();
+        updated.show_binding_name = !updated.show_binding_name;
+        assert_eq!(
+            original,
+            placement_signature(&updated, "primary", position, size, 1.0)
+        );
+    }
 
     #[test]
     fn osd_settings_update_payload_preserves_monitor_and_anchor_fields() {

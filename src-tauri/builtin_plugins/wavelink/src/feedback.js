@@ -1,3 +1,4 @@
+import { createFeedbackQueue } from "./feedback_queue.js";
 import {
   ui,
   clamp01,
@@ -32,8 +33,35 @@ export function createFeedback({
     }
   }
 
+  const feedbackQueue = createFeedbackQueue({ ctx, state, reconcile: syncFeedbackDomains });
+  let indexedBindings = null;
+  let bindingsByDomain = new Map();
+
+  function feedbackDomain(target) {
+    if (target.kind === "main_output_device" || target.kind === "main_output_cycle") return "outputs";
+    if (target.kind === "mix" || (target.kind === "endpoint" && !target.data?.identifier)) return "mixes";
+    return "channels";
+  }
+
+  function bindingDomains() {
+    if (indexedBindings === state.bindings) return bindingsByDomain;
+    indexedBindings = state.bindings;
+    bindingsByDomain = new Map();
+    let order = 0;
+    for (const binding of state.bindings || []) {
+      const target = integrationFromBindingTarget(binding?.target);
+      if (target?.integration_id !== "wavelink") continue;
+      const domain = feedbackDomain(target);
+      if (!bindingsByDomain.has(domain)) bindingsByDomain.set(domain, []);
+      bindingsByDomain.get(domain).push({ binding, target, order: order++ });
+    }
+    return bindingsByDomain;
+  }
+
   function setBindings(next) {
     state.bindings = Array.isArray(next) ? next : [];
+    indexedBindings = null;
+    feedbackQueue.invalidate();
   }
 
   function formatApplicationInfo() {
@@ -68,6 +96,7 @@ export function createFeedback({
   }
 
   async function syncOfflineFeedback() {
+    feedbackQueue.invalidate();
     // If Wave Link is disconnected, drive bound controls to 0.
     // This keeps motor faders from staying at a stale value.
     if (state.offlineFeedbackSent) return;
@@ -268,13 +297,21 @@ export function createFeedback({
     return setMainOutputDevice(nextDevice);
   }
 
-  async function syncAllFeedback() {
-    const current = state.bindings;
-    if (!Array.isArray(current) || current.length === 0) return;
-
-    for (const b of current) {
-      const t = integrationFromBindingTarget(b?.target);
-      if (!t || t.integration_id !== "wavelink") continue;
+  async function syncFeedbackDomains(domains, { send, forget, isCurrent }) {
+    const indexed = bindingDomains();
+    const current = Array.from(domains).flatMap((domain) => indexed.get(domain) || []);
+    if (domains.size > 1) current.sort((a, b) => a.order - b.order);
+    const indexById = (items) => {
+      const result = new Map();
+      for (const item of items) {
+        if (item && !result.has(String(item.id))) result.set(String(item.id), item);
+      }
+      return result;
+    };
+    const mixes = indexById(state.mixes);
+    const channels = indexById(state.channels);
+    for (const { binding: b, target: t } of current) {
+      if (!isCurrent()) return;
       const action = b?.action || "Volume";
       const data = t.data || {};
 
@@ -282,13 +319,13 @@ export function createFeedback({
         if (action === "Volume") {
           let value = null;
           if (t.kind === "mix") {
-            const mix = state.mixes.find((m) => m && String(m.id) === String(data.mixer_id));
+            const mix = mixes.get(String(data.mixer_id));
             value = getLevelFromMix(mix);
           } else if (t.kind === "channel") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             value = getLevelFromChannel(ch);
           } else if (t.kind === "channel_mix") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             const entry = getMixEntry(ch, data.mixer_id);
             value = getLevelFromMixEntry(entry);
           } else if (t.kind === "endpoint") {
@@ -296,13 +333,13 @@ export function createFeedback({
             const identifier = data.identifier || "";
             const mixerId = data.mixer_id || "";
             if (!identifier) {
-              const mix = state.mixes.find((m) => m && String(m.id) === String(mixerId));
+              const mix = mixes.get(String(mixerId));
               value = getLevelFromMix(mix);
             } else if (!mixerId) {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               value = getLevelFromChannel(ch);
             } else {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               const entry = getMixEntry(ch, mixerId);
               value = getLevelFromMixEntry(entry);
             }
@@ -317,7 +354,9 @@ export function createFeedback({
               if (intent) {
                 primaryFeedbackIntentByBinding.delete(b.id);
               }
-              await ctx.feedback.set(b.id, value, "Volume", { silent: true });
+              await send(b.id, value, "Volume");
+            } else {
+              forget(b.id, "Volume");
             }
           }
         }
@@ -325,42 +364,42 @@ export function createFeedback({
         if (shouldSyncMuteFeedback(action)) {
           let muted = null;
           if (t.kind === "mix") {
-            const mix = state.mixes.find((m) => m && String(m.id) === String(data.mixer_id));
+            const mix = mixes.get(String(data.mixer_id));
             muted = getMutedFromMix(mix);
           } else if (t.kind === "channel") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             muted = getMutedFromChannel(ch);
           } else if (t.kind === "channel_mix") {
-            const ch = state.channels.find((c) => c && String(c.id) === String(data.identifier));
+            const ch = channels.get(String(data.identifier));
             const entry = getMixEntry(ch, data.mixer_id);
             muted = getMutedFromMixEntry(entry);
           } else if (t.kind === "endpoint") {
             const identifier = data.identifier || "";
             const mixerId = data.mixer_id || "";
             if (!identifier) {
-              const mix = state.mixes.find((m) => m && String(m.id) === String(mixerId));
+              const mix = mixes.get(String(mixerId));
               muted = getMutedFromMix(mix);
             } else if (!mixerId) {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               muted = getMutedFromChannel(ch);
             } else {
-              const ch = state.channels.find((c) => c && String(c.id) === String(identifier));
+              const ch = channels.get(String(identifier));
               const entry = getMixEntry(ch, mixerId);
               muted = getMutedFromMixEntry(entry);
             }
           }
           if (typeof muted === "boolean") {
-            await ctx.feedback.set(b.id, muted ? 1.0 : 0.0, "ToggleMute", { silent: true });
+            await send(b.id, muted ? 1.0 : 0.0, "ToggleMute");
           }
         } else if (action === "ToggleEffect") {
           const state = findEffectState(data);
           if (state && typeof state.enabled === "boolean") {
-            await ctx.feedback.set(b.id, state.enabled ? 1.0 : 0.0, action, { silent: true });
+            await send(b.id, state.enabled ? 1.0 : 0.0, action);
           }
         } else if (action === "SetMainOutputDevice" && t.kind === "main_output_device") {
-          await ctx.feedback.set(b.id, targetIsMainOutputDevice(data) ? 1.0 : 0.0, action, { silent: true });
+          await send(b.id, targetIsMainOutputDevice(data) ? 1.0 : 0.0, action);
         } else if (action === "SetMainOutputDevice" && t.kind === "main_output_cycle") {
-          await ctx.feedback.set(b.id, 0.0, action, { silent: true });
+          await send(b.id, 0.0, action);
         }
       } catch {
         // ignore
@@ -377,6 +416,7 @@ export function createFeedback({
     setChannelEffectEnabled,
     setMainOutputDevice,
     cycleMainOutputDevice,
-    syncAllFeedback,
+    syncAllFeedback: feedbackQueue.sync,
+    invalidateFeedback: feedbackQueue.invalidate,
   };
 }

@@ -28,15 +28,12 @@ export function createListControls({
     return identity;
   }
 
-  function bindingRenderKey(binding, index, visibleIndex, searchQuery, typeFilter) {
+  function bindingRenderKey(binding, index) {
     return [
       bindingObjectIdentity(binding),
       index,
-      visibleIndex,
-      searchQuery,
-      typeFilter,
       String(document.documentElement?.lang || ""),
-      String(getEditingId() || ""),
+      binding.id === getEditingId(),
       bindingSnapshotKey(binding),
     ].join("|");
   }

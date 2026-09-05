@@ -13,8 +13,14 @@ function legacyControlKey(channel, controller, msgType) {
 export function createBindingLookupIndex(bindings = []) {
   const exact = new Map();
   const fallback = new Map();
+  const byId = new Map();
+  const lastById = new Map();
 
   (Array.isArray(bindings) ? bindings : []).forEach((binding) => {
+    if (!binding) return;
+    const id = String(binding.id);
+    if (!byId.has(id)) byId.set(id, binding);
+    lastById.set(id, binding);
     if (!binding?.control) return;
     const control = binding.control;
     const exactKey = controlKey(
@@ -45,5 +51,11 @@ export function createBindingLookupIndex(bindings = []) {
     )) || null;
   }
 
-  return { find, size: exact.size };
+  return {
+    find,
+    findById: (id) => byId.get(String(id)) || null,
+    // Preserve the previous Map constructor's last-entry behavior for echo guards.
+    findLastById: (id) => lastById.get(String(id)) || null,
+    size: exact.size,
+  };
 }

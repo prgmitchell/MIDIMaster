@@ -59,8 +59,11 @@ function makeBinding(index, iconData = null) {
     ],
     action: isButton ? "ToggleEffect" : "Volume",
     mode: "Absolute",
-    deadzone: 0,
-    debounce_ms: isButton ? 25 : 0,
+    // Keep this synthetic workload deterministic: every input step exceeds this
+    // threshold, while ordinary analog jitter filtering remains tested elsewhere.
+    deadzone: isButton ? 0 : 0.0001,
+    debounce_ms: 0,
+    mute_behavior: "ToggleOnPress",
   };
 }
 

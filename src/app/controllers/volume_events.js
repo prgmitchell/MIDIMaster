@@ -18,7 +18,9 @@ export function createVolumeEvents({
 
     const buttonInputValue = typeof payload.input_value === "number" ? payload.input_value : null;
     const feedbackBinding = payload.binding_id
-      ? profileState.bindings.find((binding) => binding && String(binding.id) === String(payload.binding_id))
+      ? (profileState.bindingLookupIndex?.findById
+        ? profileState.bindingLookupIndex.findById(payload.binding_id)
+        : profileState.bindings.find((binding) => binding && String(binding.id) === String(payload.binding_id)))
       : null;
     const feedbackButtonBehavior = feedbackBinding ? buttonVisualBehavior(feedbackBinding) : null;
 
@@ -44,10 +46,11 @@ export function createVolumeEvents({
       }
     }
 
-    for (const entry of context.sliderEntries) {
+    const matchingEntries = context.matchingSliders?.(payload.target);
+    for (const entry of matchingEntries || context.sliderEntries) {
       if (payload.binding_id && entry.bindingId === String(payload.binding_id)) continue;
       if (!context.canAcceptBackendVolume(entry)) continue;
-      if (entry.target && targetsMatch(entry.target, payload.target)) {
+      if (matchingEntries || (entry.target && targetsMatch(entry.target, payload.target))) {
         setBindingSliderVolume(entry.slider, payload.volume);
       }
     }

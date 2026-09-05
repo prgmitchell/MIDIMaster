@@ -12,6 +12,7 @@ import {
 export function createConnection({
   ctx,
   iconDataUrl,
+  invalidateFeedback,
   pendingAppInfoByWsId,
   pendingRpcById,
   scheduleChannelsRefresh,
@@ -216,7 +217,7 @@ export function createConnection({
       const payload = result?.mixes ?? result;
       if (Array.isArray(payload)) {
         state.mixes = payload;
-        syncAllFeedback().catch(() => {});
+        syncAllFeedback("mixes").catch(() => {});
       }
       return;
     }
@@ -225,7 +226,7 @@ export function createConnection({
       const payload = result?.channels ?? result;
       if (Array.isArray(payload)) {
         state.channels = payload;
-        syncAllFeedback().catch(() => {});
+        syncAllFeedback("channels").catch(() => {});
       }
       return;
     }
@@ -236,7 +237,7 @@ export function createConnection({
           mainOutput: result.mainOutput || null,
           outputDevices: Array.isArray(result.outputDevices) ? result.outputDevices : [],
         };
-        syncAllFeedback().catch(() => {});
+        syncAllFeedback("outputs").catch(() => {});
       }
       return;
     }
@@ -356,6 +357,7 @@ export function createConnection({
     state.disconnectedByUser = false;
     state.wasConnected = true;
     state.offlineFeedbackSent = false;
+    invalidateFeedback();
     setStatus(true, `Connected (:${state.connectedPort})`);
 
     await requestFullState();

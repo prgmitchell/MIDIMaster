@@ -811,7 +811,7 @@ export function createBindingsFeature({
     syncButtonVisualState,
     setButtonVisualState,
     getRenderedBindingRefs: (bindingId) => renderedBindings.get(bindingId),
-    getRenderedBindingEntries: () => renderedBindings.values(),
+    getRenderedBindingIndex: () => renderedBindings,
     queueBindingReveal,
     openBindingTargetPicker,
     beginBindingEdit,

@@ -1,64 +1,27 @@
 use crate::midi_event_queue::MidiEventQueueAuditSnapshot;
-use crate::model::{MidiEvent, MidiMessageType};
 use crate::AppState;
 use serde::Serialize;
 use serde_json::{Map, Value};
-use std::collections::{HashMap, VecDeque};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
+
+mod injection;
+mod metrics;
+mod synthetic;
+use metrics::*;
+pub(crate) use metrics::{
+    annotate_result_payload, record_integration_dispatch, record_local_target_result,
+    record_midi_enqueue, record_requested_targets, record_unverified_action, MidiActionScope,
+    MidiEnqueueToken,
+};
+pub(crate) use synthetic::{apply_synthetic_integration, synthetic_targets_enabled};
 use tauri::State;
 
-const MAX_ACTION_SAMPLES: usize = 100_000;
 const MAX_INJECTED_MESSAGES: u64 = 1_000_000;
 static RESULT_WRITER: OnceLock<Mutex<()>> = OnceLock::new();
-
-#[derive(Default)]
-struct NativeActionMetrics {
-    processing_durations_us: Vec<u64>,
-    enqueue_to_action_us: Vec<u64>,
-    pending_latest: HashMap<AuditMidiKey, Instant>,
-    pending_preserved: VecDeque<(AuditMidiKey, Instant)>,
-    expected_latest: HashMap<AuditMidiKey, u8>,
-    observed_latest: HashMap<AuditMidiKey, u8>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct AuditMidiKey {
-    device_id: String,
-    channel: u8,
-    controller: u8,
-    msg_type: MidiMessageType,
-}
-
-impl From<&MidiEvent> for AuditMidiKey {
-    fn from(event: &MidiEvent) -> Self {
-        Self {
-            device_id: event.device_id.clone(),
-            channel: event.channel,
-            controller: event.controller,
-            msg_type: event.msg_type.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct NativeActionSnapshot {
-    samples: usize,
-    p50_us: u64,
-    p95_us: u64,
-    p99_us: u64,
-    max_us: u64,
-}
-
-#[derive(Debug, Serialize)]
-struct MidiConvergenceSnapshot {
-    controls: usize,
-    mismatches: usize,
-    converged: bool,
-}
 
 #[derive(Debug, Serialize)]
 pub(crate) struct PerfAuditSnapshot {
@@ -72,7 +35,12 @@ pub(crate) struct PerfAuditSnapshot {
     queue: MidiEventQueueAuditSnapshot,
     native_action: NativeActionSnapshot,
     native_processing: NativeActionSnapshot,
+    queue_dispatch: NativeActionSnapshot,
     latest_value: MidiConvergenceSnapshot,
+    dispatched_value: MidiConvergenceSnapshot,
+    action_outcomes: ActionOutcomes,
+    synthetic_targets: Vec<SyntheticTargetSnapshot>,
+    synthetic_targets_enabled: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -122,119 +90,6 @@ fn scalar_dimensions(dimensions: Option<Value>) -> Result<Map<String, Value>, St
         return Err("Performance dimensions must contain at most 32 scalar values".to_string());
     }
     Ok(dimensions)
-}
-
-fn native_metrics() -> &'static Mutex<NativeActionMetrics> {
-    static METRICS: OnceLock<Mutex<NativeActionMetrics>> = OnceLock::new();
-    METRICS.get_or_init(|| Mutex::new(NativeActionMetrics::default()))
-}
-
-fn preserve_event(event: &MidiEvent) -> bool {
-    match event.msg_type {
-        MidiMessageType::Note | MidiMessageType::ProgramChange => true,
-        MidiMessageType::ControlChange => event.value == 0 || event.value == 127,
-        MidiMessageType::PitchBend => false,
-    }
-}
-
-pub(crate) fn record_midi_enqueue(event: &MidiEvent) {
-    if let Ok(mut metrics) = native_metrics().lock() {
-        let key = AuditMidiKey::from(event);
-        metrics.expected_latest.insert(key.clone(), event.value);
-        if preserve_event(event) {
-            if metrics.pending_preserved.len() < 2_048 {
-                metrics.pending_preserved.push_back((key, Instant::now()));
-            }
-        } else {
-            metrics.pending_latest.insert(key, Instant::now());
-        }
-    }
-}
-
-pub(crate) fn take_midi_enqueue(event: &MidiEvent) -> Option<Instant> {
-    let mut metrics = native_metrics().lock().ok()?;
-    let key = AuditMidiKey::from(event);
-    metrics.observed_latest.insert(key.clone(), event.value);
-    if preserve_event(event) {
-        let index = metrics
-            .pending_preserved
-            .iter()
-            .position(|(candidate, _)| candidate == &key)?;
-        return metrics.pending_preserved.remove(index).map(|(_, at)| at);
-    }
-    metrics.pending_latest.remove(&key)
-}
-
-fn push_bounded(samples: &mut Vec<u64>, duration: Duration) {
-    if samples.len() >= MAX_ACTION_SAMPLES {
-        let remove_count = MAX_ACTION_SAMPLES / 10;
-        samples.drain(..remove_count);
-    }
-    samples.push(duration.as_micros().min(u64::MAX as u128) as u64);
-}
-
-pub(crate) fn record_native_action(processing: Duration, enqueue_to_action: Option<Duration>) {
-    if let Ok(mut metrics) = native_metrics().lock() {
-        push_bounded(&mut metrics.processing_durations_us, processing);
-        if let Some(duration) = enqueue_to_action {
-            push_bounded(&mut metrics.enqueue_to_action_us, duration);
-        }
-    }
-}
-
-fn percentile(sorted: &[u64], percentile: f64) -> u64 {
-    if sorted.is_empty() {
-        return 0;
-    }
-    let index = ((sorted.len() - 1) as f64 * percentile).ceil() as usize;
-    sorted[index.min(sorted.len() - 1)]
-}
-
-fn duration_snapshot(mut samples: Vec<u64>) -> NativeActionSnapshot {
-    samples.sort_unstable();
-    NativeActionSnapshot {
-        samples: samples.len(),
-        p50_us: percentile(&samples, 0.50),
-        p95_us: percentile(&samples, 0.95),
-        p99_us: percentile(&samples, 0.99),
-        max_us: samples.last().copied().unwrap_or_default(),
-    }
-}
-
-fn native_snapshots() -> (NativeActionSnapshot, NativeActionSnapshot) {
-    let (enqueue_to_action, processing) = native_metrics()
-        .lock()
-        .map(|metrics| {
-            (
-                metrics.enqueue_to_action_us.clone(),
-                metrics.processing_durations_us.clone(),
-            )
-        })
-        .unwrap_or_default();
-    (
-        duration_snapshot(enqueue_to_action),
-        duration_snapshot(processing),
-    )
-}
-
-fn convergence_snapshot() -> MidiConvergenceSnapshot {
-    let Ok(metrics) = native_metrics().lock() else {
-        return MidiConvergenceSnapshot {
-            controls: 0,
-            mismatches: 0,
-            converged: false,
-        };
-    };
-    let mismatches = metrics
-        .expected_latest
-        .iter()
-        .filter(|(key, expected)| metrics.observed_latest.get(*key) != Some(*expected))
-        .count();
-    MidiConvergenceSnapshot {
-        controls: metrics.expected_latest.len(),
-        mismatches,
-        converged: !metrics.expected_latest.is_empty() && mismatches == 0,
-    }
 }
 
 fn audit_identity(name: &str, fallback: &str) -> String {
@@ -315,9 +170,9 @@ pub(crate) fn perf_audit_snapshot(state: State<AppState>) -> Result<PerfAuditSna
         .lock()
         .map_err(|_| "MIDI queue lock poisoned".to_string())?
         .audit_snapshot();
-    let (native_action, native_processing) = native_snapshots();
+    let native = native_snapshots();
     Ok(PerfAuditSnapshot {
-        schema_version: 1,
+        schema_version: 2,
         run_id: audit_identity("MIDIMASTER_PERF_RUN_ID", "manual"),
         scenario_id: audit_identity("MIDIMASTER_PERF_SCENARIO_ID", "manual"),
         variant: audit_identity("MIDIMASTER_PERF_VARIANT", "current"),
@@ -325,14 +180,20 @@ pub(crate) fn perf_audit_snapshot(state: State<AppState>) -> Result<PerfAuditSna
         active_profile,
         active_binding_count,
         queue,
-        native_action,
-        native_processing,
-        latest_value: convergence_snapshot(),
+        native_action: native.native_action,
+        native_processing: native.native_processing,
+        queue_dispatch: native.queue_dispatch,
+        latest_value: native.latest_value,
+        dispatched_value: native.dispatched_value,
+        action_outcomes: native.action_outcomes,
+        synthetic_targets: native.synthetic_targets,
+        synthetic_targets_enabled: synthetic_targets_enabled(),
     })
 }
 
 #[tauri::command]
 pub(crate) fn perf_audit_reset(state: State<AppState>) -> Result<(), String> {
+    state.cancel_activity_button_light_holds();
     state
         .midi_event_queue
         .lock()
@@ -353,14 +214,22 @@ pub(crate) fn perf_audit_reset(state: State<AppState>) -> Result<(), String> {
         .lock()
         .map_err(|_| "Action state lock poisoned".to_string())?
         .clear();
-    if let Ok(mut metrics) = native_metrics().lock() {
-        metrics.processing_durations_us.clear();
-        metrics.enqueue_to_action_us.clear();
-        metrics.pending_latest.clear();
-        metrics.pending_preserved.clear();
-        metrics.expected_latest.clear();
-        metrics.observed_latest.clear();
-    }
+    state
+        .last_mute_input_active
+        .lock()
+        .map_err(|_| "Input state lock poisoned".to_string())?
+        .clear();
+    state
+        .mute_transition_until
+        .lock()
+        .map_err(|_| "Mute transition lock poisoned".to_string())?
+        .clear();
+    state
+        .last_target_mute_state
+        .lock()
+        .map_err(|_| "Mute state lock poisoned".to_string())?
+        .clear();
+    reset_metrics();
     Ok(())
 }
 
@@ -384,8 +253,11 @@ pub(crate) async fn perf_audit_inject_midi(
         return Err("control_count must be between 1 and 16".to_string());
     }
     let normalized_kind = message_kind.trim().to_ascii_lowercase();
-    if !matches!(normalized_kind.as_str(), "continuous" | "button" | "action") {
-        return Err("message_kind must be continuous, button, or action".to_string());
+    if !matches!(
+        normalized_kind.as_str(),
+        "continuous" | "button" | "action" | "pitch_bend"
+    ) {
+        return Err("message_kind must be continuous, button, action, or pitch_bend".to_string());
     }
 
     let started = Instant::now();
@@ -395,29 +267,7 @@ pub(crate) async fn perf_audit_inject_midi(
             let deadline = tokio::time::Instant::from_std(started + tick.mul_f64(sequence as f64));
             tokio::time::sleep_until(deadline).await;
         }
-        let control_index = (sequence % control_count as u64) as u8;
-        let (msg_type, value) = match normalized_kind.as_str() {
-            "button" => (
-                MidiMessageType::Note,
-                if sequence % 2 == 0 { 127 } else { 0 },
-            ),
-            "action" => (MidiMessageType::ProgramChange, 127),
-            _ => (MidiMessageType::ControlChange, (sequence % 126 + 1) as u8),
-        };
-        let controller = match normalized_kind.as_str() {
-            "button" => control_index.saturating_mul(8).saturating_add(4),
-            "action" => control_index.saturating_mul(8),
-            _ => control_index.saturating_mul(8).saturating_add(1),
-        };
-        let event = MidiEvent {
-            device_id: "perf-midi-input".to_string(),
-            channel: controller % 16,
-            controller,
-            value,
-            value_14: None,
-            msg_type,
-        };
-        record_midi_enqueue(&event);
+        let event = injection::injected_event(sequence, control_count, &normalized_kind);
         state
             .midi_event_queue
             .lock()
@@ -432,7 +282,7 @@ pub(crate) async fn perf_audit_inject_midi(
         .map_err(|_| "MIDI queue lock poisoned".to_string())?
         .audit_snapshot();
     Ok(PerfAuditInjectionResult {
-        schema_version: 1,
+        schema_version: 2,
         message_count,
         rate_per_second,
         control_count,
@@ -446,24 +296,6 @@ pub(crate) async fn perf_audit_inject_midi(
 mod tests {
     use super::*;
 
-    fn event(msg_type: MidiMessageType, controller: u8, value: u8) -> MidiEvent {
-        MidiEvent {
-            device_id: "perf-midi-input".to_string(),
-            channel: 0,
-            controller,
-            value,
-            value_14: None,
-            msg_type,
-        }
-    }
-
-    #[test]
-    fn percentiles_are_stable_for_empty_and_populated_samples() {
-        assert_eq!(percentile(&[], 0.95), 0);
-        assert_eq!(percentile(&[10, 20, 30, 40], 0.50), 30);
-        assert_eq!(percentile(&[10, 20, 30, 40], 0.95), 40);
-    }
-
     #[test]
     fn local_result_records_reject_invalid_metrics_and_nested_dimensions() {
         assert!(validate_result_metric("startup.bindings_usable"));
@@ -472,30 +304,5 @@ mod tests {
             scalar_dimensions(Some(serde_json::json!({ "window": "main", "count": 2 }))).is_ok()
         );
         assert!(scalar_dimensions(Some(serde_json::json!({ "nested": { "bad": true } }))).is_err());
-    }
-
-    #[test]
-    fn enqueue_timing_tracks_latest_continuous_and_all_button_events() {
-        *native_metrics().lock().expect("metrics") = NativeActionMetrics::default();
-        let continuous = event(MidiMessageType::ControlChange, 1, 42);
-        record_midi_enqueue(&continuous);
-        record_midi_enqueue(&continuous);
-        assert!(take_midi_enqueue(&continuous).is_some());
-        assert!(take_midi_enqueue(&continuous).is_none());
-        let continuous_snapshot = convergence_snapshot();
-        assert_eq!(continuous_snapshot.controls, 1);
-        assert_eq!(continuous_snapshot.mismatches, 0);
-        assert!(continuous_snapshot.converged);
-
-        let button = event(MidiMessageType::Note, 4, 127);
-        record_midi_enqueue(&button);
-        record_midi_enqueue(&button);
-        assert!(take_midi_enqueue(&button).is_some());
-        assert!(take_midi_enqueue(&button).is_some());
-        assert!(take_midi_enqueue(&button).is_none());
-        let final_snapshot = convergence_snapshot();
-        assert_eq!(final_snapshot.controls, 2);
-        assert_eq!(final_snapshot.mismatches, 0);
-        assert!(final_snapshot.converged);
     }
 }

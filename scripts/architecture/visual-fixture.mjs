@@ -9,7 +9,8 @@ export async function renderFixture({
 }) {
   const base = `/${variant}/src`;
   const load = (path) => import(`${base}/${path}`);
-  // Initial renders are synchronous; prevent preview polling from rebuilding text during capture.
+  const paintFrame = window.requestAnimationFrame.bind(window);
+  // Fixtures contain no changing device values; stop periodic work during capture.
   window.setInterval = () => 0;
   const stable = document.createElement("style");
   stable.textContent =
@@ -37,7 +38,8 @@ export async function renderFixture({
       binding_primary_target: "Master",
     });
   } else {
-    if (variant === "after") (await load("app/feature_templates.js")).mountFeatureTemplates();
+    if (!document.getElementById("binding-config-panel"))
+      (await load("app/feature_templates.js")).mountFeatureTemplates();
     const { createDomRefs } = await load("app/dom_refs.js");
     const { defaultAppearanceSettings, applyBuiltInPreset, applyAppearanceToDocument } =
       await load("app/appearance.js");
@@ -138,9 +140,12 @@ export async function renderFixture({
   await document.fonts.ready;
   await Promise.all([...document.images].map((image) => image.decode().catch(() => {})));
   document.activeElement?.blur();
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  // Let already queued layout/preview work finish, then capture settled pixels.
+  // Both revisions otherwise keep scheduling live-preview writes at each frame.
+  window.requestAnimationFrame = () => 0;
+  await new Promise((resolve) => paintFrame(() => paintFrame(resolve)));
   await document.fonts.ready;
-  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => paintFrame(resolve));
   if (document.querySelector(".error-binding")) throw new Error("Binding fixture failed to render");
   return [...document.querySelectorAll("#binding-config-panel *")].map((element) => {
     const rect = element.getBoundingClientRect(),

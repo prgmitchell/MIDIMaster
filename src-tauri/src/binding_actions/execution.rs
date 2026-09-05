@@ -68,6 +68,8 @@ pub fn execute_local_target_action(
             if state.apply_focus_volume_with_retry(binding_id, value) {
                 Ok(())
             } else {
+                #[cfg(feature = "perf-audit")]
+                crate::perf_audit::record_local_target_result(false);
                 return false;
             }
         }
@@ -92,6 +94,8 @@ pub fn execute_local_target_action(
             .map_err(|err| err.to_string()),
         (model::BindingAction::ToggleMute, BindingTarget::Focus) => {
             if state.audio.focused_session().ok().flatten().is_none() {
+                #[cfg(feature = "perf-audit")]
+                crate::perf_audit::record_local_target_result(false);
                 return false;
             }
             state
@@ -118,6 +122,8 @@ pub fn execute_local_target_action(
         _ => return false,
     };
 
+    #[cfg(feature = "perf-audit")]
+    crate::perf_audit::record_local_target_result(result.is_ok());
     match result {
         Ok(()) => true,
         Err(err) => {
@@ -153,6 +159,15 @@ pub fn execute_target_action(
     if targets.is_empty() {
         return Ok(ActionExecutionOutcome::default());
     }
+    #[cfg(feature = "perf-audit")]
+    crate::perf_audit::record_requested_targets(
+        targets
+            .iter()
+            .filter(|target| {
+                !integrations_only || matches!(target, BindingTarget::Integration { .. })
+            })
+            .count(),
+    );
 
     let value = value.clamp(0.0, 1.0);
     let muted = value > 0.5;

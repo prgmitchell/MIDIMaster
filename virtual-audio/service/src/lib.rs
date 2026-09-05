@@ -5,6 +5,8 @@ pub mod attach;
 pub mod audio_pipe;
 pub mod device;
 pub mod limiter;
+#[cfg(feature = "perf-audit")]
+pub mod perf_audit;
 pub mod ring;
 pub mod status;
 pub mod uac1;

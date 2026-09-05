@@ -426,13 +426,9 @@ export function createApplication() {
     stripDeviceStateSuffix: (...args) => stripDeviceStateSuffix(...args),
   });
 
-  const bindingFeedback = createBindingFeedback({
-    features,
-  });
+  const bindingFeedback = createBindingFeedback({ features });
 
-  const integrationState = createIntegrationState({
-    liveState,
-  });
+  const integrationState = createIntegrationState({ liveState });
 
   const bindingDisplay = createBindingDisplay({ audioState, features, liveState });
 
@@ -447,10 +443,14 @@ export function createApplication() {
     findInlineMuteButton: (...args) => bindingFeedback.findInlineMuteButton(...args),
     flashBindingTrigger: (...args) => bindingDisplay.flashBindingTrigger(...args),
     knownMidiRouteCount: (...args) => knownMidiRouteCount(...args),
+    getTargetMetadata: () => [audioState.sessions, audioState.playbackDevices,
+      audioState.recordingDevices, audioState.focusedSession],
     liveState,
     midiControlSignature: (...args) => midiControlSignature(...args),
     profileState,
     resolveTargetVolume,
+    resolveTargetKey,
+    targetsMatch,
     setBindingSliderVolume: (...args) => bindingDisplay.setBindingSliderVolume(...args),
     setInlineMuteButtonState: (...args) => bindingFeedback.setInlineMuteButtonState(...args),
   });
@@ -636,11 +636,18 @@ export function createApplication() {
       profileState.midiPreference = normalizeMidiPreference(next);
     },
     onProfileLoaded: async ({ midiDevicePreference, midiDevicePreferenceSet }) => {
+      const finish = performanceAudit.begin("profile-midi-sync");
       profileState.midiPreference = normalizeMidiPreference({
         ...(midiDevicePreference || {}),
         configured: Boolean(midiDevicePreferenceSet),
       });
-      await features.midi?.syncToProfileDevice?.(profileState.midiPreference);
+      try {
+        await features.midi?.syncToProfileDevice?.(profileState.midiPreference);
+        finish();
+      } catch (error) {
+        finish({ ok: false });
+        throw error;
+      }
     },
     showAlert: (title, message = "") => showAlert(title, message),
     showChoices,

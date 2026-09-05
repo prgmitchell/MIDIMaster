@@ -34,6 +34,8 @@ pub(crate) struct MidiEventQueueStats {
 struct QueuedMidiEvent {
     sequence: u64,
     event: MidiEvent,
+    #[cfg(feature = "perf-audit")]
+    audit: crate::perf_audit::MidiEnqueueToken,
 }
 
 pub(crate) struct MidiEventQueue {
@@ -92,16 +94,24 @@ impl MidiEventQueue {
         }
     }
 
-    fn queued_event(&mut self, event: MidiEvent) -> QueuedMidiEvent {
+    fn queued_event(
+        &mut self,
+        event: MidiEvent,
+        #[cfg(feature = "perf-audit")] audit: crate::perf_audit::MidiEnqueueToken,
+    ) -> QueuedMidiEvent {
         let queued = QueuedMidiEvent {
             sequence: self.next_sequence,
             event,
+            #[cfg(feature = "perf-audit")]
+            audit,
         };
         self.next_sequence = self.next_sequence.saturating_add(1);
         queued
     }
 
     pub(crate) fn enqueue(&mut self, event: MidiEvent) {
+        #[cfg(feature = "perf-audit")]
+        let audit = crate::perf_audit::record_midi_enqueue(&event);
         #[cfg(feature = "perf-audit")]
         {
             self.audit_enqueued = self.audit_enqueued.saturating_add(1);
@@ -115,7 +125,11 @@ impl MidiEventQueue {
                 }
                 return;
             }
-            let queued = self.queued_event(event);
+            let queued = self.queued_event(
+                event,
+                #[cfg(feature = "perf-audit")]
+                audit,
+            );
             self.preserved.push_back(queued);
             return;
         }
@@ -127,7 +141,11 @@ impl MidiEventQueue {
             {
                 self.audit_coalesced = self.audit_coalesced.saturating_add(1);
             }
-            let queued = self.queued_event(event);
+            let queued = self.queued_event(
+                event,
+                #[cfg(feature = "perf-audit")]
+                audit,
+            );
             self.pending_latest.insert(key, queued);
             return;
         }
@@ -139,16 +157,36 @@ impl MidiEventQueue {
             }
             return;
         }
-        let queued = self.queued_event(event);
+        let queued = self.queued_event(
+            event,
+            #[cfg(feature = "perf-audit")]
+            audit,
+        );
         self.pending_latest.insert(key, queued);
     }
 
     pub(crate) fn drain(&mut self) -> Vec<MidiEvent> {
+        self.drain_queued()
+            .into_iter()
+            .map(|queued| queued.event)
+            .collect()
+    }
+
+    #[cfg(feature = "perf-audit")]
+    pub(crate) fn drain_audited(
+        &mut self,
+    ) -> Vec<(MidiEvent, crate::perf_audit::MidiEnqueueToken)> {
+        self.drain_queued()
+            .into_iter()
+            .map(|queued| (queued.event, queued.audit))
+            .collect()
+    }
+
+    fn drain_queued(&mut self) -> Vec<QueuedMidiEvent> {
         let mut events = Vec::with_capacity(self.preserved.len() + self.pending_latest.len());
         events.extend(self.preserved.drain(..));
         events.extend(self.pending_latest.drain().map(|(_, event)| event));
         events.sort_by_key(|event| event.sequence);
-        let events: Vec<MidiEvent> = events.into_iter().map(|event| event.event).collect();
         #[cfg(feature = "perf-audit")]
         {
             self.audit_drained = self.audit_drained.saturating_add(events.len() as u64);

@@ -111,8 +111,6 @@ fn midi_event_callback(
 ) -> Arc<dyn Fn(crate::model::MidiEvent) + Send + Sync + 'static> {
     Arc::new(move |event| {
         let state = app_handle.state::<AppState>();
-        #[cfg(feature = "perf-audit")]
-        crate::perf_audit::record_midi_enqueue(&event);
         let enqueue_result = state.midi_event_queue.lock();
         match enqueue_result {
             Ok(mut queue) => {

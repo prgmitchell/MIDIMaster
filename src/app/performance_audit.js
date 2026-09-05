@@ -1,6 +1,9 @@
+import { matchesRenderedBindingValue } from "./performance_rendered_value.js";
+
 const SCHEMA_VERSION = 1;
 const MAX_ENTRIES = 5000;
 const PERF_PREFIX = "midimaster:";
+const MAX_TIMING_NAMES = 256;
 
 function percentile(sorted, fraction) {
   if (!Array.isArray(sorted) || sorted.length === 0) return 0;
@@ -56,6 +59,51 @@ export function createPerformanceAudit({
   let longTaskObserver = null;
   let frameHandle = 0;
   let lastFrameAt = null;
+  let observersStarted = false;
+  const timingNames = new Set();
+  const resultFrames = new Set();
+  const pendingResults = new Map();
+  const renderedValues = new Map();
+  let resultFrameQueued = false;
+  let resetGeneration = 0;
+
+  function retainSample(samples, value) {
+    if (samples.length >= MAX_ENTRIES) samples.splice(0, MAX_ENTRIES / 10);
+    samples.push(value);
+  }
+
+  function retainTimingName(name) {
+    performanceSource?.clearMarks?.(name);
+    performanceSource?.clearMeasures?.(name);
+    timingNames.delete(name);
+    timingNames.add(name);
+    if (timingNames.size > MAX_TIMING_NAMES) {
+      const oldest = timingNames.values().next().value;
+      performanceSource?.clearMarks?.(oldest);
+      performanceSource?.clearMeasures?.(oldest);
+      timingNames.delete(oldest);
+    }
+  }
+
+  /** Start an independent run without retaining samples from a previous journey. */
+  function reset() {
+    resetGeneration += 1;
+    for (const handle of resultFrames) windowSource?.cancelAnimationFrame?.(handle);
+    resultFrames.clear();
+    pendingResults.clear();
+    renderedValues.clear();
+    resultFrameQueued = false;
+    entries.length = 0;
+    ipcDurations.length = 0;
+    ipcCount = 0;
+    ipcErrors = 0;
+    lastFrameAt = null;
+    for (const name of timingNames) {
+      performanceSource?.clearMarks?.(name);
+      performanceSource?.clearMeasures?.(name);
+    }
+    timingNames.clear();
+  }
 
   function now() {
     return Number(performanceSource?.now?.() ?? Date.now());
@@ -82,8 +130,7 @@ export function createPerformanceAudit({
       timestamp: new Date().toISOString(),
       ...fields,
     };
-    entries.push(entry);
-    if (entries.length > MAX_ENTRIES) entries.splice(0, entries.length - MAX_ENTRIES);
+    retainSample(entries, entry);
     return entry;
   }
 
@@ -91,6 +138,7 @@ export function createPerformanceAudit({
     if (!enabled) return null;
     const markName = `${PERF_PREFIX}${name}`;
     const startTimeMs = now();
+    retainTimingName(markName);
     try {
       performanceSource?.mark?.(markName, { detail });
     } catch {
@@ -102,6 +150,7 @@ export function createPerformanceAudit({
   function measure(name, startMark, endMark = null, detail = {}) {
     if (!enabled) return null;
     const measureName = `${PERF_PREFIX}${name}`;
+    retainTimingName(measureName);
     const options = {
       start: `${PERF_PREFIX}${startMark}`,
       ...(endMark ? { end: `${PERF_PREFIX}${endMark}` } : {}),
@@ -146,12 +195,51 @@ export function createPerformanceAudit({
     const durationMs = Math.max(0, now() - Number(startedAt || 0));
     ipcCount += 1;
     if (!ok) ipcErrors += 1;
-    ipcDurations.push(durationMs);
+    retainSample(ipcDurations, durationMs);
     addEntry("ipc", command, {
       startTimeMs: Number(startedAt || 0),
       durationMs,
       ok: Boolean(ok),
       ...(error ? { error: String(error?.message || error).slice(0, 500) } : {}),
+    });
+  }
+
+  /** Measure verified action results only after the affected control has rendered. */
+  function recordMidiResult(payload, readRenderedValue) {
+    if (!enabled || !payload?.perf_audit?.applied || typeof windowSource?.requestAnimationFrame !== "function") return;
+    const id = String(payload.binding_id || "");
+    if (!id) return;
+    const generation = resetGeneration;
+    pendingResults.set(id, { payload, readRenderedValue, receivedAt: now() });
+    if (pendingResults.size > MAX_ENTRIES) pendingResults.delete(pendingResults.keys().next().value);
+    if (resultFrameQueued) return;
+    resultFrameQueued = true;
+    const schedule = (callback) => {
+      const handle = windowSource.requestAnimationFrame(() => { resultFrames.delete(handle); callback(); });
+      resultFrames.add(handle);
+    };
+    schedule(() => {
+      const results = [...pendingResults.entries()];
+      pendingResults.clear();
+      resultFrameQueued = false;
+      schedule(() => {
+        if (generation !== resetGeneration) return;
+        for (const [bindingId, result] of results) {
+          const { payload: event, receivedAt, readRenderedValue: read } = result;
+          const observed = read();
+          if (!Number.isFinite(observed)) continue; // No visible control in this window.
+          const expected = typeof event.muted === "boolean" ? Number(event.muted) : event.volume;
+          if (!matchesRenderedBindingValue(observed, expected)) continue; // Superseded/echo-suppressed.
+          const detail = { bindingId, sequence: event.perf_audit.sequence, value: observed };
+          recordDuration("midi-renderer-completion", now() - receivedAt, detail);
+          const elapsed = Number(performanceSource?.timeOrigin) + now() - Number(event.perf_audit.enqueued_epoch_ms);
+          if (Number.isFinite(elapsed) && elapsed >= 0 && elapsed < 60000) {
+            recordDuration("midi-visible-update", elapsed, { ...detail, clock: "wall-correlated" });
+          }
+          renderedValues.set(bindingId, detail);
+          if (renderedValues.size > MAX_ENTRIES) renderedValues.delete(renderedValues.keys().next().value);
+        }
+      });
     });
   }
 
@@ -167,16 +255,19 @@ export function createPerformanceAudit({
       ipc: {
         count: ipcCount,
         errors: ipcErrors,
+        retainedSamples: ipcDurations.length,
         p50Ms: percentile(sortedIpc, 0.5),
         p95Ms: percentile(sortedIpc, 0.95),
         p99Ms: percentile(sortedIpc, 0.99),
       },
       entries: entries.slice(),
+      renderedValues: [...renderedValues.values()],
     };
   }
 
   function startObservers() {
-    if (!enabled) return;
+    if (!enabled || observersStarted) return;
+    observersStarted = true;
     if (PerformanceObserverSource) {
       try {
         longTaskObserver = new PerformanceObserverSource((list) => {
@@ -193,7 +284,8 @@ export function createPerformanceAudit({
       }
     }
 
-    if (typeof windowSource?.requestAnimationFrame === "function") {
+    const observeFrames = !new URLSearchParams(windowSource?.location?.search || "").has("perf-no-frames");
+    if (observeFrames && typeof windowSource?.requestAnimationFrame === "function") {
       const onFrame = (frameAt) => {
         if (lastFrameAt != null) {
           const durationMs = Math.max(0, Number(frameAt) - lastFrameAt);
@@ -209,12 +301,14 @@ export function createPerformanceAudit({
   }
 
   function stopObservers() {
+    observersStarted = false;
     longTaskObserver?.disconnect?.();
     longTaskObserver = null;
     if (frameHandle && typeof windowSource?.cancelAnimationFrame === "function") {
       windowSource.cancelAnimationFrame(frameHandle);
     }
     frameHandle = 0;
+    lastFrameAt = null;
   }
 
   const api = {
@@ -227,7 +321,9 @@ export function createPerformanceAudit({
     recordDuration,
     now,
     recordIpc,
+    recordMidiResult,
     snapshot,
+    reset,
     startObservers,
     stopObservers,
   };

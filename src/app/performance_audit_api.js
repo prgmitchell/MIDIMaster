@@ -8,7 +8,9 @@ const disabledAudit = {
   recordDuration: () => null,
   now: () => Number(globalThis.performance?.now?.() ?? Date.now()),
   recordIpc: () => {},
+  recordMidiResult: () => {},
   snapshot: () => null,
+  reset: () => {},
   startObservers: () => {},
   stopObservers: () => {},
 };
@@ -41,7 +43,9 @@ export const performanceAudit = {
   recordDuration(...args) { return implementation.recordDuration(...args); },
   now(...args) { return implementation.now(...args); },
   recordIpc(...args) { return implementation.recordIpc(...args); },
+  recordMidiResult(...args) { return implementation.recordMidiResult(...args); },
   snapshot(...args) { return implementation.snapshot(...args); },
+  reset(...args) { return implementation.reset(...args); },
   startObservers(...args) { return implementation.startObservers(...args); },
   stopObservers(...args) { return implementation.stopObservers(...args); },
 };

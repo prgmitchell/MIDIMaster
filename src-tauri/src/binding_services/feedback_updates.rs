@@ -7,42 +7,38 @@ pub fn update_midi_feedback(
     binding_id: Option<String>,
     action: Option<model::BindingAction>,
 ) -> Result<(), String> {
-    let matched_bindings: Vec<Binding> = {
-        let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
-        let profile = match profile_guard.as_ref() {
-            Some(p) => p,
-            None => return Ok(()),
-        };
-
-        profile
-            .bindings
-            .iter()
-            .filter(|binding| {
-                let binding_targets = binding.normalized_targets_ref();
-                if let Some(ref id) = binding_id {
-                    binding.id == *id
-                } else if let Some(ref act) = action {
-                    if binding.action != *act {
-                        false
-                    } else {
-                        binding_targets.contains(&target)
-                    }
-                } else {
-                    binding_targets.contains(&target)
-                }
-            })
-            .cloned()
-            .collect()
+    // Retain the immutable snapshot, then release the profile lock before MIDI I/O.
+    let profile = state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned")?
+        .clone();
+    let Some(profile) = profile else {
+        return Ok(());
     };
+    let matched_bindings = profile.bindings.iter().filter(|binding| {
+        let binding_targets = binding.normalized_targets_ref();
+        if let Some(ref id) = binding_id {
+            binding.id == *id
+        } else if let Some(ref act) = action {
+            if binding.action != *act {
+                false
+            } else {
+                binding_targets.contains(&target)
+            }
+        } else {
+            binding_targets.contains(&target)
+        }
+    });
 
     for binding in matched_bindings {
-        let key = BindingKey::from_binding(&binding);
+        let key = BindingKey::from_binding(binding);
         let state_active = if binding.uses_stateful_toggle_feedback() {
             Some(value > 0.5)
         } else {
             None
         };
-        let button_light_value = state.button_light_feedback_value(&binding, None, state_active);
+        let button_light_value = state.button_light_feedback_value(binding, None, state_active);
         let feedback_value = button_light_value.unwrap_or(value);
 
         let is_note = matches!(binding.control.msg_type, model::MidiMessageType::Note);
@@ -58,7 +54,7 @@ pub fn update_midi_feedback(
         if binding.is_button_binding() {
             feedback::send_button_light_feedback_to_binding(
                 state,
-                &binding,
+                binding,
                 FeedbackSendOptions {
                     value: feedback_value,
                     silent: false,
@@ -76,7 +72,7 @@ pub fn update_midi_feedback(
 
         feedback::send_feedback_to_binding(
             state,
-            &binding,
+            binding,
             FeedbackSendOptions {
                 value: feedback_value,
                 silent: false,
@@ -105,16 +101,20 @@ pub fn set_binding_feedback(
     input_value: Option<f32>,
     force_hardware_feedback: Option<bool>,
 ) -> Result<(), String> {
-    let profile_bindings = {
-        let profile_guard = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
-        match profile_guard.as_ref() {
-            Some(p) => p.bindings.clone(),
-            None => return Ok(()),
-        }
+    // A feedback burst can touch many bindings. Share their published snapshot
+    // instead of copying every binding (including macros and target metadata).
+    let profile = state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned")?
+        .clone();
+    let Some(profile) = profile else {
+        return Ok(());
     };
+    let profile_bindings = &profile.bindings;
 
     let binding = match profile_bindings.iter().find(|b| b.id == binding_id) {
-        Some(b) => b.clone(),
+        Some(b) => b,
         None => return Ok(()),
     };
     let primary_target = binding.primary_target_ref();
@@ -131,8 +131,7 @@ pub fn set_binding_feedback(
     } else {
         None
     };
-    let button_light_value =
-        state.button_light_feedback_value(&binding, input_active, state_active);
+    let button_light_value = state.button_light_feedback_value(binding, input_active, state_active);
     let feedback_value = button_light_value.unwrap_or(value);
     if binding.uses_stateful_toggle_feedback()
         || matches!(
@@ -140,10 +139,10 @@ pub fn set_binding_feedback(
             model::BindingAction::ToggleMute | model::BindingAction::ToggleEffect
         )
     {
-        state.set_binding_action_value(&BindingKey::from_binding(&binding), value);
+        state.set_binding_action_value(&BindingKey::from_binding(binding), value);
     }
     if matches!(effective_action, model::BindingAction::Volume) {
-        state.sync_relative_volume_binding_state(&binding, value);
+        state.sync_relative_volume_binding_state(binding, value);
     }
 
     let silent = silent.unwrap_or(false);
@@ -151,7 +150,7 @@ pub fn set_binding_feedback(
     if action_matches_binding {
         send_resolved_binding_feedback(
             state,
-            &binding,
+            binding,
             feedback_value,
             silent,
             force_hardware_feedback,
@@ -176,11 +175,11 @@ pub fn set_binding_feedback(
         let mut emitted_controls: HashSet<FeedbackControlKey> = HashSet::new();
 
         if action_matches_binding && binding.feedback_enabled {
-            let emitted_key = resolved_binding_feedback_control_key(&binding);
+            let emitted_key = resolved_binding_feedback_control_key(binding);
             emitted_controls.insert(emitted_key);
         }
 
-        for candidate in &profile_bindings {
+        for candidate in profile_bindings {
             let candidate_targets = candidate.normalized_targets_ref();
             let is_affected = candidate_targets
                 .iter()
@@ -228,14 +227,14 @@ pub fn set_binding_feedback(
     if matches!(effective_action, model::BindingAction::Volume) {
         let mut emitted_controls: HashSet<FeedbackControlKey> = HashSet::new();
         if action_matches_binding && binding.feedback_enabled {
-            let emitted_key = resolved_binding_feedback_control_key(&binding);
+            let emitted_key = resolved_binding_feedback_control_key(binding);
             emitted_controls.insert(emitted_key);
         }
-        for candidate in &profile_bindings {
+        for candidate in profile_bindings {
             if !matches!(candidate.action, model::BindingAction::Volume) {
                 continue;
             }
-            if !feedback::targets_overlap(candidate, &binding) {
+            if !feedback::targets_overlap(candidate, binding) {
                 continue;
             }
             state.sync_relative_volume_binding_state(candidate, value);
@@ -272,7 +271,7 @@ pub fn set_binding_feedback(
                 None
             };
             let payload = crate::binding_events::binding_event_payload(
-                &binding,
+                binding,
                 primary_target,
                 serde_json::json!({
                   "target": primary_target.clone(),
@@ -294,7 +293,7 @@ pub fn set_binding_feedback(
                 None
             };
             let mut payload = crate::binding_events::binding_event_payload(
-                &binding,
+                binding,
                 primary_target,
                 serde_json::json!({
                   "target": primary_target.clone(),
@@ -305,7 +304,7 @@ pub fn set_binding_feedback(
             );
             binding_actions::add_momentary_integration_input_value(
                 &mut payload,
-                &binding,
+                binding,
                 &effective_action,
                 input_value,
             );

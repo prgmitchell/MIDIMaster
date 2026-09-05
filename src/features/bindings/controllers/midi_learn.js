@@ -16,6 +16,8 @@ export function createMidiLearn({
   syncFeedbackControllerInputState,
   t,
 }) {
+  const midiSummaryKeys = new WeakMap();
+
   function updateAuxLearnUi() {
     const muteLearn = elements.bindingConfigMuteLearn;
     const assignLearn = elements.bindingConfigAssignLearn;
@@ -141,20 +143,24 @@ export function createMidiLearn({
 
   function renderMidiMappingSummary(element, deviceId, control, controlText) {
     if (!element) return;
+    const deviceLabel = control ? labelForMidiDevice(deviceId) || String(deviceId || "").trim() : "";
+    const unmappedLabel = t("bindings.notMapped");
+    const key = [Boolean(control), deviceLabel, controlText, unmappedLabel];
+    if (midiSummaryKeys.get(element)?.every((value, index) => value === key[index])) return;
+    midiSummaryKeys.set(element, key);
     element.innerHTML = "";
     if (!control) {
-      element.textContent = t("bindings.notMapped");
+      element.textContent = unmappedLabel;
       return;
     }
 
-    const deviceLabel = labelForMidiDevice(deviceId) || String(deviceId || "").trim();
     const wrapper = document.createElement("span");
     wrapper.className = "binding-config-midi-stack";
     wrapper.title = deviceLabel ? `${deviceLabel} - ${controlText}` : controlText;
 
     const device = document.createElement("span");
     device.className = "binding-config-midi-device";
-    device.textContent = deviceLabel || t("bindings.notMapped");
+    device.textContent = deviceLabel || unmappedLabel;
 
     const controlLabelEl = document.createElement("span");
     controlLabelEl.className = "binding-config-midi-control";

@@ -254,6 +254,8 @@ pub(super) fn handle_aux_or_unmatched(
             drop(guard);
 
             if let Some(updated_targets) = updated_targets {
+                #[cfg(feature = "perf-audit")]
+                crate::perf_audit::record_unverified_action();
                 let mut payload = serde_json::json!({
                     "binding_id": owner.id,
                     "targets": updated_targets
