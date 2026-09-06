@@ -2,6 +2,9 @@
 *.rs text eol=lf
 Cargo.lock text eol=lf
 
+# Generated bundles must match esbuild output byte-for-byte on Windows.
+src-tauri/builtin_plugins/*/plugin.mjs text eol=lf
+
 *.ps1 text eol=crlf
 *.bat text eol=crlf
 *.cmd text eol=crlf
