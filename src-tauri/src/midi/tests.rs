@@ -99,6 +99,63 @@ fn insert_test_route(manager: &mut MidiManager, input_device_id: &str, output_de
     );
 }
 
+#[test]
+fn output_recovery_keeps_retrying_with_backoff_after_three_failures() {
+    let mut manager = manager_with_test_route("midi:998", "midi:999");
+    let output = manager.output_routes.get_mut("midi:999").unwrap();
+    let now = Instant::now();
+    output.last_reconnect_attempt = Some(now);
+    output.reconnect_failures = 2;
+    assert!(!output.reconnect_ready(now + Duration::from_secs(4)));
+    assert!(output.reconnect_ready(now + Duration::from_secs(5)));
+    for failures in [3, 4, 100, u32::MAX] {
+        output.reconnect_failures = failures;
+        assert!(!output.reconnect_ready(now + Duration::from_secs(29)));
+        assert!(output.reconnect_ready(now + Duration::from_secs(30)));
+    }
+}
+
+#[test]
+fn output_recovery_releases_affected_inputs_and_preserves_other_routes() {
+    let mut manager = manager_with_test_route("midi:998", "midi:999");
+    insert_test_route(&mut manager, "midi:996", "midi:999");
+    insert_test_route(&mut manager, "midi:994", "midi:995");
+    manager.mark_output_suspect("midi:999", "output_reconnect_failed");
+    manager.prepare_route_recovery(
+        &[PreparedMidiRoute {
+            input_device_id: "midi:998".to_string(),
+            output_device_id: "midi:999".to_string(),
+            input_device_name: None,
+            output_device_name: None,
+        }],
+        false,
+    );
+    for input_id in ["midi:998", "midi:996"] {
+        let input = &manager.input_routes[input_id];
+        assert!(input.input_connection_suspect);
+        assert_eq!(
+            input.input_connection_suspect_reason.as_deref(),
+            Some("output_recovery")
+        );
+    }
+    assert!(!manager.input_routes["midi:994"].input_connection_suspect);
+    assert!(!manager.output_routes["midi:995"].connection_suspect);
+    assert_eq!(
+        manager.input_routes.len(),
+        3,
+        "retain route identities for retry"
+    );
+}
+
+#[test]
+fn disconnected_route_records_are_not_reported_as_connected() {
+    let mut manager = manager_with_test_route("midi:998", "midi:999");
+    assert!(manager.active_route_details().is_empty());
+    manager.mark_output_suspect("midi:999", "output_reconnect_failed");
+    assert!(manager.active_route_details().is_empty());
+    assert_eq!(manager.active_routes().len(), 1, "keep retry bookkeeping");
+}
+
 fn xtouch_mini_mc_volume_binding(controller: u8) -> Binding {
     Binding {
         id: "binding-1".to_string(),

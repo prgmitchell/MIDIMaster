@@ -50,7 +50,8 @@ export function createConnection({
 
   function routeHealthNeedsRecovery(health) {
     return Boolean(
-      health?.suspect ||
+      health?.connected === false ||
+        health?.suspect ||
         health?.inputSuspect ||
         health?.inputNameMismatch ||
         health?.outputSuspect ||
@@ -177,7 +178,9 @@ export function createConnection({
       };
     }
 
-    if (!options.force && routesEquivalent(routesToStart, connection.connectedRoutes)) {
+    // Recovery must reach the backend even when the saved device IDs are unchanged.
+    // Keep force separate: the backend should preserve other healthy connections.
+    if (!options.force && !options.recover && routesEquivalent(routesToStart, connection.connectedRoutes)) {
       if (hasUnavailableRoutes && elements.midiStatus) {
         elements.midiStatus.textContent = options.partialUnavailableStatus || t("midi.savedUnavailable");
       }
@@ -235,6 +238,7 @@ export function createConnection({
     if (typeof showMain === "function") {
       const count = connection.connectedRoutes.length;
       showMain(connection.connectedInputName, connection.connectedOutputName, {
+        connected: count > 0,
         routeCount: count,
         routes: connection.connectedRoutes.slice(),
       });
@@ -242,8 +246,12 @@ export function createConnection({
     if (typeof refreshSessions === "function") {
       await refreshSessions();
     }
-    startSessionRefresh(refreshSessions || (async () => {}), elements.mainScreen);
-    if (typeof onConnected === "function") {
+    if (connection.connectedRoutes.length > 0) {
+      startSessionRefresh(refreshSessions || (async () => {}), elements.mainScreen);
+    } else if (typeof onDisconnected === "function") {
+      onDisconnected();
+    }
+    if (connection.connectedRoutes.length > 0 && typeof onConnected === "function") {
       onConnected({
         inputId: connection.connectedInputId,
         outputId: connection.connectedOutputId,

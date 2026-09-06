@@ -28,8 +28,9 @@ const LOG_MIDI_MESSAGES: bool = false;
 const MIDI_DIAGNOSTIC_MIN_INTERVAL_MS: u128 = 250;
 const EMPTY_INPUT_ENUMERATION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 const OUTPUT_RECONNECT_COOLDOWN: Duration = Duration::from_secs(5);
+const OUTPUT_RECONNECT_BACKOFF: Duration = Duration::from_secs(30);
 const OUTPUT_RECONNECT_SKIPPED_LOG_INTERVAL: Duration = Duration::from_secs(30);
-const MAX_OUTPUT_RECONNECT_FAILURES: u32 = 3;
+const OUTPUT_RECONNECT_FAST_ATTEMPTS: u32 = 3;
 static EMPTY_INPUT_ENUMERATION_LOG_STATE: OnceLock<Mutex<EmptyEnumerationLogState>> =
     OnceLock::new();
 static INPUT_DIAGNOSTICS: OnceLock<Mutex<HashMap<MidiDiagnosticKey, MidiDiagnosticState>>> =
@@ -101,6 +102,19 @@ struct MidiOutputRoute {
     reconnect_failures: u32,
     connection_suspect: bool,
     connection_suspect_reason: Option<String>,
+}
+
+impl MidiOutputRoute {
+    fn reconnect_ready(&self, now: Instant) -> bool {
+        let cooldown = if self.reconnect_failures >= OUTPUT_RECONNECT_FAST_ATTEMPTS {
+            OUTPUT_RECONNECT_BACKOFF
+        } else {
+            OUTPUT_RECONNECT_COOLDOWN
+        };
+        self.last_reconnect_attempt
+            .map(|last| now.saturating_duration_since(last) >= cooldown)
+            .unwrap_or(true)
+    }
 }
 
 impl MidiManager {
@@ -181,6 +195,16 @@ impl MidiManager {
         let mut routes = self
             .input_routes
             .values()
+            .filter(|route| {
+                route.input_connection.is_some()
+                    && !route.input_connection_suspect
+                    && self
+                        .output_routes
+                        .get(&route.output_device_id)
+                        .is_some_and(|output| {
+                            output.output_connection.is_some() && !output.connection_suspect
+                        })
+            })
             .map(|route| MidiDeviceRoute {
                 input_device_id: Some(route.input_device_id.clone()),
                 output_device_id: Some(route.output_device_id.clone()),

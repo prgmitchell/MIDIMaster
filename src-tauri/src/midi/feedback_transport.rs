@@ -215,16 +215,11 @@ impl MidiManager {
 
         if !send_success {
             self.mark_output_suspect(&output_device_id, "output_send_failed");
-            let (should_attempt, reconnect_failures) = if let Some(route) =
-                self.output_routes.get_mut(&output_device_id)
-            {
-                let should_attempt = route
-                    .last_reconnect_attempt
-                    .map(|t| t.elapsed() >= OUTPUT_RECONNECT_COOLDOWN)
-                    .unwrap_or(true);
+            if let Some(route) = self.output_routes.get_mut(&output_device_id) {
+                let should_attempt = route.reconnect_ready(Instant::now());
                 let reconnect_failures = route.reconnect_failures;
 
-                if !should_attempt || reconnect_failures >= MAX_OUTPUT_RECONNECT_FAILURES {
+                if !should_attempt {
                     if should_log_reconnect_skipped(
                         &mut route.last_reconnect_skipped_log,
                         Instant::now(),
@@ -234,13 +229,13 @@ impl MidiManager {
                                 "midi",
                                 "output_reconnect_skipped",
                                 &format!(
-                                    "feedback_protocol={} output_device_id={} output_device_name={} cooldown_ready={} reconnect_failures={} max_failures={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
+                                    "feedback_protocol={} output_device_id={} output_device_name={} cooldown_ready={} reconnect_failures={} fast_attempts={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} normalized_value={:.4} logical_raw_midi_value={} physical_raw_midi_value={} logical_bytes_hex={} physical_bytes_hex={}",
                                     feedback.protocol,
                                     output_device_id,
                                     output_device_name,
                                     should_attempt,
                                     reconnect_failures,
-                                    MAX_OUTPUT_RECONNECT_FAILURES,
+                                    OUTPUT_RECONNECT_FAST_ATTEMPTS,
                                     channel,
                                     controller,
                                     msg_type,
@@ -260,12 +255,9 @@ impl MidiManager {
 
                 route.last_reconnect_attempt = Some(std::time::Instant::now());
                 route.last_reconnect_skipped_log = None;
-                (should_attempt, reconnect_failures)
             } else {
                 return Ok(());
             };
-            let _ = should_attempt;
-            let _ = reconnect_failures;
             run_logger::warn(
                 "midi",
                 "output_send_failed",
@@ -380,7 +372,7 @@ impl MidiManager {
                             route.connection_suspect = true;
                             route.connection_suspect_reason =
                                 Some("output_reconnect_failed".to_string());
-                            route.reconnect_failures += 1;
+                            route.reconnect_failures = route.reconnect_failures.saturating_add(1);
                             route.reconnect_failures
                         } else {
                             self.output_routes.insert(
@@ -399,10 +391,10 @@ impl MidiManager {
                             );
                             1
                         };
-                    if failures >= MAX_OUTPUT_RECONNECT_FAILURES {
-                        run_logger::error(
+                    if failures >= OUTPUT_RECONNECT_FAST_ATTEMPTS {
+                        run_logger::warn(
                             "midi",
-                            "output_reconnect_give_up",
+                            "output_reconnect_backoff",
                             &format!(
                                 "feedback_protocol={} output_device_id={} attempts={} logical_channel={} logical_controller={} logical_msg_type={:?} physical_channel={} physical_controller={} physical_msg_type={:?} physical_raw_midi_value={} physical_bytes_hex={} error={}",
                                 feedback.protocol,

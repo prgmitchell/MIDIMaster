@@ -72,13 +72,14 @@ export function createAvailability({
             );
             if (resolvedRoutes.available || anyRouteAvailable) {
               const result = await applyRoutes(routesFromResolvedPreferences(resolvedRoutes), {
+                recover: true,
                 auto: true,
                 fromProfile: true,
                 allowPartialUnavailable: !resolvedRoutes.available,
                 partialUnavailableStatus: unresolvedRouteStatus(resolvedRoutes),
               });
               if (elements.midiStatus) {
-                elements.midiStatus.textContent = result?.partial
+                elements.midiStatus.textContent = result?.partial || !result?.connected
                   ? unresolvedRouteStatus(resolvedRoutes)
                   : t("midi.reconnectedProfile");
               }
@@ -190,14 +191,14 @@ export function createAvailability({
           return;
         }
         try {
-          await applyRoutes(routes, {
+          const result = await applyRoutes(routes, {
             auto: true,
             fromProfile: true,
             allowPartialUnavailable: !resolvedRoutes.available,
             partialUnavailableStatus: unresolvedRouteStatus(resolvedRoutes),
           });
           if (elements.midiStatus) {
-            elements.midiStatus.textContent = resolvedRoutes.available
+            elements.midiStatus.textContent = resolvedRoutes.available && result?.connected && !result?.partial
               ? t("midi.reconnectedProfile")
               : unresolvedRouteStatus(resolvedRoutes);
           }

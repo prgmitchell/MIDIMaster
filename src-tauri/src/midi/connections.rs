@@ -31,15 +31,14 @@ impl MidiManager {
 
         preflight_midi_routes(&next_routes)?;
 
+        self.prepare_route_recovery(&next_routes, force_reconnect);
+
         let desired_inputs = next_routes
             .iter()
             .map(|route| route.input_device_id.clone())
             .collect::<std::collections::HashSet<_>>();
 
         for route in &next_routes {
-            if force_reconnect {
-                self.force_output_reconnect(&route.output_device_id);
-            }
             self.ensure_output_connected(
                 &route.output_device_id,
                 route.output_device_name.as_deref(),
@@ -187,6 +186,37 @@ impl MidiManager {
         }
 
         Ok(())
+    }
+
+    pub(super) fn prepare_route_recovery(&mut self, routes: &[PreparedMidiRoute], force: bool) {
+        let outputs = routes
+            .iter()
+            .filter_map(|route| {
+                let output = self.output_routes.get(&route.output_device_id)?;
+                (force || output.connection_suspect || output.output_connection.is_none())
+                    .then(|| route.output_device_id.clone())
+            })
+            .collect::<std::collections::HashSet<_>>();
+        // A failed duplex device can retain a stale input handle as well. Release
+        // both sides before reopening its output; leave unrelated routes alive.
+        for (input_id, input) in &mut self.input_routes {
+            if outputs.contains(&input.output_device_id) {
+                input.input_connection = None;
+                input.input_connection_suspect = true;
+                input.input_connection_suspect_reason = Some("output_recovery".to_string());
+                run_logger::info(
+                    "midi",
+                    "route_recovery_started",
+                    &format!(
+                        "input_device_id={} output_device_id={} reason=output_recovery",
+                        input_id, input.output_device_id
+                    ),
+                );
+            }
+        }
+        for output_id in outputs {
+            self.force_output_reconnect(&output_id);
+        }
     }
 
     pub(super) fn connect_input_route(

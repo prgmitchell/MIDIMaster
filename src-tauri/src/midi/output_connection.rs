@@ -26,7 +26,7 @@ impl MidiManager {
                     .and_then(|route| clean_expected_device_name(Some(&route.output_device_name)))
             });
         if let Some(route) = self.output_routes.get_mut(output_device_id) {
-            if route.output_connection.is_some() {
+            if route.output_connection.is_some() && !route.connection_suspect {
                 if let Some(expected_name) = expected_output_device_name.as_deref() {
                     match current_output_port_name(output_device_id) {
                         Ok(actual_name) => {
@@ -68,6 +68,8 @@ impl MidiManager {
                 return Ok(());
             }
         }
+        // Release a failed handle before opening the same Windows MIDI port again.
+        self.force_output_reconnect(output_device_id);
         let (output_connection, output_port_name) =
             Self::open_output_connection(output_device_id, expected_output_device_name.as_deref())?;
         if let Some(expected_name) = expected_output_device_name.as_deref() {
