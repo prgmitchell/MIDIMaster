@@ -9,6 +9,7 @@ export function createSelectDropdownShell({
   selectEl,
   rootClass = "",
   title = "Select",
+  preferUp = false,
 }) {
   if (!selectEl) return null;
 
@@ -38,7 +39,7 @@ export function createSelectDropdownShell({
   menu.className = "target-menu hidden";
   root.__positionDropdownMenu = () => {
     if (!root.classList.contains("settings-select-dropdown") || menu.classList.contains("hidden")) return;
-    positionFloatingDropdownMenu({ menu, trigger: button });
+    positionFloatingDropdownMenu({ menu, trigger: button, preferUp });
   };
   wireDropdownToggle({ root, menu, trigger: button });
 

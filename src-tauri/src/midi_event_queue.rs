@@ -240,7 +240,7 @@ fn should_preserve_event(event: &MidiEvent) -> bool {
     match event.msg_type {
         MidiMessageType::Note | MidiMessageType::ProgramChange => true,
         MidiMessageType::ControlChange => event.value == 0 || event.value == 127,
-        MidiMessageType::PitchBend => false,
+        MidiMessageType::PitchBend | MidiMessageType::ChannelPressure => false,
     }
 }
 

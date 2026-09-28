@@ -501,6 +501,12 @@ body[data-theme] #binding-config-panel .binding-config-curve-preset-action--dang
   color: var(--danger);
 }
 
+body[data-theme] #binding-config-panel .binding-config-toggle-title {
+  color: var(--text-primary);
+}
+
+body[data-theme] #binding-config-panel .binding-config-toggle-help,
+body[data-theme] #binding-config-panel .binding-config-indicator-field,
 body[data-theme] #binding-config-panel .binding-config-curve-toolbar-label,
 body[data-theme] #binding-config-panel .binding-config-curve-preset-heading,
 body[data-theme] #binding-config-panel .binding-config-curve-preset-empty,

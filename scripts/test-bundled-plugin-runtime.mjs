@@ -49,6 +49,7 @@ const host = createPluginHost({
     if (command === "list_plugins") return packages.map((plugin) => ({ ...plugin, enabled: true }));
     if (command === "read_plugin_text") return sources.get(args.pluginId);
     if (command === "read_plugin_base64") return "";
+    if (command === "get_audio_meter_demand") return { generation: 0, targets: [] };
     if (command === "voicemeeter_connect")
       return { connected: true, edition: "banana", capabilities: { physical_bus_count: 3 } };
     if (command === "voicemeeter_list_devices") return [{ name: "Fixture speakers", driver_type: "wdm" }];
@@ -56,7 +57,7 @@ const host = createPluginHost({
       return { status: { connected: true, edition: "banana", capabilities: { physical_bus_count: 3 } } };
     if (command === "voicemeeter_safe_command") return null;
     if (
-      ["set_integration_connection_state", "set_binding_feedback", "voicemeeter_disconnect"].includes(command)
+      ["set_integration_connection_state", "set_binding_feedback", "set_audio_meter_samples", "voicemeeter_disconnect"].includes(command)
     )
       return null;
     throw new Error(`Unexpected plugin command: ${command}`);

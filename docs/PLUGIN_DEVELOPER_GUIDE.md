@@ -422,6 +422,25 @@ With multiple MIDI routes, no plugin API change is required. Always pass the
 binding id you were given. MIDIMaster will infer the correct MIDI output from
 the binding's stored input device route.
 
+#### Audio meters for optional LED output
+
+`ctx.feedback.set(...)` is unchanged and remains the parameter/UI/OSD feedback API. Never send audio peaks through it. Plugins can additionally provide meter samples:
+
+```js
+const unsubscribe = await ctx.feedback.onAudioTargetsChanged(({ generation, targets }) => {
+  // Subscribe only to supported targets in this demand. Keep the generation
+  // with the subscriptions; discard samples from previous generations.
+});
+await ctx.feedback.setAudioLevels([
+  { target, level: 0.42 }, // full BindingTarget, normalized 0–1
+  { target: unavailableTarget, level: null },
+], generation);
+```
+
+Each batch replaces that plugin's previous meter snapshot. Include all currently requested, supported sources in a batch; use `null` for unavailable sources and zero for mute or silence. Normalize stereo sources with the maximum channel, clamp to 0–1, and batch frequent notifications at approximately 25 Hz. Hold a valid unchanged sample while connected; clear it on disconnect or source removal. A new demand generation resets samples on profile, binding, output, or route changes, and the backend rejects old generations. Disposal automatically clears a plugin's samples; also stop subscriptions and timers in `ctx.lifecycle.onDispose`.
+
+The backend combines meters across Windows and plugins, applies the fixed release, suppresses duplicate encoded MIDI values, and sends only to the optional LED destination. Motor/value feedback and logical caches remain separate. The bundled Wave Link plugin uses its existing connection and exact channel, mix, or channel-in-mix subscriptions as an example.
+
 ### 6.7 `ctx.ws` (WebSocket bridge)
 
 Use this when you need custom headers or consistent backend-managed sockets.

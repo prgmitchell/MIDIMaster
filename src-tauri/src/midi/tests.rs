@@ -1,4 +1,282 @@
 use super::*;
+
+#[test]
+fn xtouch_mc_meters_pack_all_strips_without_replacing_motor_feedback() {
+    let mut manager = manager_with_test_route("usb-in", "usb-out");
+    let mut binding = crate::test_support::binding();
+    binding.device_id = "usb-in".into();
+    binding.control.msg_type = MidiMessageType::PitchBend;
+    binding.feedback_mode = crate::model::FeedbackMode::AudioReactive;
+    binding.led_enabled = true;
+    binding.fader_curve = FaderCurve::Exponential;
+    for name in ["X-TOUCH", "2- X-TOUCH", "X-TOUCH-EXT", "X-TOUCH EXTENDER"] {
+        manager
+            .output_routes
+            .get_mut("usb-out")
+            .unwrap()
+            .output_device_name = name.into();
+        for strip in 0..8 {
+            binding.control.channel = strip;
+            let mapping = manager.automatic_led_output(&binding).unwrap();
+            assert_eq!(mapping.msg_type, MidiMessageType::ChannelPressure);
+            assert_eq!((mapping.channel, mapping.controller), (0, strip));
+            for (level, segment) in [(0.0, 0), (0.5, 8), (1.0, 12), (5.0, 12), (f32::NAN, 0)] {
+                assert_eq!(
+                    manager.meter_feedback_key(&binding, level).unwrap(),
+                    ("usb-out".into(), vec![vec![0xD0, (strip << 4) | segment]])
+                );
+            }
+            let motor = binding_feedback_send(&binding, 0.5).unwrap();
+            assert_eq!(motor.msg_type, MidiMessageType::PitchBend);
+            assert_ne!(motor.value, 0.5, "only the motor applies the fader curve");
+            let motor_message = build_feedback_message(
+                motor.channel,
+                motor.controller,
+                motor.value,
+                &motor.msg_type,
+                Some(&binding),
+                name,
+            );
+            assert_eq!(motor_message.physical_bytes[0], 0xE0 | strip);
+            binding.feedback_mode = crate::model::FeedbackMode::FollowValue;
+            assert_eq!(
+                manager.meter_feedback_key(&binding, 0.5).unwrap().1,
+                vec![vec![0xD0, (strip << 4) | 6]]
+            );
+            binding.feedback_mode = crate::model::FeedbackMode::AudioReactive;
+        }
+        binding.control.channel = 8;
+        assert!(
+            manager.automatic_led_output(&binding).is_none(),
+            "no master meter"
+        );
+    }
+    binding.control.channel = 0;
+    for name in [
+        "X-TOUCH MINI",
+        "X-TOUCH COMPACT",
+        "X-TOUCH ONE",
+        "Network Session 1",
+        "Platform X+",
+    ] {
+        manager
+            .output_routes
+            .get_mut("usb-out")
+            .unwrap()
+            .output_device_name = name.into();
+        assert!(
+            manager.meter_feedback_key(&binding, 0.5).is_none(),
+            "no meter inferred for {name}"
+        );
+    }
+}
+
+#[test]
+fn explicit_mackie_meter_routes_through_arbitrary_network_ports_and_validates_strip() {
+    let mut manager = manager_with_test_route("network-in", "network-out");
+    manager
+        .output_routes
+        .get_mut("network-out")
+        .unwrap()
+        .output_device_name = "Studio rtpMIDI".into();
+    let mut binding = crate::test_support::binding();
+    binding.control.msg_type = MidiMessageType::PitchBend;
+    binding.led_enabled = true;
+    binding.led_control = Some(AuxiliaryControl {
+        device_id: "network-in".into(),
+        channel: 0,
+        controller: 7,
+        msg_type: MidiMessageType::ChannelPressure,
+        control_kind: BindingControlKind::Continuous,
+        mode: MidiMode::Absolute,
+        deadzone: 0.0,
+        debounce_ms: 0,
+        mute_behavior: Default::default(),
+    });
+    assert_eq!(
+        manager.meter_feedback_key(&binding, 1.0).unwrap(),
+        ("network-out".into(), vec![vec![0xD0, 0x7C]])
+    );
+    binding.feedback_enabled = false;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_some());
+    let saved: Binding = serde_json::from_value(serde_json::to_value(&binding).unwrap()).unwrap();
+    assert_eq!(saved.led_control, binding.led_control);
+    binding.led_control.as_mut().unwrap().controller = 8;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+    binding.led_control.as_mut().unwrap().controller = 0;
+    binding.led_control.as_mut().unwrap().channel = 1;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+    binding.led_control.as_mut().unwrap().channel = 0;
+    binding.control_kind = BindingControlKind::Button;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+    assert!(
+        parse_midi_message("network-in", &[0xD0, 0x7C]).is_none(),
+        "returned meter packets cannot become learned controls or change volume"
+    );
+}
+
+#[test]
+fn reactive_led_feedback_preserves_motor_and_uses_only_configured_led_output() {
+    let manager = manager_with_test_route("midi:0", "midi:10");
+    let mut binding = crate::test_support::binding();
+    binding.device_id = "midi:0".into();
+    binding.control.msg_type = MidiMessageType::PitchBend;
+    binding.feedback_mode = crate::model::FeedbackMode::AudioReactive;
+    binding.fader_curve = crate::model::FaderCurve::Exponential;
+    assert!(
+        manager.meter_feedback_key(&binding, 0.5).is_none(),
+        "no implicit LED output"
+    );
+    binding.led_enabled = true;
+    binding.led_control = Some(crate::model::AuxiliaryControl {
+        device_id: "midi:0".into(),
+        channel: 2,
+        controller: 42,
+        msg_type: MidiMessageType::ControlChange,
+        control_kind: crate::model::BindingControlKind::Continuous,
+        mode: crate::model::MidiMode::Absolute,
+        deadzone: 0.0,
+        debounce_ms: 0,
+        mute_behavior: crate::model::MuteBehavior::ToggleOnPress,
+    });
+    let key = manager.meter_feedback_key(&binding, 0.5).unwrap();
+    assert_eq!(key.0, "midi:10");
+    assert_eq!(key.1, vec![vec![0xB2, 42, 64]]);
+    assert_eq!(key, manager.meter_feedback_key(&binding, 0.5001).unwrap());
+    let position = binding_led_feedback_send(&binding, 0.5, "Generic").unwrap();
+    assert_eq!(position.value, 0.5, "meter ignores the fader curve");
+    let motor = binding_feedback_send(&binding, 0.5).unwrap();
+    assert_eq!(motor.msg_type, MidiMessageType::PitchBend);
+    assert_ne!(motor.value, position.value);
+    binding.feedback_enabled = false;
+    assert!(binding_feedback_send(&binding, 0.5).is_none());
+    assert!(binding_led_feedback_send(&binding, 0.5, "Generic").is_some());
+    binding.led_control.as_mut().unwrap().msg_type = MidiMessageType::PitchBend;
+    assert!(
+        binding_led_feedback_send(&binding, 0.5, "Generic").is_none(),
+        "a motor address is not an LED output"
+    );
+}
+
+#[test]
+fn existing_feedback_reuses_note_cc_and_restores_value_feedback_without_touching_motors() {
+    let mut manager = manager_with_test_route("midi:0", "midi:10");
+    let mut binding = crate::test_support::binding();
+    binding.device_id = "midi:0".into();
+    binding.fader_curve = crate::model::FaderCurve::Exponential;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+    let original_value = binding_feedback_send(&binding, 0.5).unwrap().value;
+
+    binding.feedback_mode = crate::model::FeedbackMode::AudioReactive;
+    assert_eq!(
+        manager.meter_feedback_key(&binding, 0.5).unwrap().1,
+        vec![vec![0xB0, 7, 64]],
+        "existing CC receives meter level without the value curve"
+    );
+    manager.send_binding_feedback(&binding, 0.8).unwrap();
+    assert!(
+        !manager.output_routes["midi:10"].connection_suspect,
+        "ordinary value writes cannot compete with the meter"
+    );
+
+    binding.feedback_mode = crate::model::FeedbackMode::FollowValue;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+    assert_eq!(
+        binding_feedback_send(&binding, 0.5).unwrap().value,
+        original_value
+    );
+
+    binding.feedback_mode = crate::model::FeedbackMode::AudioReactive;
+    binding.control.msg_type = MidiMessageType::PitchBend;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+    assert_eq!(
+        binding_feedback_send(&binding, 0.5).unwrap().msg_type,
+        MidiMessageType::PitchBend
+    );
+
+    // A custom existing address may route through a different input's output.
+    binding.device_id = "unpaired-input".into();
+    binding.indicator_control = Some(crate::model::AuxiliaryControl {
+        device_id: "midi:0".into(),
+        channel: 3,
+        controller: 42,
+        msg_type: MidiMessageType::Note,
+        control_kind: crate::model::BindingControlKind::Continuous,
+        mode: Default::default(),
+        deadzone: 0.0,
+        debounce_ms: 0,
+        mute_behavior: Default::default(),
+    });
+    assert_eq!(
+        manager.meter_feedback_key(&binding, 0.5).unwrap(),
+        ("midi:10".into(), vec![vec![0x93, 42, 64]])
+    );
+    binding.feedback_enabled = false;
+    assert!(
+        manager.meter_feedback_key(&binding, 0.5).is_none(),
+        "disabled feedback stays disabled"
+    );
+    binding.feedback_enabled = true;
+    binding.control_kind = crate::model::BindingControlKind::Button;
+    assert!(
+        manager.meter_feedback_key(&binding, 0.5).is_none(),
+        "buttons keep their existing light modes"
+    );
+}
+#[test]
+fn automatic_led_uses_known_ring_protocol_and_never_guesses_a_motor() {
+    let mut manager = manager_with_test_route("midi:0", "midi:10");
+    manager
+        .output_routes
+        .get_mut("midi:10")
+        .unwrap()
+        .output_device_name = "X-TOUCH MINI".into();
+    let mut binding = crate::test_support::binding();
+    binding.device_id = "midi:0".into();
+    binding.control.channel = 0;
+    binding.control.controller = 1;
+    binding.control.msg_type = MidiMessageType::ControlChange;
+    binding.led_enabled = true;
+    binding.feedback_mode = crate::model::FeedbackMode::AudioReactive;
+    assert_eq!(
+        manager.automatic_led_output(&binding).unwrap().controller,
+        9
+    );
+    assert_eq!(
+        manager.meter_feedback_key(&binding, 0.5).unwrap().1,
+        vec![vec![0xB0, 1, 2], vec![0xB0, 9, 7]]
+    );
+    manager.send_binding_feedback(&binding, 0.8).unwrap();
+    assert!(
+        !manager.output_routes["midi:10"].connection_suspect,
+        "ordinary value feedback cannot compete with the reactive ring"
+    );
+    binding.mode = crate::model::MidiMode::Relative;
+    binding.control.controller = 16;
+    assert_eq!(
+        manager.automatic_led_output(&binding).unwrap().controller,
+        48
+    );
+    assert_eq!(
+        manager.meter_feedback_key(&binding, 0.5).unwrap().1,
+        vec![vec![0xB0, 48, 0x26]]
+    );
+    binding.control.msg_type = MidiMessageType::PitchBend;
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+    assert!(
+        binding_feedback_send(&binding, 0.8).is_some(),
+        "motor value feedback remains enabled"
+    );
+    binding.control.msg_type = MidiMessageType::ControlChange;
+    manager
+        .output_routes
+        .get_mut("midi:10")
+        .unwrap()
+        .output_device_name = "Unrecognized controller".into();
+    assert!(manager.automatic_led_output(&binding).is_none());
+    assert!(manager.meter_feedback_key(&binding, 0.5).is_none());
+}
+
 use crate::model::{
     AuxiliaryControl, BindingAction, BindingControlKind, BindingTarget, FaderCurve,
     FaderCurvePoint, MidiControl, MidiMode, MuteBehavior,

@@ -167,6 +167,7 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
     }
 
     return {
+      isDisposed: () => disposed,
       onDispose: (handler) => addDisposer(handler),
       trackListener,
       trackWs: (id) => {
@@ -310,6 +311,23 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
             },
           },
           feedback: {
+            // Demand carries a generation so late messages from an old profile
+            // cannot relight a newly configured output.
+            onAudioTargetsChanged: async (handler) => {
+              let generation = -1;
+              const deliver = (demand) => {
+                if (cleanup.isDisposed() || !demand || demand.generation < generation) return;
+                generation = demand.generation;
+                handler(demand);
+              };
+              const unlisten = await cleanup.trackListener(listen("audio_meter_demand", (event) => deliver(event.payload)));
+              deliver(await invoke("get_audio_meter_demand"));
+              cleanup.onDispose(() => invoke("set_audio_meter_samples", { provider: pluginId, generation, samples: [] }));
+              return unlisten;
+            },
+            setAudioLevels: (samples, generation) => cleanup.isDisposed() ? Promise.resolve() : invoke("set_audio_meter_samples", {
+              provider: pluginId, generation, samples,
+            }),
             set: (bindingId, value, action = null, opts = null) => {
               const silent = (typeof opts === "boolean")
                 ? opts

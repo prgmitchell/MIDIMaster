@@ -80,6 +80,7 @@ pub(crate) fn focused_application_name() -> Option<String> {
 
 pub(crate) struct AppState {
     pub(crate) audio: Box<dyn AudioBackend>,
+    pub(crate) audio_feedback: Mutex<crate::audio_feedback::AudioFeedbackState>,
     pub(crate) midi: Arc<Mutex<MidiManager>>,
     pub(crate) midi_dispatch_lock: Mutex<()>,
     pub(crate) midi_event_queue: Arc<Mutex<MidiEventQueue>>,
@@ -137,12 +138,8 @@ fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
         }
 
         match binding.primary_target().feedback_source() {
-            model::BindingTargetFeedbackSource::Sessions => {
-                needs.sessions = true;
-            }
-            model::BindingTargetFeedbackSource::FocusedSession => {
-                needs.focused_session = true;
-            }
+            model::BindingTargetFeedbackSource::Sessions => needs.sessions = true,
+            model::BindingTargetFeedbackSource::FocusedSession => needs.focused_session = true,
             model::BindingTargetFeedbackSource::Device => {
                 let model::BindingTarget::Device { device_id } = binding.primary_target() else {
                     continue;
@@ -251,6 +248,7 @@ impl AppState {
             active_profile: Mutex::new(None),
             binding_state: Arc::new(Mutex::new(HashMap::new())),
             feedback_values: Arc::new(Mutex::new(HashMap::new())),
+            audio_feedback: Mutex::new(Default::default()),
             binding_action_values: Arc::new(Mutex::new(HashMap::new())),
             integration_connection_states: Mutex::new(HashMap::new()),
             activity_button_light_generations: Arc::new(Mutex::new(HashMap::new())),
@@ -662,7 +660,7 @@ impl AppState {
         // Clear disabled outputs before rebuilding enabled feedback so a disabled
         // custom destination cannot erase a later binding that shares the address.
         for binding in &profile.bindings {
-            if binding.feedback_enabled {
+            if binding.feedback_enabled || binding.has_led_feedback() {
                 continue;
             }
             let key = BindingKey::from_binding(binding);
@@ -676,19 +674,19 @@ impl AppState {
             if let Some((assign_control, value)) = feedback::assign_button_feedback(binding) {
                 feedback.insert(assign_control.to_binding_key(), value);
             }
-            if !binding.feedback_enabled {
+            if !binding.feedback_enabled && !binding.has_led_feedback() {
                 continue;
             }
             let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();
             if !self.binding_has_available_target(binding) {
                 if binding.is_button_binding() {
                     feedback.insert(key.clone(), 0.0);
-                    if output_key != key {
+                    if binding.feedback_enabled && output_key != key {
                         feedback.insert(output_key, 0.0);
                     }
                 } else {
                     feedback.remove(&key);
-                    if output_key != key {
+                    if binding.feedback_enabled && output_key != key {
                         feedback.remove(&output_key);
                     }
                 }
@@ -720,7 +718,7 @@ impl AppState {
                     let output_key =
                         feedback::binding_feedback_control_key(binding).to_binding_key();
                     feedback.insert(key.clone(), value);
-                    if output_key != key {
+                    if binding.feedback_enabled && output_key != key {
                         feedback.insert(output_key, value);
                     }
                 }
@@ -781,12 +779,12 @@ impl AppState {
                     .button_light_feedback_value(binding, Some(input_active), state_active)
                     .unwrap_or(val);
                 feedback.insert(key.clone(), feedback_value);
-                if output_key != key {
+                if binding.feedback_enabled && output_key != key {
                     feedback.insert(output_key, feedback_value);
                 }
             } else if let Some(value) = idle_feedback_value {
                 feedback.insert(key.clone(), value);
-                if output_key != key {
+                if binding.feedback_enabled && output_key != key {
                     feedback.insert(output_key, value);
                 }
             }

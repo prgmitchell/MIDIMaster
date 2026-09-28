@@ -180,7 +180,7 @@ try {
   assert.notEqual(d.bindingConfigPreviewMainMidi.firstChild, initialSummary);
   language = "de";
   flushFrames();
-  assert.equal(d.bindingConfigPreviewMute.textContent, "de:bindings.notMapped");
+  assert.equal(d.bindingConfigPreviewMute, undefined, "Live does not duplicate the Mute mapping");
   assert.equal(d.bindingConfigPreviewStatus.textContent, "de:bindings.receivingLiveFeedback");
 
   d.bindingConfigName.value = "Cancelled";

@@ -1,6 +1,58 @@
 use super::*;
 
 impl MidiManager {
+    /// Compare actual encoded messages, including controller-specific protocols.
+    pub(crate) fn meter_feedback_key(
+        &self,
+        binding: &Binding,
+        level: f32,
+    ) -> Option<(String, Vec<Vec<u8>>)> {
+        self.encoded_feedback_key(binding, &self.led_feedback_send(binding, level)?)
+    }
+
+    fn encoded_feedback_key(
+        &self,
+        binding: &Binding,
+        send: &BindingLightFeedbackSend,
+    ) -> Option<(String, Vec<Vec<u8>>)> {
+        let route = self.input_routes.get(&send.device_id)?;
+        let output = self.output_routes.get(&route.output_device_id)?;
+        let message = build_feedback_message(
+            send.channel,
+            send.controller,
+            send.value,
+            &send.msg_type,
+            if send.use_binding_protocol {
+                Some(binding)
+            } else {
+                None
+            },
+            &output.output_device_name,
+        );
+        Some((route.output_device_id.clone(), message.physical_messages))
+    }
+
+    pub(crate) fn automatic_led_output(
+        &self,
+        binding: &Binding,
+    ) -> Option<crate::model::MidiControl> {
+        let route = self.input_routes.get(&binding.device_id)?;
+        let output = self.output_routes.get(&route.output_device_id)?;
+        automatic_led_control(binding, &output.output_device_name)
+    }
+
+    fn led_feedback_send(&self, binding: &Binding, level: f32) -> Option<BindingLightFeedbackSend> {
+        let control = if binding.led_enabled {
+            binding.led_control.as_ref()
+        } else {
+            binding.custom_feedback_output_control()
+        };
+        let device = control.map(|c| &c.device_id).unwrap_or(&binding.device_id);
+        let route = self.input_routes.get(device)?;
+        let output = self.output_routes.get(&route.output_device_id)?;
+        binding_led_feedback_send(binding, level, &output.output_device_name)
+    }
+
     pub(super) fn send_resolved_binding_feedback(
         &mut self,
         binding: &Binding,
@@ -25,7 +77,34 @@ impl MidiManager {
     }
 
     pub fn send_binding_feedback(&mut self, binding: &Binding, logical_value: f32) -> Result<()> {
-        self.send_resolved_binding_feedback(binding, binding_feedback_send(binding, logical_value))
+        let send = binding_feedback_send(binding, logical_value);
+        // Compare the actual hardware addresses: a controller protocol can put
+        // its ring on a different CC from the encoder's input address.
+        if let Some((led_output, led_messages)) = self.meter_feedback_key(binding, 0.0) {
+            if let Some((value_output, value_messages)) = send
+                .as_ref()
+                .and_then(|s| self.encoded_feedback_key(binding, s))
+            {
+                if led_output == value_output
+                    && led_messages.iter().any(|led| {
+                        value_messages
+                            .iter()
+                            .any(|value| led.get(..2) == value.get(..2))
+                    })
+                {
+                    return Ok(());
+                }
+            }
+        }
+        self.send_resolved_binding_feedback(binding, send)
+    }
+
+    pub(crate) fn send_binding_led_feedback(
+        &mut self,
+        binding: &Binding,
+        level: f32,
+    ) -> Result<()> {
+        self.send_resolved_binding_feedback(binding, self.led_feedback_send(binding, level))
     }
 
     pub fn send_binding_feedback_position(

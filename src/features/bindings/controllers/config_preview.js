@@ -4,7 +4,7 @@ import {
   buttonVisualBehavior,
   resolveButtonVisualActive,
 } from "../../../core/binding_model.js";
-import { effectiveIsButton, applyCurveToNormalized, curveDisplayName } from "../shape_helpers.js";
+import { effectiveIsButton, applyCurveToNormalized } from "../shape_helpers.js";
 import { resolveBindingVolumeValue } from "../value_sync.js";
 
 function setText(element, value) {
@@ -33,7 +33,6 @@ export function createConfigPreview({
   bindingMuteValues,
   elements,
   editorState,
-  formatMidiControlLabel,
   formatPreviewMidiValue,
   getConfigBinding,
   getLiveMidiValue,
@@ -83,32 +82,13 @@ export function createConfigPreview({
     const faderPreview = elements.bindingConfigPreviewFill?.closest?.(".binding-config-preview-fader");
     setHidden(faderPreview, isButton);
     setHidden(elements.bindingConfigPreviewButton, !isButton);
-    for (const row of [
-      elements.bindingConfigPreviewMuteRow,
-      elements.bindingConfigPreviewAssignRow,
-      elements.bindingConfigPreviewCurveRow,
-    ]) {
-      toggleClass(row, "hidden", isButton);
-    }
     renderMidiMappingSummary(
       elements.bindingConfigPreviewMainMidi,
       binding.device_id,
       binding.control,
       labelForControl(binding.control || {}),
     );
-    renderMidiMappingSummary(
-      elements.bindingConfigPreviewMute,
-      binding.mute_control?.device_id,
-      binding.mute_control,
-      formatMidiControlLabel(binding.mute_control),
-    );
-    renderMidiMappingSummary(
-      elements.bindingConfigPreviewAssign,
-      binding.assign_control?.device_id,
-      binding.assign_control,
-      formatMidiControlLabel(binding.assign_control),
-    );
-    setText(elements.bindingConfigPreviewCurve, curveDisplayName(binding.fader_curve));
+
   }
 
   function renderConfigPreview() {

@@ -117,6 +117,7 @@ export function applyBindingDeviceMigrations(binding, migrations) {
     mute_control: migratedControl(current.mute_control),
     assign_control: migratedControl(current.assign_control),
     indicator_control: migratedControl(current.indicator_control),
+    ...("led_control" in current ? { led_control: migratedControl(current.led_control) } : {}),
   };
 }
 

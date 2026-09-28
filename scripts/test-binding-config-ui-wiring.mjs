@@ -144,7 +144,7 @@ assert.match(
 );
 assert.match(
   files.css,
-  /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-layout\s*\{[\s\S]*?grid-template-areas:[\s\S]*?"feedback feedback live"[\s\S]*?"mute assign learn";[\s\S]*?align-items: stretch;/,
+  /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-layout\s*\{[\s\S]*?grid-template-areas:[\s\S]*?"feedback feedback led"[\s\S]*?"mute assign learn";[\s\S]*?align-items: stretch;/,
   "fader mute, assign, and learn cards should share the bottom grid row with feedback above them",
 );
 assert.doesNotMatch(
@@ -185,8 +185,8 @@ assert.match(
 );
 assert.match(
   files.css,
-  /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-preview-card\s*\{[\s\S]*?align-self: stretch;[\s\S]*?height: auto;[\s\S]*?min-height: 498px;/,
-  "fader live preview should stretch to the feedback row without growing with window height",
+  /\.binding-config-panel--fader:not\(\.binding-config-panel--macro-page\) \.binding-config-preview-card\s*\{[\s\S]*?align-self: stretch;[\s\S]*?height: auto;[\s\S]*?min-height: 0;/,
+  "fader live preview should fit its grid area without imposing an oversized minimum",
 );
 assert.match(
   files.css,
@@ -222,16 +222,16 @@ assert.ok(mainMidiIndex >= 0, "main MIDI preview row should exist");
 assert.ok(midiValueIndex > mainMidiIndex, "MIDI value should render inside the main MIDI section");
 assert.ok(buttonLearnIndex > midiValueIndex, "button learn section should render below the main MIDI value");
 assert.ok(buttonLearnIndex > mainMidiIndex, "button learn section should render below main MIDI");
-assert.ok(muteRowIndex > buttonLearnIndex, "button learn section should stay in the right summary stack");
+assert.equal(muteRowIndex, -1, "duplicate mute summary should be removed");
 assert.match(
   files.html,
   /binding-config-preview-summary binding-config-preview-summary--midi/,
   "main MIDI should have its own summary section",
 );
-assert.match(
+assert.doesNotMatch(
   files.html,
   /binding-config-preview-summary binding-config-preview-summary--status/,
-  "status rows should be separated from the learn section",
+  "duplicate status summaries should be removed",
 );
 assert.doesNotMatch(
   files.html,

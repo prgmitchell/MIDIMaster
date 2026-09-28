@@ -41,6 +41,13 @@ pub struct Binding {
     #[serde(default = "default_feedback_enabled")]
     pub feedback_enabled: bool,
     #[serde(default)]
+    pub feedback_mode: FeedbackMode,
+    #[serde(default)]
+    pub led_control: Option<AuxiliaryControl>,
+    /// Use a separate LED destination; false reuses ordinary feedback.
+    #[serde(default)]
+    pub led_enabled: bool,
+    #[serde(default)]
     pub indicator_control: Option<AuxiliaryControl>,
     #[serde(default)]
     pub mute_control: Option<AuxiliaryControl>,
@@ -61,6 +68,71 @@ pub struct Binding {
 }
 
 impl Binding {
+    pub fn uses_audio_feedback(&self) -> bool {
+        self.has_led_feedback() && self.feedback_mode == FeedbackMode::AudioReactive
+    }
+
+    pub fn has_led_feedback(&self) -> bool {
+        if self.is_button_binding() {
+            return false;
+        }
+        if !self.led_enabled {
+            let msg_type = self
+                .custom_feedback_output_control()
+                .map(|control| &control.msg_type)
+                .unwrap_or(&self.control.msg_type);
+            return self.feedback_enabled
+                && self.feedback_mode == FeedbackMode::AudioReactive
+                && matches!(
+                    msg_type,
+                    MidiMessageType::Note | MidiMessageType::ControlChange
+                );
+        }
+        self.led_control.is_none() || self.led_feedback_control().is_some()
+    }
+
+    /// Optional LED output is independent of motor/value feedback. Never guess
+    /// an LED address from the primary control or accept a motor's Pitch Bend.
+    /// ChannelPressure selects a Mackie meter: channel 0, controller = strip 0–7.
+    pub fn led_feedback_control(&self) -> Option<&AuxiliaryControl> {
+        let led = self.led_control.as_ref()?;
+        if !self.led_enabled
+            || self.is_button_binding()
+            || led.device_id.is_empty()
+            || !matches!(
+                led.msg_type,
+                MidiMessageType::Note
+                    | MidiMessageType::ControlChange
+                    | MidiMessageType::ChannelPressure
+            )
+            || (led.msg_type == MidiMessageType::ChannelPressure
+                && (led.channel != 0 || led.controller > 7))
+        {
+            return None;
+        }
+        let same_address = |control: &AuxiliaryControl| {
+            led.device_id == control.device_id
+                && led.channel == control.channel
+                && led.controller == control.controller
+                && led.msg_type == control.msg_type
+        };
+        let overlaps_value = self.feedback_enabled
+            && self
+                .custom_feedback_output_control()
+                .map(same_address)
+                .unwrap_or_else(|| {
+                    led.device_id == self.device_id
+                        && led.channel == self.control.channel
+                        && led.controller == self.control.controller
+                        && led.msg_type == self.control.msg_type
+                });
+        let overlaps_button = [&self.mute_control, &self.assign_control]
+            .into_iter()
+            .flatten()
+            .any(same_address);
+        (!overlaps_value && !overlaps_button).then_some(led)
+    }
+
     pub(crate) fn strip_derived_integration_icons(&mut self) -> bool {
         fn strip_target(target: &mut BindingTarget) -> bool {
             let BindingTarget::Integration { data, .. } = target else {
@@ -183,7 +255,9 @@ impl Binding {
         match control.msg_type {
             MidiMessageType::ControlChange | MidiMessageType::Note => Some(control),
             MidiMessageType::PitchBend if !self.is_button_binding() => Some(control),
-            MidiMessageType::PitchBend | MidiMessageType::ProgramChange => None,
+            MidiMessageType::PitchBend
+            | MidiMessageType::ProgramChange
+            | MidiMessageType::ChannelPressure => None,
         }
     }
 
@@ -195,7 +269,9 @@ impl Binding {
         let control = self.indicator_control.as_ref()?;
         match control.msg_type {
             MidiMessageType::ControlChange | MidiMessageType::Note => Some(control),
-            MidiMessageType::PitchBend | MidiMessageType::ProgramChange => None,
+            MidiMessageType::PitchBend
+            | MidiMessageType::ProgramChange
+            | MidiMessageType::ChannelPressure => None,
         }
     }
 

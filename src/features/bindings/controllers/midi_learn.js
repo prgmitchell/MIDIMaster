@@ -96,6 +96,16 @@ export function createMidiLearn({
         lockClear || buttonFeedbackDisabled,
       );
     }
+    const ledDisabled = binding?.led_enabled !== true;
+    if (elements.bindingConfigFeedbackMode) elements.bindingConfigFeedbackMode.disabled = lockClear;
+    for (const field of [elements.bindingConfigLedChannel, elements.bindingConfigLedController]) {
+      if (field) field.disabled = lockClear || ledDisabled || !binding?.led_control;
+    }
+    if (binding?.led_control?.msg_type === "ChannelPressure" && elements.bindingConfigLedChannel)
+      elements.bindingConfigLedChannel.disabled = true;
+    if (elements.bindingConfigLedMsgType) elements.bindingConfigLedMsgType.disabled = lockClear;
+    if (listState.ledMsgTypeDropdown) listState.ledMsgTypeDropdown.button.disabled = lockClear;
+    if (listState.feedbackModeDropdown) listState.feedbackModeDropdown.button.disabled = lockClear;
     if (listState.feedbackOutputMsgTypeDropdown) {
       listState.feedbackOutputMsgTypeDropdown.button.disabled = lockClear;
       listState.feedbackOutputMsgTypeDropdown.button.setAttribute("aria-disabled", String(lockClear));

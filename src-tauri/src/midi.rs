@@ -9,9 +9,9 @@ mod protocol;
 
 use self::ports::*;
 use self::protocol::{
-    binding_feedback_position_send, binding_feedback_send, binding_light_feedback_sends,
-    build_feedback_message, parse_midi_message, send_feedback_messages, BindingLightFeedbackSend,
-    FeedbackMessage,
+    automatic_led_control, binding_feedback_position_send, binding_feedback_send,
+    binding_led_feedback_send, binding_light_feedback_sends, build_feedback_message,
+    parse_midi_message, send_feedback_messages, BindingLightFeedbackSend, FeedbackMessage,
 };
 use crate::model::{Binding, DeviceInfo, MidiDeviceRoute, MidiEvent, MidiMessageType};
 use crate::run_logger;

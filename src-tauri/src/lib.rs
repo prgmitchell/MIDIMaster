@@ -4,6 +4,7 @@ mod app_paths;
 mod app_settings;
 mod app_state;
 mod audio;
+mod audio_feedback;
 mod background_tasks;
 mod binding_actions;
 mod binding_events;
@@ -440,6 +441,10 @@ pub fn run() {
                 shutdown.subscribe(),
             );
             shutdown.track_background_task(feedback_task);
+            shutdown.track_background_task(audio_feedback::spawn(
+                app.handle().clone(),
+                shutdown.subscribe(),
+            ));
             let virtual_audio_task = background_tasks::spawn_virtual_audio_refresh_loop(
                 app.handle().clone(),
                 shutdown.subscribe(),
@@ -854,6 +859,51 @@ mod tests {
             .unwrap();
         assert!((synced - 1.0).abs() < f32::EPSILON);
         assert!((state.binding_action_value(&key).unwrap() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn led_follow_value_remains_current_when_motor_feedback_is_disabled() {
+        let state = test_app_state(TestAudioBackend::new(vec![model::SessionInfo {
+            id: "session-firefox".into(),
+            display_name: "Firefox".into(),
+            application_key: None,
+            process_name: Some("firefox.exe".into()),
+            process_path: None,
+            icon_data: None,
+            volume: 0.75,
+            is_muted: false,
+            is_master: false,
+        }]));
+        let mut binding = relative_application_volume_binding("firefox");
+        binding.feedback_enabled = false;
+        binding.led_enabled = true;
+        binding.led_control = Some(model::AuxiliaryControl {
+            device_id: binding.device_id.clone(),
+            channel: 2,
+            controller: 42,
+            msg_type: model::MidiMessageType::Note,
+            control_kind: model::BindingControlKind::Continuous,
+            mode: Default::default(),
+            deadzone: 0.0,
+            debounce_ms: 0,
+            mute_behavior: Default::default(),
+        });
+        let key = BindingKey::from_binding(&binding);
+        state.sync_feedback_values(&profile_with_binding(binding.clone()));
+        assert_eq!(state.feedback_values.lock().unwrap().get(&key), Some(&0.75));
+        state.audio_feedback.lock().unwrap().replace(
+            "meter".into(),
+            0,
+            vec![crate::audio_feedback::AudioSample {
+                target: binding.primary_target(),
+                level: Some(0.2),
+            }],
+        );
+        assert_eq!(
+            state.feedback_values.lock().unwrap().get(&key),
+            Some(&0.75),
+            "meter samples never enter logical feedback"
+        );
     }
 
     #[test]

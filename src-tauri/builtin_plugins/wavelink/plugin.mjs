@@ -240,6 +240,176 @@ function normalizeEndpoint(target) {
   return null;
 }
 
+// src-tauri/builtin_plugins/wavelink/src/meters.js
+function meterAddress(target) {
+  const endpoint = normalizeEndpoint(target);
+  if (!endpoint) return null;
+  const { identifier, mixer_id: mix } = endpoint;
+  if (!identifier && !mix) return null;
+  return {
+    type: identifier ? "channel" : "mix",
+    id: identifier || mix,
+    subId: identifier ? mix : ""
+  };
+}
+var keyFor = ({ type, id, subId = "" }) => JSON.stringify([type, id, subId]);
+function stereoMeterLevel(meter) {
+  const values = [
+    meter?.levelLeftPercentage,
+    meter?.levelRightPercentage
+  ].filter(Number.isFinite);
+  return values.length ? Math.max(0, Math.min(1, Math.max(...values))) : null;
+}
+function targetMeterLevel(address, level, state) {
+  if (level == null || !state.wsId) return null;
+  const mix = address.type === "mix" || address.subId ? state.mixes.find((m) => String(m.id) === (address.subId || address.id)) : null;
+  if ((address.type === "mix" || address.subId) && !mix) return null;
+  if (mix?.isMuted) return 0;
+  if (address.type === "channel") {
+    const channel = state.channels.find((c) => String(c.id) === address.id);
+    if (!channel) return null;
+    if (channel.isMuted) return 0;
+    if (address.subId) {
+      const route = channel.mixes?.find((m) => String(m.id) === address.subId);
+      if (!route) return null;
+      if (route.isMuted) return 0;
+    }
+  }
+  return level;
+}
+function createMeters({ ctx, state, requestJsonRpc }) {
+  let generation = -1;
+  let wanted = /* @__PURE__ */ new Map();
+  const subscribed = /* @__PURE__ */ new Map();
+  const levels = /* @__PURE__ */ new Map();
+  let reconciling = null;
+  let publishTimer = null;
+  let publishing = null;
+  let dirty = false;
+  let disposed = false;
+  async function publish() {
+    publishTimer = null;
+    if (disposed || publishing || !dirty || generation < 0) return;
+    dirty = false;
+    const samples = [...wanted.values()].flatMap(
+      ({ address, targets }) => targets.map((target) => ({
+        target,
+        level: targetMeterLevel(address, levels.get(keyFor(address)), state)
+      }))
+    );
+    publishing = ctx.feedback.setAudioLevels(samples, generation);
+    try {
+      await publishing;
+    } catch (error) {
+      console.warn("Wave Link meter feedback failed", error);
+    } finally {
+      publishing = null;
+      if (dirty) refresh();
+    }
+  }
+  function refresh(scope) {
+    for (const [key, { address }] of wanted) {
+      const channel = state.channels.find((c) => String(c.id) === address.id);
+      const mixId = address.type === "mix" ? address.id : address.subId;
+      if (scope === "channels" && address.type === "channel" && (!channel || address.subId && !channel.mixes?.some((m) => String(m.id) === address.subId)) || scope === "mixes" && mixId && !state.mixes.some((m) => String(m.id) === mixId))
+        levels.delete(key);
+    }
+    dirty = true;
+    if (!disposed && !publishTimer && !publishing)
+      publishTimer = setTimeout(publish, 40);
+  }
+  function reconcile() {
+    if (disposed || reconciling || !state.wsId) return reconciling;
+    const socket = state.wsId;
+    const revision = generation;
+    reconciling = (async () => {
+      for (const [key, { address, generation: subscribedGeneration }] of [
+        ...subscribed
+      ]) {
+        if (wanted.has(key) && subscribedGeneration === generation) continue;
+        await requestJsonRpc("setSubscription", {
+          levelMeterChanged: { ...address, isEnabled: false }
+        });
+        if (state.wsId !== socket) return;
+        subscribed.delete(key);
+        levels.delete(key);
+      }
+      for (const [key, { address }] of wanted) {
+        if (disposed || subscribed.has(key)) continue;
+        const response = await requestJsonRpc("setSubscription", {
+          levelMeterChanged: { ...address, isEnabled: true }
+        });
+        if (state.wsId !== socket) return;
+        if (response?.ok)
+          subscribed.set(key, { address, generation: revision });
+      }
+    })().catch((error) => {
+      if (state.wsId === socket)
+        console.warn("Wave Link meter subscription failed", error);
+    }).finally(() => {
+      reconciling = null;
+      refresh();
+      if (!disposed && state.wsId && (state.wsId !== socket || revision !== generation || [...subscribed.keys()].some((key) => !wanted.has(key))))
+        void reconcile();
+    });
+    return reconciling;
+  }
+  function setDemand(demand) {
+    if (disposed || demand.generation < generation) return;
+    const next = /* @__PURE__ */ new Map();
+    for (const target of demand.targets || []) {
+      const address = meterAddress(target);
+      if (!address) continue;
+      const key = keyFor(address);
+      if (!next.has(key)) next.set(key, { address, targets: [] });
+      next.get(key).targets.push(target);
+    }
+    if (generation !== demand.generation) levels.clear();
+    generation = demand.generation;
+    wanted = next;
+    void reconcile();
+    refresh();
+  }
+  function receive(params) {
+    if (disposed) return;
+    for (const [type, field] of [
+      ["channel", "channels"],
+      ["mix", "mixes"]
+    ]) {
+      for (const meter of params?.[field] || []) {
+        const key = keyFor({ type, id: meter.id, subId: meter.subId || "" });
+        if (wanted.has(key)) levels.set(key, stereoMeterLevel(meter));
+      }
+    }
+    refresh();
+  }
+  function disconnected() {
+    subscribed.clear();
+    levels.clear();
+    refresh();
+  }
+  async function dispose() {
+    disposed = true;
+    if (publishTimer) clearTimeout(publishTimer);
+    await Promise.allSettled([publishing, reconciling]);
+    await ctx.feedback?.setAudioLevels?.([], generation);
+    if (state.wsId) {
+      await Promise.all(
+        [...subscribed.values()].map(
+          ({ address }) => requestJsonRpc("setSubscription", {
+            levelMeterChanged: { ...address, isEnabled: false }
+          }).catch(() => {
+          })
+        )
+      );
+    }
+    subscribed.clear();
+    levels.clear();
+  }
+  ctx.feedback?.onAudioTargetsChanged?.(setDemand)?.catch((error) => console.warn("Wave Link meter demand failed", error));
+  return { receive, refresh, reconcile, disconnected, dispose };
+}
+
 // src-tauri/builtin_plugins/wavelink/src/connection_tab.js
 function createConnectionTab({
   applyProfileSettings,
@@ -763,6 +933,7 @@ function createIntegration({
 // src-tauri/builtin_plugins/wavelink/src/connection.js
 function createConnection({
   ctx,
+  meters,
   iconDataUrl,
   invalidateFeedback,
   pendingAppInfoByWsId,
@@ -915,6 +1086,10 @@ function createConnection({
       return;
     }
     if (!json || typeof json !== "object") return;
+    if (json.method === "levelMeterChanged") {
+      meters?.receive(json.params);
+      return;
+    }
     const id = json.id;
     if (id != null && pendingRpcById.has(id)) {
       const pending = pendingRpcById.get(id);
@@ -952,6 +1127,7 @@ function createConnection({
       const payload = result?.mixes ?? result;
       if (Array.isArray(payload)) {
         state.mixes = payload;
+        meters?.refresh("mixes");
         syncAllFeedback("mixes").catch(() => {
         });
       }
@@ -962,6 +1138,7 @@ function createConnection({
       const payload = result?.channels ?? result;
       if (Array.isArray(payload)) {
         state.channels = payload;
+        meters?.refresh("channels");
         syncAllFeedback("channels").catch(() => {
         });
       }
@@ -1081,6 +1258,7 @@ function createConnection({
     invalidateFeedback();
     setStatus(true, `Connected (:${state.connectedPort})`);
     await requestFullState();
+    void meters?.reconcile();
     return true;
   }
   return {
@@ -1159,6 +1337,7 @@ function createFeedbackQueue({ ctx, state, reconcile }) {
 // src-tauri/builtin_plugins/wavelink/src/feedback.js
 function createFeedback({
   ctx,
+  meters,
   primaryFeedbackIntentByBinding,
   requestJsonRpc,
   scheduleChannelsRefresh,
@@ -1231,6 +1410,7 @@ function createFeedback({
     return null;
   }
   async function syncOfflineFeedback() {
+    meters?.disconnected();
     feedbackQueue.invalidate();
     if (state.offlineFeedbackSent) return;
     const current = state.bindings;
@@ -1781,7 +1961,12 @@ async function activate(ctx) {
       state.postLocalWriteRefreshTimer = null;
     }
   }
-  function disposeWaveLinkRuntime() {
+  async function disposeWaveLinkRuntime() {
+    try {
+      await meters.dispose();
+    } catch (error) {
+      console.warn("Wave Link meter cleanup failed", error);
+    }
     state.disposed = true;
     state.connecting = false;
     state.manualConnectRequested = false;
@@ -1805,6 +1990,7 @@ async function activate(ctx) {
     pendingAppInfoByWsId.clear();
     pendingRpcById.clear();
   }
+  const meters = createMeters({ ctx, state, requestJsonRpc: (...args) => requestJsonRpc(...args) });
   const {
     endpointKey,
     rememberLocalVolumeIntent,
@@ -1837,6 +2023,7 @@ async function activate(ctx) {
     invalidateFeedback
   } = createFeedback({
     ctx,
+    meters,
     primaryFeedbackIntentByBinding,
     requestJsonRpc: (...args) => requestJsonRpc(...args),
     scheduleChannelsRefresh,
@@ -1857,6 +2044,7 @@ async function activate(ctx) {
     connectOnce
   } = createConnection({
     ctx,
+    meters,
     iconDataUrl,
     invalidateFeedback,
     pendingAppInfoByWsId,
@@ -1883,6 +2071,7 @@ async function activate(ctx) {
     if (state.wsId && closedId === state.wsId) {
       clearPendingAppInfo(closedId);
       state.wsId = null;
+      meters.disconnected();
       state.connectedPort = null;
       state.connecting = false;
       pendingVolumeWrites.clear();

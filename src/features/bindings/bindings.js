@@ -375,6 +375,8 @@ export function createBindingsFeature({
     updateFeedbackOutputFromFields,
   } = createFeedbackEditor({
     elements,
+    lifetime,
+    invoke,
     editorState,
     getConfigBinding: (...args) => getConfigBinding(...args),
     listState,
@@ -452,7 +454,6 @@ export function createBindingsFeature({
   const {
     updateAuxLearnUi,
     stopAuxLearn,
-    formatMidiControlLabel,
     renderMidiMappingSummary,
     formatPreviewMidiValue,
     renderAssignMappingLabel,
@@ -495,7 +496,6 @@ export function createBindingsFeature({
     bindingMuteValues,
     elements,
     editorState,
-    formatMidiControlLabel,
     formatPreviewMidiValue,
     getConfigBinding,
     getLiveMidiValue,

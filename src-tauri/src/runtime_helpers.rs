@@ -514,7 +514,9 @@ pub(crate) fn classify_learned_control(candidate: &LearnCandidate) -> LearnedCon
         model::MidiMessageType::ControlChange => {
             classify_cc_candidate(candidate.saw_zero, candidate.saw_max)
         }
-        model::MidiMessageType::PitchBend => model::BindingControlKind::Continuous,
+        model::MidiMessageType::PitchBend | model::MidiMessageType::ChannelPressure => {
+            model::BindingControlKind::Continuous
+        }
     };
     learned
 }

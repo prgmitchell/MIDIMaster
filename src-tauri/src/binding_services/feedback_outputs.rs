@@ -8,6 +8,9 @@ pub(super) fn send_resolved_binding_feedback(
     force_hardware_feedback: bool,
     context: &str,
 ) {
+    if !binding.feedback_enabled && binding.has_led_feedback() {
+        feedback::set_feedback_cache_value(state, &BindingKey::from_binding(binding), value);
+    }
     if !binding.feedback_enabled {
         return;
     }

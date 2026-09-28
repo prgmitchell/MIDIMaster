@@ -339,12 +339,12 @@
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-layout {
   display: grid;
-  flex: 0 1 auto;
+  flex: 1 0 auto;
   grid-template-columns: minmax(0, 0.675fr) minmax(0, 0.675fr) minmax(270px, 0.85fr);
   grid-template-areas:
     "name name live"
     "curve curve live"
-    "feedback feedback live"
+    "feedback feedback led"
     "mute assign learn";
   gap: 12px;
   align-items: stretch;
@@ -392,6 +392,11 @@
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--curve {
   grid-area: curve;
+  gap: 8px;
+}
+
+.binding-config-panel--fader .binding-config-curve-help {
+  height: auto;
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--feedback-output {
@@ -411,7 +416,25 @@
   align-self: stretch;
   box-sizing: border-box;
   height: auto;
-  min-height: 498px;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  padding: 10px 12px;
+}
+
+.binding-config-panel--fader .binding-config-preview-stage {
+  min-height: 0;
+  max-height: 310px;
+}
+
+.binding-config-panel--fader .binding-config-preview-fader {
+  min-height: 200px;
+}
+
+.binding-config-panel--fader .binding-config-preview-meta {
+  grid-template-rows: auto auto;
+  align-content: start;
+  padding-top: 0;
 }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-shell {

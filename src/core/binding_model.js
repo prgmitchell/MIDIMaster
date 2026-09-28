@@ -87,11 +87,20 @@ export function normalizeControlKind(raw) {
   return value === "Button" || value === "Continuous" ? value : "Auto";
 }
 
-function normalizeMidiMapping(raw, { indicator = false, allowPitchBendIndicator = false } = {}) {
+function normalizeMidiMapping(raw, { indicator = false, allowPitchBendIndicator = false, led = false } = {}) {
   if (!raw || typeof raw !== "object") return null;
   const deviceId = String(raw.device_id || "").trim();
   if (!deviceId) return null;
   const msgType = String(raw.msg_type || "ControlChange");
+  if (led && msgType === "ChannelPressure") {
+    return {
+      ...raw,
+      device_id: deviceId,
+      msg_type: msgType,
+      channel: 0,
+      controller: Math.min(7, Math.max(0, Math.trunc(Number(raw.controller) || 0))),
+    };
+  }
   const pitchBendAllowed = indicator && allowPitchBendIndicator && msgType === "PitchBend";
   if (indicator && msgType !== "ControlChange" && msgType !== "Note" && !pitchBendAllowed) {
     return null;
@@ -413,6 +422,9 @@ export function normalizeBinding(binding) {
   if (!binding || typeof binding !== "object") return binding;
   const out = { ...binding };
   out.feedback_enabled = out.feedback_enabled !== false;
+  out.led_enabled = out.led_enabled === true;
+  out.led_control = normalizeMidiMapping(out.led_control, { indicator: true, led: true });
+  out.feedback_mode = out.feedback_mode === "AudioReactive" ? "AudioReactive" : "FollowValue";
   const preferredSpecial = out.action === "Macro" || out.action === "Soundboard" ? out.action : null;
   let selectedSpecial = null;
   const normalizedTargets = getBindingTargets(out).filter((target) => {

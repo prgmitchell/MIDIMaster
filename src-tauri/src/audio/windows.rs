@@ -1,5 +1,7 @@
 use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo};
 use crate::audio::AudioBackend;
+#[path = "windows/meter.rs"]
+mod meter;
 use crate::device_target::{parse_device_target, DeviceTargetKind};
 use crate::model::{PlaybackDeviceInfo, SessionInfo};
 use anyhow::{anyhow, Result};
@@ -200,6 +202,9 @@ fn focused_session_with_visuals(include_visuals: bool) -> Result<Option<SessionI
 }
 
 impl AudioBackend for WindowsAudioBackend {
+    fn create_meter(&self) -> Option<Box<dyn crate::audio_feedback::AudioMeter>> {
+        meter::WindowsMeter::new().ok().map(|m| Box::new(m) as _)
+    }
     fn list_sessions(&self) -> Result<Vec<SessionInfo>> {
         list_sessions_with_visuals(true)
     }
@@ -1049,17 +1054,14 @@ fn init_com() -> Result<Option<ComGuard>> {
 }
 
 fn get_device_enumerator() -> Result<IMMDeviceEnumerator> {
-    let enumerator: IMMDeviceEnumerator =
-        unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }?;
-    Ok(enumerator)
+    Ok(unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }?)
 }
 
 fn get_default_device_from_flow(
     enumerator: &IMMDeviceEnumerator,
     flow: EDataFlow,
 ) -> Result<IMMDevice> {
-    let device = unsafe { enumerator.GetDefaultAudioEndpoint(flow, eMultimedia) }?;
-    Ok(device)
+    Ok(unsafe { enumerator.GetDefaultAudioEndpoint(flow, eMultimedia) }?)
 }
 
 fn get_default_device_from(enumerator: &IMMDeviceEnumerator) -> Result<IMMDevice> {
@@ -1074,15 +1076,13 @@ fn get_default_device() -> Result<IMMDevice> {
 fn get_endpoint_volume(
     device: &windows::Win32::Media::Audio::IMMDevice,
 ) -> Result<IAudioEndpointVolume> {
-    let endpoint: IAudioEndpointVolume = unsafe { device.Activate(CLSCTX_ALL, None) }?;
-    Ok(endpoint)
+    Ok(unsafe { device.Activate(CLSCTX_ALL, None) }?)
 }
 
 fn get_session_manager(
     device: &windows::Win32::Media::Audio::IMMDevice,
 ) -> Result<IAudioSessionManager2> {
-    let manager: IAudioSessionManager2 = unsafe { device.Activate(CLSCTX_ALL, None) }?;
-    Ok(manager)
+    Ok(unsafe { device.Activate(CLSCTX_ALL, None) }?)
 }
 
 fn device_id_string(device: &IMMDevice) -> Option<String> {

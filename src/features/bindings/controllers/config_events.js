@@ -74,8 +74,9 @@ export function createConfigEvents({
       listState.indicatorMsgTypeDropdown = createSelectDropdownShell({
         selectEl: elements.bindingConfigIndicatorMsgType,
         rootClass: "binding-config-light-dropdown settings-select-dropdown",
-        title: "Indicator message type",
+        title: t("bindings.indicatorMessageType"),
       });
+      listState.indicatorMsgTypeDropdown.button.dataset.i18nTitle = "bindings.indicatorMessageType";
     }
     if (elements.bindingConfigFeedbackMsgType && !listState.feedbackOutputMsgTypeDropdown) {
       listState.feedbackOutputMsgTypeDropdown = createSelectDropdownShell({
@@ -83,6 +84,7 @@ export function createConfigEvents({
         rootClass: "binding-config-light-dropdown settings-select-dropdown",
         title: t("bindings.feedbackMessageType"),
       });
+      listState.feedbackOutputMsgTypeDropdown.button.dataset.i18nTitle = "bindings.feedbackMessageType";
     }
     renderIndicatorDropdowns();
 

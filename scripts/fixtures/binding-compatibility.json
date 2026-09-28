@@ -35,7 +35,10 @@
         "open_application": null,
         "autohotkey_script": null,
         "soundboard": null,
-        "macro_steps": []
+        "macro_steps": [],
+        "feedback_mode": "FollowValue",
+        "led_control": null,
+        "led_enabled": false
       }
     },
     {
@@ -80,7 +83,10 @@
         "open_application": null,
         "autohotkey_script": null,
         "soundboard": null,
-        "macro_steps": []
+        "macro_steps": [],
+        "feedback_mode": "FollowValue",
+        "led_control": null,
+        "led_enabled": false
       }
     },
     {
@@ -123,7 +129,10 @@
         "open_application": null,
         "autohotkey_script": null,
         "soundboard": null,
-        "macro_steps": []
+        "macro_steps": [],
+        "feedback_mode": "FollowValue",
+        "led_control": null,
+        "led_enabled": false
       }
     },
     {
@@ -188,7 +197,10 @@
         "open_application": null,
         "autohotkey_script": null,
         "soundboard": null,
-        "macro_steps": []
+        "macro_steps": [],
+        "feedback_mode": "FollowValue",
+        "led_control": null,
+        "led_enabled": false
       }
     },
     {
@@ -280,7 +292,10 @@
         "hotkey": null,
         "open_application": null,
         "autohotkey_script": null,
-        "soundboard": null
+        "soundboard": null,
+        "feedback_mode": "FollowValue",
+        "led_control": null,
+        "led_enabled": false
       }
     }
   ],

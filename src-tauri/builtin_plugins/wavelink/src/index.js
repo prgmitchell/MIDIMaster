@@ -1,3 +1,4 @@
+import { createMeters } from "./meters.js";
 import { createConnectionTab } from "./connection_tab.js";
 import { createIntegration } from "./integration.js";
 import { createReconnectController } from "../../../plugin_sources/shared/runtime.js";
@@ -114,7 +115,9 @@ export async function activate(ctx) {
     }
   }
 
-  function disposeWaveLinkRuntime() {
+  async function disposeWaveLinkRuntime() {
+    try { await meters.dispose(); }
+    catch (error) { console.warn("Wave Link meter cleanup failed", error); }
     state.disposed = true;
     state.connecting = false;
     state.manualConnectRequested = false;
@@ -137,6 +140,8 @@ export async function activate(ctx) {
     pendingAppInfoByWsId.clear();
     pendingRpcById.clear();
   }
+
+  const meters = createMeters({ ctx, state, requestJsonRpc: (...args) => requestJsonRpc(...args) });
 
   const {
     endpointKey,
@@ -171,6 +176,7 @@ export async function activate(ctx) {
     invalidateFeedback,
   } = createFeedback({
     ctx,
+    meters,
     primaryFeedbackIntentByBinding,
     requestJsonRpc: (...args) => requestJsonRpc(...args),
     scheduleChannelsRefresh,
@@ -192,6 +198,7 @@ export async function activate(ctx) {
     connectOnce,
   } = createConnection({
     ctx,
+    meters,
     iconDataUrl,
     invalidateFeedback,
     pendingAppInfoByWsId,
@@ -221,6 +228,7 @@ export async function activate(ctx) {
     if (state.wsId && closedId === state.wsId) {
       clearPendingAppInfo(closedId);
       state.wsId = null;
+      meters.disconnected();
       state.connectedPort = null;
       state.connecting = false;
       pendingVolumeWrites.clear();

@@ -2,6 +2,45 @@ use crate::{binding_services, model, model::Binding, AppState};
 use tauri::{AppHandle, State};
 
 #[tauri::command]
+pub fn get_automatic_led_output(
+    state: State<'_, AppState>,
+    binding: Binding,
+) -> Result<Option<model::MidiControl>, String> {
+    Ok(state
+        .midi
+        .lock()
+        .map_err(|_| "MIDI lock poisoned")?
+        .automatic_led_output(&binding))
+}
+
+#[tauri::command]
+pub fn get_audio_meter_demand(
+    state: State<'_, AppState>,
+) -> Result<crate::audio_feedback::MeterDemand, String> {
+    Ok(state
+        .audio_feedback
+        .lock()
+        .map_err(|_| "Meter lock poisoned")?
+        .demand
+        .clone())
+}
+
+#[tauri::command]
+pub fn set_audio_meter_samples(
+    state: State<'_, AppState>,
+    provider: String,
+    generation: u64,
+    samples: Vec<crate::audio_feedback::AudioSample>,
+) -> Result<(), String> {
+    state
+        .audio_feedback
+        .lock()
+        .map_err(|_| "Meter lock poisoned")?
+        .replace(provider, generation, samples);
+    Ok(())
+}
+
+#[tauri::command]
 pub fn add_binding(state: State<AppState>, binding: Binding) -> Result<(), String> {
     binding_services::add_binding(state.inner(), binding)
 }

@@ -71,6 +71,29 @@ You can drag bindings to reorder them. The order is saved to your profile.
 - `Relative`:
   - Control sends increments/decrements (useful for endless encoders).
 
+### Fader and Knob Feedback
+
+`Feedback output` sets the ordinary feedback address. By default it follows the controlled value, with the fader curve applied. Pitch Bend always follows value to keep motorized faders aligned with volume.
+
+`LED output`, below Live, defaults to **Use existing feedback** and **Follow Value**, preserving existing LED behavior. Its read-only Channel and Control mirror `Feedback output`; edit the address there. You can choose **Audio Reactive** to use that existing Note/CC output for metering. Pitch Bend remains value-only and needs a separate LED output for reactive feedback. If `Feedback output` is disabled, **Use existing feedback** leaves it disabled.
+
+Choose **Automatic** to control a recognized LED mapping independently; Channel and Control are hidden. This supports X-TOUCH Mini standard-mode and X-TOUCH Mini/Extender Mackie-mode encoder rings, plus full-size X-TOUCH and Extender channel meters for Pitch Bend faders 1–8 in Mackie Control (MC) mode. The master fader has no associated meter. If no mapping is known, the help text says so and nothing is sent by the additional output. For other hardware, choose **Note** or **CC** and enter its separate LED address from the controller's MIDI documentation. The two modes are:
+
+- **Follow Value**: display the controlled parameter's value.
+- **Audio Reactive**: display the loudest available audio target, with immediate attack and a fixed 160 ms fade to silence. Audio level bypasses the fader curve.
+
+An additional LED output can operate independently of ordinary value feedback. Reactive feedback exclusively owns its destination, so value updates cannot compete with the meter. Selecting **Use existing feedback** with **Follow Value** promptly restores ordinary feedback. Existing feedback retains its configured MIDI route; separate LED output uses the MIDI output paired with its input route. If a manually selected LED address overlaps this binding's enabled value output, Mute, or Assign, the help text explains the conflict. Use **Use existing feedback** to meter the ordinary Note/CC output, or choose a separate address.
+
+Audio Reactive supports Windows master output, applications (including sessions on non-default playback devices), individual sessions, the focused application, playback devices, and recording devices. Wave Link channels, mixes, and channel-in-mix targets use their corresponding meters; **Game → Mix** uses that exact route. Multiple targets, multiple sessions for an application, and stereo meters use their highest available level. Muted sources contribute zero. Unsupported or missing sources contribute nothing; with no available meter, the LED receives zero.
+
+Live's bar, percentage, and raw MIDI value continue to show the controlled parameter. Audio meters do not change application volume, logical feedback, or OSD values. Button-light settings remain unchanged.
+
+For an X-TOUCH in **MC mode**, select **Automatic** for a recognized USB output, or **Mackie meter** and **Strip 1–8** explicitly. The explicit option also works through rtpMIDI with any port name; pair the binding's input with the intended output in MIDI Routes. Mackie meters use Channel Pressure (Aftertouch), with the strip and meter segment packed into the data byte (`D0`, `(strip−1) × 16 + segment`). MIDI Channel stays fixed at 1. Audio Reactive uses the protocol's dB divisions; Follow Value fills the meter proportionally. Held nonzero segments refresh every 120 ms to prevent the hardware's automatic decay. The separate meter does not replace Pitch Bend motor feedback. This option is for MC mode, not HUI or CTRL mode. See the [Mackie Control metering reference](https://github.com/NicoG60/TouchMCU/blob/main/doc/mackie_control_protocol.md#metering).
+
+The receiving hardware determines how Note velocities or CC values appear. Some LEDs only switch on/off or use specific color codes. Meter LEDs often do not emit MIDI input, so unknown output addresses are entered manually.
+
+Inspired by @jrlpez’s audio-reactive feedback proposal in [#34](https://github.com/prgmitchell/MIDIMaster/pull/34); independently implemented.
+
 ### Actions (Buttons)
 
 Buttons typically support:

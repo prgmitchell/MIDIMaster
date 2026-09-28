@@ -254,6 +254,37 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
               </div>
             </section>
 
+            <section id="binding-config-led-section" class="binding-config-section binding-config-section--led">
+              <div class="binding-config-led-heading">
+                <span class="binding-config-toggle-title" data-i18n="bindings.ledOutput">LED output</span>
+                  <select id="binding-config-feedback-mode" class="binding-config-light-select" aria-label="Feedback mode" data-i18n-aria-label="bindings.feedbackMode">
+                    <option value="FollowValue" data-i18n="bindings.followValue">Follow Value</option>
+                    <option value="AudioReactive" data-i18n="bindings.audioReactive">Audio Reactive</option>
+                  </select>
+              </div>
+              <span id="binding-config-led-help" class="binding-config-toggle-help" data-i18n="bindings.ledExistingFeedbackHelp">Keeps your existing LED feedback unchanged.</span>
+              <div class="binding-config-led-fields">
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorType">Type</span>
+                  <select id="binding-config-led-msg-type" class="binding-config-light-select" aria-label="LED message type" data-i18n-aria-label="bindings.ledMessageType">
+                    <option value="Existing" data-i18n="bindings.ledExistingFeedback">Use existing feedback</option>
+                    <option value="Automatic" data-i18n="bindings.ledAutomatic">Automatic</option>
+                    <option value="ChannelPressure" data-i18n="bindings.ledMackieMeter">Mackie meter</option>
+                    <option value="Note">Note</option>
+                    <option value="ControlChange">CC</option>
+                  </select>
+                </label>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorChannel">Channel</span>
+                  <input id="binding-config-led-channel" type="number" min="1" max="16" step="1" inputmode="numeric" aria-label="LED channel" data-i18n-aria-label="bindings.ledChannelLabel" />
+                </label>
+                <label class="binding-config-indicator-field">
+                  <span data-i18n="bindings.indicatorControl">Control</span>
+                  <input id="binding-config-led-controller" type="number" min="0" max="127" step="1" inputmode="numeric" aria-label="LED control" data-i18n-aria-label="bindings.ledControlLabel" />
+                </label>
+              </div>
+            </section>
+
             <section id="binding-config-mute-section" class="binding-config-section binding-config-section--mute">
               <span class="binding-config-title binding-config-title-with-action">
                 <span data-i18n="bindings.mute">Mute</span>
@@ -403,20 +434,6 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                       </div>
                     </div>
                   </section>
-                  <div class="binding-config-preview-summary binding-config-preview-summary--status">
-                    <div id="binding-config-preview-mute-row" class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label" data-i18n="bindings.mute">Mute</span>
-                      <span id="binding-config-preview-mute" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
-                    </div>
-                    <div id="binding-config-preview-assign-row" class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label" data-i18n="common.assign">Assign</span>
-                      <span id="binding-config-preview-assign" class="binding-config-preview-summary-value" data-i18n="bindings.notMapped">Not mapped</span>
-                    </div>
-                    <div id="binding-config-preview-curve-row" class="binding-config-preview-summary-row">
-                      <span class="binding-config-preview-summary-label" data-i18n="bindings.curve">Curve</span>
-                      <span id="binding-config-preview-curve" class="binding-config-preview-summary-value" data-i18n="bindings.linear">Linear</span>
-                    </div>
-                  </div>
                 </div>
               </div>
               <div id="binding-config-preview-learn-shell" class="binding-config-preview-learn-shell">

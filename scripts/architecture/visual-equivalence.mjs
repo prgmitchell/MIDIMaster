@@ -9,6 +9,7 @@ import { ROOT } from "./inventory.mjs";
 
 // A local, isolated Edge profile exercises both revisions in the same renderer.
 // This is a manual Windows check; it never starts Tauri or accesses connected devices.
+const feedbackLayout = process.env.MIDIMASTER_FEEDBACK_LAYOUT === "1";
 const baseline =
   process.env.MIDIMASTER_VISUAL_BASELINE ||
   JSON.parse(await readFile(new URL("./baseline.json", import.meta.url), "utf8")).revision;
@@ -134,7 +135,17 @@ try {
     cases.push({ view: "osd", anchor });
   for (const style of ["midnight", "glass", "neon", "studio"])
     cases.push({ view: "osd", anchor: "center", style });
+  if (feedbackLayout) {
+    cases.length = 0;
+    for (const width of [1280, 1480]) for (const theme of ["dark", "light"])
+      for (const feedbackMode of ["FollowValue", "AudioReactive"]) for (const feedbackOutput of ["manual", "automatic", "existing", "meter"])
+        for (const feedbackMenu of [false, "mode", "type"])
+          cases.push({ view: "fader", width, theme, feedbackMode, feedbackOutput, feedbackMenu, feedbackLayout: true });
+  }
   for (const [index, fixture] of cases.entries()) {
+    if (feedbackLayout) await session.send("Emulation.setDeviceMetricsOverride", {
+      width: fixture.width, height: 820, deviceScaleFactor: 1, mobile: false,
+    });
     const name = `${String(index + 1).padStart(2, "0")}-${fixture.view}-${fixture.theme || fixture.anchor}-${fixture.compact ? "compact" : fixture.style || "normal"}`;
     if (process.env.MIDIMASTER_VISUAL_FILTER && !name.includes(process.env.MIDIMASTER_VISUAL_FILTER))
       continue;
@@ -154,6 +165,19 @@ try {
         throw new Error(
           `${name} ${variant}: ${result.exceptionDetails.exception?.description || result.exceptionDetails.text}`,
         );
+      if (feedbackLayout) {
+        const layout = result.result.value;
+        assert.ok(layout.scrollHeight <= layout.clientHeight + 1, `${name} ${variant}: dialog scrolls`);
+        for (const box of [layout.footer, ...layout.controls]) {
+          assert.ok(box.top >= 0 && box.bottom <= 820 && box.left >= 0 && box.right <= fixture.width, `${name} ${variant}: clipped control`);
+        }
+        if (variant === "after") {
+          assert.ok(Math.abs(layout.name.top - layout.live.top) <= 2, `${name}: Live title is not aligned with Name`);
+          for (const card of layout.bottomCards) {
+            assert.ok(layout.footer.top - card.bottom >= 10, `${name}: bottom card needs space above footer`);
+          }
+        }
+      }
       await writeFile(join(output, `${name}-${variant}.json`), JSON.stringify(result.result.value, null, 2));
       const shot = await session.send("Page.captureScreenshot", {
         format: "png",
@@ -168,10 +192,10 @@ try {
   }
   await writeFile(join(output, "results.json"), JSON.stringify({ baseline, cases: results }, null, 2) + "\n");
   assert.ok(
-    results.every((result) => result.identical),
+    feedbackLayout || results.every((result) => result.identical),
     "Before/after screenshots differ; inspect the saved images",
   );
-  console.log(`All ${results.length} screenshot pairs are byte-identical. Artifacts: ${output}`);
+  console.log(feedbackLayout ? `All ${results.length} feedback layout cases fit at minimum height. Artifacts: ${output}` : `All ${results.length} screenshot pairs are byte-identical. Artifacts: ${output}`);
 } finally {
   if (session) {
     await session.send("Browser.close").catch(() => {});

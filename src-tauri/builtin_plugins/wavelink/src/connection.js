@@ -11,6 +11,7 @@ import {
 /** connection workflow. */
 export function createConnection({
   ctx,
+  meters,
   iconDataUrl,
   invalidateFeedback,
   pendingAppInfoByWsId,
@@ -182,6 +183,11 @@ export function createConnection({
     }
     if (!json || typeof json !== "object") return;
 
+    if (json.method === "levelMeterChanged") {
+      meters?.receive(json.params);
+      return;
+    }
+
     const id = json.id;
     if (id != null && pendingRpcById.has(id)) {
       const pending = pendingRpcById.get(id);
@@ -217,6 +223,7 @@ export function createConnection({
       const payload = result?.mixes ?? result;
       if (Array.isArray(payload)) {
         state.mixes = payload;
+        meters?.refresh("mixes");
         syncAllFeedback("mixes").catch(() => {});
       }
       return;
@@ -226,6 +233,7 @@ export function createConnection({
       const payload = result?.channels ?? result;
       if (Array.isArray(payload)) {
         state.channels = payload;
+        meters?.refresh("channels");
         syncAllFeedback("channels").catch(() => {});
       }
       return;
@@ -361,6 +369,7 @@ export function createConnection({
     setStatus(true, `Connected (:${state.connectedPort})`);
 
     await requestFullState();
+    void meters?.reconcile();
     return true;
   }
 

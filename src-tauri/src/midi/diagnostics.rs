@@ -132,9 +132,10 @@ pub(super) fn diagnostic_log_reason(
 pub(super) fn diagnostic_max_value(msg_type: &MidiMessageType) -> u16 {
     match msg_type {
         MidiMessageType::PitchBend => 16383,
-        MidiMessageType::ControlChange | MidiMessageType::Note | MidiMessageType::ProgramChange => {
-            127
-        }
+        MidiMessageType::ControlChange
+        | MidiMessageType::Note
+        | MidiMessageType::ProgramChange
+        | MidiMessageType::ChannelPressure => 127,
     }
 }
 

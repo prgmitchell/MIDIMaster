@@ -127,6 +127,30 @@
   gap: 4px;
 }
 
+/* The optional LED destination fits beneath Live without growing the dialog. */
+.binding-config-section--led { grid-area: led; gap: 6px; }
+.binding-config-panel--button .binding-config-section--led { display: none; }
+.binding-config-led-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 164px;
+  align-items: center;
+  gap: 8px;
+}
+.binding-config-feedback-mode .target-button { height: 32px; }
+.binding-config-led-fields {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(64px, .65fr) minmax(64px, .65fr);
+  gap: 10px;
+}
+.binding-config-led-fields.is-automatic { grid-template-columns: 1fr; }
+.binding-config-led-fields.is-existing { grid-template-columns: minmax(180px, 1fr) minmax(56px, .5fr) minmax(56px, .5fr); }
+.binding-config-led-fields .hidden { display: none; }
+.binding-config-section--led > .binding-config-toggle-help {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .binding-config-indicator-field {
   min-width: 0;
   display: grid;

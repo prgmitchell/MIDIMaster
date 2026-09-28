@@ -1,6 +1,10 @@
 use crate::model::SessionInfo;
 
 pub trait AudioBackend: Send + Sync {
+    /// Created and used entirely on the meter worker, never moved between threads.
+    fn create_meter(&self) -> Option<Box<dyn crate::audio_feedback::AudioMeter>> {
+        None
+    }
     fn list_sessions(&self) -> anyhow::Result<Vec<SessionInfo>>;
     fn list_session_states(&self) -> anyhow::Result<Vec<SessionInfo>> {
         self.list_sessions()

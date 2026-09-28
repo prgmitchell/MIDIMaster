@@ -168,6 +168,7 @@ export function positionFloatingDropdownMenu({
   gap = 6,
   viewportPadding = 14,
   zIndex = 1000,
+  preferUp = false,
 } = {}) {
   if (!menu || !trigger || menu.classList.contains("hidden")) return;
 
@@ -197,7 +198,8 @@ export function positionFloatingDropdownMenu({
   menu.style.zIndex = String(zIndex);
 
   const menuHeight = Math.min(menu.scrollHeight || safeMaxHeight, safeMaxHeight);
-  const openUp = availableBelow < Math.min(180, menuHeight) && availableAbove > availableBelow;
+  const openUp = (preferUp && availableAbove >= menuHeight)
+    || (availableBelow < Math.min(180, menuHeight) && availableAbove > availableBelow);
   const top = openUp
     ? Math.max(viewportPadding, rect.top - gap - menuHeight)
     : Math.min(rect.bottom + gap, viewportHeight - viewportPadding - menuHeight);

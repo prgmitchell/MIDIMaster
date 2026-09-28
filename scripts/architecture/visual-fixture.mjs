@@ -6,6 +6,10 @@ export async function renderFixture({
   view = "list",
   anchor = "top-right",
   style = "midnight",
+  feedbackMode = "FollowValue",
+  feedbackMenu = false,
+  feedbackOutput = "manual",
+  feedbackLayout = false,
 }) {
   const base = `/${variant}/src`;
   const load = (path) => import(`${base}/${path}`);
@@ -51,8 +55,13 @@ export async function renderFixture({
       {
         id: "fader",
         name: "Music",
+        device_id: "fixture-midi",
         control_kind: "Continuous",
         action: "Volume",
+        feedback_mode: feedbackMode,
+        led_enabled: feedbackOutput !== "existing",
+        led_control: feedbackOutput === "manual" ? { device_id: "fixture-midi", channel: 0, controller: 42, msg_type: "Note" }
+          : feedbackOutput === "meter" ? { device_id: "fixture-midi", channel: 0, controller: 7, msg_type: "ChannelPressure" } : null,
         targets: ["Master"],
         control: { channel: 1, controller: 7, msg_type: "ControlChange" },
       },
@@ -78,6 +87,7 @@ export async function renderFixture({
     ].map(normalizeBinding);
     const invoke = async (command) =>
       command === "get_virtual_audio_status" ? { install_state: "not-installed" } : [];
+    const translations = feedbackLayout ? await (await fetch(`${base}/locales/en.json`)).json() : {};
     const feature = createBindingsFeature({
       invoke,
       dom: dom.bindings,
@@ -89,12 +99,16 @@ export async function renderFixture({
       bindingLastValues: {},
       bindingMuteValues: {},
       bindingInteractionTimes: {},
-      i18n: { t: (key) => key },
+      i18n: { t: (key) => translations[key] || key },
     });
     feature.bindUi();
     await feature.setCompactBindings(compact);
     feature.renderBindings();
     if (view === "fader" || view === "button") feature.beginBindingEdit(view);
+    if (feedbackMenu && variant === "after") {
+      const selector = feedbackMenu === "type" ? "#binding-config-led-msg-type" : "#binding-config-feedback-mode";
+      document.querySelector(selector)?.parentElement?.querySelector(".target-button")?.click();
+    }
     if (view === "macro")
       feature.getRenderedBindingRefs("macro").item.querySelector(".binding-macro-edit-button").click();
     if (view === "sound")
@@ -147,6 +161,18 @@ export async function renderFixture({
   await document.fonts.ready;
   await new Promise((resolve) => paintFrame(resolve));
   if (document.querySelector(".error-binding")) throw new Error("Binding fixture failed to render");
+  if (feedbackLayout) {
+    const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect().toJSON();
+    const body = document.querySelector(".binding-config-body");
+    return {
+      scrollHeight: body.scrollHeight, clientHeight: body.clientHeight,
+      name: rect(".binding-config-section--name .binding-config-title"),
+      live: rect(".binding-config-preview-card > .binding-config-title-row .binding-config-title"),
+      footer: rect(".binding-config-footer"),
+      bottomCards: ["#binding-config-mute-section", "#binding-config-assign-section", "#binding-config-preview-learn-shell"].map(rect).filter(Boolean),
+      controls: ["#binding-config-led-section", "#binding-config-feedback-output-section", "#binding-config-mute-section", "#binding-config-assign-section", "#binding-config-preview-learn-shell", "#binding-config-save", "#binding-config-cancel", "#binding-config-led-section .target-menu:not(.hidden)"].map(rect).filter(Boolean),
+    };
+  }
   return [...document.querySelectorAll("#binding-config-panel *")].map((element) => {
     const rect = element.getBoundingClientRect(),
       css = getComputedStyle(element);

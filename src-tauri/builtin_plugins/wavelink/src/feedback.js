@@ -15,6 +15,7 @@ import {
 /** feedback workflow. */
 export function createFeedback({
   ctx,
+  meters,
   primaryFeedbackIntentByBinding,
   requestJsonRpc,
   scheduleChannelsRefresh,
@@ -96,6 +97,7 @@ export function createFeedback({
   }
 
   async function syncOfflineFeedback() {
+    meters?.disconnected();
     feedbackQueue.invalidate();
     // If Wave Link is disconnected, drive bound controls to 0.
     // This keeps motor faders from staying at a stale value.

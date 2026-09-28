@@ -50,6 +50,7 @@ fn control_ids(binding: &Binding) -> impl Iterator<Item = &str> {
             &binding.mute_control,
             &binding.assign_control,
             &binding.indicator_control,
+            &binding.led_control,
         ]
         .into_iter()
         .filter_map(|c| c.as_ref().map(|c| c.device_id.as_str())),
@@ -171,6 +172,7 @@ pub(crate) fn reconciled_profile(
             &mut binding.mute_control,
             &mut binding.assign_control,
             &mut binding.indicator_control,
+            &mut binding.led_control,
         ]
         .into_iter()
         .flatten()

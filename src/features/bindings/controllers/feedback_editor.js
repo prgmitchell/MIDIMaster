@@ -1,3 +1,4 @@
+import { createLedFeedbackEditor } from "./led_feedback_editor.js";
 import { effectiveButtonLightMode, normalizeButtonLightBehavior } from "../../../core/binding_model.js";
 import { renderNativeSelectDropdown } from "../../ui/dropdown_select.js";
 import { normalizeControlKind } from "../shape_helpers.js";
@@ -5,6 +6,8 @@ import { normalizeControlKind } from "../shape_helpers.js";
 /** feedback editor workflow. */
 export function createFeedbackEditor({
   elements,
+  lifetime,
+  invoke,
   editorState,
   getConfigBinding,
   listState,
@@ -12,6 +15,8 @@ export function createFeedbackEditor({
   t,
   updateAuxLearnUi,
 }) {
+  const led = createLedFeedbackEditor({ elements, lifetime, invoke, editorState, getConfigBinding, listState, t });
+
   function buttonLightOptionText(value) {
     if (value === "Disabled") {
       return t("bindings.feedbackDisabled");
@@ -182,6 +187,7 @@ export function createFeedbackEditor({
   }
 
   function syncFeedbackOutputUi(binding, options = {}) {
+    led.sync(binding);
     const feedbackDisabled = binding?.feedback_enabled === false;
     let custom = normalizeIndicatorControl(binding?.indicator_control, {
       allowPitchBend: true,

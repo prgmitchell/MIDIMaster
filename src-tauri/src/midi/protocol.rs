@@ -93,6 +93,104 @@ pub(super) fn binding_feedback_send(
     binding_feedback_position_send(binding, physical_position)
 }
 
+pub(super) fn binding_led_feedback_send(
+    binding: &Binding,
+    level: f32,
+    output_name: &str,
+) -> Option<BindingLightFeedbackSend> {
+    if !binding.has_led_feedback() {
+        return None;
+    }
+    if !binding.led_enabled {
+        // Reuse the configured Note/CC output without applying the value curve.
+        return binding_feedback_position_send(binding, level);
+    }
+    if let Some(control) = binding.led_feedback_control() {
+        if control.msg_type == MidiMessageType::ChannelPressure {
+            return Some(mackie_meter_send(
+                binding,
+                &control.device_id,
+                control.controller,
+                level,
+            ));
+        }
+        return Some(indicator_light_feedback_send(control, level));
+    }
+    let control = automatic_led_control(binding, output_name)?;
+    if control.msg_type == MidiMessageType::ChannelPressure {
+        return Some(mackie_meter_send(
+            binding,
+            &binding.device_id,
+            control.controller,
+            level,
+        ));
+    }
+    Some(primary_light_feedback_send(binding, level, true))
+}
+
+fn mackie_meter_send(
+    binding: &Binding,
+    device_id: &str,
+    strip: u8,
+    level: f32,
+) -> BindingLightFeedbackSend {
+    let level = crate::audio_feedback::clamp_level(level);
+    let segment = if binding.feedback_mode == crate::model::FeedbackMode::AudioReactive {
+        // MCU meter divisions are dB, not a 7-bit CC scale. Zero is off, 12 is
+        // 0 dBFS; 14/15 are overload commands and must never be sent as levels.
+        let db = 20.0 * level.log10();
+        [
+            -60.0, -50.0, -40.0, -30.0, -20.0, -14.0, -10.0, -8.0, -6.0, -4.0, -2.0, 0.0,
+        ]
+        .iter()
+        .filter(|threshold| db >= **threshold)
+        .count() as u8
+    } else {
+        (level * 12.0).round() as u8
+    };
+    // MCU packs the strip and segment into the pressure byte. Convert that byte
+    // to the normal transport's 0–1 range so routing/reconnect stay shared.
+    BindingLightFeedbackSend {
+        device_id: device_id.to_owned(),
+        channel: 0,
+        controller: strip,
+        value: ((strip << 4) | segment) as f32 / 127.0,
+        msg_type: MidiMessageType::ChannelPressure,
+        use_binding_protocol: false,
+    }
+}
+
+pub(super) fn automatic_led_control(
+    binding: &Binding,
+    output_name: &str,
+) -> Option<crate::model::MidiControl> {
+    let name = output_name.to_ascii_uppercase();
+    // Eight strip faders use Pitch Bend channels 0–7 in MC mode. Do not infer
+    // meters for the master fader, unrelated hardware, or models without them.
+    if name.contains("X-TOUCH")
+        && !["MINI", "COMPACT", "ONE"]
+            .iter()
+            .any(|model| name.contains(model))
+        && !binding.is_button_binding()
+        && binding.control.msg_type == MidiMessageType::PitchBend
+        && binding.control.channel < 8
+    {
+        return Some(crate::model::MidiControl {
+            channel: 0,
+            controller: binding.control.channel,
+            msg_type: MidiMessageType::ChannelPressure,
+        });
+    }
+    // Generic CC does not tell us that an associated LED exists.
+    let ring = build_xtouch_mini_standard_feedback(binding, 0.0, output_name)
+        .or_else(|| build_xtouch_mc_vpot_feedback(binding, 0.0, output_name))?;
+    Some(crate::model::MidiControl {
+        channel: ring.channel,
+        controller: ring.controller,
+        msg_type: ring.msg_type,
+    })
+}
+
 pub(super) fn binding_feedback_position_send(
     binding: &Binding,
     physical_position: f32,
@@ -218,6 +316,10 @@ fn build_direct_feedback_bytes(
                 controller,
                 controller as u16,
             )
+        }
+        MidiMessageType::ChannelPressure => {
+            let raw = (normalized_value * 127.0).round() as u8;
+            (vec![0xD0 | (channel & 0x0F), raw], 0, raw as u16)
         }
     };
     FeedbackBytes {
