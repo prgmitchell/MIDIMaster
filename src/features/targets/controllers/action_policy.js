@@ -12,6 +12,7 @@ import {
   SET_DEFAULT_DEVICE_ICON_DATA,
 } from "../catalog_presentation.js";
 import { BUILT_IN_TARGETS, actionPickerOption } from "../../../core/target_model.js";
+import { focusableApplicationNames } from "./window_focus.js";
 import {
   normalizeButtonActionOption as normalizeCanonicalButtonActionOption,
   pushUniqueAction,
@@ -19,6 +20,7 @@ import {
 
 /** action policy workflow. */
 export function createActionPolicy({
+  callInvoke,
   t,
   getSess,
   getPlayback,
@@ -256,7 +258,8 @@ export function createActionPolicy({
       if (
         source === "selected" &&
         includeWindowFocusAction &&
-        (targetOption.kind === "session" || targetOption.kind === "application")
+        (targetOption.kind === "session" || targetOption.kind === "application") &&
+        (await focusableApplicationNames(callInvoke, [targetOption.value])).has(targetOption.value)
       ) {
         actions.push({
           label: t("targets.action.focusWindow"),

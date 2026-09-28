@@ -2,6 +2,13 @@ use crate::{binding_services, model, model::Binding, AppState};
 use tauri::{AppHandle, State};
 
 #[tauri::command]
+pub fn filter_focusable_applications(
+    application_names: Vec<String>,
+) -> Result<Vec<String>, String> {
+    crate::window_focus::filter_focusable_applications(application_names)
+}
+
+#[tauri::command]
 pub fn get_automatic_led_output(
     state: State<'_, AppState>,
     binding: Binding,

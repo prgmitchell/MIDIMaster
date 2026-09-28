@@ -3,9 +3,8 @@ pub use special::*;
 mod execution;
 use crate::model::{self, Binding, BindingTarget};
 use crate::run_logger;
-use crate::runtime_helpers::{
-    focus_window_by_process_name, open_path_with_shell_association, send_hotkey, send_media_key,
-};
+use crate::runtime_helpers::{open_path_with_shell_association, send_hotkey, send_media_key};
+use crate::window_focus::focus_window_by_process_name;
 use crate::AppState;
 pub use execution::*;
 use std::collections::HashMap;

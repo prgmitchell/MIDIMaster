@@ -40,6 +40,7 @@ mod telemetry;
 mod test_support;
 mod virtual_audio;
 mod voicemeeter;
+mod window_focus;
 mod windows_autostart;
 mod windows_display;
 mod ws_bridge;

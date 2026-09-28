@@ -8,7 +8,17 @@ const handler = {
     { target, buttonActions: [{ value: "SetDefaultDevice", label: "Hydrated", role: "command" }] },
   ],
 };
+const waveLink = "aumid:elgato.wavelink_g54w8ztgkx496!app";
+let focusableNames = new Set([waveLink]);
+let focusLookupFailed = false;
+const focusRequests = [];
 const policy = createActionPolicy({
+  callInvoke: async (command, { applicationNames }) => {
+    assert.equal(command, "filter_focusable_applications");
+    focusRequests.push(applicationNames);
+    if (focusLookupFailed) throw new Error("Window lookup failed");
+    return applicationNames.filter((name) => focusableNames.has(name));
+  },
   t: (key) => key,
   getSess: () => [],
   getPlayback: () => [],
@@ -48,7 +58,27 @@ assert.deepEqual(
   ["ToggleMute", "Volume"],
 );
 assert.deepEqual(
-  (await policy.buildActionOptionsForTargetOption({ kind: "session" })).map((a) => a.value),
+  focusRequests,
+  [],
+  "ordinary audio menus do not query window availability",
+);
+const applicationOption = { kind: "session", value: waveLink };
+assert.deepEqual(
+  (await policy.buildActionOptionsForTargetOption(applicationOption)).map((a) => a.value),
   ["ToggleMute", "FocusWindow", "Volume"],
+);
+focusableNames.clear();
+assert.deepEqual(
+  (await policy.buildActionOptionsForTargetOption(applicationOption)).map((a) => a.value),
+  ["ToggleMute", "Volume"],
+  "macro action choices exclude Focus Window while an app is tray-only",
+);
+focusableNames.add(waveLink);
+assert.ok((await policy.buildActionOptionsForTargetOption(applicationOption)).some((a) => a.value === "FocusWindow"));
+focusLookupFailed = true;
+assert.deepEqual(
+  (await policy.buildActionOptionsForTargetOption(applicationOption)).map((a) => a.value),
+  ["ToggleMute", "Volume"],
+  "a failed window lookup does not offer unverified focus targets",
 );
 console.log("Target action policy tests passed");

@@ -275,6 +275,8 @@ export function createPanel({
     renderCategories();
     render();
     elements.targetPanel.classList.remove("hidden");
+    // Async submenus must not reopen a panel the user closed or navigated away from.
+    return () => panelState.activeTargetPanelSelect === onSelect;
   }
 
   return { closeTargetPanel, openTargetPanel };

@@ -31,6 +31,7 @@ macro_rules! command_registry {
             stop_midi_route,
             stop_midi_device,
             list_sessions,
+            filter_focusable_applications,
             list_monitors,
             get_osd_settings,
             update_osd_settings,

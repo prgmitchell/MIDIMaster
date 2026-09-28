@@ -8,15 +8,6 @@ pub(crate) struct LearnCandidate {
     pub saw_max: bool,
 }
 
-fn normalize_process_name(value: &str) -> String {
-    let raw = value.trim().to_lowercase();
-    let filename = raw.rsplit(['\\', '/']).next().unwrap_or(&raw);
-    filename
-        .strip_suffix(".exe")
-        .unwrap_or(filename)
-        .to_string()
-}
-
 fn key_name_to_vk(name: &str) -> Option<u16> {
     let upper = name.trim().to_uppercase();
     match upper.as_str() {
@@ -142,97 +133,6 @@ fn hotkey_input_vk(vk: u16) -> u16 {
         0x12 => 0xA4, // VK_LMENU
         _ => vk,
     }
-}
-
-#[cfg(target_os = "windows")]
-fn focus_window_target_matches(
-    target_name: &str,
-    identity: &crate::audio::windows::process_helpers::ProcessIdentity,
-) -> bool {
-    use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo};
-
-    // Discovery stores packaged apps by AUMID (or package family), not executable
-    // name. Preserve those identifiers while accepting legacy executable targets.
-    let target_name = target_name.trim().to_lowercase();
-    let target_name = if target_name.starts_with("aumid:") || target_name.starts_with("package:") {
-        target_name
-    } else {
-        normalize_process_name(&target_name)
-    };
-    application_name_matches(
-        &target_name,
-        ApplicationMatchInfo {
-            process_path: identity.path.as_deref(),
-            application_user_model_id: identity.application_user_model_id.as_deref(),
-            package_family_name: identity.package_family_name.as_deref(),
-            package_full_name: identity.package_full_name.as_deref(),
-            ..Default::default()
-        },
-    )
-}
-
-#[cfg(target_os = "windows")]
-pub(crate) fn focus_window_by_process_name(process_name: &str) -> Result<(), String> {
-    use windows::Win32::Foundation::{HWND, LPARAM};
-    use windows::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
-        SetForegroundWindow, ShowWindow, SW_RESTORE,
-    };
-
-    struct Search {
-        needle: String,
-        hwnd: HWND,
-    }
-
-    unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> windows_core::BOOL {
-        let search = unsafe { &mut *(lparam.0 as *mut Search) };
-        if !unsafe { IsWindowVisible(hwnd) }.as_bool() {
-            return windows_core::BOOL(1);
-        }
-        if unsafe { GetWindowTextLengthW(hwnd) } <= 0 {
-            return windows_core::BOOL(1);
-        }
-
-        let mut process_id = 0u32;
-        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut process_id)) };
-        let identity = crate::audio::windows::process_helpers::query_process_identity(process_id);
-        if !focus_window_target_matches(&search.needle, &identity) {
-            return windows_core::BOOL(1);
-        }
-
-        search.hwnd = hwnd;
-        windows_core::BOOL(0)
-    }
-
-    let needle = process_name.trim().to_string();
-    if needle.is_empty() {
-        return Err("missing_process_name".to_string());
-    }
-
-    let mut search = Search {
-        needle,
-        hwnd: HWND::default(),
-    };
-    unsafe {
-        let _ = EnumWindows(Some(enum_proc), LPARAM(&mut search as *mut Search as isize));
-    }
-    if search.hwnd.is_invalid() {
-        return Err("window_not_found".to_string());
-    }
-    unsafe {
-        if IsIconic(search.hwnd).as_bool() {
-            let _ = ShowWindow(search.hwnd, SW_RESTORE);
-        }
-        if !SetForegroundWindow(search.hwnd).as_bool() {
-            return Err("set_foreground_failed".to_string());
-        }
-    }
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-pub(crate) fn focus_window_by_process_name(_process_name: &str) -> Result<(), String> {
-    Err("unsupported_platform".to_string())
 }
 
 #[cfg(target_os = "windows")]
@@ -512,75 +412,6 @@ pub(crate) fn classify_learned_control(candidate: &LearnCandidate) -> LearnedCon
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg(target_os = "windows")]
-    fn wave_link_identity() -> crate::audio::windows::process_helpers::ProcessIdentity {
-        crate::audio::windows::process_helpers::ProcessIdentity {
-            path: Some(r"C:\Program Files\WindowsApps\Elgato.WaveLink\Elgato.WaveLink.exe".into()),
-            application_user_model_id: Some("Elgato.WaveLink_g54w8ztgkx496!App".into()),
-            package_family_name: Some("Elgato.WaveLink_g54w8ztgkx496".into()),
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn focus_window_matches_saved_wave_link_aumid() {
-        assert!(focus_window_target_matches(
-            "aumid:elgato.wavelink_g54w8ztgkx496!app",
-            &wave_link_identity(),
-        ));
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn focus_window_matches_package_identity_without_executable_path() {
-        let mut identity = wave_link_identity();
-        identity.path = None;
-        assert!(focus_window_target_matches(
-            "  AUMID:ELGATO.WAVELINK_G54W8ZTGKX496!APP  ",
-            &identity,
-        ));
-        identity.application_user_model_id = None;
-        assert!(focus_window_target_matches(
-            "package:elgato.wavelink_g54w8ztgkx496",
-            &identity,
-        ));
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn focus_window_does_not_match_a_different_application_id() {
-        let identity = wave_link_identity();
-        for target in [
-            "aumid:elgato.wavelink_g54w8ztgkx496!OtherApp",
-            "aumid:elgato.wavelink_differentpublisher!app",
-            "package:elgato.wavelink_differentpublisher",
-            "",
-            "   ",
-        ] {
-            assert!(!focus_window_target_matches(target, &identity), "{target}");
-        }
-        assert!(!focus_window_target_matches(
-            "aumid:elgato.wavelink_g54w8ztgkx496!app",
-            &Default::default(),
-        ));
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn focus_window_preserves_executable_name_and_path_matching() {
-        let identity = wave_link_identity();
-        for target in [
-            "elgato.wavelink",
-            " Elgato.WaveLink.EXE ",
-            r"C:\Program Files\Elgato\Elgato.WaveLink.exe",
-            "C:/Program Files/Elgato/Elgato.WaveLink.exe",
-        ] {
-            assert!(focus_window_target_matches(target, &identity), "{target}");
-        }
-        assert!(!focus_window_target_matches("notepad.exe", &identity));
-    }
 
     fn keys(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| value.to_string()).collect()

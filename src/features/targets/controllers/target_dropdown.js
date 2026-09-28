@@ -212,6 +212,7 @@ export function createTargetDropdown({
       loadMacroNavActionOptionsForDropdown,
       buildActionOptionsForTargetOption,
     } = createActionPolicy({
+      callInvoke,
       t,
       getSess,
       getPlayback,

@@ -6,6 +6,7 @@ import {
   PROFILE_SWITCH_ICON_DATA,
 } from "../catalog_presentation.js";
 import { BUILT_IN_TARGETS, actionDefinition } from "../../../core/target_model.js";
+import { focusableApplicationNames } from "./window_focus.js";
 
 /** picker workflow. */
 export function createPicker({
@@ -46,13 +47,14 @@ export function createPicker({
       isBindingButton,
     );
     const options = filterPickerOptions(rawPickerOptions);
+    let rootPanelIsCurrent = () => false;
 
     const buildButtonActionOptions = (targetOption) =>
       buildActionOptionsForTargetOption(targetOption, { source: "menu" });
 
-    const buildWindowFocusOptions = () => {
+    const buildWindowFocusOptions = async () => {
       const seen = new Set();
-      return getSess()
+      const candidates = getSess()
         .filter((session) => session && !session.is_master && session.id !== "master")
         .map((session) => {
           const key = normalizeKey(session);
@@ -69,6 +71,8 @@ export function createPicker({
           };
         })
         .filter(Boolean);
+      const available = await focusableApplicationNames(callInvoke, candidates.map((option) => option.value));
+      return candidates.filter((option) => available.has(option.value));
     };
 
     const captureOptions = () =>
@@ -79,15 +83,17 @@ export function createPicker({
         icon_data: [CAPTURE_ICON_DATA, SNIP_ICON_DATA, RECORD_ICON_DATA][index],
       }));
 
-    const showWindowFocusSubmenu = () => {
-      const focusOptions = buildWindowFocusOptions();
+    const showWindowFocusSubmenu = async () => {
+      const isCurrent = rootPanelIsCurrent;
+      const focusOptions = await buildWindowFocusOptions();
+      if (!isCurrent()) return;
       openTargetPanel(
         focusOptions.length > 0
           ? focusOptions
           : [
               {
                 value: "",
-                label: t("targets.noRunningApplications"),
+                label: t("targets.noneAvailable"),
                 kind: "placeholder",
                 icon_data: WINDOW_FOCUS_ICON_DATA,
               },
@@ -189,7 +195,7 @@ export function createPicker({
     };
 
     const openRootTargetPanel = () => {
-      openTargetPanel(
+      rootPanelIsCurrent = openTargetPanel(
         options,
         null,
         null,
@@ -200,7 +206,7 @@ export function createPicker({
           }
 
           if (targetOption.kind === "action-root" && targetOption.value === "window-focus") {
-            showWindowFocusSubmenu();
+            showWindowFocusSubmenu().catch(() => {});
             return false;
           }
 
