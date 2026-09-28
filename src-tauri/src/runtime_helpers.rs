@@ -145,40 +145,30 @@ fn hotkey_input_vk(vk: u16) -> u16 {
 }
 
 #[cfg(target_os = "windows")]
-fn query_process_path(process_id: u32) -> Option<String> {
-    use std::ffi::OsString;
-    use std::os::windows::ffi::OsStringExt;
-    use windows::core::PWSTR;
-    use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{
-        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
-        PROCESS_QUERY_LIMITED_INFORMATION,
-    };
+fn focus_window_target_matches(
+    target_name: &str,
+    identity: &crate::audio::windows::process_helpers::ProcessIdentity,
+) -> bool {
+    use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo};
 
-    if process_id == 0 {
-        return None;
-    }
-    let handle =
-        unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) }.ok()?;
-    if handle.is_invalid() {
-        return None;
-    }
-    let mut buffer = vec![0u16; 4096];
-    let mut size = buffer.len() as u32;
-    let result = unsafe {
-        QueryFullProcessImageNameW(
-            handle,
-            PROCESS_NAME_WIN32,
-            PWSTR(buffer.as_mut_ptr()),
-            &mut size,
-        )
+    // Discovery stores packaged apps by AUMID (or package family), not executable
+    // name. Preserve those identifiers while accepting legacy executable targets.
+    let target_name = target_name.trim().to_lowercase();
+    let target_name = if target_name.starts_with("aumid:") || target_name.starts_with("package:") {
+        target_name
+    } else {
+        normalize_process_name(&target_name)
     };
-    let _ = unsafe { CloseHandle(handle) };
-    if result.is_err() {
-        return None;
-    }
-    buffer.truncate(size as usize);
-    Some(OsString::from_wide(&buffer).to_string_lossy().to_string())
+    application_name_matches(
+        &target_name,
+        ApplicationMatchInfo {
+            process_path: identity.path.as_deref(),
+            application_user_model_id: identity.application_user_model_id.as_deref(),
+            package_family_name: identity.package_family_name.as_deref(),
+            package_full_name: identity.package_full_name.as_deref(),
+            ..Default::default()
+        },
+    )
 }
 
 #[cfg(target_os = "windows")]
@@ -205,10 +195,8 @@ pub(crate) fn focus_window_by_process_name(process_name: &str) -> Result<(), Str
 
         let mut process_id = 0u32;
         unsafe { GetWindowThreadProcessId(hwnd, Some(&mut process_id)) };
-        let Some(path) = query_process_path(process_id) else {
-            return windows_core::BOOL(1);
-        };
-        if normalize_process_name(&path) != search.needle {
+        let identity = crate::audio::windows::process_helpers::query_process_identity(process_id);
+        if !focus_window_target_matches(&search.needle, &identity) {
             return windows_core::BOOL(1);
         }
 
@@ -216,7 +204,7 @@ pub(crate) fn focus_window_by_process_name(process_name: &str) -> Result<(), Str
         windows_core::BOOL(0)
     }
 
-    let needle = normalize_process_name(process_name);
+    let needle = process_name.trim().to_string();
     if needle.is_empty() {
         return Err("missing_process_name".to_string());
     }
@@ -524,6 +512,75 @@ pub(crate) fn classify_learned_control(candidate: &LearnCandidate) -> LearnedCon
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "windows")]
+    fn wave_link_identity() -> crate::audio::windows::process_helpers::ProcessIdentity {
+        crate::audio::windows::process_helpers::ProcessIdentity {
+            path: Some(r"C:\Program Files\WindowsApps\Elgato.WaveLink\Elgato.WaveLink.exe".into()),
+            application_user_model_id: Some("Elgato.WaveLink_g54w8ztgkx496!App".into()),
+            package_family_name: Some("Elgato.WaveLink_g54w8ztgkx496".into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn focus_window_matches_saved_wave_link_aumid() {
+        assert!(focus_window_target_matches(
+            "aumid:elgato.wavelink_g54w8ztgkx496!app",
+            &wave_link_identity(),
+        ));
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn focus_window_matches_package_identity_without_executable_path() {
+        let mut identity = wave_link_identity();
+        identity.path = None;
+        assert!(focus_window_target_matches(
+            "  AUMID:ELGATO.WAVELINK_G54W8ZTGKX496!APP  ",
+            &identity,
+        ));
+        identity.application_user_model_id = None;
+        assert!(focus_window_target_matches(
+            "package:elgato.wavelink_g54w8ztgkx496",
+            &identity,
+        ));
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn focus_window_does_not_match_a_different_application_id() {
+        let identity = wave_link_identity();
+        for target in [
+            "aumid:elgato.wavelink_g54w8ztgkx496!OtherApp",
+            "aumid:elgato.wavelink_differentpublisher!app",
+            "package:elgato.wavelink_differentpublisher",
+            "",
+            "   ",
+        ] {
+            assert!(!focus_window_target_matches(target, &identity), "{target}");
+        }
+        assert!(!focus_window_target_matches(
+            "aumid:elgato.wavelink_g54w8ztgkx496!app",
+            &Default::default(),
+        ));
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn focus_window_preserves_executable_name_and_path_matching() {
+        let identity = wave_link_identity();
+        for target in [
+            "elgato.wavelink",
+            " Elgato.WaveLink.EXE ",
+            r"C:\Program Files\Elgato\Elgato.WaveLink.exe",
+            "C:/Program Files/Elgato/Elgato.WaveLink.exe",
+        ] {
+            assert!(focus_window_target_matches(target, &identity), "{target}");
+        }
+        assert!(!focus_window_target_matches("notepad.exe", &identity));
+    }
 
     fn keys(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| value.to_string()).collect()

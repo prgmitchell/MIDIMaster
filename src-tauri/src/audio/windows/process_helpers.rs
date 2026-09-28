@@ -1,5 +1,6 @@
 #[path = "process_helpers/process_identity.rs"]
 mod process_identity;
+pub(crate) use process_identity::query_process_identity;
 pub(super) use process_identity::*;
 #[path = "process_helpers/session_identity.rs"]
 mod session_identity;
@@ -46,7 +47,7 @@ use windows::Win32::UI::Shell::{ExtractIconExW, SHLoadIndirectString};
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(super) struct ProcessIdentity {
+pub(crate) struct ProcessIdentity {
     pub path: Option<String>,
     pub application_user_model_id: Option<String>,
     pub package_family_name: Option<String>,

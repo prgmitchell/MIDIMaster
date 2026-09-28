@@ -20,7 +20,7 @@ pub(in crate::audio::windows) fn query_effective_process_identity(
         .unwrap_or(identity)
 }
 
-pub(in crate::audio::windows) fn query_process_identity(process_id: u32) -> ProcessIdentity {
+pub(crate) fn query_process_identity(process_id: u32) -> ProcessIdentity {
     if process_id == 0 {
         return ProcessIdentity::default();
     }

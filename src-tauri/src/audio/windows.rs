@@ -29,7 +29,7 @@ use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
 #[path = "windows/process_helpers.rs"]
-mod process_helpers;
+pub(crate) mod process_helpers;
 pub use process_helpers::extract_executable_icon_base64;
 use process_helpers::*;
 
