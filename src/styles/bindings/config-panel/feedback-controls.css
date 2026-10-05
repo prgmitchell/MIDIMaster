@@ -132,6 +132,11 @@
 .binding-config-section--outputs > p, .binding-config-section--modifiers > p { margin: 0; height: 2.7em; min-height: 2.7em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .binding-config-panel--button .binding-config-section--outputs { display: none; }
 .binding-config-outputs-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 8px; }
+/* Reserve the scrollbar in the section padding so rows align with the toolbar. */
+#binding-config-panel .binding-config-outputs-list,
+#binding-config-panel .binding-config-modifiers-list { margin-right: -8px; scrollbar-color: auto; }
+#binding-config-panel .binding-config-outputs-list::-webkit-scrollbar,
+#binding-config-panel .binding-config-modifiers-list::-webkit-scrollbar { width: 8px; }
 .binding-config-panel--fader .binding-config-output-row { grid-template-columns: 16px 24px minmax(76px, 1fr) 256px 32px 32px 32px; gap: 8px; padding: 8px; min-height: 67px; box-sizing: border-box; }
 .binding-config-panel--fader .binding-config-output-row .binding-config-icon-button { width: 32px; min-width: 32px; height: 32px; }
 .binding-config-output-row > .binding-config-output-fields,
