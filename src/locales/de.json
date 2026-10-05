@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "Lautestes verfügbares Ziel; ohne Audio bleibt die Anzeige dunkel.",
   "bindings.ledOutput": "LED-Ausgang",
   "bindings.ledOutputHelp": "Optional: separate Note- oder CC-Adresse.",
-  "bindings.ledExistingFeedback": "Vorhandenes Feedback verwenden",
+  "bindings.ledExistingFeedback": "Vorhanden",
   "bindings.ledExistingFeedbackHelp": "Behält das bisherige LED-Feedback bei.",
   "bindings.ledExistingFeedbackDisabled": "Die Feedback-Ausgabe ist deaktiviert.",
   "bindings.ledExistingMotorHelp": "Pitch Bend folgt dem Wert. Wähle einen separaten LED-Ausgang.",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "Keine bekannte LED-Zuordnung. Typ manuell wählen.",
   "bindings.ledMackieMeter": "Mackie-Pegelanzeige",
   "bindings.ledMeterStrip": "Kanalzug",
-  "bindings.ledMackieMeterHelp": "MC-Modus: Aftertouch-Pegelanzeige, Kanalzug 1–8. Motor-Feedback bleibt separat."
+  "bindings.ledMackieMeterHelp": "MC-Modus: Aftertouch-Pegelanzeige, Kanalzug 1–8. Motor-Feedback bleibt separat.",
+  "bindings.outputs": "Ausgänge",
+  "bindings.addOutput": "Ausgang hinzufügen",
+  "bindings.removeOutput": "Ausgewählten Ausgang entfernen",
+  "bindings.reorderOutput": "Ausgang neu anordnen (Alt + Auf/Ab)",
+  "bindings.defaultOutput": "Standardausgang kann nicht entfernt werden",
+  "bindings.outputsHelp": "Senden Sie Faderwerte und LED-Rückmeldungen an Ihre MIDI-Geräte. Sie können mehrere Feedback- und LED-Ausgänge hinzufügen."
 }

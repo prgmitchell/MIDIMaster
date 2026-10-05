@@ -363,7 +363,7 @@ pub(crate) fn spawn_feedback_refresh_loop(
                     if let Ok(mut midi) = state.midi.lock() {
                         for binding in &profile.bindings {
                             let key = BindingKey::from_binding(binding);
-                            if binding.feedback_enabled {
+                            if binding.has_value_feedback() {
                                 if let Some(volume) = feedback_snapshot.get(&key).cloned() {
                                     let output_key =
                                         feedback::binding_feedback_control_key(binding)

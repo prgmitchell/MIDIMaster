@@ -8,10 +8,10 @@ pub(super) fn send_resolved_binding_feedback(
     force_hardware_feedback: bool,
     context: &str,
 ) {
-    if !binding.feedback_enabled && binding.has_led_feedback() {
+    if !binding.feedback_enabled && binding.has_any_led_feedback() {
         feedback::set_feedback_cache_value(state, &BindingKey::from_binding(binding), value);
     }
-    if !binding.feedback_enabled {
+    if !binding.has_value_feedback() {
         return;
     }
     if binding.is_button_binding() {
@@ -60,8 +60,9 @@ pub(super) fn binding_has_clearable_feedback_output(binding: &Binding) -> bool {
 pub(super) fn active_feedback_outputs(bindings: &[Binding]) -> HashSet<FeedbackControlKey> {
     bindings
         .iter()
-        .filter(|binding| binding_has_clearable_feedback_output(binding))
-        .map(resolved_binding_feedback_control_key)
+        .flat_map(Binding::value_output_bindings)
+        .filter(binding_has_clearable_feedback_output)
+        .map(|binding| resolved_binding_feedback_control_key(&binding))
         .collect()
 }
 
@@ -71,12 +72,12 @@ pub(super) fn stale_feedback_bindings_for_removed_outputs(
 ) -> Vec<Binding> {
     removed_bindings
         .iter()
-        .filter(|binding| binding_has_clearable_feedback_output(binding))
+        .flat_map(Binding::value_output_bindings)
+        .filter(binding_has_clearable_feedback_output)
         .filter(|binding| {
             let old_output = resolved_binding_feedback_control_key(binding);
             !active_output_keys.contains(&old_output)
         })
-        .cloned()
         .collect()
 }
 

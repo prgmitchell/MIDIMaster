@@ -127,8 +127,8 @@ assert.match(
 
 assert.match(
   files.html,
-  /id="binding-config-feedback-output-section" class="binding-config-section binding-config-section--feedback-output hidden"/,
-  "fader feedback output should be its own section",
+  /id="binding-config-outputs-section" class="binding-config-section binding-config-section--outputs hidden"/,
+  "fader feedback and LED outputs should share a section",
 );
 assert.match(
   files.html,
@@ -153,7 +153,7 @@ assert.match(
 );
 assert.match(
   files.css,
-  /"name live"[\s\S]*?"curve live"[\s\S]*?"feedback modifiers"[\s\S]*?"led modifiers"/,
+  /"name live"[\s\S]*?"curve live"[\s\S]*?"outputs modifiers"/,
   "fader layout follows the two-column mockup",
 );
 assert.doesNotMatch(

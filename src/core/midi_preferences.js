@@ -155,6 +155,7 @@ export function applyBindingDeviceMigrations(binding, migrations) {
     mute_control: migratedControl(current.mute_control),
     assign_control: migratedControl(current.assign_control),
     indicator_control: migratedControl(current.indicator_control),
+    ...(Array.isArray(current.additional_outputs) ? { additional_outputs: current.additional_outputs.map((output) => ({ ...output, control: migratedControl(output.control) })) } : {}),
     ...(Array.isArray(current.modifiers)
       ? {
           modifiers: current.modifiers.map((item) => ({

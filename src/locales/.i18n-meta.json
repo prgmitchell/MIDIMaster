@@ -698,7 +698,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -724,7 +724,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "es": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -1425,7 +1431,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -1451,7 +1457,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "de": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -2152,7 +2164,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -2178,7 +2190,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "it": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -2879,7 +2897,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -2905,7 +2923,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "pt-BR": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -3606,7 +3630,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -3632,7 +3656,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "nl": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -4333,7 +4363,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -4359,7 +4389,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "pl": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -5060,7 +5096,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -5086,7 +5122,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "ja": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -5787,7 +5829,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -5813,7 +5855,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "ko": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -6514,7 +6562,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -6540,7 +6588,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "zh-Hans": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -7241,7 +7295,7 @@
     "bindings.ledAddressConflict": "e4a3c7eeee179344f65f7c06999eec5913919dc285ef11424fbbf5cff634d096",
     "bindings.ledAutomatic": "d461a493a3753877c9486cffa3444265a33370af8a7fff242fb119b71750839c",
     "bindings.ledAutomaticKnown": "5e9bee65ac995e7ba585929b0a78ac51c5368c40b43838b3d55c8c182120045b",
-    "bindings.ledExistingFeedback": "f2ae4f0699e9330c4d86969b583a8040f93316a96fa7ffa1b2ff69f34ec68ca2",
+    "bindings.ledExistingFeedback": "0a597385b8bebf6f72e9528351fa0e58c9fe4d02bf5041e3154c32ce2970cd35",
     "bindings.ledExistingFeedbackHelp": "7955634e8efe23b40be8b456854f727f6906b0e07e2cf5515fffd329f3500ebf",
     "bindings.ledExistingFeedbackDisabled": "c1ae3d183a99830aa479d896a98fe6df0818155c3831b20d62792fb847ebbf80",
     "bindings.ledExistingMotorHelp": "35fd813420628cb2988f58d4b7cc1634247ef903dadd148ddc8487211ba864ae",
@@ -7267,7 +7321,13 @@
     "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
     "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
     "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
-    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b",
+    "bindings.outputs": "e7ce99764a2debd20909bfcf02693d2c1aa3c6b38e1edc86fe2604296fe5e868",
+    "bindings.addOutput": "1674ce8b6694b5d00115d4de551c0ec19c31fe100a5cc7be359c7c8b4911ed68",
+    "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
+    "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
+    "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

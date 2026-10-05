@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "Destino disponible más alto; sin audio, la luz se apaga.",
   "bindings.ledOutput": "Salida LED",
   "bindings.ledOutputHelp": "Dirección Note o CC independiente, opcional.",
-  "bindings.ledExistingFeedback": "Usar la realimentación existente",
+  "bindings.ledExistingFeedback": "Existente",
   "bindings.ledExistingFeedbackHelp": "Conserva el comportamiento actual de los LED.",
   "bindings.ledExistingFeedbackDisabled": "La salida de realimentación está desactivada.",
   "bindings.ledExistingMotorHelp": "Pitch Bend sigue el valor. Elige una salida LED independiente.",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "No se conoce la asignación LED. Elige el tipo manualmente.",
   "bindings.ledMackieMeter": "Medidor Mackie",
   "bindings.ledMeterStrip": "Tira",
-  "bindings.ledMackieMeterHelp": "Modo MC: medidor Aftertouch, tira 1–8. La respuesta del motor es independiente."
+  "bindings.ledMackieMeterHelp": "Modo MC: medidor Aftertouch, tira 1–8. La respuesta del motor es independiente.",
+  "bindings.outputs": "Salidas",
+  "bindings.addOutput": "Añadir salida",
+  "bindings.removeOutput": "Eliminar la salida seleccionada",
+  "bindings.reorderOutput": "Reordenar salida (Alt + Arriba/Abajo)",
+  "bindings.defaultOutput": "La salida predeterminada no se puede eliminar",
+  "bindings.outputsHelp": "Envía los valores del fader y la respuesta LED a tus dispositivos MIDI. Puedes añadir varias salidas de respuesta y LED."
 }

@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "Najgłośniejszy dostępny cel; bez dźwięku światło jest wyłączone.",
   "bindings.ledOutput": "Wyjście LED",
   "bindings.ledOutputHelp": "Opcjonalny, osobny adres Note lub CC.",
-  "bindings.ledExistingFeedback": "Użyj istniejącego sprzężenia zwrotnego",
+  "bindings.ledExistingFeedback": "Istniejące",
   "bindings.ledExistingFeedbackHelp": "Zachowuje dotychczasowe działanie diod LED.",
   "bindings.ledExistingFeedbackDisabled": "Wyjście sprzężenia zwrotnego jest wyłączone.",
   "bindings.ledExistingMotorHelp": "Pitch Bend podąża za wartością. Wybierz osobne wyjście LED.",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "Brak znanego mapowania LED. Wybierz typ ręcznie.",
   "bindings.ledMackieMeter": "Miernik Mackie",
   "bindings.ledMeterStrip": "Pasek",
-  "bindings.ledMackieMeterHelp": "Tryb MC: miernik Aftertouch, pasek 1–8. Sterowanie silnikiem pozostaje osobne."
+  "bindings.ledMackieMeterHelp": "Tryb MC: miernik Aftertouch, pasek 1–8. Sterowanie silnikiem pozostaje osobne.",
+  "bindings.outputs": "Wyjścia",
+  "bindings.addOutput": "Dodaj wyjście",
+  "bindings.removeOutput": "Usuń wybrane wyjście",
+  "bindings.reorderOutput": "Zmień kolejność wyjścia (Alt + Góra/Dół)",
+  "bindings.defaultOutput": "Domyślne wyjście nie może zostać usunięte",
+  "bindings.outputsHelp": "Wysyłaj wartości suwaka i sygnały zwrotne LED do urządzeń MIDI. Możesz dodać wiele wyjść sygnałów zwrotnych i LED."
 }

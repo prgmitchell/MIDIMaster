@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "利用可能な対象の最大音量に反応。音声がない場合は消灯します。",
   "bindings.ledOutput": "LED出力",
   "bindings.ledOutputHelp": "任意の独立したNoteまたはCCアドレス。",
-  "bindings.ledExistingFeedback": "既存のフィードバックを使用",
+  "bindings.ledExistingFeedback": "既存",
   "bindings.ledExistingFeedbackHelp": "既存のLEDフィードバックを維持します。",
   "bindings.ledExistingFeedbackDisabled": "フィードバック出力は無効です。",
   "bindings.ledExistingMotorHelp": "ピッチベンドは値に追従します。別のLED出力を選択してください。",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "既知のLED割り当てがありません。種類を手動で選択してください。",
   "bindings.ledMackieMeter": "Mackieメーター",
   "bindings.ledMeterStrip": "ストリップ",
-  "bindings.ledMackieMeterHelp": "MCモード：Aftertouchメーター、ストリップ1～8。モーターフィードバックは独立しています。"
+  "bindings.ledMackieMeterHelp": "MCモード：Aftertouchメーター、ストリップ1～8。モーターフィードバックは独立しています。",
+  "bindings.outputs": "出力",
+  "bindings.addOutput": "出力を追加",
+  "bindings.removeOutput": "選択した出力を削除",
+  "bindings.reorderOutput": "出力を並べ替え (Alt + 上/下)",
+  "bindings.defaultOutput": "デフォルト出力は削除できません",
+  "bindings.outputsHelp": "フェーダーの値とLEDフィードバックをMIDIデバイスに送信します。フィードバック出力とLED出力は複数追加できます。"
 }

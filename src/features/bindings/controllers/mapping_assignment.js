@@ -3,6 +3,7 @@ import {
   modifierForField,
 } from "../../../core/fader_modifiers.js";
 import { findControlConflict } from "../../../core/control_mapping.js";
+import { outputForField } from "../../../core/fader_outputs.js";
 import {
   effectiveIsButton,
   normalizeControlKind,
@@ -46,6 +47,10 @@ export function createMappingAssignment({
     if (field === "control") return "Primary";
     if (field.startsWith("modifier:"))
       return modifierForField(binding, field)?.kind || "Modifier";
+    if (field.startsWith("output:"))
+      return outputForField(binding, field)?.kind === "Led"
+        ? t("bindings.ledOutput")
+        : t("bindings.feedbackOutput");
     if (field === "mute_control") return "Mute";
     if (field === "assign_control") return "Assign";
     if (field === "indicator_control") {
@@ -82,6 +87,7 @@ export function createMappingAssignment({
       }
       setControlMapping(binding, field, mapping);
       if (field === "indicator_control") binding.feedback_enabled = true;
+      if (field === "led_control") binding.led_enabled = true;
     }
     if (sameBindingTransfer) {
       editorState.acceptedTransfers.delete(field);
@@ -103,10 +109,9 @@ export function createMappingAssignment({
     const conflict = findMappingConflict(binding.id, field, mapping);
     if (conflict) {
       if (conflict.binding.id === binding.id && conflict.field === "control") {
-        setLearnPanelTransfer(
-          t("bindings.modifierPrimaryConflict"),
-          { allowTransfer: false },
-        );
+        setLearnPanelTransfer(t("bindings.modifierPrimaryConflict"), {
+          allowTransfer: false,
+        });
         return;
       }
       const ownerName = conflict.binding.name || "Binding";
@@ -142,6 +147,7 @@ export function createMappingAssignment({
       }
       setControlMapping(binding, field, mapping);
       if (field === "indicator_control") binding.feedback_enabled = true;
+      if (field === "led_control") binding.led_enabled = true;
     }
     editorState.acceptedTransfers.delete(field);
     if (field === "control") {
@@ -201,10 +207,14 @@ export function createMappingAssignment({
         stopAuxLearn({ closePanel: false });
         if (!targetField) return;
         const isFaderFeedbackOutput =
-          targetField === "indicator_control" &&
+          (targetField === "indicator_control" ||
+            outputForField(getConfigBinding(), targetField)?.kind ===
+              "Feedback") &&
           !effectiveIsButton(getConfigBinding());
         const mapping =
-          targetField === "indicator_control"
+          targetField === "indicator_control" ||
+          targetField === "led_control" ||
+          targetField.startsWith("output:")
             ? normalizeIndicatorControl(learned, {
                 allowPitchBend: isFaderFeedbackOutput,
                 controlKind: isFaderFeedbackOutput ? "Continuous" : "Button",

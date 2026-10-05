@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "Luidste beschikbare doel; zonder audio blijft het licht uit.",
   "bindings.ledOutput": "LED-uitvoer",
   "bindings.ledOutputHelp": "Optioneel, apart Note- of CC-adres.",
-  "bindings.ledExistingFeedback": "Bestaande feedback gebruiken",
+  "bindings.ledExistingFeedback": "Bestaand",
   "bindings.ledExistingFeedbackHelp": "Behoudt de bestaande ledfeedback.",
   "bindings.ledExistingFeedbackDisabled": "De feedbackuitgang is uitgeschakeld.",
   "bindings.ledExistingMotorHelp": "Pitch Bend volgt de waarde. Kies een aparte leduitgang.",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "Geen bekende LED-toewijzing. Kies het type handmatig.",
   "bindings.ledMackieMeter": "Mackie-meter",
   "bindings.ledMeterStrip": "Kanaalstrip",
-  "bindings.ledMackieMeterHelp": "MC-modus: Aftertouch-meter, strip 1–8. Motorfeedback blijft apart."
+  "bindings.ledMackieMeterHelp": "MC-modus: Aftertouch-meter, strip 1–8. Motorfeedback blijft apart.",
+  "bindings.outputs": "Uitvoer",
+  "bindings.addOutput": "Uitvoer toevoegen",
+  "bindings.removeOutput": "Geselecteerde uitvoer verwijderen",
+  "bindings.reorderOutput": "Uitvoer herschikken (Alt + Omhoog/Omlaag)",
+  "bindings.defaultOutput": "Standaard uitvoer kan niet verwijderd worden",
+  "bindings.outputsHelp": "Stuur faderwaarden en LED-feedback naar uw MIDI-apparaten. U kunt meerdere feedback- en LED-uitgangen toevoegen."
 }

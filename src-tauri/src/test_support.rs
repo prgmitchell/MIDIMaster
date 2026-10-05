@@ -26,6 +26,8 @@ pub fn binding() -> Binding {
         button_light_mode: model::ButtonLightMode::Activity,
         button_light_behavior: model::ButtonLightBehavior::FollowState,
         feedback_enabled: true,
+        additional_outputs: Vec::new(),
+        output_order: Vec::new(),
         feedback_mode: Default::default(),
         led_control: None,
         led_enabled: false,

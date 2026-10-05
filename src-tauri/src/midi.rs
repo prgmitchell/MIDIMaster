@@ -1,5 +1,8 @@
 mod diagnostics;
 use diagnostics::*;
+mod additional_feedback;
+#[cfg(test)]
+mod additional_feedback_tests;
 mod connections;
 mod feedback_transport;
 mod health;
@@ -9,9 +12,9 @@ mod protocol;
 
 use self::ports::*;
 use self::protocol::{
-    automatic_led_control, binding_feedback_position_send, binding_feedback_send,
-    binding_led_feedback_send, binding_light_feedback_sends, build_feedback_message,
-    parse_midi_message, send_feedback_messages, BindingLightFeedbackSend, FeedbackMessage,
+    automatic_led_control, binding_feedback_position_send, binding_led_feedback_send,
+    binding_light_feedback_sends, build_feedback_message, parse_midi_message,
+    send_feedback_messages, BindingLightFeedbackSend, FeedbackMessage,
 };
 use crate::model::{Binding, DeviceInfo, MidiDeviceRoute, MidiEvent, MidiMessageType};
 use crate::run_logger;

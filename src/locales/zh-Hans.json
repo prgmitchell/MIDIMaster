@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "跟随可用目标中的最大音量；无可用音频时熄灭。",
   "bindings.ledOutput": "LED 输出",
   "bindings.ledOutputHelp": "可选的独立 Note 或 CC 地址。",
-  "bindings.ledExistingFeedback": "使用现有反馈",
+  "bindings.ledExistingFeedback": "现有",
   "bindings.ledExistingFeedbackHelp": "保持现有的 LED 反馈行为不变。",
   "bindings.ledExistingFeedbackDisabled": "反馈输出已禁用。",
   "bindings.ledExistingMotorHelp": "弯音跟随数值。请选择单独的 LED 输出。",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "没有已知的 LED 映射。请手动选择类型。",
   "bindings.ledMackieMeter": "Mackie 电平表",
   "bindings.ledMeterStrip": "通道条",
-  "bindings.ledMackieMeterHelp": "MC 模式：Aftertouch 电平表，通道条 1–8。电动推子反馈保持独立。"
+  "bindings.ledMackieMeterHelp": "MC 模式：Aftertouch 电平表，通道条 1–8。电动推子反馈保持独立。",
+  "bindings.outputs": "输出",
+  "bindings.addOutput": "添加输出",
+  "bindings.removeOutput": "删除选中输出",
+  "bindings.reorderOutput": "重新排列输出 (Alt + 上/下)",
+  "bindings.defaultOutput": "无法删除默认输出",
+  "bindings.outputsHelp": "将推子值和 LED 反馈发送到 MIDI 设备。可以添加多个反馈输出和 LED 输出。"
 }

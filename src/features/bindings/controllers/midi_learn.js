@@ -15,6 +15,7 @@ export function createMidiLearn({
   renderConfigPreview,
   syncFeedbackControllerInputState,
   updateModifierLearnUi = () => {},
+  updateOutputLearnUi = () => {},
   discardUnmappedModifiers = () => {},
   t,
 }) {
@@ -22,6 +23,7 @@ export function createMidiLearn({
 
   function updateAuxLearnUi() {
     updateModifierLearnUi();
+    updateOutputLearnUi();
     const indicatorLearn = elements.bindingConfigIndicatorLearn;
     const feedbackLearn = elements.bindingConfigFeedbackLearn;
     const indicatorClear = elements.bindingConfigIndicatorClear;

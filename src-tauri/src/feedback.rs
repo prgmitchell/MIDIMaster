@@ -350,7 +350,10 @@ pub fn send_feedback_to_binding(
     binding: &Binding,
     options: FeedbackSendOptions<'_>,
 ) {
-    if !binding.feedback_enabled {
+    if !binding.has_value_feedback() {
+        if binding.has_any_led_feedback() {
+            set_feedback_cache_value(state, &BindingKey::from_binding(binding), options.value);
+        }
         return;
     }
     let logical_key = BindingKey::from_binding(binding);

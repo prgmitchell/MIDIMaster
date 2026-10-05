@@ -145,8 +145,19 @@ fn failed_save_cannot_publish_and_repeated_success_does_not_write_again() {
 fn noncolliding_reconnect_updates_all_roles_and_route_baseline_even_without_controls() {
     let mut profile = fixture();
     profile.bindings[0].indicator_control = profile.bindings[0].mute_control.clone();
+    profile.bindings[0].additional_outputs = vec![crate::model::FaderOutput {
+        id: "extra".into(),
+        kind: crate::model::FaderOutputKind::Led,
+        control: profile.bindings[0].mute_control.clone().unwrap(),
+        enabled: true,
+        feedback_mode: crate::model::FeedbackMode::AudioReactive,
+    }];
     let desired = vec![route("midi:4", "A"), route("midi:1", "B")];
     let updated = reconciled_profile(&profile, &desired, &desired[..1]);
+    assert_eq!(
+        updated.bindings[0].additional_outputs[0].control.device_id,
+        "midi:4"
+    );
     assert_eq!(
         updated.bindings[0]
             .indicator_control

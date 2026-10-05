@@ -127,8 +127,38 @@
   gap: 4px;
 }
 
-/* The optional LED destination fits beneath Live without growing the dialog. */
-.binding-config-section--led { grid-area: led; gap: 6px; }
+/* Output destinations are edited directly in their compact list rows. */
+.binding-config-section--outputs { position: relative; display: flex; flex-direction: column; min-height: 0; }
+.binding-config-section--outputs > p, .binding-config-section--modifiers > p { margin: 0; height: 2.7em; min-height: 2.7em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.binding-config-panel--button .binding-config-section--outputs { display: none; }
+.binding-config-outputs-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 8px; }
+.binding-config-panel--fader .binding-config-output-row { grid-template-columns: 16px 24px minmax(76px, 1fr) 256px 32px 32px 32px; gap: 8px; padding: 8px; min-height: 67px; box-sizing: border-box; }
+.binding-config-panel--fader .binding-config-output-row .binding-config-icon-button { width: 32px; min-width: 32px; height: 32px; }
+.binding-config-output-row > .binding-config-output-fields,
+.binding-config-output-row > .binding-config-output-mode,
+.binding-config-output-row > .binding-config-icon-button { align-self: end; }
+.binding-config-output-row .binding-config-output-icon { color: var(--accent, #53b2ff); }
+.binding-config-output-row .binding-config-midi-device { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.binding-config-output-row .binding-config-midi-control { display: none; }
+.binding-config-output-mode { min-width: 0; display: flex; justify-content: end; }
+.binding-config-output-mode-dropdown .target-display,
+.binding-config-output-mode-dropdown .caret { display: none; }
+.binding-config-panel--fader .binding-config-output-mode-dropdown .target-button { padding: 0; border-radius: 10px; justify-content: center; }
+#binding-config-panel .binding-config-output-mode-dropdown .target-menu { min-width: 160px; }
+.binding-config-output-row .binding-config-light-dropdown { width: 100%; min-width: 0; }
+.binding-config-panel--fader .binding-config-output-row .target-button { width: 100%; height: 32px; min-height: 32px; font-size: 11px; padding: 0 6px; }
+.binding-config-output-row .target-display { white-space: nowrap; }
+.binding-config-output-row .target-display .target-label-main { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.binding-config-output-row button:disabled { opacity: .45; cursor: default; }
+.binding-config-output-controls.hidden { display: none; }
+.binding-config-output-row .binding-config-output-fields,
+.binding-config-output-row .binding-config-output-fields.binding-config-led-fields { display: grid; grid-template-columns: minmax(0, 1fr) 44px 52px; align-items: end; gap: 8px; min-width: 0; }
+.binding-config-output-row .binding-config-output-fields.is-automatic { grid-template-columns: minmax(0, 1fr); }
+.binding-config-output-row .binding-config-indicator-field { gap: 3px; font-size: 10px; }
+.binding-config-output-row .binding-config-indicator-field > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.binding-config-panel--fader .binding-config-output-row input { height: 32px; border-radius: 10px; padding: 0 4px; font-size: 11px; text-align: center; appearance: textfield; }
+.binding-config-output-row input::-webkit-inner-spin-button, .binding-config-output-row input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.binding-config-section--led { gap: 6px; }
 .binding-config-panel--button .binding-config-section--led { display: none; }
 .binding-config-led-heading {
   display: grid;

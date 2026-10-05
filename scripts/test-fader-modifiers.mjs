@@ -82,7 +82,7 @@ const feature = createBindingsFeature({
   bindingInteractionTimes: {},
 });
 const rows = () => [
-  ...document.querySelectorAll(".binding-config-modifier-row"),
+  ...document.querySelectorAll(".binding-config-modifiers-list .binding-config-modifier-row"),
 ];
 const add = (kind) => {
   d.bindingConfigModifierAdd.click();

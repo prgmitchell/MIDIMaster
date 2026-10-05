@@ -8,6 +8,27 @@ import {
   renderNativeSelectDropdown,
 } from "../../ui/dropdown_select.js";
 
+export function renderLedModeDropdown(entry, selectEl, t) {
+  if (!entry || !selectEl) return;
+  renderNativeSelectDropdown({ entry, selectEl });
+  entry.root.classList.add("binding-config-output-mode-dropdown");
+  entry.button.classList.add(
+    "binding-config-button",
+    "binding-config-button--secondary",
+    "binding-config-icon-button",
+  );
+  entry.button.dataset.outputModeTrigger = "true";
+  if (!entry.button.querySelector("[data-output-mode-icon]")) {
+    entry.button.insertAdjacentHTML(
+      "beforeend",
+      `<svg class="binding-config-mode-icon" data-output-mode-icon viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M15.5 5.5 17 4l3 3-1.5 1.5M8.5 5.5 7 4 4 7l1.5 1.5M15.5 18.5 17 20l3-3-1.5-1.5M8.5 18.5 7 20l-3-3 1.5-1.5M20 12h-2M6 12H4M12 4v2M12 18v2"/></svg>`,
+    );
+  }
+  entry.button.title = `${t("bindings.feedbackMode")}: ${t(selectEl.value === "AudioReactive" ? "bindings.audioReactive" : "bindings.followValue")}`;
+  entry.button.setAttribute("aria-label", entry.button.title);
+  entry.button.disabled = selectEl.disabled;
+}
+
 /** Known LED protocols are automatic; unknown hardware uses a manual address. */
 export function createLedFeedbackEditor({
   elements,
@@ -93,6 +114,11 @@ export function createLedFeedbackEditor({
       enabled &&
       [
         valueOutput,
+        ...(binding.additional_outputs || [])
+          .filter(
+            (output) => output.kind === "Feedback" && output.enabled !== false,
+          )
+          .map((output) => output.control),
         ...getFaderModifiers(binding).map((item) => item.control),
       ].some((other) => controlsEqual(led, other));
     const help = elements.bindingConfigLedHelp;
@@ -137,12 +163,11 @@ export function createLedFeedbackEditor({
       [type, listState.ledMsgTypeDropdown],
     ]) {
       if (!entry) continue;
-      renderNativeSelectDropdown({
-        entry,
-        selectEl,
-        truncateDisplayLabel: selectEl === type,
-      });
-      entry.button.title = t(entry.button.dataset.i18nTitle);
+      if (selectEl === mode) renderLedModeDropdown(entry, selectEl, t);
+      else {
+        renderNativeSelectDropdown({ entry, selectEl });
+        entry.button.title = t(entry.button.dataset.i18nTitle);
+      }
       entry.button.disabled = selectEl.disabled;
     }
   }

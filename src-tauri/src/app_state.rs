@@ -571,7 +571,7 @@ impl AppState {
         // Clear disabled outputs before rebuilding enabled feedback so a disabled
         // custom destination cannot erase a later binding that shares the address.
         for binding in &profile.bindings {
-            if binding.feedback_enabled || binding.has_led_feedback() {
+            if binding.has_value_feedback() || binding.has_any_led_feedback() {
                 continue;
             }
             let key = BindingKey::from_binding(binding);
@@ -585,7 +585,7 @@ impl AppState {
             for (assign_control, value) in feedback::assign_buttons_feedback(binding) {
                 feedback.insert(assign_control.to_binding_key(), value);
             }
-            if !binding.feedback_enabled && !binding.has_led_feedback() {
+            if !binding.has_value_feedback() && !binding.has_any_led_feedback() {
                 continue;
             }
             let output_key = feedback::binding_feedback_control_key(binding).to_binding_key();

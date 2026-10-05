@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "사용 가능한 대상 중 가장 큰 소리에 반응하며, 오디오가 없으면 꺼집니다.",
   "bindings.ledOutput": "LED 출력",
   "bindings.ledOutputHelp": "선택 사항: 별도의 Note 또는 CC 주소.",
-  "bindings.ledExistingFeedback": "기존 피드백 사용",
+  "bindings.ledExistingFeedback": "기존",
   "bindings.ledExistingFeedbackHelp": "기존 LED 피드백 동작을 유지합니다.",
   "bindings.ledExistingFeedbackDisabled": "피드백 출력이 비활성화되어 있습니다.",
   "bindings.ledExistingMotorHelp": "피치 벤드는 값을 따릅니다. 별도의 LED 출력을 선택하세요.",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "알려진 LED 매핑이 없습니다. 유형을 직접 선택하세요.",
   "bindings.ledMackieMeter": "Mackie 미터",
   "bindings.ledMeterStrip": "스트립",
-  "bindings.ledMackieMeterHelp": "MC 모드: Aftertouch 미터, 스트립 1–8. 모터 피드백은 별도로 유지됩니다."
+  "bindings.ledMackieMeterHelp": "MC 모드: Aftertouch 미터, 스트립 1–8. 모터 피드백은 별도로 유지됩니다.",
+  "bindings.outputs": "출력",
+  "bindings.addOutput": "출력 추가",
+  "bindings.removeOutput": "선택된 출력을 제거",
+  "bindings.reorderOutput": "출력 순서 변경 (Alt + 위/아래)",
+  "bindings.defaultOutput": "기본 출력은 제거할 수 없습니다",
+  "bindings.outputsHelp": "페이더 값과 LED 피드백을 MIDI 장치로 보냅니다. 피드백 출력과 LED 출력을 여러 개 추가할 수 있습니다."
 }

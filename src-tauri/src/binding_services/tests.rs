@@ -142,6 +142,33 @@ fn disabled_bindings_are_not_active_primary_feedback_outputs() {
 }
 
 #[test]
+fn removing_an_extra_output_clears_only_that_destination_even_with_default_disabled() {
+    let mut previous = crate::test_support::binding();
+    previous.feedback_enabled = false;
+    previous.additional_outputs = [22, 23]
+        .into_iter()
+        .map(|controller| model::FaderOutput {
+            id: format!("extra-{controller}"),
+            kind: model::FaderOutputKind::Feedback,
+            control: indicator_control(controller),
+            enabled: true,
+            feedback_mode: model::FeedbackMode::FollowValue,
+        })
+        .collect();
+    let mut current = previous.clone();
+    current.additional_outputs.remove(0);
+    let active = active_feedback_outputs(&[current.clone()]);
+    let stale = stale_feedback_bindings_for_removed_outputs(&[previous], &active);
+    assert_eq!(active.len(), 1);
+    assert_eq!(stale.len(), 1);
+    assert_eq!(stale[0].indicator_control.as_ref().unwrap().controller, 22);
+    assert!(should_clear_stale_feedback_hardware(
+        &stale[0],
+        Some(&current)
+    ));
+}
+
+#[test]
 fn disabling_button_feedback_clears_hardware_but_disabling_fader_does_not() {
     let button = integration_button_binding("stateful");
     let mut disabled_button = button.clone();

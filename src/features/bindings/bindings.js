@@ -1,4 +1,5 @@
 import { createFaderModifiers } from "./controllers/fader_modifiers.js";
+import { createFaderOutputs } from "./controllers/fader_outputs.js";
 import { createSoundboardWorkspace } from "./controllers/soundboard_workspace.js";
 import { createCurveWorkspace } from "./controllers/curve_workspace.js";
 import { createMacroWorkspace } from "./controllers/macro_workspace.js";
@@ -302,6 +303,7 @@ export function createBindingsFeature({
 
     bindConfigModalUi();
     bindModifiersUi();
+    bindOutputsUi();
     bindBindingTypeFilterUi();
     bindBindingDensityUi();
     if (elements.bindingSearchInput) {
@@ -459,6 +461,12 @@ export function createBindingsFeature({
     renderMidiMappingSummary: (...args) => renderMidiMappingSummary(...args),
   });
 
+  const { renderOutputs, bindOutputsUi, updateOutputLearnUi, disposeOutputs } = createFaderOutputs({
+    elements, editorState, getConfigBinding: (...args) => getConfigBinding(...args), lifetime,
+    startAuxLearn: (...args) => startAuxLearn(...args), syncFeedbackOutputUi,
+    labelForMidiDevice, listState, t,
+  });
+
   const {
     updateAuxLearnUi,
     stopAuxLearn,
@@ -475,6 +483,7 @@ export function createBindingsFeature({
     renderConfigPreview: (...args) => renderConfigPreview(...args),
     syncFeedbackControllerInputState,
     updateModifierLearnUi,
+    updateOutputLearnUi,
     discardUnmappedModifiers,
     t,
   });
@@ -588,6 +597,7 @@ export function createBindingsFeature({
     renderCustomCurveEditor,
     renderMacroEditor,
     renderModifiers,
+    renderOutputs,
     renderSoundboardEditor,
     restoreConfigPreviewBindings,
     setBindings,
@@ -774,6 +784,7 @@ export function createBindingsFeature({
   function dispose() {
     lifetime.dispose();
     disposeModifiers();
+    disposeOutputs();
     hotkeyLearn.stop();
     stopAuxLearn();
     stopConfigPreviewTimer();

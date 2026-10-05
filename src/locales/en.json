@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "Loudest available target; unavailable audio stays dark.",
   "bindings.ledOutput": "LED output",
   "bindings.ledOutputHelp": "Optional, separate Note or CC address.",
-  "bindings.ledExistingFeedback": "Use existing feedback",
+  "bindings.ledExistingFeedback": "Existing",
   "bindings.ledExistingFeedbackHelp": "Keeps your existing LED feedback unchanged.",
   "bindings.ledExistingFeedbackDisabled": "Feedback output is disabled.",
   "bindings.ledExistingMotorHelp": "Pitch Bend follows value. Choose a separate LED output.",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "No known LED mapping. Choose a type manually.",
   "bindings.ledMackieMeter": "Mackie meter",
   "bindings.ledMeterStrip": "Strip",
-  "bindings.ledMackieMeterHelp": "MC mode: Aftertouch meter, strip 1–8. Motor feedback stays separate."
+  "bindings.ledMackieMeterHelp": "MC mode: Aftertouch meter, strip 1–8. Motor feedback stays separate.",
+  "bindings.outputs": "Outputs",
+  "bindings.addOutput": "Add output",
+  "bindings.removeOutput": "Remove selected output",
+  "bindings.reorderOutput": "Reorder output (Alt + Up/Down)",
+  "bindings.defaultOutput": "Default output cannot be removed",
+  "bindings.outputsHelp": "Send fader values and LED feedback to your MIDI devices. Multiple feedback and LED outputs can be added."
 }

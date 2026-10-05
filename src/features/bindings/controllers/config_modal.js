@@ -36,6 +36,7 @@ export function createConfigModal({
   renderCustomCurveEditor,
   renderMacroEditor,
   renderModifiers,
+  renderOutputs = () => {},
   renderSoundboardEditor,
   restoreConfigPreviewBindings,
   setBindings,
@@ -221,11 +222,7 @@ export function createConfigModal({
         "hidden",
         isButton || showSpecialPage,
       );
-    if (elements.bindingConfigFeedbackOutputSection)
-      elements.bindingConfigFeedbackOutputSection.classList.toggle(
-        "hidden",
-        isButton || showSpecialPage,
-      );
+    elements.bindingConfigOutputsSection?.classList.toggle("hidden", isButton || showSpecialPage);
     if (elements.bindingConfigModifiersSection)
       elements.bindingConfigModifiersSection.classList.toggle(
         "hidden",
@@ -255,6 +252,7 @@ export function createConfigModal({
       renderCurveCards();
       renderCustomCurveEditor();
       renderModifiers(binding);
+      renderOutputs(binding);
       syncFeedbackOutputUi(binding);
     }
     renderConfigPreview();

@@ -50,12 +50,22 @@ export function modifierForField(binding, field) {
 }
 
 export function getControlMapping(binding, field) {
+  if (field?.startsWith("output:"))
+    return binding?.additional_outputs?.find((output) => `output:${output.id}` === field)?.control;
   return field?.startsWith("modifier:")
     ? modifierForField(binding, field)?.control
     : binding?.[field];
 }
 
 export function setControlMapping(binding, field, mapping) {
+  if (field?.startsWith("output:")) {
+    const output = binding.additional_outputs?.find((item) => `output:${item.id}` === field);
+    if (output) {
+      if (mapping) output.control = { ...mapping, control_kind: "Continuous" };
+      output.enabled = Boolean(mapping);
+    }
+    return;
+  }
   if (field?.startsWith("modifier:")) {
     const modifier = ensureFaderModifiers(binding).find(
       (item) => modifierField(item.id) === field,

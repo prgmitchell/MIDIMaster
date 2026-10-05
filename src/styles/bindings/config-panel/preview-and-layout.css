@@ -341,12 +341,11 @@
   display: grid;
   flex: 1 1 auto;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  grid-template-rows: auto auto auto minmax(150px, 1fr);
+  grid-template-rows: auto auto minmax(250px, 1fr);
   grid-template-areas:
     "name live"
     "curve live"
-    "feedback modifiers"
-    "led modifiers";
+    "outputs modifiers";
   gap: 12px;
   align-items: stretch;
   align-content: start;
@@ -362,8 +361,7 @@
 
 .binding-config-panel--fader .binding-config-section--name { grid-area: name; }
 .binding-config-panel--fader .binding-config-section--curve { grid-area: curve; gap: 8px; }
-.binding-config-panel--fader .binding-config-section--feedback-output { grid-area: feedback; }
-.binding-config-panel--fader .binding-config-section--led { grid-area: led; align-content: start; }
+.binding-config-panel--fader .binding-config-section--outputs { grid-area: outputs; }
 .binding-config-panel--fader .binding-config-curve-help { height: auto; }
 .binding-config-panel--fader .binding-config-curve-card-visual { height: 96px; }
 .binding-config-panel--fader .binding-config-section--led > .binding-config-toggle-help { min-height: 1.35em; }
@@ -416,7 +414,7 @@
 .binding-config-panel--fader .binding-config-modifier-toolbar .binding-config-icon-button { width: 40px; min-width: 40px; height: 40px; }
 .binding-config-modifier-toolbar { position: relative; display: flex; gap: 6px; }
 .binding-config-modifier-toolbar .binding-config-mode-menu { left: auto; right: 0; top: calc(100% + 6px); bottom: auto; }
-.binding-config-modifiers-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.binding-config-modifiers-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; display: flex; flex-direction: column; gap: 8px; }
 .binding-config-modifiers-empty { margin: 0; padding: 12px 0; color: var(--text-secondary, #96a8c6); font-size: 12px; }
 .binding-config-modifier-row {
   flex: 0 0 auto;

@@ -213,7 +213,26 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
               <p id="binding-config-curve-help" class="binding-config-curve-help" data-i18n="bindings.linearHelp">Linear response. Output value changes at the same rate as the fader movement.</p>
             </section>
 
-            <section id="binding-config-feedback-output-section" class="binding-config-section binding-config-section--feedback-output hidden">
+            <section id="binding-config-outputs-section" class="binding-config-section binding-config-section--outputs hidden">
+              <div class="binding-config-title-row">
+                <span class="binding-config-title" data-i18n="bindings.outputs">Outputs</span>
+                <div class="binding-config-modifier-toolbar">
+                  <button id="binding-config-output-add" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Add output" title="Add output" data-i18n-aria-label="bindings.addOutput" data-i18n-title="bindings.addOutput" aria-haspopup="menu" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg>
+                  </button>
+                  <button id="binding-config-output-remove" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Remove selected output" title="Remove selected output" data-i18n-aria-label="bindings.removeOutput" data-i18n-title="bindings.removeOutput" disabled>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16" /></svg>
+                  </button>
+                  <div id="binding-config-output-menu" class="binding-config-mode-menu hidden" role="menu">
+                    <button type="button" class="binding-config-mode-option" data-output-kind="Feedback" role="menuitem" data-i18n="bindings.feedbackOutput">Feedback output</button>
+                    <button type="button" class="binding-config-mode-option" data-output-kind="Led" role="menuitem" data-i18n="bindings.ledOutput">LED output</button>
+                  </div>
+                </div>
+              </div>
+              <p class="binding-config-toggle-help" data-i18n="bindings.outputsHelp" data-i18n-title="bindings.outputsHelp">Send fader values and LED feedback to your MIDI devices. Multiple feedback and LED outputs can be added.</p>
+              <div id="binding-config-outputs-list" class="binding-config-outputs-list"></div>
+              <div class="binding-config-output-controls hidden">
+            <div id="binding-config-feedback-output-section" class="binding-config-output-settings binding-config-section--feedback-output hidden">
               <div id="binding-config-feedback-output-custom" class="binding-config-indicator-custom binding-config-feedback-output-custom">
                 <div class="binding-config-indicator-heading">
                   <span class="binding-config-toggle-title" data-i18n="bindings.feedbackOutput">Feedback output</span>
@@ -252,9 +271,9 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                   </button>
                 </div>
               </div>
-            </section>
+            </div>
 
-            <section id="binding-config-led-section" class="binding-config-section binding-config-section--led">
+            <div id="binding-config-led-section" class="binding-config-output-settings binding-config-section--led hidden">
               <div class="binding-config-led-heading">
                 <span class="binding-config-toggle-title" data-i18n="bindings.ledOutput">LED output</span>
                   <select id="binding-config-feedback-mode" class="binding-config-light-select" aria-label="Feedback mode" data-i18n-aria-label="bindings.feedbackMode">
@@ -267,7 +286,7 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                 <label class="binding-config-indicator-field">
                   <span data-i18n="bindings.indicatorType">Type</span>
                   <select id="binding-config-led-msg-type" class="binding-config-light-select" aria-label="LED message type" data-i18n-aria-label="bindings.ledMessageType">
-                    <option value="Existing" data-i18n="bindings.ledExistingFeedback">Use existing feedback</option>
+                    <option value="Existing" data-i18n="bindings.ledExistingFeedback">Existing</option>
                     <option value="Automatic" data-i18n="bindings.ledAutomatic">Automatic</option>
                     <option value="ChannelPressure" data-i18n="bindings.ledMackieMeter">Mackie meter</option>
                     <option value="Note">Note</option>
@@ -282,6 +301,8 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                   <span data-i18n="bindings.indicatorControl">Control</span>
                   <input id="binding-config-led-controller" type="number" min="0" max="127" step="1" inputmode="numeric" aria-label="LED control" data-i18n-aria-label="bindings.ledControlLabel" />
                 </label>
+              </div>
+            </div>
               </div>
             </section>
 
@@ -380,7 +401,7 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                     </div>
                   </div>
                 </div>
-                <p class="binding-config-toggle-help" data-i18n="bindings.modifiersHelp">Add mute, solo, or assign actions for this fader. Multiple modifiers can be added.</p>
+                <p class="binding-config-toggle-help" data-i18n="bindings.modifiersHelp" data-i18n-title="bindings.modifiersHelp">Add mute, solo, or assign actions for this fader. Multiple modifiers can be added.</p>
                 <div id="binding-config-modifiers-list" class="binding-config-modifiers-list"></div>
               </section>
           </aside>

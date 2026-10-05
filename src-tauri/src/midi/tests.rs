@@ -1,5 +1,11 @@
 use super::*;
 
+fn binding_feedback_send(binding: &Binding, value: f32) -> Option<BindingLightFeedbackSend> {
+    additional_feedback::value_feedback_sends(binding, value, false)
+        .into_iter()
+        .next()
+}
+
 #[test]
 fn xtouch_mc_meters_pack_all_strips_without_replacing_motor_feedback() {
     let mut manager = manager_with_test_route("usb-in", "usb-out");
@@ -343,7 +349,10 @@ fn ignores_truncated_three_byte_messages_without_dropping_program_change() {
     assert!(parse_midi_message("midi:0", &[0xC0, 0x05]).is_some());
 }
 
-fn manager_with_test_route(input_device_id: &str, output_device_id: &str) -> MidiManager {
+pub(super) fn manager_with_test_route(
+    input_device_id: &str,
+    output_device_id: &str,
+) -> MidiManager {
     let mut manager = MidiManager::new();
     insert_test_route(&mut manager, input_device_id, output_device_id);
     manager

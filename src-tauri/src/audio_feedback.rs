@@ -149,13 +149,13 @@ pub(crate) fn spawn(
                     .map(|p| {
                         p.bindings
                             .iter()
+                            .flat_map(Binding::led_output_bindings)
                             .filter(|b| {
                                 state
                                     .midi
                                     .lock()
                                     .is_ok_and(|m| m.meter_feedback_key(b, 0.0).is_some())
                             })
-                            .cloned()
                             .collect()
                     })
                     .unwrap_or_default();

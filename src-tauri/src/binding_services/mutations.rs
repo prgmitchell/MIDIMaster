@@ -41,7 +41,7 @@ pub(crate) fn add_binding_to_active_profile(
         return Err("Binding cannot have more than 8 targets".to_string());
     }
 
-    let (saved_profile, stale_feedback_bindings, previous_bindings, feedback_was_reenabled) = {
+    let (saved_profile, stale_feedback_bindings, previous_bindings, feedback_outputs_changed) = {
         let mut profile_guard = state
             .active_profile
             .lock()
@@ -59,8 +59,10 @@ pub(crate) fn add_binding_to_active_profile(
                 target_states: Vec::new(),
             });
         let previous_bindings = profile.bindings.clone();
-        let feedback_was_reenabled = previous_bindings.iter().any(|existing| {
-            existing.id == binding.id && !existing.feedback_enabled && binding.feedback_enabled
+        let feedback_outputs_changed = previous_bindings.iter().any(|existing| {
+            existing.id == binding.id
+                && ((!existing.feedback_enabled && binding.feedback_enabled)
+                    || existing.additional_outputs != binding.additional_outputs)
         });
         let mut removed_bindings = Vec::new();
         profile.bindings.retain(|existing| {
@@ -92,7 +94,7 @@ pub(crate) fn add_binding_to_active_profile(
             profile,
             stale_feedback_bindings,
             previous_bindings,
-            feedback_was_reenabled,
+            feedback_outputs_changed,
         )
     };
     state.cancel_activity_button_light_holds();
@@ -102,13 +104,15 @@ pub(crate) fn add_binding_to_active_profile(
     feedback::reconcile_assign_feedback_outputs(state, &previous_bindings, &saved_profile.bindings);
     state.sync_feedback_values(&saved_profile);
     state.send_idle_button_light_feedback_values(&saved_profile);
-    if feedback_was_reenabled {
+    if feedback_outputs_changed {
         if let Some(binding) = saved_profile.bindings.iter().find(|binding| {
-            binding.feedback_enabled
+            binding.has_value_feedback()
                 && !binding.is_button_binding()
-                && previous_bindings
-                    .iter()
-                    .any(|previous| previous.id == binding.id && !previous.feedback_enabled)
+                && previous_bindings.iter().any(|previous| {
+                    previous.id == binding.id
+                        && (!previous.feedback_enabled
+                            || previous.additional_outputs != binding.additional_outputs)
+                })
         }) {
             let key = BindingKey::from_binding(binding);
             let value = state
@@ -123,7 +127,7 @@ pub(crate) fn add_binding_to_active_profile(
                     value,
                     false,
                     true,
-                    &format!("feedback_reenabled:{}", binding.id),
+                    &format!("feedback_outputs_changed:{}", binding.id),
                 );
             }
         }

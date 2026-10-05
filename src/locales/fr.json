@@ -710,7 +710,7 @@
   "bindings.audioReactiveHelp": "Cible disponible la plus forte ; sans audio, la lumière reste éteinte.",
   "bindings.ledOutput": "Sortie LED",
   "bindings.ledOutputHelp": "Adresse Note ou CC distincte, facultative.",
-  "bindings.ledExistingFeedback": "Utiliser le retour existant",
+  "bindings.ledExistingFeedback": "Existant",
   "bindings.ledExistingFeedbackHelp": "Conserve le fonctionnement actuel du retour LED.",
   "bindings.ledExistingFeedbackDisabled": "La sortie de retour est désactivée.",
   "bindings.ledExistingMotorHelp": "Le Pitch Bend suit la valeur. Choisissez une sortie LED distincte.",
@@ -723,5 +723,11 @@
   "bindings.ledAutomaticUnavailable": "Aucune correspondance LED connue. Choisissez le type manuellement.",
   "bindings.ledMackieMeter": "Vu-mètre Mackie",
   "bindings.ledMeterStrip": "Tranche",
-  "bindings.ledMackieMeterHelp": "Mode MC : vu-mètre Aftertouch, tranche 1–8. Le retour moteur reste séparé."
+  "bindings.ledMackieMeterHelp": "Mode MC : vu-mètre Aftertouch, tranche 1–8. Le retour moteur reste séparé.",
+  "bindings.outputs": "Sorties",
+  "bindings.addOutput": "Ajouter la sortie",
+  "bindings.removeOutput": "Supprimer la sortie sélectionnée",
+  "bindings.reorderOutput": "Réorganiser la sortie (Alt + Haut/Bas)",
+  "bindings.defaultOutput": "La sortie par défaut ne peut pas être supprimée",
+  "bindings.outputsHelp": "Envoyez les valeurs des faders et le retour LED à vos appareils MIDI. Vous pouvez ajouter plusieurs sorties de retour et LED."
 }
