@@ -5,6 +5,7 @@ import { createPanelMetadata } from "./controllers/panel_metadata.js";
 import { createIcons } from "./controllers/icons.js";
 import { createApplicationTargets } from "./controllers/application_targets.js";
 import { createBrightness } from "./controllers/brightness.js";
+import { createApplicationEditor } from "./controllers/application_editor.js";
 
 export function createTargetsFeature({
   invoke,
@@ -174,6 +175,8 @@ export function createTargetsFeature({
     targetKey,
   });
 
+  const { openApplicationEditor } = createApplicationEditor({ elements, openTargetPanel, closeTargetPanel, pickOpenApplication, t });
+
   const { buildTargetSelect } = createTargetDropdown({
     buildMonitorBrightnessOptions: (...args) => buildMonitorBrightnessOptions(...args),
     buildTargetOptions: (...args) => buildTargetOptions(...args),
@@ -195,8 +198,8 @@ export function createTargetsFeature({
     normalizeKey,
     normalizeOpenApplication: (...args) => normalizeOpenApplication(...args),
     openTargetPanel: (...args) => openTargetPanel(...args),
+    openApplicationEditor,
     pickAutoHotkeyScript: (...args) => pickAutoHotkeyScript(...args),
-    pickOpenApplication: (...args) => pickOpenApplication(...args),
     refreshBrightnessMonitors: (...args) => refreshBrightnessMonitors(...args),
     resolveDisplay,
     resolveOpenApplicationIcon: (...args) => resolveOpenApplicationIcon(...args),

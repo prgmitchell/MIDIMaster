@@ -296,7 +296,7 @@ pub fn apply_special_button_action(
                 return true;
             }
 
-            match ProcessCommand::new(app_path).spawn() {
+            match crate::application_launch::launch(open_app) {
                 Ok(_) => {
                     run_logger::info(
                         log_target,

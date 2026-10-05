@@ -16,6 +16,8 @@ pub struct OpenApplicationMapping {
     pub display: String,
     #[serde(default)]
     pub icon_data: Option<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub arguments: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

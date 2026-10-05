@@ -48,6 +48,7 @@ windows = { version = "0.61", features = [
   "Win32_Storage_FileSystem",
   "Win32_Storage_Packaging_Appx",
   "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
   "Win32_UI_Shell_PropertiesSystem",
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Input_KeyboardAndMouse"

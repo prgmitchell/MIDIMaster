@@ -717,7 +717,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "es": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -1437,7 +1444,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "de": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -2157,7 +2171,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "it": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -2877,7 +2898,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "pt-BR": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -3597,7 +3625,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "nl": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -4317,7 +4352,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "pl": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -5037,7 +5079,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "ja": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -5757,7 +5806,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "ko": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -6477,7 +6533,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "zh-Hans": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -7197,7 +7260,14 @@
     "bindings.modifierMode": "08bf2418cca97fefbdf7f0d29719b005a6117989d84358de68bc57570ffbae36",
     "bindings.modifierPrimaryConflict": "e676280fc3ba82d212f2748d2824f11073ca8ca610f8f759c3931fec48a2ed2f",
     "bindings.noModifiers": "4b2e64ad03cdca5e8450ae84d65eb1b75f307efe43e888ce4378b4e0e169dfcf",
-    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d"
+    "dialogs.soloUnavailableTitle": "0178e83dac01e6ba8770fa6157e7a75000fc6ef6dff58c4f5dcda947c101a75d",
+    "targets.application": "b924ad1910fd39a322ccf9b4da45e8937e0ed753f77fe0dc863213ae0ea12fe3",
+    "targets.chooseApplication": "153fc1b05c8b8c466ec2a64e31965c5407efe2d252376f8be3b41c56cd23f7fe",
+    "targets.applicationNotSelected": "90e8c7caf62fa08f1218ebba3e371fd0c7a569746e01bc454b4e9901f5ea8c3d",
+    "targets.applicationParameters": "2b172fc00d39397b02a2a941455f163eb14027f5266dd3d4ab44d663433ebb92",
+    "targets.applicationParametersPlaceholder": "2717c9ae73c3129cb2c9e0a07116ef2f7db614738a3b4d1b76c01bd491dc31e9",
+    "targets.applicationParametersHelp": "0e225367de6c6422c6a066676d01951ec8575fb7fc530c3184b0960c95353a88",
+    "targets.applicationPickFailed": "43477e170028a6077cbaf05d20098988f6fc7afc29104c4c3e7cc99406901c6b"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

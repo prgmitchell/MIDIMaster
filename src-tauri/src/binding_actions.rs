@@ -9,7 +9,6 @@ use crate::AppState;
 pub use execution::*;
 use std::collections::HashMap;
 use std::path::Path;
-use std::process::Command as ProcessCommand;
 use tauri::{AppHandle, Emitter};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

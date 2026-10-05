@@ -18,6 +18,7 @@ export function createPanel({
     }
     elements.targetPanel.classList.add("hidden");
     elements.targetPanel.classList.remove("target-panel--over-config");
+    elements.targetPanel.classList.remove("target-panel--application");
     if (elements.targetPanelList) {
       elements.targetPanelList.innerHTML = "";
     }
@@ -39,6 +40,7 @@ export function createPanel({
     if (!elements.targetPanel || !elements.targetPanelList) {
       return;
     }
+    elements.targetPanel.classList.remove("target-panel--application");
     panelState.activeTargetPanelSelect = onSelect;
     panelState.activeTargetPanelBack = nav && typeof nav === "object" ? nav.onBack || null : null;
     panelState.activeTargetPanelIntegrationId =
@@ -270,7 +272,9 @@ export function createPanel({
 
     if (searchInput) {
       searchInput.oninput = render;
-      setTimeout(() => searchInput.focus(), 0);
+      setTimeout(() => {
+        if (!elements.targetPanel.classList.contains("target-panel--application")) searchInput.focus();
+      }, 0);
     }
     renderCategories();
     render();

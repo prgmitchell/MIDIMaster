@@ -130,11 +130,12 @@ export function normalizeOpenApplicationMapping(rawOpenApplication) {
   if (!rawOpenApplication || typeof rawOpenApplication !== "object") return null;
   const path = String(rawOpenApplication.path || "").trim();
   const display = String(rawOpenApplication.display || "").trim();
+  const args = String(rawOpenApplication.arguments || "").trim();
   const icon_data =
     typeof rawOpenApplication.icon_data === "string" && rawOpenApplication.icon_data.trim()
       ? rawOpenApplication.icon_data.trim()
       : null;
-  return path ? { path, display: display || path, icon_data } : null;
+  return path ? { path, display: display || path, icon_data, ...(args ? { arguments: args } : {}) } : null;
 }
 
 export function normalizeAutoHotkeyScriptMapping(rawScript) {

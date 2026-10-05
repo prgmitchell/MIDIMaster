@@ -68,9 +68,7 @@ pub fn open_logs_folder(app: AppHandle) -> Result<String, String> {
 pub fn pick_executable_path() -> Result<Option<PickExecutableResult>, String> {
     #[cfg(target_os = "windows")]
     {
-        let picked = rfd::FileDialog::new()
-            .add_filter("Applications", &["exe"])
-            .pick_file();
+        let picked = crate::application_launch::pick_application_path()?;
         let Some(path) = picked else {
             return Ok(None);
         };
@@ -79,13 +77,8 @@ pub fn pick_executable_path() -> Result<Option<PickExecutableResult>, String> {
             return Err("Selected path is not a file".to_string());
         }
 
-        let ext_ok = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.eq_ignore_ascii_case("exe"))
-            .unwrap_or(false);
-        if !ext_ok {
-            return Err("Selected file must be a .exe".to_string());
+        if !crate::application_launch::supported_path(&path) {
+            return Err("Selected file must be an .exe or .lnk shortcut".to_string());
         }
 
         let path_string = path.to_string_lossy().to_string();

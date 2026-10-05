@@ -17,6 +17,20 @@
   display: none;
 }
 
+#target-panel.target-panel--application .target-panel-content { width: min(640px, calc(100vw - 48px)); height: auto; }
+.target-panel--application .target-panel-search-shell,
+.target-panel--application .target-panel-categories { display: none; }
+.target-panel--application .target-panel-body { display: block; overflow-y: auto; }
+.application-launch-editor { display: flex; flex-direction: column; gap: 18px; padding: 8px; }
+.application-launch-editor label { display: flex; flex-direction: column; gap: 8px; font-weight: 600; }
+.application-launch-editor input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--control-border); border-radius: 8px; color: var(--text-primary); background: var(--control-bg); font: inherit; }
+.application-launch-editor input:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.application-launch-editor p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+.application-launch-path { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.application-launch-path span { grid-column: 1 / -1; }
+.application-launch-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.application-launch-editor .application-launch-error { color: var(--danger, #dc4545); }
+
 .target-panel-content {
   background: #fff;
   border-radius: 12px;

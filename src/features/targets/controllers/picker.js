@@ -19,7 +19,7 @@ export function createPicker({
   openTargetPanel,
   callInvoke,
   buildMonitorBrightnessOptions,
-  pickOpenApplication,
+  openApplicationEditor,
   closeTargetPanel,
   pickAutoHotkeyScript,
   getHost,
@@ -251,18 +251,14 @@ export function createPicker({
           }
 
           if (isBindingButton && targetOption.kind === "open-application-target") {
-            (async () => {
-              try {
-                const openApplication = await pickOpenApplication();
-                if (!openApplication) return;
+            openApplicationEditor(selection.selectedOpenApplication,
+              (openApplication) => {
                 selectOption(targetOption, {
                   value: "OpenApplication",
                   label: t("targets.openApplication"),
                   openApplication,
                 });
-                closeTargetPanel();
-              } catch {}
-            })();
+              }, openRootTargetPanel);
             return false;
           }
 

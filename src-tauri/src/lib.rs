@@ -3,6 +3,7 @@
 mod app_paths;
 mod app_settings;
 mod app_state;
+mod application_launch;
 mod audio;
 mod audio_feedback;
 mod background_tasks;

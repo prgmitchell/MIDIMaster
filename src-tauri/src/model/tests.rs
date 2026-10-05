@@ -765,6 +765,7 @@ fn mapped_button_light_requires_open_application_path() {
         path: "C:\\Program Files\\App\\app.exe".to_string(),
         display: "App".to_string(),
         icon_data: None,
+        arguments: String::new(),
     });
     assert_eq!(binding.mapped_button_light_feedback_value(), Some(1.0));
 }
@@ -890,6 +891,7 @@ fn idle_button_light_clears_activity_mode_for_stateless_actions() {
         path: "C:\\Program Files\\App\\app.exe".to_string(),
         display: "App".to_string(),
         icon_data: None,
+        arguments: String::new(),
     });
 
     assert_eq!(binding.mapped_button_light_feedback_value(), None);
