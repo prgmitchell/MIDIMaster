@@ -982,11 +982,11 @@ export function createApplication() {
     features.midi?.dispose?.();
     features.targets?.dispose?.();
     features.settings?.dispose?.();
-    features.profiles?.dispose?.().catch((error) => diagnosticError("profile_shutdown_save_failed", error));
     midiInventoryController.dispose();
     midiEventDispatch.clearPerformance();
     invoke("stop_midi_device").catch(() => {});
-    disposal = backendEvents.disposeSolo().finally(() => Promise.allSettled([eventSubscriptions.dispose(), features.plugins?.dispose?.()]));
+    disposal = backendEvents.disposeSolo().finally(() => features.profiles?.dispose?.().catch((error) => diagnosticError("profile_shutdown_save_failed", error)))
+      .finally(() => Promise.allSettled([eventSubscriptions.dispose(), features.plugins?.dispose?.()]));
     return disposal;
   }
   lifetime.listen(window, "beforeunload", dispose);

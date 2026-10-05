@@ -74,8 +74,14 @@ fn set_active_profile_state(
     state: &AppState,
     app: &AppHandle,
     profile: &Profile,
+    restore: bool,
 ) -> Result<(), String> {
     crate::solo::reset_for_profile(app, state)?;
+    state
+        .profile_target_state
+        .lock()
+        .map_err(|_| "Lock poisoned")?
+        .activate(profile, restore);
     let previous_bindings = {
         let mut active_profile = state
             .active_profile
@@ -104,6 +110,9 @@ fn set_active_profile_state(
     }
 
     state.sync_feedback_values(profile);
+    if restore {
+        state.sync_feedback_values(profile);
+    }
     state.send_idle_button_light_feedback_values(profile);
     Ok(())
 }
@@ -121,7 +130,20 @@ pub fn load_profile(
     app: AppHandle,
     state: State<AppState>,
     name: String,
+    capture_current: Option<bool>,
 ) -> Result<Profile, String> {
+    if capture_current.unwrap_or(true) {
+        crate::solo::reset_for_profile(&app, &state)?;
+        let previous = state
+            .active_profile
+            .lock()
+            .map_err(|_| "Lock poisoned")?
+            .clone();
+        if let Some(previous) = previous {
+            state.sync_feedback_values(&previous);
+            crate::profile_target_state::checkpoint(&state)?;
+        }
+    }
     let mut profile = state
         .profile_store
         .load_profile(&name)
@@ -143,7 +165,7 @@ pub fn load_profile(
             .map_err(|err| err.to_string())?;
     }
 
-    set_active_profile_state(&state, &app, &profile)?;
+    set_active_profile_state(&state, &app, &profile, true)?;
     Ok(profile)
 }
 
@@ -152,14 +174,38 @@ pub fn save_profile(
     app: AppHandle,
     state: State<AppState>,
     mut profile: Profile,
+    activate: Option<bool>,
 ) -> Result<(), String> {
     profile.normalize_bindings();
     normalize_profile_midi_preference(&mut profile);
+    let active = state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned")?
+        .clone();
+    let update_active = activate.unwrap_or(true)
+        && active
+            .as_ref()
+            .map(|active| active.name == profile.name)
+            .unwrap_or(true);
+    if update_active {
+        crate::solo::reset_for_profile(&app, &state)?;
+        if let Some(active) = active {
+            state.sync_feedback_values(&active);
+        }
+        state
+            .profile_target_state
+            .lock()
+            .map_err(|_| "Lock poisoned")?
+            .include_in(&mut profile);
+    }
     state
         .profile_store
         .save_profile(profile.clone())
         .map_err(|err| err.to_string())?;
-    set_active_profile_state(&state, &app, &profile)?;
+    if update_active {
+        set_active_profile_state(&state, &app, &profile, false)?;
+    }
     Ok(())
 }
 
@@ -178,7 +224,50 @@ pub fn get_active_profile(state: State<AppState>) -> Result<Option<Profile>, Str
         .active_profile
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
-    Ok(active.as_ref().map(|snapshot| snapshot.profile().clone()))
+    let mut profile = active.as_ref().map(|snapshot| snapshot.profile().clone());
+    if let Some(profile) = profile.as_mut() {
+        state
+            .profile_target_state
+            .lock()
+            .map_err(|_| "Lock poisoned")?
+            .include_in(profile);
+    }
+    Ok(profile)
+}
+
+#[tauri::command]
+pub fn checkpoint_profile_state(
+    app: AppHandle,
+    state: State<AppState>,
+    profile_name: String,
+    target_states: Vec<crate::model::ProfileTargetState>,
+    leave_profile: Option<bool>,
+) -> Result<bool, String> {
+    let active = state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned")?
+        .clone();
+    if active.as_ref().map(|active| active.name.as_str()) != Some(profile_name.as_str()) {
+        return Ok(false);
+    }
+    if leave_profile.unwrap_or(false) {
+        crate::solo::reset_for_profile(&app, &state)?;
+        let active = state
+            .active_profile
+            .lock()
+            .map_err(|_| "Lock poisoned")?
+            .clone();
+        if let Some(active) = active.filter(|active| active.name == profile_name) {
+            state.sync_feedback_values(&active);
+        }
+    }
+    if state.solo.is_active() {
+        return Ok(false);
+    }
+    crate::profile_target_state::update_integrations(&state, &profile_name, target_states)?;
+    crate::profile_target_state::checkpoint(&state)?;
+    Ok(true)
 }
 
 #[tauri::command]
@@ -269,6 +358,7 @@ mod tests {
             plugin_settings: Default::default(),
             midi_device_preference: Default::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         }
     }
 

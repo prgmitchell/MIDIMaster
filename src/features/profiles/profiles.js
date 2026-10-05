@@ -4,6 +4,7 @@ import { createProfileMenu } from "./controllers/profile_menu.js";
 import { createProfilePage } from "./controllers/profile_page.js";
 import { createProfileLoading } from "./controllers/profile_loading.js";
 import { createPersistence } from "./controllers/persistence.js";
+import { createProfileTargetState } from "./controllers/target_state.js";
 import { DEFAULT_OSD_SETTINGS, toPersistedOsdSettings } from "../../core/osd_settings.js";
 import { closeAllDropdowns } from "../ui/dropdown_badges.js";
 
@@ -55,6 +56,7 @@ export function createProfilesFeature({
     resolve: null,
     reject: null,
   };
+  const targetState = createProfileTargetState({ invoke, getActiveProfileName, getBindings, getPluginHost });
 
   function normalizeProfileName(name) {
     return String(name || "").trim();
@@ -234,6 +236,7 @@ export function createProfilesFeature({
     setProfilePluginSettings,
     setProfileSelection: (...args) => setProfileSelection(...args),
     startPluginHostIfNeeded,
+    targetState,
   });
 
   const { renderProfilePage } = createProfilePage({
@@ -278,12 +281,15 @@ export function createProfilesFeature({
     showAlert,
     showChoices,
     t: (...args) => t(...args),
+    flushProfileSave,
+    targetState,
   });
 
   return {
-    dispose: () => {
+    dispose: async () => {
       lifetime.dispose();
-      return flushProfileSave();
+      await flushProfileSave();
+      await targetState.dispose();
     },
     bindUi,
     refreshProfiles,

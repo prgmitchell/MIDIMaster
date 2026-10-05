@@ -22,6 +22,7 @@ macro_rules! command_registry {
     () => {
         tauri::generate_handler![
             frontend_log,
+            checkpoint_profile_state,
             list_midi_devices,
             list_midi_output_devices,
             get_midi_connection_health,

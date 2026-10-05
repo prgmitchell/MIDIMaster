@@ -29,6 +29,7 @@ export function createProfileLoading({
   setProfilePluginSettings,
   setProfileSelection,
   startPluginHostIfNeeded,
+  targetState,
 }) {
   async function loadProfileByName(name, options = {}) {
     const {
@@ -41,7 +42,14 @@ export function createProfileLoading({
     const n = String(name || "").trim();
     if (!n) return;
     await flushProfileSave();
-    const profile = await invoke("load_profile", { name: n });
+    if (options.checkpoint !== false) await targetState?.beforeSwitch();
+    let profile;
+    try {
+      profile = await invoke("load_profile", { name: n, captureCurrent: !targetState && options.checkpoint !== false });
+    } catch (error) {
+      targetState?.resume();
+      throw error;
+    }
 
     if (typeof setActiveProfileName === "function") {
       setActiveProfileName(profile.name);
@@ -91,6 +99,7 @@ export function createProfileLoading({
     if (startPlugins && typeof startPluginHostIfNeeded === "function") {
       await startPluginHostIfNeeded().catch(() => {});
     }
+    await targetState?.loaded(profile);
 
     if (profile.osd_settings) {
       const nextOsd = fromOsdSettings(profile.osd_settings, {
@@ -123,6 +132,7 @@ export function createProfileLoading({
   async function deleteProfileByName(name) {
     const n = String(name || "").trim();
     if (!n || n === "Default") return;
+    await flushProfileSave();
     await invoke("delete_profile", { name: n });
 
     const current = typeof getActiveProfileName === "function" ? getActiveProfileName() || "" : "";
@@ -172,7 +182,9 @@ export function createProfileLoading({
   async function createProfileByName(rawName) {
     const name = normalizeProfileName(rawName);
     if (!name) return;
+    await flushProfileSave();
     await invoke("save_profile", {
+      activate: false,
       profile: {
         name,
         bindings: [],

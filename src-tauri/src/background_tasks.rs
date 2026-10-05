@@ -342,6 +342,9 @@ pub(crate) fn spawn_feedback_refresh_loop(
                     }
 
                     let feedback_snapshot = state.sync_feedback_values(profile);
+                    if let Err(error) = crate::profile_target_state::checkpoint(&state) {
+                        run_logger::warn("profiles", "state_checkpoint_failed", &error);
+                    }
                     if profile_has_focus_target(profile)
                         && !focused_sessions_match(
                             &last_focused_session,

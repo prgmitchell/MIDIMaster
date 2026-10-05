@@ -24,6 +24,7 @@ pub use midi_types::{
 pub use osd_types::OsdSettings;
 pub use profile_types::{
     normalized_routes_with_legacy, MidiDevicePreference, MidiDeviceRoute, Profile, ProfileSummary,
+    ProfileTargetState,
 };
 
 #[cfg(test)]

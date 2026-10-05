@@ -174,6 +174,17 @@ async fn stop_background_tasks(app: &AppHandle) {
 
 fn stop_managed_resources(app: &AppHandle) {
     let state = app.state::<AppState>();
+    if let Some(profile) = state
+        .active_profile
+        .lock()
+        .ok()
+        .and_then(|profile| profile.clone())
+    {
+        state.sync_feedback_values(&profile);
+    }
+    if let Err(error) = crate::profile_target_state::checkpoint(&state) {
+        run_logger::warn("profiles", "shutdown_state_checkpoint_failed", &error);
+    }
     state.soundboard.stop_all();
     state.virtual_audio.stop();
     state.cancel_activity_button_light_holds();

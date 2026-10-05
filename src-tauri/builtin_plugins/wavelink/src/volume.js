@@ -173,6 +173,7 @@ export function createVolume({
   }
 
   return {
+    clearLastSentVolumes: () => lastSentVolumeByEndpoint.clear(),
     endpointKey,
     rememberLocalVolumeIntent,
     shouldIgnoreStaleLocalVolume,

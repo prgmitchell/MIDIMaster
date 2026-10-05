@@ -1,5 +1,9 @@
+import { createProfileState } from "./profile_state.js";
 /** integration workflow. */
 export function createIntegration({
+  flushVolumeWrites,
+  resetVolumeState,
+  localMuteIntentByInput,
   applyObsVolumeBatch,
   ctx,
   discoverAudioInputs,
@@ -23,6 +27,9 @@ export function createIntegration({
   function registerPluginIntegration() {
     ctx.registerIntegration({
       id: "obs",
+      ...createProfileState({ state, request, flushVolumeWrites,
+        resetVolumeState: () => { resetVolumeState?.(); localMuteIntentByInput?.clear(); },
+      }),
       name: "OBS Studio",
       icon_data: iconDataUrl || null,
       buttonActions: [momentaryAction("Trigger", "Volume"), statefulAction("Toggle Mute", "ToggleMute")],

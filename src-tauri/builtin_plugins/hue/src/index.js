@@ -294,7 +294,7 @@ export async function activate(ctx) {
       writeScheduler,
     });
 
-  const { normalizeBatchTargets, handleHueToggle, handleHuePowerAction, handleHueVolumeTargets } =
+  const { normalizeBatchTargets, handleHueToggle, handleHuePowerAction, handleHueVolumeTargets, captureTargetState, restoreTargetState } =
     createActions({
       ctx,
       groupLightIdsByKey,
@@ -406,6 +406,8 @@ export async function activate(ctx) {
   })();
 
   const { registerPluginIntegration } = createIntegration({
+    captureTargetState,
+    restoreTargetState,
     ctx,
     handleHuePowerAction,
     handleHueToggle,

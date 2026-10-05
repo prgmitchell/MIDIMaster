@@ -93,6 +93,28 @@ impl ProfileStore {
         self.commit_candidate(cache, candidate)
     }
 
+    pub(crate) fn update_target_states(
+        &self,
+        name: &str,
+        states: Vec<crate::model::ProfileTargetState>,
+    ) -> Result<()> {
+        let mut cache = self.cache()?;
+        let cache = cache.as_mut().expect("profile cache initialized");
+        let Some(profile) = cache.profiles.iter().find(|profile| profile.name == name) else {
+            return Ok(());
+        };
+        if profile.target_states == states {
+            return Ok(());
+        }
+        let mut candidate = cache.profiles.clone();
+        candidate
+            .iter_mut()
+            .find(|profile| profile.name == name)
+            .unwrap()
+            .target_states = states;
+        self.commit_candidate(cache, candidate)
+    }
+
     pub fn clear_all(&self) -> Result<()> {
         let mut cache = self
             .cache
@@ -188,6 +210,7 @@ mod tests {
             plugin_settings: Default::default(),
             midi_device_preference: Default::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         }
     }
 

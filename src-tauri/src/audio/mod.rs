@@ -53,6 +53,7 @@ pub trait AudioBackend: Send + Sync {
 pub mod windows;
 
 pub mod target_match;
+pub(crate) mod target_state;
 
 #[cfg(not(target_os = "windows"))]
 pub mod unsupported;

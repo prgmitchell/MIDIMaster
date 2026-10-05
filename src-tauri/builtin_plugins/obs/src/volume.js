@@ -160,5 +160,7 @@ export function createVolume({
     return queuedAny;
   }
 
-  return { shouldIgnoreEcho, shouldIgnoreBindingVolumeEcho, normalizeBatchTargets, applyObsVolumeBatch };
+  return { shouldIgnoreEcho, shouldIgnoreBindingVolumeEcho, normalizeBatchTargets, applyObsVolumeBatch, flushVolumeWrites,
+    resetVolumeState: () => { lastLocalWriteAt.clear(); lastSentVolumeByInput.clear(); localVolumeIntentByBinding.clear(); },
+  };
 }

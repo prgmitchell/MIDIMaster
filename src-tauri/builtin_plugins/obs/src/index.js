@@ -219,7 +219,7 @@ export async function activate(ctx) {
     sourceVisibilityKey,
   } = createTargets({});
 
-  const { shouldIgnoreEcho, shouldIgnoreBindingVolumeEcho, normalizeBatchTargets, applyObsVolumeBatch } =
+  const { shouldIgnoreEcho, shouldIgnoreBindingVolumeEcho, normalizeBatchTargets, applyObsVolumeBatch, flushVolumeWrites, resetVolumeState } =
     createVolume({
       ctx,
       lastLocalWriteAt,
@@ -322,6 +322,9 @@ export async function activate(ctx) {
   reconnect.run();
 
   const { registerPluginIntegration } = createIntegration({
+    flushVolumeWrites,
+    resetVolumeState,
+    localMuteIntentByInput,
     applyObsVolumeBatch,
     ctx,
     discoverAudioInputs,

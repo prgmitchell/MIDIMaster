@@ -232,6 +232,14 @@ pub struct Profile {
     pub midi_device_preference: MidiDevicePreference,
     #[serde(default)]
     pub midi_device_preference_set: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_states: Vec<ProfileTargetState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProfileTargetState {
+    pub target: super::BindingTarget,
+    pub state: serde_json::Value,
 }
 
 impl Profile {
@@ -254,6 +262,17 @@ impl Profile {
         let mut changed = false;
         for binding in &mut self.bindings {
             changed |= binding.strip_derived_integration_icons();
+        }
+        for entry in &mut self.target_states {
+            if let super::BindingTarget::Integration { data, .. } = &mut entry.target {
+                if let Some(data) = data.as_object_mut() {
+                    changed |= data.remove("icon_data").is_some();
+                    changed |= data.remove("iconData").is_some();
+                }
+            }
+            if let super::BindingTarget::Application { icon_data, .. } = &mut entry.target {
+                changed |= icon_data.take().is_some();
+            }
         }
         changed
     }

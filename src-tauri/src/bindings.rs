@@ -345,6 +345,7 @@ mod tests {
             plugin_settings: std::collections::HashMap::new(),
             midi_device_preference: crate::model::MidiDevicePreference::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         }
     }
 

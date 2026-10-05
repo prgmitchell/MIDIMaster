@@ -56,6 +56,7 @@ pub(crate) fn add_binding_to_active_profile(
                 plugin_settings: std::collections::HashMap::new(),
                 midi_device_preference: model::MidiDevicePreference::default(),
                 midi_device_preference_set: false,
+                target_states: Vec::new(),
             });
         let previous_bindings = profile.bindings.clone();
         let feedback_was_reenabled = previous_bindings.iter().any(|existing| {

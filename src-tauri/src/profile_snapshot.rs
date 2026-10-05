@@ -141,6 +141,7 @@ mod tests {
             plugin_settings: Default::default(),
             midi_device_preference: Default::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         };
         profile.bindings.push(binding("two", "midi:0", 8));
         let snapshot = ProfileSnapshot::new(profile);
@@ -165,6 +166,7 @@ mod tests {
             plugin_settings: Default::default(),
             midi_device_preference: Default::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         };
         let snapshot = ProfileSnapshot::new(profile);
 

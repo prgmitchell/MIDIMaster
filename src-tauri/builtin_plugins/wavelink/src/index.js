@@ -145,6 +145,7 @@ export async function activate(ctx) {
 
   const {
     endpointKey,
+    clearLastSentVolumes,
     rememberLocalVolumeIntent,
     shouldIgnoreStaleLocalVolume,
     flushVolumeWrites,
@@ -263,6 +264,7 @@ export async function activate(ctx) {
   reconnect.run();
 
   const { registerPluginIntegration } = createIntegration({
+    clearLastSentVolumes,
     ctx,
     cycleMainOutputDevice,
     describeFromCache,

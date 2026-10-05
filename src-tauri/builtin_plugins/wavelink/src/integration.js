@@ -11,9 +11,11 @@ import {
   setStatus,
 } from "./protocol.js";
 import { createWaveLinkSolo } from "./solo.js";
+import { createProfileState } from "./profile_state.js";
 
 /** integration workflow. */
 export function createIntegration({
+  clearLastSentVolumes,
   ctx,
   cycleMainOutputDevice,
   describeFromCache,
@@ -41,6 +43,9 @@ export function createIntegration({
       icon_data: iconDataUrl || null,
       buttonActions: [{ label: "Toggle Mute", value: "ToggleMute" }],
       createSoloPlan: createWaveLinkSolo({ state, requestJsonRpc }),
+      ...createProfileState({ state, requestJsonRpc, flushVolumeWrites, getChannelEffects, setChannelEffectEnabled, invalidateFeedback,
+        resetVolumeState: () => { clearLastSentVolumes?.(); localVolumeIntentByEndpoint.clear(); primaryFeedbackIntentByBinding.clear(); },
+      }),
       describeTarget: (target) => {
         const t = target?.Integration || target?.integration;
         const data = t?.data || {};

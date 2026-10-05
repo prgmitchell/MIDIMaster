@@ -253,5 +253,22 @@ export function createActions({
     }
   }
 
-  return { normalizeBatchTargets, handleHueToggle, handleHuePowerAction, handleHueVolumeTargets };
+  function captureTargetState(raw) {
+    const target = normalizeIntegrationTarget(raw);
+    const current = target && stateByKey.get(targetKey(target.kind, target.id));
+    return state.connected && current ? { on: current.on, bri: current.bri } : null;
+  }
+
+  async function restoreTargetState(raw, saved) {
+    const target = normalizeIntegrationTarget(raw);
+    if (!state.connected || !target || !stateByKey.has(targetKey(target.kind, target.id)) || typeof saved.on !== "boolean" || !Number.isFinite(saved.bri)) return false;
+    const bri = clampHueBri(saved.bri);
+    updateOptimisticState(target, { on: saved.on, bri });
+    rememberIntentForTargetAndMembers(target, { on: saved.on, bri });
+    queueHueWrite(target.kind, target.id, { on: saved.on, bri, transitiontime: 0 }, { fanoutGroup: false });
+    await syncAffectedFeedback(target);
+    return true;
+  }
+
+  return { normalizeBatchTargets, handleHueToggle, handleHuePowerAction, handleHueVolumeTargets, captureTargetState, restoreTargetState };
 }

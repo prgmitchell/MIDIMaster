@@ -7,6 +7,8 @@ import {
 
 /** integration workflow. */
 export function createIntegration({
+  captureTargetState,
+  restoreTargetState,
   ctx,
   handleHuePowerAction,
   handleHueToggle,
@@ -22,6 +24,8 @@ export function createIntegration({
   function registerPluginIntegration() {
     ctx.registerIntegration({
       id: "hue",
+      captureTargetState,
+      restoreTargetState,
       name: "Philips Hue",
       icon_data: iconDataUrl || null,
       buttonActions: [{ label: "Toggle On/Off", value: "ToggleMute", behavior: "stateful" }],

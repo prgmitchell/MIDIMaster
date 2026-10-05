@@ -125,7 +125,13 @@ pub fn execute_local_target_action(
     #[cfg(feature = "perf-audit")]
     crate::perf_audit::record_local_target_result(result.is_ok());
     match result {
-        Ok(()) => true,
+        Ok(()) => {
+            // Brightness has no readback feedback; remember successful writes.
+            if binding_id != "profile_restore" && matches!(action, model::BindingAction::Volume) {
+                crate::profile_target_state::observe_brightness(state, target, value);
+            }
+            true
+        }
         Err(err) => {
             run_logger::warn(
                 log_target,

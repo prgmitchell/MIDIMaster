@@ -19,6 +19,7 @@ fn fixture() -> Profile {
         plugin_settings: Default::default(),
         midi_device_preference: Default::default(),
         midi_device_preference_set: true,
+        target_states: Vec::new(),
     };
     profile.bindings.clear();
     profile.midi_device_preference.routes = vec![route("midi:0", "A"), route("midi:1", "B")];

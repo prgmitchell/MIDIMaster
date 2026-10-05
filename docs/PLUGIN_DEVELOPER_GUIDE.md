@@ -201,6 +201,21 @@ ctx.registerIntegration({
 });
 ```
 
+#### Profile state (optional)
+
+Integrations can implement `captureTargetState(target)` and
+`restoreTargetState(target, state)` to remember levels and persistent on/off
+states in profiles. Here `target` is the inner `{ integration_id, kind, data }`
+object. Capture returns a JSON object, or `null` when the target is unavailable
+or represents a momentary action. Restore must set the supplied state directly
+and return `true` after success; return `false` while unavailable so MIDIMaster
+can retry after reconnecting. Do not toggle, launch, or replay a trigger.
+
+An optional `prepareStateCapture({ refresh })` runs once per integration before
+capture. When `refresh` is true (leaving a profile), flush pending
+writes and fetch current state. Regular capture runs once per second. Failed or
+unavailable targets retain their saved state; temporary Solo states are excluded.
+
 #### `describeTarget(target)`
 
 Purpose:

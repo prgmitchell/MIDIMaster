@@ -77,6 +77,7 @@ window.__TAURI__ = {
       if (
         [
           "set_active_profile_preference",
+          "checkpoint_profile_state",
           "stop_midi_device",
           "stop_soundboard_preview",
           "preview_osd",

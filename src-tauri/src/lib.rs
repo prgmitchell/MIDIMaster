@@ -29,6 +29,7 @@ mod perf_audit;
 mod plugin_api;
 mod profile_snapshot;
 mod profile_store;
+mod profile_target_state;
 mod run_logger;
 mod runtime_helpers;
 mod runtime_midi;
@@ -674,6 +675,7 @@ mod tests {
             plugin_settings: HashMap::new(),
             midi_device_preference: model::MidiDevicePreference::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         }
     }
 
@@ -946,6 +948,7 @@ mod tests {
             plugin_settings: HashMap::new(),
             midi_device_preference: model::MidiDevicePreference::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         };
 
         state.sync_feedback_values(&profile);
@@ -1228,6 +1231,7 @@ mod tests {
             plugin_settings: Default::default(),
             midi_device_preference: Default::default(),
             midi_device_preference_set: false,
+            target_states: Vec::new(),
         };
         state
             .profile_store

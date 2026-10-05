@@ -10,12 +10,16 @@ export function createImportExport({
   showAlert,
   showChoices,
   t,
+  flushProfileSave,
+  targetState,
 }) {
   async function exportProfileByName(name) {
     const profileName = normalizeProfileName(name);
     if (!profileName) return;
 
     try {
+      await flushProfileSave?.();
+      if (profileName === getActiveProfileName?.()) await targetState?.checkpoint();
       const savedPath = await invoke("export_current_profile", { profileName });
       if (savedPath && typeof showAlert === "function") {
         showAlert(t("profiles.exportedTitle"), t("profiles.exportedMessage", { path: savedPath }));
@@ -73,8 +77,10 @@ export function createImportExport({
         name: nextName,
       };
 
-      await invoke("save_profile", { profile: profileToSave });
-      await loadProfileByName(nextName);
+      await flushProfileSave?.();
+      await targetState?.beforeSwitch();
+      await invoke("save_profile", { profile: profileToSave, activate: false });
+      await loadProfileByName(nextName, { checkpoint: false });
       await refreshProfiles(nextName);
       closeProfileDropdown();
 
@@ -86,6 +92,7 @@ export function createImportExport({
         }
       }
     } catch (error) {
+      targetState?.resume();
       if (typeof showAlert === "function") {
         showAlert(t("profiles.importFailedTitle"), String(error));
       }
