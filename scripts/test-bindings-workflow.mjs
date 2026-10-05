@@ -85,11 +85,9 @@ assert.equal(bindings[0].feedback_mode, "FollowValue", "feedback mode edits rema
 change(d.bindingConfigFeedbackMsgType, "PitchBend");
 assert.equal(d.bindingConfigFeedbackController.disabled, true);
 assert.equal(d.bindingConfigFeedbackController.value, "N/A");
-d.bindingConfigAssignModeClear.click();
 d.bindingConfigSave.click();
 await settle();
 assert.equal(bindings[0].name, "Changed draft");
-assert.equal(bindings[0].assign_mode, "Clear");
 assert.equal(bindings[0].feedback_mode, "AudioReactive");
 assert.equal(bindings[0].led_control.controller, 42);
 assert.equal(bindings[0].led_control.msg_type, "Note");

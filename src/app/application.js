@@ -1,3 +1,4 @@
+import { getFaderModifiers } from "../core/fader_modifiers.js";
 import { createApplicationState } from "./application_state.js";
 import { createClientPreferences } from "./controllers/client_preferences.js";
 import { createBindingFeedback } from "./controllers/binding_feedback.js";
@@ -264,9 +265,8 @@ export function createApplication() {
   }
 
   function knownMidiRouteCount() {
-    return Math.max(viewState.activeMidiRouteCount || 0,
-      normalizeMidiRoutes(profileState.midiPreference).length,
-      new Set(profileState.bindings.flatMap((b) => [b.device_id, b.mute_control?.device_id, b.assign_control?.device_id]).filter(Boolean)).size);
+    const devices = profileState.bindings.flatMap((b) => [b.device_id, ...getFaderModifiers(b).map((item) => item.control?.device_id)]).filter(Boolean);
+    return Math.max(viewState.activeMidiRouteCount || 0, normalizeMidiRoutes(profileState.midiPreference).length, new Set(devices).size);
 
   }
 
@@ -495,7 +495,7 @@ export function createApplication() {
     midiConnectionStatus,
     midiStatus,
     osdState,
-    profileState,
+    profileState, invoke, getPluginHost,
     queueMidiUiEvent,
     queuePerfMidiDispatch,
     queueVolumeUpdatePayload: (...args) => midiDisplay.queueVolumeUpdatePayload(...args),
@@ -986,7 +986,7 @@ export function createApplication() {
     midiInventoryController.dispose();
     midiEventDispatch.clearPerformance();
     invoke("stop_midi_device").catch(() => {});
-    disposal = Promise.allSettled([eventSubscriptions.dispose(), features.plugins?.dispose?.()]);
+    disposal = backendEvents.disposeSolo().finally(() => Promise.allSettled([eventSubscriptions.dispose(), features.plugins?.dispose?.()]));
     return disposal;
   }
   lifetime.listen(window, "beforeunload", dispose);

@@ -527,6 +527,132 @@ function createConnectionTab({
   return { registerConnectionTab };
 }
 
+// src-tauri/builtin_plugins/wavelink/src/solo.js
+function muted(item) {
+  const value = item?.isMuted ?? item?.muted;
+  if (typeof value !== "boolean")
+    throw new Error("Wave Link mute state is unavailable");
+  return value;
+}
+function buildWaveLinkSoloPlan({
+  channels,
+  mixes,
+  targets,
+  nativeChannelIds = [],
+  wsId
+}) {
+  const endpoints = targets.map(normalizeEndpoint).filter(Boolean);
+  const wholeMixes = /* @__PURE__ */ new Set();
+  const channelRoutes = /* @__PURE__ */ new Map();
+  const findChannel = (id) => channels.find(
+    (ch) => String(ch.id).toLowerCase() === String(id).toLowerCase()
+  );
+  const findMix = (id) => mixes.find((mix) => String(mix.id) === String(id));
+  function addChannel(id, mixId = "") {
+    const channel = findChannel(id);
+    if (!channel)
+      throw new Error("The selected Wave Link channel is unavailable");
+    const key = String(channel.id);
+    if (!mixId) channelRoutes.set(key, null);
+    else if (channelRoutes.get(key) !== null) {
+      const routes = channelRoutes.get(key) || /* @__PURE__ */ new Set();
+      if (!channel.mixes?.some((mix) => String(mix.id) === mixId)) {
+        throw new Error(
+          "The selected Wave Link channel is not routed to that mix"
+        );
+      }
+      routes.add(mixId);
+      channelRoutes.set(key, routes);
+    }
+  }
+  for (const endpoint of endpoints) {
+    if (endpoint.mixer_id && !findMix(endpoint.mixer_id))
+      throw new Error("The selected Wave Link mix is unavailable");
+    if (endpoint.identifier) addChannel(endpoint.identifier, endpoint.mixer_id);
+    else if (endpoint.mixer_id) wholeMixes.add(endpoint.mixer_id);
+    else throw new Error("Select a Wave Link channel or mix to use Solo");
+  }
+  for (const id of nativeChannelIds) if (findChannel(id)) addChannel(id);
+  if (!endpoints.length && !channelRoutes.size) return null;
+  const audibleMixes = new Set(wholeMixes);
+  const apply = [], restore = [];
+  function change(method, base, original, next) {
+    restore.push({ method, params: { ...base, isMuted: original } });
+    if (original === next) return;
+    apply.push({ method, params: { ...base, isMuted: next } });
+  }
+  for (const channel of channels) {
+    const id = String(channel.id);
+    const selected = channelRoutes.has(id);
+    const routes = channelRoutes.get(id);
+    change(
+      "setChannel",
+      { id },
+      muted(channel),
+      selected ? false : wholeMixes.size ? muted(channel) : true
+    );
+    for (const route of channel.mixes || []) {
+      const mixId = String(route.id);
+      const original = muted(route);
+      let next = true;
+      if (selected && routes === null) next = original;
+      else if (selected && routes?.has(mixId)) next = false;
+      else if (wholeMixes.has(mixId)) next = original;
+      if (!next && (selected || !muted(channel) && wholeMixes.has(mixId)))
+        audibleMixes.add(mixId);
+      restore.push({
+        method: "setChannel",
+        params: { id, mixes: [{ id: mixId, isMuted: original }] }
+      });
+      if (next !== original) {
+        apply.push({
+          method: "setChannel",
+          params: { id, mixes: [{ id: mixId, isMuted: next }] }
+        });
+      }
+    }
+  }
+  for (const mix of mixes)
+    change(
+      "setMix",
+      { id: String(mix.id) },
+      muted(mix),
+      !audibleMixes.has(String(mix.id))
+    );
+  return {
+    ws_id: wsId,
+    apply,
+    restore,
+    allow_virtual_inputs: endpoints.length > 0,
+    virtual_channel_ids: channels.map((channel) => String(channel.id))
+  };
+}
+function createWaveLinkSolo({ state, requestJsonRpc }) {
+  return async ({ targets, nativeChannelIds }) => {
+    if (!state.wsId || state.disposed)
+      throw new Error("Connect Wave Link before using Solo");
+    const wsId = state.wsId;
+    const [channelResponse, mixResponse] = await Promise.all([
+      requestJsonRpc("getChannels"),
+      requestJsonRpc("getMixes")
+    ]);
+    if (state.wsId !== wsId || !channelResponse.ok || !mixResponse.ok) {
+      throw new Error("Could not read Wave Link's current mute states");
+    }
+    const channels = channelResponse.result?.channels;
+    const mixes = mixResponse.result?.mixes;
+    if (!Array.isArray(channels) || !Array.isArray(mixes))
+      throw new Error("Wave Link mixer state is unavailable");
+    return buildWaveLinkSoloPlan({
+      channels,
+      mixes,
+      targets,
+      nativeChannelIds,
+      wsId
+    });
+  };
+}
+
 // src-tauri/builtin_plugins/wavelink/src/integration.js
 function createIntegration({
   ctx,
@@ -543,6 +669,7 @@ function createIntegration({
   queueVolumeWrite,
   rememberLocalVolumeIntent,
   sendJsonRpc,
+  requestJsonRpc,
   setChannelEffectEnabled,
   setMainOutputDevice,
   state,
@@ -554,6 +681,7 @@ function createIntegration({
       name: "Wave Link",
       icon_data: iconDataUrl || null,
       buttonActions: [{ label: "Toggle Mute", value: "ToggleMute" }],
+      createSoloPlan: createWaveLinkSolo({ state, requestJsonRpc }),
       describeTarget: (target) => {
         const t = target?.Integration || target?.integration;
         const data = t?.data || {};
@@ -887,18 +1015,18 @@ function createIntegration({
             }
             return;
           } else if (action === "ToggleMute") {
-            const muted = level > 0.5;
+            const muted2 = level > 0.5;
             if (!state.wsId) {
               return;
             }
             if (!endpoint.identifier) {
-              await sendJsonRpc("setMix", { id: endpoint.mixer_id, isMuted: muted }, 202);
+              await sendJsonRpc("setMix", { id: endpoint.mixer_id, isMuted: muted2 }, 202);
             } else if (!endpoint.mixer_id) {
-              await sendJsonRpc("setChannel", { id: endpoint.identifier, isMuted: muted }, 102);
+              await sendJsonRpc("setChannel", { id: endpoint.identifier, isMuted: muted2 }, 102);
             } else {
               await sendJsonRpc(
                 "setChannel",
-                { id: endpoint.identifier, mixes: [{ id: endpoint.mixer_id, isMuted: muted }] },
+                { id: endpoint.identifier, mixes: [{ id: endpoint.mixer_id, isMuted: muted2 }] },
                 102
               );
             }
@@ -1647,34 +1775,34 @@ function createFeedback({
           }
         }
         if (shouldSyncMuteFeedback(action)) {
-          let muted = null;
+          let muted2 = null;
           if (t.kind === "mix") {
             const mix = mixes.get(String(data.mixer_id));
-            muted = getMutedFromMix(mix);
+            muted2 = getMutedFromMix(mix);
           } else if (t.kind === "channel") {
             const ch = channels.get(String(data.identifier));
-            muted = getMutedFromChannel(ch);
+            muted2 = getMutedFromChannel(ch);
           } else if (t.kind === "channel_mix") {
             const ch = channels.get(String(data.identifier));
             const entry = getMixEntry(ch, data.mixer_id);
-            muted = getMutedFromMixEntry(entry);
+            muted2 = getMutedFromMixEntry(entry);
           } else if (t.kind === "endpoint") {
             const identifier = data.identifier || "";
             const mixerId = data.mixer_id || "";
             if (!identifier) {
               const mix = mixes.get(String(mixerId));
-              muted = getMutedFromMix(mix);
+              muted2 = getMutedFromMix(mix);
             } else if (!mixerId) {
               const ch = channels.get(String(identifier));
-              muted = getMutedFromChannel(ch);
+              muted2 = getMutedFromChannel(ch);
             } else {
               const ch = channels.get(String(identifier));
               const entry = getMixEntry(ch, mixerId);
-              muted = getMutedFromMixEntry(entry);
+              muted2 = getMutedFromMixEntry(entry);
             }
           }
-          if (typeof muted === "boolean") {
-            await send(b.id, muted ? 1 : 0, "ToggleMute");
+          if (typeof muted2 === "boolean") {
+            await send(b.id, muted2 ? 1 : 0, "ToggleMute");
           }
         } else if (action === "ToggleEffect") {
           const state2 = findEffectState(data);
@@ -2115,6 +2243,7 @@ async function activate(ctx) {
     queueVolumeWrite,
     rememberLocalVolumeIntent,
     sendJsonRpc,
+    requestJsonRpc,
     setChannelEffectEnabled,
     setMainOutputDevice,
     state,

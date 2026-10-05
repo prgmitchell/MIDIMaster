@@ -303,8 +303,11 @@ pub(crate) fn spawn_feedback_refresh_loop(
                 .ok()
                 .and_then(|profile| profile.clone());
             let profile_active = profile.is_some();
+            if !profile_active && state.solo.is_active() {
+                let _ = crate::solo::reset(&app_handle, &state).await;
+            }
             if let Some(profile) = profile.as_ref() {
-                let sync_interval = if profile_has_focus_target(profile) {
+                let sync_interval = if profile_has_focus_target(profile) || state.solo.is_active() {
                     FOCUS_FEEDBACK_SYNC_INTERVAL
                 } else {
                     FEEDBACK_SYNC_INTERVAL
@@ -312,6 +315,13 @@ pub(crate) fn spawn_feedback_refresh_loop(
 
                 if last_feedback_sync.elapsed() >= sync_interval {
                     last_feedback_sync = loop_started;
+                    if !state.solo.valid_in(profile) {
+                        if let Err(error) = crate::solo::reset(&app_handle, &state).await {
+                            run_logger::warn("solo", "restore_failed", &error);
+                        }
+                        let _ = app_handle.emit("binding_solo_reset", ());
+                    }
+                    state.solo.reconcile(&state);
 
                     let active_routes = state
                         .midi
@@ -370,8 +380,8 @@ pub(crate) fn spawn_feedback_refresh_loop(
                                     }
                                 }
                             }
-                            if let Some((assign_control, assign_value)) =
-                                feedback::assign_button_feedback(binding)
+                            for (assign_control, assign_value) in
+                                feedback::assign_buttons_feedback(binding)
                             {
                                 let output_key = assign_control.to_binding_key();
                                 if should_send_feedback(

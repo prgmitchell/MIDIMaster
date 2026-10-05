@@ -3,6 +3,7 @@ import { readRenderedBindingValue } from "../performance_rendered_value.js";
 import { parseEventPayload } from "../event_payload.js";
 import { t } from "../i18n.js";
 import { fromOsdSettings } from "../../core/osd_settings.js";
+import { createSoloController } from "./solo.js";
 import { setBindingTargets, getBindingTargets, getPrimaryBindingTarget } from "../../core/binding_model.js";
 
 /** backend events workflow. */
@@ -19,6 +20,8 @@ export function createBackendEvents({
   midiStatus,
   osdState,
   profileState,
+  invoke,
+  getPluginHost,
   queueMidiUiEvent,
   queuePerfMidiDispatch,
   queueVolumeUpdatePayload,
@@ -32,7 +35,10 @@ export function createBackendEvents({
   updateFocusedSessionState,
   updateIntegrationStateFromEventPayload,
 }) {
+  const solo = createSoloController({ invoke, getPluginHost, diagnosticError, showAlert });
   async function setupListeners() {
+    await eventSubscriptions.subscribe("binding_solo_input", (event) => solo.enqueue(parseEventPayload(event)));
+    await eventSubscriptions.subscribe("binding_solo_reset", () => solo.resetInputs());
     if (performanceAudit.enabled) {
       await eventSubscriptions.subscribe("perf_audit_midi_dispatch", (event) => {
         const payload = parseEventPayload(event);
@@ -229,5 +235,5 @@ export function createBackendEvents({
     });
   }
 
-  return { setupListeners };
+  return { setupListeners, disposeSolo: solo.dispose };
 }

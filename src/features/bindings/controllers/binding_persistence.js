@@ -1,9 +1,18 @@
 import { ensureBindingShape } from "../shape_helpers.js";
 
 /** binding persistence workflow. */
-export function createBindingPersistence({ getBindings, getHost, invoke, saveProfile }) {
+export function createBindingPersistence({
+  getBindings,
+  getHost,
+  invoke,
+  saveProfile,
+}) {
   async function persistBindingBackend(binding) {
     ensureBindingShape(binding);
+    if (Array.isArray(binding.modifiers))
+      binding.modifiers = binding.modifiers.filter(
+        (item) => item.control?.device_id,
+      );
     await invoke("add_binding", { binding });
   }
 
@@ -26,5 +35,9 @@ export function createBindingPersistence({ getBindings, getHost, invoke, savePro
     scheduleProfileSave(reason);
   }
 
-  return { persistBindingBackend, syncPluginHostBindings, finishBindingUiMutation };
+  return {
+    persistBindingBackend,
+    syncPluginHostBindings,
+    finishBindingUiMutation,
+  };
 }

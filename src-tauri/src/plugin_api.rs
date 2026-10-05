@@ -1,3 +1,5 @@
+use crate::app_paths::app_data_root_dir;
+use crate::run_logger;
 use base64::Engine;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -10,12 +12,8 @@ use std::{
     process::Command,
     time::Duration,
 };
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use url::Url;
-
-use crate::app_paths::app_data_root_dir;
-use crate::run_logger;
-
 const BUNDLED_PLUGIN_IDS: &[&str] = &["hue", "obs", "voicemeeter", "wavelink"];
 const HUE_API_TIMEOUT_MS: u64 = 4500;
 const HUE_PAIR_TIMEOUT_MS: u64 = 3500;
@@ -42,7 +40,6 @@ pub struct PluginManifest {
     pub description: String,
     #[serde(default)]
     pub categories: Vec<String>,
-
     // Augmented fields computed by MIDIMaster.
     #[serde(default)]
     pub bundled: bool,
@@ -747,6 +744,9 @@ pub fn hue_api_put(
 #[tauri::command]
 pub fn set_plugin_enabled(app: AppHandle, plugin_id: String, enabled: bool) -> Result<(), String> {
     validate_plugin_id(&plugin_id)?;
+    if !enabled && plugin_id == "wavelink" {
+        crate::solo::reset_for_profile(&app, &app.state::<crate::AppState>())?;
+    }
     let mut state = load_plugins_state(&app);
     state.disabled.retain(|id| id != &plugin_id);
     if !enabled {

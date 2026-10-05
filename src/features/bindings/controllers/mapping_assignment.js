@@ -1,3 +1,7 @@
+import {
+  setControlMapping,
+  modifierForField,
+} from "../../../core/fader_modifiers.js";
 import { findControlConflict } from "../../../core/control_mapping.js";
 import {
   effectiveIsButton,
@@ -25,9 +29,14 @@ export function createMappingAssignment({
   setTransferPrompt,
   stopAuxLearn,
   updateAuxLearnUi,
+  t,
 }) {
   function findMappingConflict(bindingId, field, mapping) {
-    return findControlConflict(editorState.previewOriginalBindings || getBindings(), mapping, {
+    const current = getConfigBinding();
+    const bindings = (editorState.previewOriginalBindings || getBindings()).map(
+      (binding) => (binding.id === bindingId && current ? current : binding),
+    );
+    return findControlConflict(bindings, mapping, {
       bindingId,
       field,
     });
@@ -35,6 +44,8 @@ export function createMappingAssignment({
 
   function conflictFieldLabel(field, binding) {
     if (field === "control") return "Primary";
+    if (field.startsWith("modifier:"))
+      return modifierForField(binding, field)?.kind || "Modifier";
     if (field === "mute_control") return "Mute";
     if (field === "assign_control") return "Assign";
     if (field === "indicator_control") {
@@ -52,7 +63,7 @@ export function createMappingAssignment({
     if (!conflict || !conflict.binding) return;
     const sameBindingTransfer = conflict.binding.id === binding.id;
     if (sameBindingTransfer && conflict.field !== field) {
-      binding[conflict.field] = null;
+      setControlMapping(binding, conflict.field, null);
     }
     if (field === "control") {
       binding.device_id = mapping.device_id;
@@ -65,9 +76,11 @@ export function createMappingAssignment({
       binding.mode = mapping.mode || binding.mode || "Absolute";
     } else {
       if (field === "mute_control" && mapping && typeof mapping === "object") {
-        mapping.mute_behavior = normalizeMuteBehavior(mapping.mute_behavior || binding.mute_behavior);
+        mapping.mute_behavior = normalizeMuteBehavior(
+          mapping.mute_behavior || binding.mute_behavior,
+        );
       }
-      binding[field] = mapping;
+      setControlMapping(binding, field, mapping);
       if (field === "indicator_control") binding.feedback_enabled = true;
     }
     if (sameBindingTransfer) {
@@ -89,6 +102,13 @@ export function createMappingAssignment({
 
     const conflict = findMappingConflict(binding.id, field, mapping);
     if (conflict) {
+      if (conflict.binding.id === binding.id && conflict.field === "control") {
+        setLearnPanelTransfer(
+          t("bindings.modifierPrimaryConflict"),
+          { allowTransfer: false },
+        );
+        return;
+      }
       const ownerName = conflict.binding.name || "Binding";
       const ownerSlot = conflictFieldLabel(conflict.field, conflict.binding);
       const message =
@@ -116,9 +136,11 @@ export function createMappingAssignment({
       binding.mode = mapping.mode || binding.mode || "Absolute";
     } else {
       if (field === "mute_control" && mapping && typeof mapping === "object") {
-        mapping.mute_behavior = normalizeMuteBehavior(mapping.mute_behavior || binding.mute_behavior);
+        mapping.mute_behavior = normalizeMuteBehavior(
+          mapping.mute_behavior || binding.mute_behavior,
+        );
       }
-      binding[field] = mapping;
+      setControlMapping(binding, field, mapping);
       if (field === "indicator_control") binding.feedback_enabled = true;
     }
     editorState.acceptedTransfers.delete(field);
@@ -163,7 +185,13 @@ export function createMappingAssignment({
     editorState.learnField = field;
     updateAuxLearnUi();
     setLearnPanelWaiting();
-    await invoke("start_midi_learn");
+    try {
+      await invoke("start_midi_learn");
+    } catch {
+      stopAuxLearn();
+      return;
+    }
+    if (editorState.learnField !== field) return;
     if (editorState.learnTimer) clearInterval(editorState.learnTimer);
     editorState.learnTimer = setInterval(async () => {
       try {
@@ -173,7 +201,8 @@ export function createMappingAssignment({
         stopAuxLearn({ closePanel: false });
         if (!targetField) return;
         const isFaderFeedbackOutput =
-          targetField === "indicator_control" && !effectiveIsButton(getConfigBinding());
+          targetField === "indicator_control" &&
+          !effectiveIsButton(getConfigBinding());
         const mapping =
           targetField === "indicator_control"
             ? normalizeIndicatorControl(learned, {
@@ -182,10 +211,14 @@ export function createMappingAssignment({
               })
             : normalizeAuxControl(learned);
         if (!mapping) {
+          stopAuxLearn();
           renderConfigModal();
           return;
         }
-        if (targetField === "indicator_control" && !effectiveIsButton(getConfigBinding())) {
+        if (
+          targetField === "indicator_control" &&
+          !effectiveIsButton(getConfigBinding())
+        ) {
           mapping.control_kind = "Continuous";
         }
         await applyAuxMapping(targetField, mapping);

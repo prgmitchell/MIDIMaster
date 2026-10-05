@@ -33,6 +33,7 @@ mod runtime_helpers;
 mod runtime_midi;
 mod settings_services;
 mod shutdown;
+mod solo;
 mod soundboard;
 mod store_api;
 mod telemetry;

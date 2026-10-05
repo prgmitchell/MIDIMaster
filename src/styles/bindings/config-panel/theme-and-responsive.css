@@ -359,10 +359,13 @@ body[data-theme] .binding-config-midi-control {
       "name"
       "curve"
       "feedback"
-      "mute"
-      "assign"
+      "led"
       "live"
-      "learn";
+      "modifiers";
+    grid-template-rows: none;
+  }
+  .binding-config-panel--fader .binding-config-section--modifiers {
+    height: 280px;
   }
 }
 

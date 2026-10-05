@@ -1,3 +1,4 @@
+import { createFaderModifiers } from "./controllers/fader_modifiers.js";
 import { createSoundboardWorkspace } from "./controllers/soundboard_workspace.js";
 import { createCurveWorkspace } from "./controllers/curve_workspace.js";
 import { createMacroWorkspace } from "./controllers/macro_workspace.js";
@@ -300,6 +301,7 @@ export function createBindingsFeature({
     );
 
     bindConfigModalUi();
+    bindModifiersUi();
     bindBindingTypeFilterUi();
     bindBindingDensityUi();
     if (elements.bindingSearchInput) {
@@ -451,13 +453,17 @@ export function createBindingsFeature({
     t,
   });
 
+  const { renderModifiers, bindModifiersUi, updateModifierLearnUi, disposeModifiers, discardUnmappedModifiers } = createFaderModifiers({
+    elements, editorState, getConfigBinding: (...args) => getConfigBinding(...args), lifetime,
+    startAuxLearn: (...args) => startAuxLearn(...args), t,
+    renderMidiMappingSummary: (...args) => renderMidiMappingSummary(...args),
+  });
+
   const {
     updateAuxLearnUi,
     stopAuxLearn,
     renderMidiMappingSummary,
     formatPreviewMidiValue,
-    renderAssignMappingLabel,
-    renderMuteMappingLabel,
     normalizeAuxControl,
     getConfigBinding,
   } = createMidiLearn({
@@ -468,6 +474,8 @@ export function createBindingsFeature({
     listState,
     renderConfigPreview: (...args) => renderConfigPreview(...args),
     syncFeedbackControllerInputState,
+    updateModifierLearnUi,
+    discardUnmappedModifiers,
     t,
   });
 
@@ -561,10 +569,8 @@ export function createBindingsFeature({
   const { closeConfigModal, getBindingById, renderConfigModal } = createConfigModal({
     cancelMacroDrag,
     clearTransferPrompt,
-    closeAssignModeMenu: (...args) => closeAssignModeMenu(...args),
     closeCurvePresetForm,
     closeCurvePresetMenu,
-    closeMuteModeMenu: (...args) => closeMuteModeMenu(...args),
     curveState,
     elements,
     editorState,
@@ -576,13 +582,12 @@ export function createBindingsFeature({
     loadSoundboardAnalysis,
     macroState,
     persistBindingBackend: (...args) => persistBindingBackend(...args),
-    renderAssignMappingLabel,
     renderBindings: (...args) => renderBindings(...args),
     renderConfigPreview,
     renderCurveCards,
     renderCustomCurveEditor,
     renderMacroEditor,
-    renderMuteMappingLabel,
+    renderModifiers,
     renderSoundboardEditor,
     restoreConfigPreviewBindings,
     setBindings,
@@ -590,24 +595,14 @@ export function createBindingsFeature({
     stopAuxLearn,
     stopConfigPreviewTimer,
     stopSoundboardPreview,
-    syncAssignModeUi: (...args) => syncAssignModeUi(...args),
     syncButtonLightUi: (...args) => syncButtonLightUi(...args),
     syncCurvePresetToolbar,
     syncFeedbackOutputUi,
-    syncMuteModeUi: (...args) => syncMuteModeUi(...args),
     t,
     updateAuxLearnUi,
   });
 
-  const {
-    syncButtonLightUi,
-    closeMuteModeMenu,
-    openMuteModeMenu,
-    closeAssignModeMenu,
-    openAssignModeMenu,
-    syncAssignModeUi,
-    syncMuteModeUi,
-  } = createAuxiliaryModes({
+  const { syncButtonLightUi } = createAuxiliaryModes({
     buttonLightSelectValue,
     elements,
     listState,
@@ -626,6 +621,7 @@ export function createBindingsFeature({
   );
 
   const { commitTransferPrompt, startPrimaryLearn, startAuxLearn } = createMappingAssignment({
+    t,
     applyPrimaryControlPreview,
     clearTransferPrompt,
     editorState,
@@ -738,11 +734,9 @@ export function createBindingsFeature({
     addCustomCurvePoint,
     cancelMacroDrag,
     clearTransferPrompt,
-    closeAssignModeMenu,
     closeConfigModal,
     closeCurvePresetForm,
     closeCurvePresetMenu,
-    closeMuteModeMenu,
     commitTransferPrompt,
     curveState,
     customCurveSurfaceFromEvent,
@@ -753,28 +747,22 @@ export function createBindingsFeature({
     getConfigBinding,
     hotkeyLearn,
     listState,
-    openAssignModeMenu,
     openCurvePresetForm,
-    openMuteModeMenu,
     removeCustomCurvePoint,
-    renderAssignMappingLabel,
     renderButtonLightDropdown,
     renderConfigModal,
     renderConfigPreview,
     renderCurvePresetMenu,
     renderIndicatorDropdowns,
-    renderMuteMappingLabel,
     saveConfigModal,
     setCurvePresetMenuOpen,
     startAuxLearn,
     startPrimaryLearn,
     stopAuxLearn,
     submitCurvePresetForm,
-    syncAssignModeUi,
     syncButtonLightUi,
     syncFeedbackOutputUi,
     syncIndicatorUi,
-    syncMuteModeUi,
     t,
     updateAuxLearnUi,
     updateCustomCurveFromPointer,
@@ -785,6 +773,7 @@ export function createBindingsFeature({
 
   function dispose() {
     lifetime.dispose();
+    disposeModifiers();
     hotkeyLearn.stop();
     stopAuxLearn();
     stopConfigPreviewTimer();

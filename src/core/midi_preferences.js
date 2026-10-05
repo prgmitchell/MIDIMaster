@@ -1,19 +1,39 @@
 export function normalizeMidiPreference(source) {
-  const current = (source && typeof source === "object") ? source : {};
+  const current = source && typeof source === "object" ? source : {};
   const routes = normalizeMidiRoutes(current);
   const first = routes[0] || {};
   return {
-    inputDeviceId: String(first.inputDeviceId || current.inputDeviceId || current.input_device_id || "").trim(),
-    outputDeviceId: String(first.outputDeviceId || current.outputDeviceId || current.output_device_id || "").trim(),
-    inputDeviceName: String(first.inputDeviceName || current.inputDeviceName || current.input_device_name || "").trim(),
-    outputDeviceName: String(first.outputDeviceName || current.outputDeviceName || current.output_device_name || "").trim(),
+    inputDeviceId: String(
+      first.inputDeviceId ||
+        current.inputDeviceId ||
+        current.input_device_id ||
+        "",
+    ).trim(),
+    outputDeviceId: String(
+      first.outputDeviceId ||
+        current.outputDeviceId ||
+        current.output_device_id ||
+        "",
+    ).trim(),
+    inputDeviceName: String(
+      first.inputDeviceName ||
+        current.inputDeviceName ||
+        current.input_device_name ||
+        "",
+    ).trim(),
+    outputDeviceName: String(
+      first.outputDeviceName ||
+        current.outputDeviceName ||
+        current.output_device_name ||
+        "",
+    ).trim(),
     routes,
     configured: Boolean(
-      current.configured
-      ?? current.midiDevicePreferenceSet
-      ?? current.midi_device_preference_set
-      ?? current.midi_device_preference_configured
-      ?? (routes.length > 0)
+      current.configured ??
+        current.midiDevicePreferenceSet ??
+        current.midi_device_preference_set ??
+        current.midi_device_preference_configured ??
+        routes.length > 0,
     ),
   };
 }
@@ -24,29 +44,43 @@ export function hasMidiPreference(source) {
 }
 
 export function normalizeMidiRoute(source) {
-  const current = (source && typeof source === "object") ? source : {};
-  const inputDeviceId = String(current.inputDeviceId || current.input_device_id || "").trim();
-  const outputDeviceId = String(current.outputDeviceId || current.output_device_id || "").trim();
+  const current = source && typeof source === "object" ? source : {};
+  const inputDeviceId = String(
+    current.inputDeviceId || current.input_device_id || "",
+  ).trim();
+  const outputDeviceId = String(
+    current.outputDeviceId || current.output_device_id || "",
+  ).trim();
   if (!inputDeviceId || !outputDeviceId) return null;
   return {
     inputDeviceId,
     outputDeviceId,
-    inputDeviceName: String(current.inputDeviceName || current.input_device_name || "").trim(),
-    outputDeviceName: String(current.outputDeviceName || current.output_device_name || "").trim(),
+    inputDeviceName: String(
+      current.inputDeviceName || current.input_device_name || "",
+    ).trim(),
+    outputDeviceName: String(
+      current.outputDeviceName || current.output_device_name || "",
+    ).trim(),
     enabled: current.enabled !== false,
   };
 }
 
 export function normalizeMidiRoutes(source) {
-  const current = (source && typeof source === "object") ? source : {};
+  const current = source && typeof source === "object" ? source : {};
   const rawRoutes = Array.isArray(current.routes)
     ? current.routes
-    : (Array.isArray(current.midi_device_routes) ? current.midi_device_routes : []);
+    : Array.isArray(current.midi_device_routes)
+      ? current.midi_device_routes
+      : [];
   const routes = [];
 
   rawRoutes.forEach((raw) => {
     const route = normalizeMidiRoute(raw);
-    if (!route || routes.some((existing) => sameInputRouteIdentity(existing, route))) return;
+    if (
+      !route ||
+      routes.some((existing) => sameInputRouteIdentity(existing, route))
+    )
+      return;
     routes.push(route);
   });
 
@@ -89,27 +123,31 @@ export function buildPersistedMidiPreference(source) {
 
 export function stripUnavailableMidiSuffix(label) {
   const raw = String(label || "").trim();
-  return raw.endsWith(" (Unavailable)") ? raw.slice(0, -" (Unavailable)".length) : raw;
+  return raw.endsWith(" (Unavailable)")
+    ? raw.slice(0, -" (Unavailable)".length)
+    : raw;
 }
 
 export function applyBindingDeviceMigrations(binding, migrations) {
-  const current = (binding && typeof binding === "object") ? binding : {};
-  const applicable = (Array.isArray(migrations) ? migrations : [])
-    .filter((migration) => String(migration?.bindingId || "") === String(current.id || ""));
+  const current = binding && typeof binding === "object" ? binding : {};
+  const applicable = (Array.isArray(migrations) ? migrations : []).filter(
+    (migration) =>
+      String(migration?.bindingId || "") === String(current.id || ""),
+  );
   if (applicable.length === 0) return binding;
 
   const migratedDeviceId = (deviceId) => {
     const value = String(deviceId || "");
-    const migration = applicable.find((candidate) => (
-      candidate.previousDeviceId && candidate.previousDeviceId === value
-    ));
+    const migration = applicable.find(
+      (candidate) =>
+        candidate.previousDeviceId && candidate.previousDeviceId === value,
+    );
     return migration ? migration.deviceId : value;
   };
-  const migratedControl = (control) => (
+  const migratedControl = (control) =>
     control && typeof control === "object"
       ? { ...control, device_id: migratedDeviceId(control.device_id) }
-      : control
-  );
+      : control;
 
   return {
     ...current,
@@ -117,16 +155,34 @@ export function applyBindingDeviceMigrations(binding, migrations) {
     mute_control: migratedControl(current.mute_control),
     assign_control: migratedControl(current.assign_control),
     indicator_control: migratedControl(current.indicator_control),
-    ...("led_control" in current ? { led_control: migratedControl(current.led_control) } : {}),
+    ...(Array.isArray(current.modifiers)
+      ? {
+          modifiers: current.modifiers.map((item) => ({
+            ...item,
+            control: migratedControl(item.control),
+          })),
+        }
+      : {}),
+    ...("led_control" in current
+      ? { led_control: migratedControl(current.led_control) }
+      : {}),
   };
 }
 
 function sameInputRouteIdentity(left, right) {
-  const leftInputId = String(left?.inputDeviceId || left?.input_device_id || "").trim();
-  const rightInputId = String(right?.inputDeviceId || right?.input_device_id || "").trim();
+  const leftInputId = String(
+    left?.inputDeviceId || left?.input_device_id || "",
+  ).trim();
+  const rightInputId = String(
+    right?.inputDeviceId || right?.input_device_id || "",
+  ).trim();
   if (!leftInputId || leftInputId !== rightInputId) return false;
 
-  const leftName = stripUnavailableMidiSuffix(left?.inputDeviceName || left?.input_device_name || "");
-  const rightName = stripUnavailableMidiSuffix(right?.inputDeviceName || right?.input_device_name || "");
+  const leftName = stripUnavailableMidiSuffix(
+    left?.inputDeviceName || left?.input_device_name || "",
+  );
+  const rightName = stripUnavailableMidiSuffix(
+    right?.inputDeviceName || right?.input_device_name || "",
+  );
   return !(leftName && rightName && leftName !== rightName);
 }

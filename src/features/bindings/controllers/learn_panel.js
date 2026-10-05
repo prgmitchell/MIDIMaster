@@ -22,11 +22,16 @@ export function createLearnPanel({
 
   function resetLearnPanelUi() {
     if (!hasLearnPanelSupport()) return;
-    if (elements.learnPanelTitle) elements.learnPanelTitle.textContent = defaultLearnPanelTitle();
-    if (elements.learnPanelMessage) elements.learnPanelMessage.textContent = defaultLearnPanelMessage();
-    if (elements.learnPanelSpinner) elements.learnPanelSpinner.classList.remove("hidden");
-    if (elements.learnPanelActions) elements.learnPanelActions.classList.add("hidden");
-    if (elements.learnPanelCancel) elements.learnPanelCancel.textContent = t("common.cancel");
+    if (elements.learnPanelTitle)
+      elements.learnPanelTitle.textContent = defaultLearnPanelTitle();
+    if (elements.learnPanelMessage)
+      elements.learnPanelMessage.textContent = defaultLearnPanelMessage();
+    if (elements.learnPanelSpinner)
+      elements.learnPanelSpinner.classList.remove("hidden");
+    if (elements.learnPanelActions)
+      elements.learnPanelActions.classList.add("hidden");
+    if (elements.learnPanelCancel)
+      elements.learnPanelCancel.textContent = t("common.cancel");
     if (elements.learnPanelConfirm) {
       elements.learnPanelConfirm.textContent = t("common.transfer");
       elements.learnPanelConfirm.classList.remove("hidden");
@@ -46,23 +51,34 @@ export function createLearnPanel({
 
   function setLearnPanelWaiting() {
     if (!hasLearnPanelSupport()) return;
-    if (elements.learnPanelTitle) elements.learnPanelTitle.textContent = defaultLearnPanelTitle();
-    if (elements.learnPanelMessage) elements.learnPanelMessage.textContent = defaultLearnPanelMessage();
-    if (elements.learnPanelSpinner) elements.learnPanelSpinner.classList.remove("hidden");
-    if (elements.learnPanelActions) elements.learnPanelActions.classList.add("hidden");
+    if (elements.learnPanelTitle)
+      elements.learnPanelTitle.textContent = defaultLearnPanelTitle();
+    if (elements.learnPanelMessage)
+      elements.learnPanelMessage.textContent = defaultLearnPanelMessage();
+    if (elements.learnPanelSpinner)
+      elements.learnPanelSpinner.classList.remove("hidden");
+    if (elements.learnPanelActions)
+      elements.learnPanelActions.classList.add("hidden");
     showLearnPanel();
   }
 
-  function setLearnPanelTransfer(message) {
+  function setLearnPanelTransfer(message, { allowTransfer = true } = {}) {
     if (!hasLearnPanelSupport()) return;
-    if (elements.learnPanelTitle) elements.learnPanelTitle.textContent = t("bindings.transferMapping");
-    if (elements.learnPanelMessage) elements.learnPanelMessage.textContent = message || "";
-    if (elements.learnPanelSpinner) elements.learnPanelSpinner.classList.add("hidden");
-    if (elements.learnPanelActions) elements.learnPanelActions.classList.remove("hidden");
-    if (elements.learnPanelCancel) elements.learnPanelCancel.textContent = t("common.cancel");
+    if (elements.learnPanelTitle)
+      elements.learnPanelTitle.textContent = allowTransfer
+        ? t("bindings.transferMapping")
+        : defaultLearnPanelTitle();
+    if (elements.learnPanelMessage)
+      elements.learnPanelMessage.textContent = message || "";
+    if (elements.learnPanelSpinner)
+      elements.learnPanelSpinner.classList.add("hidden");
+    if (elements.learnPanelActions)
+      elements.learnPanelActions.classList.remove("hidden");
+    if (elements.learnPanelCancel)
+      elements.learnPanelCancel.textContent = t("common.cancel");
     if (elements.learnPanelConfirm) {
       elements.learnPanelConfirm.textContent = t("common.transfer");
-      elements.learnPanelConfirm.classList.remove("hidden");
+      elements.learnPanelConfirm.classList.toggle("hidden", !allowTransfer);
     }
     showLearnPanel();
   }

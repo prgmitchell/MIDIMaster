@@ -10,6 +10,7 @@ import {
   clamp01,
   setStatus,
 } from "./protocol.js";
+import { createWaveLinkSolo } from "./solo.js";
 
 /** integration workflow. */
 export function createIntegration({
@@ -27,6 +28,7 @@ export function createIntegration({
   queueVolumeWrite,
   rememberLocalVolumeIntent,
   sendJsonRpc,
+  requestJsonRpc,
   setChannelEffectEnabled,
   setMainOutputDevice,
   state,
@@ -38,6 +40,7 @@ export function createIntegration({
       name: "Wave Link",
       icon_data: iconDataUrl || null,
       buttonActions: [{ label: "Toggle Mute", value: "ToggleMute" }],
+      createSoloPlan: createWaveLinkSolo({ state, requestJsonRpc }),
       describeTarget: (target) => {
         const t = target?.Integration || target?.integration;
         const data = t?.data || {};

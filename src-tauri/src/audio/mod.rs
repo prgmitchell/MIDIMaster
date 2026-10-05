@@ -1,5 +1,12 @@
 use crate::model::SessionInfo;
 
+#[derive(Clone, Debug)]
+pub struct SoloAudioSource {
+    pub session: SessionInfo,
+    pub device_id: String,
+    pub wave_link_channel_id: Option<String>,
+}
+
 pub trait AudioBackend: Send + Sync {
     /// Created and used entirely on the meter worker, never moved between threads.
     fn create_meter(&self) -> Option<Box<dyn crate::audio_feedback::AudioMeter>> {
@@ -8,6 +15,18 @@ pub trait AudioBackend: Send + Sync {
     fn list_sessions(&self) -> anyhow::Result<Vec<SessionInfo>>;
     fn list_session_states(&self) -> anyhow::Result<Vec<SessionInfo>> {
         self.list_sessions()
+    }
+    fn list_solo_sources(&self) -> anyhow::Result<Vec<SoloAudioSource>> {
+        Ok(self
+            .list_session_states()?
+            .into_iter()
+            .filter(|session| !session.is_master)
+            .map(|session| SoloAudioSource {
+                session,
+                device_id: String::new(),
+                wave_link_channel_id: None,
+            })
+            .collect())
     }
     fn list_playback_devices(&self) -> anyhow::Result<Vec<crate::model::PlaybackDeviceInfo>>;
     fn list_recording_devices(&self) -> anyhow::Result<Vec<crate::model::PlaybackDeviceInfo>>;

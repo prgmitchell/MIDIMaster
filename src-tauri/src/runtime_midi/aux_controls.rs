@@ -67,20 +67,31 @@ pub(super) fn handle_aux_or_unmatched(
     event: &MidiEvent,
 ) -> Result<(), String> {
     let aux_match = profile.bindings.iter().find_map(|candidate| {
-        if let Some(mapping) = candidate.mute_control.as_ref() {
+        for (kind, mapping, mode) in candidate.modifier_controls() {
             if AppState::binding_matches_aux(mapping, event) {
-                return Some((candidate.clone(), "mute", mapping.clone()));
-            }
-        }
-        if let Some(mapping) = candidate.assign_control.as_ref() {
-            if AppState::binding_matches_aux(mapping, event) {
-                return Some((candidate.clone(), "assign", mapping.clone()));
+                let role = match kind {
+                    model::FaderModifierKind::Mute => "mute",
+                    model::FaderModifierKind::Solo => "solo",
+                    model::FaderModifierKind::Assign => "assign",
+                };
+                return Some((candidate.clone(), role, mapping.clone(), mode.clone()));
             }
         }
         None
     });
 
-    if let Some((owner, role, aux_mapping)) = aux_match {
+    if let Some((owner, role, aux_mapping, assign_mode)) = aux_match {
+        if role == "solo" {
+            if event.value == 0 {
+                state.solo.send_feedback(state, &owner);
+            }
+            let _ = app.emit("binding_solo_input", serde_json::json!({
+                "binding_id": owner.id, "value": event.value,
+                "behavior": aux_mapping.mute_behavior,
+                "control_key": format!("{}:{}:{}:{:?}", event.device_id, event.channel, event.controller, event.msg_type),
+            }));
+            return Ok(());
+        }
         let mut targets = owner.normalized_targets();
         targets.retain(|t| *t != model::BindingTarget::Unset);
         if role == "mute" && targets.is_empty() {
@@ -156,7 +167,7 @@ pub(super) fn handle_aux_or_unmatched(
         }
 
         if role == "assign" {
-            let transition = resolve_assign_transition(&owner.assign_mode, !targets.is_empty());
+            let transition = resolve_assign_transition(&assign_mode, !targets.is_empty());
             let new_target = if transition == AssignTransition::ClearTargets {
                 None
             } else {
@@ -323,22 +334,25 @@ pub(super) fn handle_aux_or_unmatched(
             );
             return Ok(());
         }
-        if let Ok(mut feedback) = state.feedback_values.lock() {
-            feedback.insert(key.clone(), if next_muted { 1.0 } else { 0.0 });
+        for (_, control, _) in owner
+            .modifier_controls()
+            .filter(|(kind, _, _)| *kind == model::FaderModifierKind::Mute)
+        {
+            feedback::send_feedback_to_control(
+                state,
+                &feedback::FeedbackControlKey::from_aux(control),
+                feedback::FeedbackSendOptions {
+                    value: if next_muted { 1.0 } else { 0.0 },
+                    silent: false,
+                    force_hardware_feedback: true,
+                    context: &format!("mute_aux:{}", owner.id),
+                },
+            );
         }
         state.set_binding_action_value(
             &BindingKey::from_binding(&owner),
             if next_muted { 1.0 } else { 0.0 },
         );
-        if let Ok(mut midi) = state.midi.lock() {
-            let _ = midi.send_feedback(
-                &aux_mapping.device_id,
-                aux_mapping.channel,
-                aux_mapping.controller,
-                if next_muted { 1.0 } else { 0.0 },
-                aux_mapping.msg_type.clone(),
-            );
-        }
 
         if let Ok(mut last_update) = state.osd_last_update.lock() {
             *last_update = Some(Instant::now());

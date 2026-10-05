@@ -1,4 +1,4 @@
-// Declarative markup: kept intact to preserve DOM hierarchy and CSS selectors.
+// Shared configuration markup for faders, buttons, and their specialized editors.
 export const bindingsTemplate = `<div id="binding-config-panel" class="target-panel hidden">
     <div class="target-panel-content binding-config-content">
       <div class="target-panel-header">
@@ -285,92 +285,6 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
               </div>
             </section>
 
-            <section id="binding-config-mute-section" class="binding-config-section binding-config-section--mute">
-              <span class="binding-config-title binding-config-title-with-action">
-                <span data-i18n="bindings.mute">Mute</span>
-                <div id="binding-config-mute-mode-root" class="binding-config-mode-root">
-                  <button
-                    id="binding-config-mute-mode-button"
-                    type="button"
-                    class="binding-config-mode-trigger"
-                    title="Mute behavior: Toggle on press"
-                    aria-label="Mute behavior"
-                    data-i18n-title="bindings.muteBehaviorToggle"
-                    data-i18n-aria-label="bindings.muteBehavior"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                  >
-                    <svg class="binding-config-mode-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <circle cx="12" cy="12" r="3"></circle>
-                      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
-                    </svg>
-                  </button>
-                  <div id="binding-config-mute-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Mute behavior options" data-i18n-aria-label="bindings.muteBehaviorOptions">
-                    <button id="binding-config-mute-mode-toggle" type="button" class="binding-config-mode-option" data-mode="ToggleOnPress" role="menuitem" data-i18n="bindings.toggle">Toggle</button>
-                    <button id="binding-config-mute-mode-value" type="button" class="binding-config-mode-option" data-mode="SetFromValue" role="menuitem" data-i18n="common.match">Match</button>
-                  </div>
-                </div>
-              </span>
-              <div class="binding-config-actions">
-                <span id="binding-config-mute-label" class="binding-config-label" data-i18n="bindings.notMapped">Not mapped</span>
-                <button id="binding-config-mute-learn" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Learn" title="Learn" data-i18n-aria-label="common.learn" data-i18n-title="common.learn">
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <circle cx="12" cy="12" r="7"></circle>
-                    <circle cx="12" cy="12" r="2.5"></circle>
-                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
-                  </svg>
-                </button>
-                <button id="binding-config-mute-clear" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Clear" title="Clear" data-i18n-aria-label="common.clear" data-i18n-title="common.clear">
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M6 6l12 12M18 6 6 18"></path>
-                  </svg>
-                </button>
-              </div>
-            </section>
-
-            <section id="binding-config-assign-section" class="binding-config-section binding-config-section--assign">
-              <span class="binding-config-title binding-config-title-with-action">
-                <span data-i18n="common.assign">Assign</span>
-                <div id="binding-config-assign-mode-root" class="binding-config-mode-root">
-                  <button
-                    id="binding-config-assign-mode-button"
-                    type="button"
-                    class="binding-config-mode-trigger"
-                    title="Assign mode: Add"
-                    aria-label="Assign mode"
-                    data-i18n-title="bindings.assignModeAdd"
-                    data-i18n-aria-label="bindings.assignMode"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                  >
-                    <svg class="binding-config-mode-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <circle cx="12" cy="12" r="3"></circle>
-                      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 0 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 0 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 0 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
-                    </svg>
-                  </button>
-                  <div id="binding-config-assign-mode-menu" class="binding-config-mode-menu hidden" role="menu" aria-label="Assign mode options" data-i18n-aria-label="bindings.assignModeOptions">
-                    <button id="binding-config-assign-mode-add" type="button" class="binding-config-mode-option" data-mode="Add" role="menuitem" data-i18n="common.add">Add</button>
-                    <button id="binding-config-assign-mode-replace" type="button" class="binding-config-mode-option" data-mode="Replace" role="menuitem" data-i18n="bindings.replace">Replace</button>
-                    <button id="binding-config-assign-mode-clear" type="button" class="binding-config-mode-option" data-mode="Clear" role="menuitem" data-i18n="common.clear">Clear</button>
-                  </div>
-                </div>
-              </span>
-              <div class="binding-config-actions">
-                <span id="binding-config-assign-label" class="binding-config-label" data-i18n="bindings.notMapped">Not mapped</span>
-                <button id="binding-config-assign-learn" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Learn" title="Learn" data-i18n-aria-label="common.learn" data-i18n-title="common.learn">
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <circle cx="12" cy="12" r="7"></circle>
-                    <circle cx="12" cy="12" r="2.5"></circle>
-                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
-                  </svg>
-                </button>
-                <button id="binding-config-assign-clear" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Clear" title="Clear" data-i18n-aria-label="common.clear" data-i18n-title="common.clear">
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M6 6l12 12M18 6 6 18"></path>
-                  </svg>
-                </button>
-              </div>
-            </section>
           </div>
 
           <aside class="binding-config-preview-column">
@@ -434,8 +348,6 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                       </div>
                     </div>
                   </section>
-                </div>
-              </div>
               <div id="binding-config-preview-learn-shell" class="binding-config-preview-learn-shell">
                 <div class="binding-config-title-row">
                   <span class="binding-config-title" data-i18n="common.learn">Learn</span>
@@ -448,14 +360,36 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                   </div>
                 </div>
               </div>
+                </div>
+              </div>
             </section>
+              <section id="binding-config-modifiers-section" class="binding-config-section binding-config-section--modifiers hidden">
+                <div class="binding-config-title-row">
+                  <span class="binding-config-title" data-i18n="bindings.modifiers">Modifiers</span>
+                  <div class="binding-config-modifier-toolbar">
+                    <button id="binding-config-modifier-add" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Add modifier" data-i18n-aria-label="bindings.addModifier" title="Add modifier" data-i18n-title="bindings.addModifier" aria-haspopup="menu" aria-expanded="false">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg>
+                    </button>
+                    <button id="binding-config-modifier-remove" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Remove selected modifier" data-i18n-aria-label="bindings.removeModifier" title="Remove selected modifier" data-i18n-title="bindings.removeModifier" disabled>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16" /></svg>
+                    </button>
+                    <div id="binding-config-modifier-menu" class="binding-config-mode-menu hidden" role="menu">
+                      <button type="button" class="binding-config-mode-option" data-modifier-kind="Mute" role="menuitem" data-i18n="bindings.mute">Mute</button>
+                      <button type="button" class="binding-config-mode-option" data-modifier-kind="Solo" role="menuitem" data-i18n="bindings.solo">Solo</button>
+                      <button type="button" class="binding-config-mode-option" data-modifier-kind="Assign" role="menuitem" data-i18n="common.assign">Assign</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="binding-config-toggle-help" data-i18n="bindings.modifiersHelp">Add mute, solo, or assign actions for this fader. Multiple modifiers can be added.</p>
+                <div id="binding-config-modifiers-list" class="binding-config-modifiers-list"></div>
+              </section>
           </aside>
         </div>
 
+      </div>
         <div class="binding-config-footer">
           <button id="binding-config-cancel" type="button" class="binding-config-button binding-config-button--secondary" data-i18n="common.cancel">Cancel</button>
           <button id="binding-config-save" type="button" class="binding-config-button binding-config-button--primary" data-i18n="common.save">Save</button>
         </div>
-      </div>
     </div>
   </div>`;

@@ -1,5 +1,12 @@
 use std::path::Path;
 
+pub(super) fn split_session_id(session_id: &str) -> (Option<&str>, &str) {
+    session_id
+        .split_once('|')
+        .map(|(device, inner)| (Some(device), inner))
+        .unwrap_or((None, session_id))
+}
+
 fn normalize_name(value: &str) -> String {
     value.trim().to_lowercase()
 }

@@ -99,6 +99,7 @@ pub(crate) struct AppState {
     pub(crate) focus_volume_failure_logs: Mutex<HashMap<String, Instant>>,
     pub(crate) mute_transition_until: Mutex<HashMap<BindingKey, Instant>>,
     pub(crate) last_target_mute_state: Mutex<HashMap<BindingKey, bool>>,
+    pub(crate) solo: crate::solo::SoloRuntime,
     pub(crate) learn_pending: Mutex<bool>,
     pub(crate) learn_candidate: Mutex<Option<LearnCandidate>>,
     pub(crate) learned_control: Mutex<Option<LearnedControl>>,
@@ -259,6 +260,7 @@ impl AppState {
             focus_volume_failure_logs: Mutex::new(HashMap::new()),
             mute_transition_until: Mutex::new(HashMap::new()),
             last_target_mute_state: Mutex::new(HashMap::new()),
+            solo: crate::solo::SoloRuntime::default(),
             learn_pending: Mutex::new(false),
             learn_candidate: Mutex::new(None),
             learned_control: Mutex::new(None),
@@ -671,7 +673,7 @@ impl AppState {
 
         for binding in &profile.bindings {
             let key = BindingKey::from_binding(binding);
-            if let Some((assign_control, value)) = feedback::assign_button_feedback(binding) {
+            for (assign_control, value) in feedback::assign_buttons_feedback(binding) {
                 feedback.insert(assign_control.to_binding_key(), value);
             }
             if !binding.feedback_enabled && !binding.has_led_feedback() {

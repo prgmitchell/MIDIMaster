@@ -1,7 +1,10 @@
-use crate::audio::target_match::{application_name_matches, ApplicationMatchInfo};
+use crate::audio::target_match::{
+    application_name_matches, split_session_id, ApplicationMatchInfo,
+};
 use crate::audio::AudioBackend;
 #[path = "windows/meter.rs"]
 mod meter;
+mod solo_sources;
 use crate::device_target::{parse_device_target, DeviceTargetKind};
 use crate::model::{PlaybackDeviceInfo, SessionInfo};
 use anyhow::{anyhow, Result};
@@ -211,6 +214,10 @@ impl AudioBackend for WindowsAudioBackend {
 
     fn list_session_states(&self) -> Result<Vec<SessionInfo>> {
         list_sessions_with_visuals(false)
+    }
+
+    fn list_solo_sources(&self) -> Result<Vec<crate::audio::SoloAudioSource>> {
+        solo_sources::list_sources()
     }
 
     fn list_playback_devices(&self) -> Result<Vec<PlaybackDeviceInfo>> {
@@ -867,14 +874,6 @@ fn optional_identity_match(left: Option<&str>, right: Option<&str>) -> bool {
             !left.trim().is_empty() && left.trim().eq_ignore_ascii_case(right.trim())
         }
         _ => false,
-    }
-}
-
-fn split_session_id(session_id: &str) -> (Option<&str>, &str) {
-    if let Some((device_id, inner)) = session_id.split_once('|') {
-        (Some(device_id), inner)
-    } else {
-        (None, session_id)
     }
 }
 

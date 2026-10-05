@@ -1,4 +1,9 @@
-import { cloneBindingDraft, normalizeControlKind, ensureBindingShape } from "../shape_helpers.js";
+import { setControlMapping } from "../../../core/fader_modifiers.js";
+import {
+  cloneBindingDraft,
+  normalizeControlKind,
+  ensureBindingShape,
+} from "../shape_helpers.js";
 import { normalizeRelativeFormat } from "../../../core/binding_model.js";
 
 /** edit preview workflow. */
@@ -14,7 +19,9 @@ export function createEditPreview({
   syncPluginHostBindings,
 }) {
   function cloneBindingsList(list) {
-    return (Array.isArray(list) ? list : []).map((binding) => cloneBindingDraft(binding)).filter(Boolean);
+    return (Array.isArray(list) ? list : [])
+      .map((binding) => cloneBindingDraft(binding))
+      .filter(Boolean);
   }
 
   function rememberConfigPreviewOriginalBindings() {
@@ -32,7 +39,8 @@ export function createEditPreview({
   }
 
   function applyPrimaryPreviewFields(baseBinding, draftBinding) {
-    const next = cloneBindingDraft(baseBinding) || cloneBindingDraft(draftBinding);
+    const next =
+      cloneBindingDraft(baseBinding) || cloneBindingDraft(draftBinding);
     if (!next || !draftBinding) return next;
     next.device_id = draftBinding.device_id;
     next.control =
@@ -41,7 +49,9 @@ export function createEditPreview({
         : draftBinding.control;
     next.control_kind = normalizeControlKind(draftBinding.control_kind);
     next.mode = draftBinding.mode === "Relative" ? "Relative" : "Absolute";
-    next.relative_format = normalizeRelativeFormat(draftBinding.relative_format);
+    next.relative_format = normalizeRelativeFormat(
+      draftBinding.relative_format,
+    );
     if (Number.isFinite(Number(draftBinding.deadzone))) {
       next.deadzone = Number(draftBinding.deadzone);
     }
@@ -61,7 +71,7 @@ export function createEditPreview({
     return nextBindings.map((binding) => {
       if (binding.id !== conflictId) return binding;
       const next = cloneBindingDraft(binding);
-      next[conflict.field] = null;
+      setControlMapping(next, conflict.field, null);
       return next;
     });
   }
@@ -76,9 +86,14 @@ export function createEditPreview({
         nextBindings = applyPreviewConflict(nextBindings, entry.conflict);
       }
     }
-    const bindingIndex = nextBindings.findIndex((binding) => binding.id === editorState.bindingId);
+    const bindingIndex = nextBindings.findIndex(
+      (binding) => binding.id === editorState.bindingId,
+    );
     if (bindingIndex < 0) return null;
-    nextBindings[bindingIndex] = applyPrimaryPreviewFields(nextBindings[bindingIndex], draft);
+    nextBindings[bindingIndex] = applyPrimaryPreviewFields(
+      nextBindings[bindingIndex],
+      draft,
+    );
     return nextBindings;
   }
 
@@ -86,7 +101,9 @@ export function createEditPreview({
     const previous = cloneBindingsList(previousBindings);
     const next = cloneBindingsList(nextBindings);
     const nextById = new Map(next.map((binding) => [binding.id, binding]));
-    const previousById = new Map(previous.map((binding) => [binding.id, binding]));
+    const previousById = new Map(
+      previous.map((binding) => [binding.id, binding]),
+    );
 
     for (const binding of previous) {
       if (!nextById.has(binding.id)) {
@@ -96,7 +113,10 @@ export function createEditPreview({
 
     for (const binding of next) {
       const previousBinding = previousById.get(binding.id);
-      if (!previousBinding || bindingSnapshotKey(previousBinding) !== bindingSnapshotKey(binding)) {
+      if (
+        !previousBinding ||
+        bindingSnapshotKey(previousBinding) !== bindingSnapshotKey(binding)
+      ) {
         await persistBindingBackend(binding);
       }
     }
@@ -110,7 +130,11 @@ export function createEditPreview({
     renderBindings();
     syncPluginHostBindings();
     try {
-      await persistBindingsDiff(previousBindings, nextBindings, "control preview");
+      await persistBindingsDiff(
+        previousBindings,
+        nextBindings,
+        "control preview",
+      );
     } catch (err) {
       console.error("Failed to apply control preview:", err);
     }
@@ -119,12 +143,18 @@ export function createEditPreview({
   async function restoreConfigPreviewBindings() {
     if (!editorState.previewOriginalBindings) return;
     const previousBindings = cloneBindingsList(getBindings());
-    const restoredBindings = cloneBindingsList(editorState.previewOriginalBindings);
+    const restoredBindings = cloneBindingsList(
+      editorState.previewOriginalBindings,
+    );
     setBindings(restoredBindings);
     renderBindings();
     syncPluginHostBindings();
     try {
-      await persistBindingsDiff(previousBindings, restoredBindings, "control preview rollback");
+      await persistBindingsDiff(
+        previousBindings,
+        restoredBindings,
+        "control preview rollback",
+      );
     } catch (err) {
       console.error("Failed to restore control preview:", err);
     }

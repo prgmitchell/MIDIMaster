@@ -339,13 +339,14 @@
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-layout {
   display: grid;
-  flex: 1 0 auto;
-  grid-template-columns: minmax(0, 0.675fr) minmax(0, 0.675fr) minmax(270px, 0.85fr);
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(150px, 1fr);
   grid-template-areas:
-    "name name live"
-    "curve curve live"
-    "feedback feedback led"
-    "mute assign learn";
+    "name live"
+    "curve live"
+    "feedback modifiers"
+    "led modifiers";
   gap: 12px;
   align-items: stretch;
   align-content: start;
@@ -353,63 +354,19 @@
   overflow: visible;
 }
 
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-main-column {
-  display: contents;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-column {
-  display: contents;
-}
-
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-main-column,
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-column,
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-shell {
   display: contents;
-  width: 100%;
 }
 
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-actions {
-  grid-template-columns: minmax(0, 1fr) 40px 40px;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--mute .binding-config-icon-button,
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--assign .binding-config-icon-button {
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
-  padding: 0;
-  justify-self: end;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--mute,
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--assign,
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-shell {
-  gap: 8px;
-  padding: 8px 10px;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--name {
-  grid-area: name;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--curve {
-  grid-area: curve;
-  gap: 8px;
-}
-
-.binding-config-panel--fader .binding-config-curve-help {
-  height: auto;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--feedback-output {
-  grid-area: feedback;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--mute {
-  grid-area: mute;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-section--assign {
-  grid-area: assign;
-}
+.binding-config-panel--fader .binding-config-section--name { grid-area: name; }
+.binding-config-panel--fader .binding-config-section--curve { grid-area: curve; gap: 8px; }
+.binding-config-panel--fader .binding-config-section--feedback-output { grid-area: feedback; }
+.binding-config-panel--fader .binding-config-section--led { grid-area: led; align-content: start; }
+.binding-config-panel--fader .binding-config-curve-help { height: auto; }
+.binding-config-panel--fader .binding-config-curve-card-visual { height: 96px; }
+.binding-config-panel--fader .binding-config-section--led > .binding-config-toggle-help { min-height: 1.35em; }
 
 .binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-card {
   grid-area: live;
@@ -417,40 +374,75 @@
   box-sizing: border-box;
   height: auto;
   min-height: 0;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
   align-content: start;
-  padding: 10px 12px;
+  padding: 10px;
 }
 
-.binding-config-panel--fader .binding-config-preview-stage {
-  min-height: 0;
-  max-height: 310px;
-}
-
-.binding-config-panel--fader .binding-config-preview-fader {
-  min-height: 200px;
-}
-
+.binding-config-panel--fader .binding-config-preview-stage { min-height: 0; gap: 10px; padding: 10px; }
+.binding-config-panel--fader .binding-config-preview-fader { min-height: 170px; gap: 12px; }
+.binding-config-panel--fader .binding-config-preview-target { gap: 8px; }
+.binding-config-panel--fader .binding-config-preview-target-label { font-size: 16px; }
 .binding-config-panel--fader .binding-config-preview-meta {
-  grid-template-rows: auto auto;
-  align-content: start;
-  padding-top: 0;
-}
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-shell {
-  grid-area: learn;
+  grid-template-rows: auto auto minmax(0, 1fr);
   align-content: stretch;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100%;
+  min-width: 0;
+  gap: 14px;
+  padding: 0;
 }
+.binding-config-panel--fader .binding-config-preview-value { color: var(--text-primary, #ecf3ff); }
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-shell {
+  display: flex;
+  align-items: end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.binding-config-panel--fader .binding-config-preview-learn-shell > .binding-config-title-row { display: none; }
+.binding-config-panel--fader .binding-config-preview-learn-row { width: 100%; }
+.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-indicator { display: none; }
 
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-row {
-  align-content: center;
+.binding-config-section--modifiers {
+  grid-area: modifiers;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
-
-.binding-config-panel--fader:not(.binding-config-panel--macro-page) .binding-config-preview-learn-indicator {
-  display: none;
+.binding-config-section--modifiers > p { margin: 0; }
+.binding-config-panel--fader .binding-config-modifier-toolbar .binding-config-icon-button { width: 40px; min-width: 40px; height: 40px; }
+.binding-config-modifier-toolbar { position: relative; display: flex; gap: 6px; }
+.binding-config-modifier-toolbar .binding-config-mode-menu { left: auto; right: 0; top: calc(100% + 6px); bottom: auto; }
+.binding-config-modifiers-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.binding-config-modifiers-empty { margin: 0; padding: 12px 0; color: var(--text-secondary, #96a8c6); font-size: 12px; }
+.binding-config-modifier-row {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 18px 26px minmax(0, 1fr) auto 36px 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 1px solid var(--control-border, rgba(120, 144, 184, .18));
+  border-radius: 10px;
+  background: var(--control-bg, rgba(11, 18, 28, .78));
 }
+.binding-config-modifier-row.is-selected { border-color: var(--accent, #53b2ff); }
+.binding-config-modifier-grip { width: 18px; padding: 0; border: 0; background: transparent; color: var(--text-secondary, #96a8c6); cursor: grab; }
+.binding-config-modifier-grip .drag-grip { display: block; width: 10px; height: 20px; }
+.binding-config-modifier-icon { display: flex; align-items: center; color: var(--text-secondary, #96a8c6); }
+.binding-config-modifier-icon--mute { color: var(--danger, #ff5b67); }
+.binding-config-modifier-icon--solo { color: var(--warning, #ffd166); }
+.binding-config-modifier-icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.binding-config-modifier-copy { min-width: 0; display: grid; gap: 3px; color: var(--text-primary, #ecf3ff); font-size: 12px; }
+.binding-config-modifier-mapping { min-width: 0; color: var(--text-secondary, #96a8c6); }
+.binding-config-modifier-mapping .binding-config-midi-device { font-weight: 400; }
+.binding-config-modifier-dropdown { width: 84px; min-width: 0; }
+.binding-config-modifier-dropdown .target-button { width: 100%; min-height: 32px; height: 32px; border-radius: 10px; font-size: 11px; padding: 0 8px; }
+.binding-config-modifier-row .binding-config-icon-button { width: 36px; min-width: 36px; height: 36px; }
+.binding-config-modifier-row button:disabled, .binding-config-modifier-mode:disabled { opacity: .45; cursor: default; }
 
 .binding-config-panel--button .binding-config-content {
   width: min(940px, 96vw);

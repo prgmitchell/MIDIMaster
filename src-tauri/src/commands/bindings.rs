@@ -2,6 +2,25 @@ use crate::{binding_services, model, model::Binding, AppState};
 use tauri::{AppHandle, State};
 
 #[tauri::command]
+pub(crate) fn get_binding_solo_context(
+    state: State<'_, AppState>,
+    binding_id: String,
+) -> Result<crate::solo::SoloContext, String> {
+    state.solo.context(&state, &binding_id)
+}
+
+#[tauri::command]
+pub(crate) async fn set_binding_solo(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    binding_id: String,
+    active: bool,
+    wave_link: Option<crate::solo::WaveLinkSoloPlan>,
+) -> Result<(), String> {
+    crate::solo::set(&app, &state, &binding_id, active, wave_link).await
+}
+
+#[tauri::command]
 pub fn filter_focusable_applications(
     application_names: Vec<String>,
 ) -> Result<Vec<String>, String> {

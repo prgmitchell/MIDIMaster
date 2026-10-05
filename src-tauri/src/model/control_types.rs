@@ -20,6 +20,23 @@ pub struct AuxiliaryControl {
     pub mute_behavior: MuteBehavior,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum FaderModifierKind {
+    Mute,
+    Solo,
+    Assign,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FaderModifier {
+    pub id: String,
+    pub kind: FaderModifierKind,
+    #[serde(default)]
+    pub control: Option<AuxiliaryControl>,
+    #[serde(default)]
+    pub assign_mode: AssignMode,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum BindingControlKind {
     #[default]

@@ -141,6 +141,12 @@ impl WsHub {
         if self.inner.shutting_down.load(Ordering::Acquire) {
             return Err("WebSocket bridge is shutting down".to_string());
         }
+        self.send_cleanup_text(id, text).await
+    }
+
+    // Internal restoration must reach the mixer before the bridge closes,
+    // even after ordinary plugin traffic has been stopped for shutdown.
+    pub(crate) async fn send_cleanup_text(&self, id: u64, text: String) -> Result<(), String> {
         let conns = self.inner.conns.lock().await;
         let tx = conns
             .get(&id)
@@ -271,6 +277,23 @@ mod tests {
             assert!(matches!(rx.recv().await, Some(Message::Close(None))));
             assert_eq!(hub.inner.conns.lock().await.len(), 0);
             assert!(hub.send_text(1, "ignored".to_string()).await.is_err());
+        });
+    }
+
+    #[test]
+    fn solo_restoration_can_be_queued_before_shutdown_closes_the_socket() {
+        tauri::async_runtime::block_on(async {
+            let hub = WsHub::new();
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            hub.inner.conns.lock().await.insert(1, tx);
+            hub.begin_shutdown();
+            assert!(hub.send_text(1, "ordinary traffic".into()).await.is_err());
+            hub.send_cleanup_text(1, "restore mute states".into())
+                .await
+                .unwrap();
+            assert!(
+                matches!(rx.recv().await, Some(Message::Text(text)) if text == "restore mute states")
+            );
         });
     }
 }

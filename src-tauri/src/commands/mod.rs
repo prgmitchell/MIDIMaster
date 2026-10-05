@@ -85,6 +85,8 @@ macro_rules! command_registry {
             set_audio_meter_samples,
             set_integration_connection_state,
             apply_binding_action,
+            get_binding_solo_context,
+            set_binding_solo,
             pick_soundboard_audio,
             analyze_soundboard_audio,
             preview_soundboard_audio,

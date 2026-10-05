@@ -32,6 +32,7 @@ pub fn binding() -> Binding {
         indicator_control: None,
         mute_control: None,
         assign_control: None,
+        modifiers: None,
         assign_mode: model::AssignMode::Add,
         hotkey: None,
         open_application: None,

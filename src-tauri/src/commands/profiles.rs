@@ -75,6 +75,7 @@ fn set_active_profile_state(
     app: &AppHandle,
     profile: &Profile,
 ) -> Result<(), String> {
+    crate::solo::reset_for_profile(app, state)?;
     let previous_bindings = {
         let mut active_profile = state
             .active_profile

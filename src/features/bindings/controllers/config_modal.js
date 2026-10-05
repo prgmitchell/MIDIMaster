@@ -17,10 +17,8 @@ import { clonePlain, normalizeMacroDraftSteps } from "../macro_draft.js";
 export function createConfigModal({
   cancelMacroDrag,
   clearTransferPrompt,
-  closeAssignModeMenu,
   closeCurvePresetForm,
   closeCurvePresetMenu,
-  closeMuteModeMenu,
   curveState,
   elements,
   editorState,
@@ -32,13 +30,12 @@ export function createConfigModal({
   loadSoundboardAnalysis,
   macroState,
   persistBindingBackend,
-  renderAssignMappingLabel,
   renderBindings,
   renderConfigPreview,
   renderCurveCards,
   renderCustomCurveEditor,
   renderMacroEditor,
-  renderMuteMappingLabel,
+  renderModifiers,
   renderSoundboardEditor,
   restoreConfigPreviewBindings,
   setBindings,
@@ -46,11 +43,9 @@ export function createConfigModal({
   stopAuxLearn,
   stopConfigPreviewTimer,
   stopSoundboardPreview,
-  syncAssignModeUi,
   syncButtonLightUi,
   syncCurvePresetToolbar,
   syncFeedbackOutputUi,
-  syncMuteModeUi,
   t,
   updateAuxLearnUi,
 }) {
@@ -75,8 +70,6 @@ export function createConfigModal({
     hotkeyLearn.stop();
     stopAuxLearn();
     clearTransferPrompt();
-    closeMuteModeMenu();
-    closeAssignModeMenu();
     closeCurvePresetMenu();
     stopConfigPreviewTimer();
     curveState.customCurvePointer = null;
@@ -91,7 +84,9 @@ export function createConfigModal({
       try {
         setTargets(
           emptySoundboardBindingToClean,
-          getTargets(emptySoundboardBindingToClean).filter((target) => !isSoundboardTarget(target)),
+          getTargets(emptySoundboardBindingToClean).filter(
+            (target) => !isSoundboardTarget(target),
+          ),
         );
         emptySoundboardBindingToClean.soundboard = null;
         if (emptySoundboardBindingToClean.action === "Soundboard") {
@@ -101,7 +96,9 @@ export function createConfigModal({
         await persistBindingBackend(emptySoundboardBindingToClean);
         setBindings(
           getBindings().map((binding) =>
-            binding.id === emptySoundboardBindingToClean.id ? emptySoundboardBindingToClean : binding,
+            binding.id === emptySoundboardBindingToClean.id
+              ? emptySoundboardBindingToClean
+              : binding,
           ),
         );
         renderBindings();
@@ -119,7 +116,8 @@ export function createConfigModal({
     editorState.initialPersistence = null;
     editorState.removeEmptySoundboardTargetOnCancel = false;
     macroState.selectedPath = null;
-    if (elements.bindingConfigPanel) elements.bindingConfigPanel.classList.add("hidden");
+    if (elements.bindingConfigPanel)
+      elements.bindingConfigPanel.classList.add("hidden");
   }
 
   function getBindingById(bindingId) {
@@ -129,13 +127,14 @@ export function createConfigModal({
   function renderConfigModal() {
     const binding = getConfigBinding();
     if (!binding) {
-      closeConfigModal().catch((err) => console.error("Failed to close binding config:", err));
+      closeConfigModal().catch((err) =>
+        console.error("Failed to close binding config:", err),
+      );
       return;
     }
-    closeAssignModeMenu();
-    closeMuteModeMenu();
     const preserveMacroDraftSteps =
-      macroState.pageOpen && (binding.action === "Macro" || getTargets(binding).some(isMacroTarget))
+      macroState.pageOpen &&
+      (binding.action === "Macro" || getTargets(binding).some(isMacroTarget))
         ? clonePlain(binding.macro_steps || [])
         : null;
     ensureAuxShape(binding);
@@ -147,9 +146,12 @@ export function createConfigModal({
     const isButton = effectiveIsButton(binding);
     const isMacroBinding = isButton && binding.action === "Macro";
     const isSoundboardBinding =
-      isButton && (binding.action === "Soundboard" || getTargets(binding).some(isSoundboardTarget));
+      isButton &&
+      (binding.action === "Soundboard" ||
+        getTargets(binding).some(isSoundboardTarget));
     const showMacroPage = isMacroBinding && macroState.pageOpen;
-    const showSoundboardPage = isSoundboardBinding && editorState.soundboardPageOpen;
+    const showSoundboardPage =
+      isSoundboardBinding && editorState.soundboardPageOpen;
     const showSpecialPage = showMacroPage || showSoundboardPage;
     if (elements.bindingConfigSave) elements.bindingConfigSave.disabled = false;
     if (elements.bindingConfigTitle) {
@@ -166,59 +168,94 @@ export function createConfigModal({
       elements.bindingConfigBack.disabled = true;
     }
     if (elements.bindingConfigPanel) {
-      elements.bindingConfigPanel.classList.toggle("binding-config-panel--button", isButton);
-      elements.bindingConfigPanel.classList.toggle("binding-config-panel--fader", !isButton);
-      elements.bindingConfigPanel.classList.toggle("binding-config-panel--macro-page", showMacroPage);
+      elements.bindingConfigPanel.classList.toggle(
+        "binding-config-panel--button",
+        isButton,
+      );
+      elements.bindingConfigPanel.classList.toggle(
+        "binding-config-panel--fader",
+        !isButton,
+      );
+      elements.bindingConfigPanel.classList.toggle(
+        "binding-config-panel--macro-page",
+        showMacroPage,
+      );
       elements.bindingConfigPanel.classList.toggle(
         "binding-config-panel--soundboard-page",
         showSoundboardPage,
       );
     }
-    const nameSection = elements.bindingConfigName?.closest?.(".binding-config-section");
+    const nameSection = elements.bindingConfigName?.closest?.(
+      ".binding-config-section",
+    );
     if (nameSection) nameSection.classList.toggle("hidden", showSpecialPage);
     if (elements.bindingConfigButtonLightSection)
-      elements.bindingConfigButtonLightSection.classList.toggle("hidden", !isButton || showSpecialPage);
+      elements.bindingConfigButtonLightSection.classList.toggle(
+        "hidden",
+        !isButton || showSpecialPage,
+      );
     if (elements.bindingConfigButtonLearnSection)
-      elements.bindingConfigButtonLearnSection.classList.toggle("hidden", !isButton || showSpecialPage);
+      elements.bindingConfigButtonLearnSection.classList.toggle(
+        "hidden",
+        !isButton || showSpecialPage,
+      );
     if (elements.bindingConfigMacroSummarySection)
       elements.bindingConfigMacroSummarySection.classList.add("hidden");
     if (elements.bindingConfigMacroSection)
-      elements.bindingConfigMacroSection.classList.toggle("hidden", !showMacroPage);
+      elements.bindingConfigMacroSection.classList.toggle(
+        "hidden",
+        !showMacroPage,
+      );
     if (elements.bindingConfigSoundboardSection)
-      elements.bindingConfigSoundboardSection.classList.toggle("hidden", !showSoundboardPage);
+      elements.bindingConfigSoundboardSection.classList.toggle(
+        "hidden",
+        !showSoundboardPage,
+      );
     if (elements.bindingConfigPreviewLearnShell)
-      elements.bindingConfigPreviewLearnShell.classList.toggle("hidden", isButton || showSpecialPage);
+      elements.bindingConfigPreviewLearnShell.classList.toggle(
+        "hidden",
+        isButton || showSpecialPage,
+      );
     if (elements.bindingConfigCurveSection)
-      elements.bindingConfigCurveSection.classList.toggle("hidden", isButton || showSpecialPage);
+      elements.bindingConfigCurveSection.classList.toggle(
+        "hidden",
+        isButton || showSpecialPage,
+      );
     if (elements.bindingConfigFeedbackOutputSection)
-      elements.bindingConfigFeedbackOutputSection.classList.toggle("hidden", isButton || showSpecialPage);
-    if (elements.bindingConfigMuteSection)
-      elements.bindingConfigMuteSection.classList.toggle("hidden", isButton || showSpecialPage);
-    if (elements.bindingConfigAssignSection)
-      elements.bindingConfigAssignSection.classList.toggle("hidden", isButton || showSpecialPage);
-    if (elements.bindingConfigName) elements.bindingConfigName.value = binding.name?.trim() || "";
+      elements.bindingConfigFeedbackOutputSection.classList.toggle(
+        "hidden",
+        isButton || showSpecialPage,
+      );
+    if (elements.bindingConfigModifiersSection)
+      elements.bindingConfigModifiersSection.classList.toggle(
+        "hidden",
+        isButton || showSpecialPage,
+      );
+    if (elements.bindingConfigName)
+      elements.bindingConfigName.value = binding.name?.trim() || "";
     if (isButton) {
       syncButtonLightUi(binding);
       if (showMacroPage) {
         renderMacroEditor(binding);
       } else if (showSoundboardPage) {
         renderSoundboardEditor(binding);
-        if (soundboardState.analysis?.path !== binding.soundboard?.path && !soundboardState.analysisError) {
+        if (
+          soundboardState.analysis?.path !== binding.soundboard?.path &&
+          !soundboardState.analysisError
+        ) {
           loadSoundboardAnalysis(binding).catch(() => {});
         }
       } else if (elements.bindingConfigMacroList) {
         elements.bindingConfigMacroList.innerHTML = "";
-        if (elements.bindingConfigMacroSummary) elements.bindingConfigMacroSummary.innerHTML = "";
+        if (elements.bindingConfigMacroSummary)
+          elements.bindingConfigMacroSummary.innerHTML = "";
       }
     } else {
       syncCurvePresetToolbar(binding);
       renderCurveCards();
       renderCustomCurveEditor();
-      renderMuteMappingLabel(binding);
-      renderAssignMappingLabel(binding);
+      renderModifiers(binding);
       syncFeedbackOutputUi(binding);
-      syncMuteModeUi(binding?.mute_control?.mute_behavior || binding?.mute_behavior || "ToggleOnPress");
-      syncAssignModeUi(binding.assign_mode || "Add");
     }
     renderConfigPreview();
     updateAuxLearnUi();

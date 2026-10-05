@@ -452,6 +452,19 @@ export function normalizeBinding(binding) {
   if (out.mute_control && typeof out.mute_control === "object") {
     out.mute_control = normalizeMidiMapping(out.mute_control);
   }
+  if (Array.isArray(out.modifiers)) {
+    out.modifiers = out.modifiers
+      .filter((item) => item && ["Mute", "Solo", "Assign"].includes(item.kind))
+      .map((item, index) => ({
+        id: String(item.id || `modifier-${index}`),
+        kind: item.kind,
+        control: normalizeMidiMapping(item.control),
+        assign_mode: ["Replace", "Clear"].includes(item.assign_mode)
+          ? item.assign_mode
+          : "Add",
+      }))
+      .filter((item) => item.control);
+  }
   const indicatorIsFeedbackOutput = !bindingLooksLikeButton(out);
   out.indicator_control = normalizeMidiMapping(out.indicator_control, {
     indicator: true,

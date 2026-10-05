@@ -1,3 +1,4 @@
+import { getFaderModifiers } from "../../../core/fader_modifiers.js";
 import {
   controlsEqual,
   primaryControlMapping,
@@ -56,13 +57,19 @@ export function createLedFeedbackEditor({
     control.type = pitchBend ? "text" : "number";
     control.min = meter ? "1" : "0";
     control.max = meter ? "8" : "127";
-    control.value = pitchBend ? "N/A" : String((address?.controller ?? 0) + (meter ? 1 : 0));
+    control.value = pitchBend
+      ? "N/A"
+      : String((address?.controller ?? 0) + (meter ? 1 : 0));
     const controlLabel = control.closest("label")?.querySelector("span");
     if (controlLabel) {
-      controlLabel.dataset.i18n = meter ? "bindings.ledMeterStrip" : "bindings.indicatorControl";
+      controlLabel.dataset.i18n = meter
+        ? "bindings.ledMeterStrip"
+        : "bindings.indicatorControl";
       controlLabel.textContent = t(controlLabel.dataset.i18n);
     }
-    control.dataset.i18nAriaLabel = meter ? "bindings.ledMeterStrip" : "bindings.ledControlLabel";
+    control.dataset.i18nAriaLabel = meter
+      ? "bindings.ledMeterStrip"
+      : "bindings.ledControlLabel";
     control.setAttribute("aria-label", t(control.dataset.i18nAriaLabel));
     mode.value =
       binding?.feedback_mode === "AudioReactive"
@@ -84,9 +91,10 @@ export function createLedFeedbackEditor({
     const valueOutput = binding?.feedback_enabled !== false ? existing : null;
     const conflict =
       enabled &&
-      [valueOutput, binding?.mute_control, binding?.assign_control].some(
-        (other) => controlsEqual(led, other),
-      );
+      [
+        valueOutput,
+        ...getFaderModifiers(binding).map((item) => item.control),
+      ].some((other) => controlsEqual(led, other));
     const help = elements.bindingConfigLedHelp;
     if (help) {
       const reactive = mode.value === "AudioReactive";
@@ -148,12 +156,17 @@ export function createLedFeedbackEditor({
       mode.value === "AudioReactive" ? "AudioReactive" : "FollowValue";
     binding.led_enabled = type.value !== "Existing";
     const meter = type.value === "ChannelPressure";
-    const enteringMeter = meter && binding.led_control?.msg_type !== "ChannelPressure";
+    const enteringMeter =
+      meter && binding.led_control?.msg_type !== "ChannelPressure";
     binding.led_control = ["Existing", "Automatic"].includes(type.value)
       ? null
       : {
           device_id: binding.device_id,
-          msg_type: meter ? "ChannelPressure" : type.value === "Note" ? "Note" : "ControlChange",
+          msg_type: meter
+            ? "ChannelPressure"
+            : type.value === "Note"
+              ? "Note"
+              : "ControlChange",
           channel: meter ? 0 : midiNumber(Number(channel.value) - 1, 15),
           controller: meter
             ? enteringMeter

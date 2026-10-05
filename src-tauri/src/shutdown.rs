@@ -257,6 +257,9 @@ fn stop_managed_resources_best_effort(app: &AppHandle) {
 
 async fn perform_cleanup(app: AppHandle) {
     stop_background_tasks(&app).await;
+    if let Err(error) = crate::solo::reset(&app, &app.state::<AppState>()).await {
+        run_logger::warn("solo", "shutdown_restore_failed", &error);
+    }
 
     let blocking_app = app.clone();
     match timeout(
@@ -436,6 +439,7 @@ pub(crate) fn finish_unexpected_exit(app: &AppHandle) {
         &format!("phase={:?}", coordinator.phase()),
     );
     coordinator.abort_background_tasks();
+    let _ = crate::solo::reset_for_profile(app, &app.state::<AppState>());
     app.state::<WsHub>().shutdown_now();
     stop_managed_resources_best_effort(app);
     coordinator.mark_complete();

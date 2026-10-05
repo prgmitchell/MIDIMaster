@@ -45,16 +45,22 @@ fn source_index(saved: &[MidiDeviceRoute], next: &MidiDeviceRoute) -> Option<usi
 }
 
 fn control_ids(binding: &Binding) -> impl Iterator<Item = &str> {
-    std::iter::once(binding.device_id.as_str()).chain(
-        [
-            &binding.mute_control,
-            &binding.assign_control,
-            &binding.indicator_control,
-            &binding.led_control,
-        ]
-        .into_iter()
-        .filter_map(|c| c.as_ref().map(|c| c.device_id.as_str())),
-    )
+    std::iter::once(binding.device_id.as_str())
+        .chain(
+            [
+                &binding.mute_control,
+                &binding.assign_control,
+                &binding.indicator_control,
+                &binding.led_control,
+            ]
+            .into_iter()
+            .filter_map(|c| c.as_ref().map(|c| c.device_id.as_str())),
+        )
+        .chain(
+            binding
+                .modifier_controls()
+                .map(|(_, control, _)| control.device_id.as_str()),
+        )
 }
 
 /// Remove incomplete swaps/chains, including chains into disabled or missing routes.
@@ -168,6 +174,11 @@ pub(crate) fn reconciled_profile(
             }
         };
         migrate(&mut binding.device_id);
+        for modifier in binding.modifiers.iter_mut().flatten() {
+            if let Some(control) = modifier.control.as_mut() {
+                migrate(&mut control.device_id);
+            }
+        }
         for control in [
             &mut binding.mute_control,
             &mut binding.assign_control,

@@ -188,7 +188,10 @@ pub fn set_binding_feedback(
                 continue;
             }
 
-            if let Some(mute_control) = candidate.mute_control.as_ref() {
+            for (_, mute_control, _) in candidate
+                .modifier_controls()
+                .filter(|(kind, _, _)| *kind == model::FaderModifierKind::Mute)
+            {
                 let aux_key = FeedbackControlKey::from_aux(mute_control);
                 if emitted_controls.insert(aux_key.clone()) {
                     feedback::send_feedback_to_control(

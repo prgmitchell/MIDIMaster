@@ -1,10 +1,14 @@
+import { setControlMapping } from "../../../core/fader_modifiers.js";
 import {
   cloneBindingDraft,
   ensureBindingShape,
   isMacroTarget,
   isSoundboardTarget,
 } from "../shape_helpers.js";
-import { getBindingTargets as getTargets, normalizeSoundboardMapping } from "../../../core/binding_model.js";
+import {
+  getBindingTargets as getTargets,
+  normalizeSoundboardMapping,
+} from "../../../core/binding_model.js";
 
 /** edit session workflow. */
 export function createEditSession({
@@ -40,9 +44,12 @@ export function createEditSession({
     ensureBindingShape(editorState.draft);
     macroState.pageOpen = Boolean(
       options.macroPage &&
-        (editorState.draft?.action === "Macro" || getTargets(editorState.draft).some(isMacroTarget)),
+        (editorState.draft?.action === "Macro" ||
+          getTargets(editorState.draft).some(isMacroTarget)),
     );
-    macroState.selectedPath = macroState.pageOpen ? macroPathForFirstStep(editorState.draft) : null;
+    macroState.selectedPath = macroState.pageOpen
+      ? macroPathForFirstStep(editorState.draft)
+      : null;
     editorState.soundboardPageOpen = Boolean(
       options.soundboardPage &&
         (editorState.draft?.action === "Soundboard" ||
@@ -59,7 +66,8 @@ export function createEditSession({
     soundboardState.outputDevicesLoaded = false;
     soundboardState.virtualAudioState = "loading";
     editorState.acceptedTransfers.clear();
-    if (elements.bindingConfigPanel) elements.bindingConfigPanel.classList.remove("hidden");
+    if (elements.bindingConfigPanel)
+      elements.bindingConfigPanel.classList.remove("hidden");
     startConfigPreviewTimer();
     renderConfigModal();
     if (editorState.soundboardPageOpen) {
@@ -82,23 +90,35 @@ export function createEditSession({
     for (const entry of editorState.acceptedTransfers.values()) {
       const { conflict } = entry;
       if (!conflict?.binding) continue;
-      const conflictIndex = nextBindings.findIndex((binding) => binding.id === conflict.binding.id);
+      const conflictIndex = nextBindings.findIndex(
+        (binding) => binding.id === conflict.binding.id,
+      );
       if (conflictIndex < 0) continue;
       if (conflict.field === "control") {
-        await invoke("remove_binding", { binding: nextBindings[conflictIndex] });
+        await invoke("remove_binding", {
+          binding: nextBindings[conflictIndex],
+        });
         nextBindings.splice(conflictIndex, 1);
         continue;
       }
-      const nextConflictBinding = cloneBindingDraft(nextBindings[conflictIndex]);
-      nextConflictBinding[conflict.field] = null;
+      const nextConflictBinding = cloneBindingDraft(
+        nextBindings[conflictIndex],
+      );
+      setControlMapping(nextConflictBinding, conflict.field, null);
       nextBindings[conflictIndex] = nextConflictBinding;
       setBindings(nextBindings);
       await persistBindingBackend(nextConflictBinding);
     }
 
-    const bindingIndex = nextBindings.findIndex((binding) => binding.id === editorState.bindingId);
+    const bindingIndex = nextBindings.findIndex(
+      (binding) => binding.id === editorState.bindingId,
+    );
     if (bindingIndex < 0) return;
     const nextBinding = cloneBindingDraft(draft);
+    if (Array.isArray(nextBinding.modifiers))
+      nextBinding.modifiers = nextBinding.modifiers.filter(
+        (item) => item.control?.device_id,
+      );
     nextBindings[bindingIndex] = nextBinding;
     setBindings(nextBindings);
     await persistBindingBackend(nextBinding);
@@ -120,7 +140,11 @@ export function createEditSession({
     renderBindings();
   }
 
-  function focusBindingNameInput(nameInput, bindingId, { select = false } = {}) {
+  function focusBindingNameInput(
+    nameInput,
+    bindingId,
+    { select = false } = {},
+  ) {
     if (!nameInput) return;
     const applyFocus = () => {
       if (bindingId !== getEditingId()) return;

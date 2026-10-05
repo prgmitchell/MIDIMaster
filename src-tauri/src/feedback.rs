@@ -101,31 +101,38 @@ pub fn binding_feedback_control_key(binding: &Binding) -> FeedbackControlKey {
         .unwrap_or_else(|| FeedbackControlKey::from_binding(binding))
 }
 
-pub fn assign_button_feedback(binding: &Binding) -> Option<(FeedbackControlKey, f32)> {
-    let control = binding.assign_control.as_ref()?;
-    if matches!(control.msg_type, model::MidiMessageType::ProgramChange) {
-        return None;
-    }
-    let assign_control = FeedbackControlKey::from_aux(control);
-    let conflicts_with_existing_role = FeedbackControlKey::from_binding(binding) == assign_control
-        || binding
-            .mute_control
-            .as_ref()
-            .map(FeedbackControlKey::from_aux)
-            .is_some_and(|candidate| candidate == assign_control)
-        || binding
-            .indicator_control
-            .as_ref()
-            .map(FeedbackControlKey::from_aux)
-            .is_some_and(|candidate| candidate == assign_control);
-    if conflicts_with_existing_role {
-        return None;
-    }
+pub fn assign_buttons_feedback(binding: &Binding) -> Vec<(FeedbackControlKey, f32)> {
     let has_real_targets = binding
         .normalized_targets_ref()
         .iter()
         .any(|target| !matches!(target, model::BindingTarget::Unset));
-    Some((assign_control, if has_real_targets { 1.0 } else { 0.0 }))
+    binding
+        .modifier_controls()
+        .filter(|(kind, _, _)| *kind == model::FaderModifierKind::Assign)
+        .filter_map(|(_, control, _)| {
+            if matches!(control.msg_type, model::MidiMessageType::ProgramChange) {
+                return None;
+            }
+            let output = FeedbackControlKey::from_aux(control);
+            let conflicts = FeedbackControlKey::from_binding(binding) == output
+                || binding.modifier_controls().any(|(kind, candidate, _)| {
+                    matches!(
+                        kind,
+                        model::FaderModifierKind::Mute | model::FaderModifierKind::Solo
+                    ) && FeedbackControlKey::from_aux(candidate) == output
+                })
+                || binding
+                    .indicator_control
+                    .as_ref()
+                    .is_some_and(|candidate| FeedbackControlKey::from_aux(candidate) == output);
+            (!conflicts).then_some((output, if has_real_targets { 1.0 } else { 0.0 }))
+        })
+        .collect()
+}
+
+#[cfg(test)]
+fn assign_button_feedback(binding: &Binding) -> Option<(FeedbackControlKey, f32)> {
+    assign_buttons_feedback(binding).into_iter().next()
 }
 
 pub fn send_assign_button_feedback(
@@ -134,25 +141,39 @@ pub fn send_assign_button_feedback(
     force_hardware_feedback: bool,
     context: &str,
 ) {
-    let Some((control, value)) = assign_button_feedback(binding) else {
-        return;
-    };
-    send_feedback_to_control(
-        state,
-        &control,
-        FeedbackSendOptions {
-            value,
-            silent: false,
-            force_hardware_feedback,
-            context,
-        },
-    );
+    for (control, value) in assign_buttons_feedback(binding) {
+        send_feedback_to_control(
+            state,
+            &control,
+            FeedbackSendOptions {
+                value,
+                silent: false,
+                force_hardware_feedback,
+                context,
+            },
+        );
+    }
 }
 
 fn assign_feedback_outputs(bindings: &[Binding]) -> HashSet<FeedbackControlKey> {
     bindings
         .iter()
-        .filter_map(|binding| assign_button_feedback(binding).map(|(control, _)| control))
+        .flat_map(|binding| {
+            assign_buttons_feedback(binding)
+                .into_iter()
+                .map(|(control, _)| control)
+                .chain(
+                    binding
+                        .modifier_controls()
+                        .filter(|(kind, control, _)| {
+                            matches!(
+                                *kind,
+                                model::FaderModifierKind::Mute | model::FaderModifierKind::Solo
+                            ) && control.msg_type != model::MidiMessageType::ProgramChange
+                        })
+                        .map(|(_, control, _)| FeedbackControlKey::from_aux(control)),
+                )
+        })
         .collect()
 }
 
@@ -165,7 +186,7 @@ fn stale_assign_feedback_outputs(
         if binding.feedback_enabled {
             current_outputs.insert(binding_feedback_control_key(binding));
         }
-        if let Some(control) = binding.mute_control.as_ref() {
+        for (_, control, _) in binding.modifier_controls() {
             current_outputs.insert(FeedbackControlKey::from_aux(control));
         }
         if binding.feedback_enabled {
@@ -536,5 +557,49 @@ mod tests {
         current.mute_control = Some(indicator_control(30));
 
         assert!(stale_assign_feedback_outputs(&[previous], &[current]).is_empty());
+    }
+
+    #[test]
+    fn modifier_feedback_tracks_all_rows_and_clears_only_removed_outputs() {
+        let mut binding = button_binding(21);
+        binding.assign_control = Some(indicator_control(29));
+        binding.modifiers = Some(vec![
+            model::FaderModifier {
+                id: "assign-add".into(),
+                kind: model::FaderModifierKind::Assign,
+                control: Some(indicator_control(30)),
+                assign_mode: model::AssignMode::Add,
+            },
+            model::FaderModifier {
+                id: "assign-clear".into(),
+                kind: model::FaderModifierKind::Assign,
+                control: Some(indicator_control(31)),
+                assign_mode: model::AssignMode::Clear,
+            },
+            model::FaderModifier {
+                id: "mute".into(),
+                kind: model::FaderModifierKind::Mute,
+                control: Some(indicator_control(32)),
+                assign_mode: model::AssignMode::Add,
+            },
+        ]);
+        let outputs = assign_buttons_feedback(&binding);
+        assert_eq!(
+            outputs
+                .iter()
+                .map(|(control, _)| control.controller)
+                .collect::<Vec<_>>(),
+            vec![30, 31]
+        );
+        assert!(outputs.iter().all(|(_, value)| *value == 1.0));
+        let mut current = binding.clone();
+        current.modifiers.as_mut().unwrap().remove(1);
+        let stale = stale_assign_feedback_outputs(&[binding.clone()], &[current]);
+        assert_eq!(stale.len(), 1);
+        assert_eq!(stale.iter().next().unwrap().controller, 31);
+        let mut empty = binding.clone();
+        empty.modifiers = Some(vec![]);
+        assert!(assign_buttons_feedback(&empty).is_empty());
+        assert_eq!(stale_assign_feedback_outputs(&[binding], &[empty]).len(), 3);
     }
 }

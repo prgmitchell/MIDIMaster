@@ -277,6 +277,7 @@ export async function activate(ctx) {
     queueVolumeWrite,
     rememberLocalVolumeIntent,
     sendJsonRpc,
+    requestJsonRpc,
     setChannelEffectEnabled,
     setMainOutputDevice,
     state,

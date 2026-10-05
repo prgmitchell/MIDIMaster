@@ -1,6 +1,6 @@
 import { createSelectDropdownShell } from "../../ui/dropdown_select.js";
 import { normalizeButtonLightBehavior, presetCurvePoints } from "../../../core/binding_model.js";
-import { normalizeMuteBehavior, curveEditorPoints } from "../shape_helpers.js";
+import { curveEditorPoints } from "../shape_helpers.js";
 import { localCustomCurvePoint, segmentIndexForCurveX } from "../curve_geometry.js";
 
 /** config events workflow. */
@@ -10,11 +10,9 @@ export function createConfigEvents({
   addCustomCurvePoint,
   cancelMacroDrag,
   clearTransferPrompt,
-  closeAssignModeMenu,
   closeConfigModal,
   closeCurvePresetForm,
   closeCurvePresetMenu,
-  closeMuteModeMenu,
   commitTransferPrompt,
   curveState,
   customCurveSurfaceFromEvent,
@@ -25,28 +23,22 @@ export function createConfigEvents({
   getConfigBinding,
   hotkeyLearn,
   listState,
-  openAssignModeMenu,
   openCurvePresetForm,
-  openMuteModeMenu,
   removeCustomCurvePoint,
-  renderAssignMappingLabel,
   renderButtonLightDropdown,
   renderConfigModal,
   renderConfigPreview,
   renderCurvePresetMenu,
   renderIndicatorDropdowns,
-  renderMuteMappingLabel,
   saveConfigModal,
   setCurvePresetMenuOpen,
   startAuxLearn,
   startPrimaryLearn,
   stopAuxLearn,
   submitCurvePresetForm,
-  syncAssignModeUi,
   syncButtonLightUi,
   syncFeedbackOutputUi,
   syncIndicatorUi,
-  syncMuteModeUi,
   t,
   updateAuxLearnUi,
   updateCustomCurveFromPointer,
@@ -222,16 +214,8 @@ export function createConfigEvents({
         }
       });
     }
-    if (elements.bindingConfigMuteLearn) {
-      lifetime.listen(elements.bindingConfigMuteLearn, "click", async () => {
-        await startAuxLearn("mute_control");
-      });
-    }
-    if (elements.bindingConfigAssignLearn) {
-      lifetime.listen(elements.bindingConfigAssignLearn, "click", async () => {
-        await startAuxLearn("assign_control");
-      });
-    }
+
+
     if (elements.bindingConfigIndicatorLearn) {
       lifetime.listen(elements.bindingConfigIndicatorLearn, "click", async () => {
         await startAuxLearn("indicator_control");
@@ -248,39 +232,9 @@ export function createConfigEvents({
         await startAuxLearn("indicator_control");
       });
     }
-    if (elements.bindingConfigMuteClear) {
-      lifetime.listen(elements.bindingConfigMuteClear, "click", () => {
-        if (editorState.transferPrompt) return;
-        const binding = getConfigBinding();
-        if (!binding) return;
-        binding.mute_control = null;
-        editorState.acceptedTransfers.delete("mute_control");
-        renderConfigModal();
-      });
-    }
-    if (elements.bindingConfigMuteModeButton) {
-      lifetime.listen(elements.bindingConfigMuteModeButton, "click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const menu = elements.bindingConfigMuteModeMenu;
-        if (!menu) return;
-        if (menu.classList.contains("hidden")) {
-          openMuteModeMenu();
-        } else {
-          closeMuteModeMenu();
-        }
-      });
-    }
-    if (elements.bindingConfigAssignClear) {
-      lifetime.listen(elements.bindingConfigAssignClear, "click", () => {
-        if (editorState.transferPrompt) return;
-        const binding = getConfigBinding();
-        if (!binding) return;
-        binding.assign_control = null;
-        editorState.acceptedTransfers.delete("assign_control");
-        renderConfigModal();
-      });
-    }
+
+
+
     if (elements.bindingConfigIndicatorClear) {
       lifetime.listen(elements.bindingConfigIndicatorClear, "click", () => {
         if (editorState.transferPrompt) return;
@@ -303,64 +257,6 @@ export function createConfigEvents({
         syncFeedbackOutputUi(binding);
         renderConfigPreview();
       });
-    }
-    const onMuteModeOptionClick = async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const button = event.currentTarget;
-      const mode = normalizeMuteBehavior(button?.dataset?.mode);
-      const binding = getConfigBinding();
-      if (!binding) return;
-      binding.mute_behavior = mode;
-      if (binding.mute_control && typeof binding.mute_control === "object") {
-        binding.mute_control.mute_behavior = mode;
-      }
-      renderMuteMappingLabel(binding);
-      syncMuteModeUi(mode);
-      closeMuteModeMenu();
-      renderConfigPreview();
-    };
-    if (elements.bindingConfigMuteModeToggle) {
-      lifetime.listen(elements.bindingConfigMuteModeToggle, "click", onMuteModeOptionClick);
-    }
-    if (elements.bindingConfigMuteModeValue) {
-      lifetime.listen(elements.bindingConfigMuteModeValue, "click", onMuteModeOptionClick);
-    }
-    if (elements.bindingConfigAssignModeButton) {
-      lifetime.listen(elements.bindingConfigAssignModeButton, "click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const menu = elements.bindingConfigAssignModeMenu;
-        if (!menu) return;
-        if (menu.classList.contains("hidden")) {
-          openAssignModeMenu();
-        } else {
-          closeAssignModeMenu();
-        }
-      });
-    }
-    const onAssignModeOptionClick = async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const button = event.currentTarget;
-      const rawMode = button?.dataset?.mode;
-      const mode = rawMode === "Replace" ? "Replace" : rawMode === "Clear" ? "Clear" : "Add";
-      const binding = getConfigBinding();
-      if (!binding) return;
-      binding.assign_mode = mode;
-      renderAssignMappingLabel(binding);
-      syncAssignModeUi(binding.assign_mode);
-      closeAssignModeMenu();
-      renderConfigPreview();
-    };
-    if (elements.bindingConfigAssignModeAdd) {
-      lifetime.listen(elements.bindingConfigAssignModeAdd, "click", onAssignModeOptionClick);
-    }
-    if (elements.bindingConfigAssignModeReplace) {
-      lifetime.listen(elements.bindingConfigAssignModeReplace, "click", onAssignModeOptionClick);
-    }
-    if (elements.bindingConfigAssignModeClear) {
-      lifetime.listen(elements.bindingConfigAssignModeClear, "click", onAssignModeOptionClick);
     }
 
     if (elements.learnPanel) {
@@ -449,10 +345,6 @@ export function createConfigEvents({
 
     lifetime.listen(document, "click", (event) => {
       if (!editorState.bindingId) return;
-      const muteRoot = elements.bindingConfigMuteModeRoot;
-      if (muteRoot && !muteRoot.contains(event.target)) {
-        closeMuteModeMenu();
-      }
       const curvePresetRoot = elements.bindingConfigCurvePresetRoot;
       if (elements.alertOverlay?.contains?.(event.target)) {
         return;
@@ -460,9 +352,6 @@ export function createConfigEvents({
       if (curvePresetRoot && !curvePresetRoot.contains(event.target)) {
         closeCurvePresetMenu();
       }
-      const root = elements.bindingConfigAssignModeRoot;
-      if (!root || root.contains(event.target)) return;
-      closeAssignModeMenu();
     });
 
     lifetime.listen(document, "pointermove", (event) => {

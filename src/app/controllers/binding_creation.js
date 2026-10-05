@@ -1,3 +1,7 @@
+import {
+  modifierForField,
+  setControlMapping,
+} from "../../core/fader_modifiers.js";
 import { findControlConflict } from "../../core/control_mapping.js";
 import { t } from "../i18n.js";
 import { normalizeCustomCurvePoints } from "../../core/binding_model.js";
@@ -22,8 +26,10 @@ export function createBindingCreation({
 }) {
   function resetCreateLearnPanelUi() {
     if (!learnPanel) return;
-    if (learnPanelTitle) learnPanelTitle.textContent = t("bindings.waitingMidiTitle");
-    if (learnPanelMessage) learnPanelMessage.textContent = t("bindings.learnMessage");
+    if (learnPanelTitle)
+      learnPanelTitle.textContent = t("bindings.waitingMidiTitle");
+    if (learnPanelMessage)
+      learnPanelMessage.textContent = t("bindings.learnMessage");
     if (learnPanelSpinner) learnPanelSpinner.classList.remove("hidden");
     if (learnPanelActions) learnPanelActions.classList.add("hidden");
     if (learnPanelConfirm) learnPanelConfirm.textContent = t("common.transfer");
@@ -50,7 +56,8 @@ export function createBindingCreation({
 
   async function promptCreateLearnTransfer(message) {
     if (!learnPanel) return false;
-    if (learnPanelTitle) learnPanelTitle.textContent = t("bindings.transferMapping");
+    if (learnPanelTitle)
+      learnPanelTitle.textContent = t("bindings.transferMapping");
     if (learnPanelMessage) learnPanelMessage.textContent = message || "";
     if (learnPanelSpinner) learnPanelSpinner.classList.add("hidden");
     if (learnPanelActions) learnPanelActions.classList.remove("hidden");
@@ -91,13 +98,16 @@ export function createBindingCreation({
     const controlKind = payload.control_kind || "Auto";
     const isButton =
       controlKind === "Button" ||
-      (controlKind === "Auto" && (msgType === "Note" || msgType === "ProgramChange"));
+      (controlKind === "Auto" &&
+        (msgType === "Note" || msgType === "ProgramChange"));
     const control = {
       channel: payload.channel,
       controller: payload.controller,
       msg_type: msgType,
     };
-    const defaultName = t("bindings.bindingFallback", { number: profileState.bindings.length + 1 });
+    const defaultName = t("bindings.bindingFallback", {
+      number: profileState.bindings.length + 1,
+    });
     return {
       id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       name: defaultName,
@@ -131,13 +141,17 @@ export function createBindingCreation({
       if (conflict && conflict.field === "control") {
         hideCreateLearnPanel();
         const owner = conflict.binding?.name || t("bindings.unnamedBinding");
-        showAlert(t("bindings.alreadyAssignedTitle"), t("bindings.alreadyAssignedMessage", { name: owner }));
+        showAlert(
+          t("bindings.alreadyAssignedTitle"),
+          t("bindings.alreadyAssignedMessage", { name: owner }),
+        );
         return;
       }
 
       if (
         conflict &&
-        (conflict.field === "mute_control" ||
+        (conflict.field.startsWith("modifier:") ||
+          conflict.field === "mute_control" ||
           conflict.field === "assign_control" ||
           conflict.field === "indicator_control")
       ) {
@@ -147,16 +161,20 @@ export function createBindingCreation({
             ? t("bindings.mute")
             : conflict.field === "assign_control"
               ? t("common.assign")
-              : "Indicator";
+              : modifierForField(conflict.binding, conflict.field)?.kind ||
+                "Indicator";
         const confirmed = await promptCreateLearnTransfer(
-          t("bindings.transferFromAuxMessage", { slot: ownerSlot, name: owner }),
+          t("bindings.transferFromAuxMessage", {
+            slot: ownerSlot,
+            name: owner,
+          }),
         );
         if (!confirmed) {
           hideCreateLearnPanel();
           return;
         }
 
-        conflict.binding[conflict.field] = null;
+        setControlMapping(conflict.binding, conflict.field, null);
         await invoke("add_binding", { binding: conflict.binding });
       }
 

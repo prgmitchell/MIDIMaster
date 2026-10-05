@@ -55,6 +55,9 @@ pub struct Binding {
     pub assign_control: Option<AuxiliaryControl>,
     #[serde(default)]
     pub assign_mode: AssignMode,
+    /// None reads the old mute/assign slots; Some, even empty, owns the mappings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modifiers: Option<Vec<FaderModifier>>,
     #[serde(default)]
     pub hotkey: Option<HotkeyMapping>,
     #[serde(default)]
@@ -68,6 +71,33 @@ pub struct Binding {
 }
 
 impl Binding {
+    pub fn modifier_controls(
+        &self,
+    ) -> impl Iterator<Item = (FaderModifierKind, &AuxiliaryControl, &AssignMode)> {
+        self.modifiers
+            .iter()
+            .flatten()
+            .filter_map(|modifier| {
+                modifier
+                    .control
+                    .as_ref()
+                    .map(|control| (modifier.kind, control, &modifier.assign_mode))
+            })
+            .chain(
+                self.mute_control
+                    .iter()
+                    .filter(|_| self.modifiers.is_none())
+                    .map(|control| (FaderModifierKind::Mute, control, &self.assign_mode)),
+            )
+            .chain(
+                self.assign_control
+                    .iter()
+                    .filter(|_| self.modifiers.is_none())
+                    .map(|control| (FaderModifierKind::Assign, control, &self.assign_mode)),
+            )
+            .filter(|(_, control, _)| !control.device_id.trim().is_empty())
+    }
+
     pub fn uses_audio_feedback(&self) -> bool {
         self.has_led_feedback() && self.feedback_mode == FeedbackMode::AudioReactive
     }
@@ -126,9 +156,9 @@ impl Binding {
                         && led.controller == self.control.controller
                         && led.msg_type == self.control.msg_type
                 });
-        let overlaps_button = [&self.mute_control, &self.assign_control]
-            .into_iter()
-            .flatten()
+        let overlaps_button = self
+            .modifier_controls()
+            .map(|(_, control, _)| control)
             .any(same_address);
         (!overlaps_value && !overlaps_button).then_some(led)
     }

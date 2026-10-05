@@ -14,17 +14,16 @@ export function createMidiLearn({
   listState,
   renderConfigPreview,
   syncFeedbackControllerInputState,
+  updateModifierLearnUi = () => {},
+  discardUnmappedModifiers = () => {},
   t,
 }) {
   const midiSummaryKeys = new WeakMap();
 
   function updateAuxLearnUi() {
-    const muteLearn = elements.bindingConfigMuteLearn;
-    const assignLearn = elements.bindingConfigAssignLearn;
+    updateModifierLearnUi();
     const indicatorLearn = elements.bindingConfigIndicatorLearn;
     const feedbackLearn = elements.bindingConfigFeedbackLearn;
-    const muteClear = elements.bindingConfigMuteClear;
-    const assignClear = elements.bindingConfigAssignClear;
     const indicatorClear = elements.bindingConfigIndicatorClear;
     const feedbackClear = elements.bindingConfigFeedbackClear;
     const previewLearnButton = elements.bindingConfigPreviewLearnButton;
@@ -36,22 +35,6 @@ export function createMidiLearn({
     const feedbackDisabled = binding?.feedback_enabled === false;
     const buttonFeedbackDisabled = isButton && feedbackDisabled;
 
-    if (muteLearn) {
-      const active = editorState.learnField === "mute_control";
-      const label = active ? t("bindings.listening") : t("common.learn");
-      muteLearn.classList.toggle("is-learning", active);
-      muteLearn.title = label;
-      muteLearn.setAttribute("aria-label", label);
-      muteLearn.disabled = transferLocked || Boolean(editorState.learnField && !active);
-    }
-    if (assignLearn) {
-      const active = editorState.learnField === "assign_control";
-      const label = active ? t("bindings.listening") : t("common.learn");
-      assignLearn.classList.toggle("is-learning", active);
-      assignLearn.title = label;
-      assignLearn.setAttribute("aria-label", label);
-      assignLearn.disabled = transferLocked || Boolean(editorState.learnField && !active);
-    }
     if (indicatorLearn) {
       const active = editorState.learnField === "indicator_control";
       const label = active ? t("bindings.listening") : t("bindings.learnIndicatorOutput");
@@ -71,8 +54,6 @@ export function createMidiLearn({
     }
 
     const lockClear = transferLocked || Boolean(editorState.learnField);
-    if (muteClear) muteClear.disabled = lockClear;
-    if (assignClear) assignClear.disabled = lockClear;
     if (indicatorClear) indicatorClear.disabled = lockClear || buttonFeedbackDisabled;
     if (feedbackClear) feedbackClear.disabled = lockClear;
     if (elements.bindingConfigIndicatorMsgType)
@@ -111,8 +92,6 @@ export function createMidiLearn({
       listState.feedbackOutputMsgTypeDropdown.button.setAttribute("aria-disabled", String(lockClear));
       listState.feedbackOutputMsgTypeDropdown.root.classList.toggle("is-disabled", lockClear);
     }
-    if (elements.bindingConfigMuteModeButton) elements.bindingConfigMuteModeButton.disabled = lockClear;
-    if (elements.bindingConfigAssignModeButton) elements.bindingConfigAssignModeButton.disabled = lockClear;
     for (const learnButton of [previewLearnButton, buttonLearnButton]) {
       if (!learnButton) continue;
       const label = isButton ? t("bindings.learnButton") : t("bindings.learnFader");
@@ -131,6 +110,7 @@ export function createMidiLearn({
       editorState.learnTimer = null;
     }
     editorState.learnField = null;
+    if (closePanel) discardUnmappedModifiers();
     updateAuxLearnUi();
     renderConfigPreview();
     if (closePanel) {
