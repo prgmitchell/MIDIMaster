@@ -136,7 +136,7 @@ test("reload saves the exact selected profile and waits for fresh sync despite u
     assert.equal(completed, false, "loading the profile label still precedes sync completion");
     assert.equal(f.stored.get(f.name).bindings[0].name, "Saved edit");
     assert.deepEqual(f.calls.filter(call => call.command === "load_profile"), [
-      { command: "load_profile", args: { name: f.name } },
+      { command: "load_profile", args: { name: f.name, captureCurrent: false } },
     ]);
     assert.equal(f.calls.find(call => call.command === "save_profile").args.profile.name, f.name);
     f.syncGate.resolve();

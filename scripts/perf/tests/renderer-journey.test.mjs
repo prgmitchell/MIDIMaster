@@ -286,7 +286,7 @@ test("profile switch contract selects the profile button after the async menu re
     assert.equal(active, "Performance 2");
     assert.deepEqual(
       calls.filter(({ command }) => command === "load_profile"),
-      [{ command: "load_profile", args: { name: "Performance 2" } }],
+      [{ command: "load_profile", args: { name: "Performance 2", captureCurrent: false } }],
     );
     assert.equal(
       calls.some(({ command }) => command === "delete_profile"),

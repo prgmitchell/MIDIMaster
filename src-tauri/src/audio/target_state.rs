@@ -36,7 +36,7 @@ pub(crate) fn feedback_sync_needs(profile: &Profile) -> FeedbackSyncNeeds {
                     let model::BindingTarget::Device { device_id } = target else {
                         continue;
                     };
-                    let (kind, _) = parse_device_target(&device_id);
+                    let (kind, _) = parse_device_target(device_id);
                     match kind {
                         DeviceTargetKind::Playback => needs.playback_devices = true,
                         DeviceTargetKind::Recording => needs.recording_devices = true,
