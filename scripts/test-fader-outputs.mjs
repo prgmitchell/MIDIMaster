@@ -46,6 +46,27 @@ const input = (field, value) => {
   field.value = value;
   field.dispatchEvent(new Event("input", { bubbles: true }));
 };
+const dragOutput = (from, to, cancel = false) => {
+  const previousHitTest = document.elementFromPoint;
+  document.elementFromPoint = () => to;
+  try {
+    const down = new Event("pointerdown", { bubbles: true, cancelable: true });
+    Object.assign(down, { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+    from.querySelector("[data-output-grip]").dispatchEvent(down);
+    assert.equal(
+      down.defaultPrevented,
+      true,
+      "pointer dragging suppresses native dragging",
+    );
+    const end = new Event(cancel ? "pointercancel" : "pointerup", {
+      bubbles: true,
+    });
+    Object.assign(end, { pointerId: 1, clientX: 10, clientY: 100 });
+    document.dispatchEvent(end);
+  } finally {
+    document.elementFromPoint = previousHitTest;
+  }
+};
 const chooseMode = (row, value) => {
   const trigger = row.querySelector("[data-output-mode-trigger]");
   assert.ok(trigger.querySelector("[data-output-mode-icon]"));
@@ -211,11 +232,27 @@ try {
     "default-led",
     "permanent defaults can be reordered",
   );
+  dragOutput(rows()[0], rows()[1]);
+  assert.equal(
+    rows()[0].dataset.outputId,
+    "default-feedback",
+    "the default LED output can be dragged",
+  );
+  dragOutput(rows()[0], rows()[1]);
+  assert.equal(
+    rows()[0].dataset.outputId,
+    "default-led",
+    "the default feedback output can be dragged",
+  );
+  const orderBeforeCancel = rows().map((row) => row.dataset.outputId);
+  dragOutput(rows()[0], rows()[1], true);
+  assert.deepEqual(
+    rows().map((row) => row.dataset.outputId),
+    orderBeforeCancel,
+    "cancelled drags preserve the order",
+  );
   const extraId = rows()[2].dataset.outputId;
-  rows()[2]
-    .querySelector("[data-output-grip]")
-    .dispatchEvent(new Event("dragstart", { bubbles: true }));
-  rows()[1].dispatchEvent(new Event("drop", { bubbles: true }));
+  dragOutput(rows()[2], rows()[1]);
   assert.deepEqual(
     rows().map((row) => row.dataset.outputId),
     ["default-led", extraId, "default-feedback"],

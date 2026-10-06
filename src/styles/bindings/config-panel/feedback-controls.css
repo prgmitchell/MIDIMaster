@@ -143,6 +143,9 @@
 .binding-config-output-row > .binding-config-output-mode,
 .binding-config-output-row > .binding-config-icon-button { align-self: end; }
 .binding-config-output-row .binding-config-output-icon { color: var(--accent, #53b2ff); }
+.binding-config-output-row.is-dragging { opacity: .65; }
+.binding-config-output-row [data-output-grip] { touch-action: none; }
+.binding-config-output-row.is-dragging [data-output-grip] { cursor: grabbing; }
 .binding-config-output-row .binding-config-midi-device { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .binding-config-output-row .binding-config-midi-control { display: none; }
 .binding-config-output-mode { min-width: 0; display: flex; justify-content: end; }

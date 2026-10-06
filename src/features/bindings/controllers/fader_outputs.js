@@ -41,7 +41,7 @@ export function createFaderOutputs({
 }) {
   let selectedId = null,
     bindingId = null,
-    draggedId = null;
+    drag = null;
   const rows = new Map();
   const locked = () =>
     Boolean(editorState.learnField || editorState.transferPrompt);
@@ -79,7 +79,17 @@ export function createFaderOutputs({
     ...(binding.additional_outputs || []),
   ];
 
+  function cancelDrag() {
+    const previous = drag;
+    drag = null;
+    if (!previous) return;
+    rows.get(previous.id)?.row.classList.remove("is-dragging");
+    if (previous.grip.hasPointerCapture?.(previous.pointerId))
+      previous.grip.releasePointerCapture(previous.pointerId);
+  }
+
   function disposeOutputs() {
+    cancelDrag();
     // Keep the permanent controls and their event handlers when rebuilding rows.
     const ledHome = elements.bindingConfigOutputLedSettings;
     if (ledHome && listState.feedbackModeDropdown) {
@@ -275,7 +285,7 @@ export function createFaderOutputs({
     const row = document.createElement("div");
     row.className = "binding-config-modifier-row binding-config-output-row";
     row.dataset.outputId = output.id;
-    row.innerHTML = `<button type="button" class="binding-config-modifier-grip" draggable="true" data-output-grip><span class="drag-grip" aria-hidden="true"></span></button>
+    row.innerHTML = `<button type="button" class="binding-config-modifier-grip" data-output-grip><span class="drag-grip" aria-hidden="true"></span></button>
       <span class="binding-config-modifier-icon binding-config-output-icon" aria-hidden="true"></span>
       <div class="binding-config-modifier-copy"><strong></strong><span class="binding-config-modifier-mapping binding-config-midi-stack"><span class="binding-config-midi-device"></span><span class="binding-config-midi-control"></span></span></div>
       <div data-output-fields></div>
@@ -491,29 +501,42 @@ export function createFaderOutputs({
     });
     lifetime.listen(elements.bindingConfigOutputsList, "change", update);
     lifetime.listen(elements.bindingConfigOutputsList, "input", update);
-    lifetime.listen(elements.bindingConfigOutputsList, "dragstart", (event) => {
-      if (locked() || !event.target.closest("[data-output-grip]")) {
+    lifetime.listen(
+      elements.bindingConfigOutputsList,
+      "pointerdown",
+      (event) => {
+        const grip = event.target.closest("[data-output-grip]");
+        if (!grip || locked() || event.button !== 0) return;
         event.preventDefault();
-        return;
-      }
-      draggedId = event.target.closest("[data-output-id]").dataset.outputId;
-      if (event.dataTransfer) {
-        event.dataTransfer.setData("text/plain", draggedId);
-        event.dataTransfer.effectAllowed = "move";
-      }
+        cancelDrag();
+        const row = grip.closest("[data-output-id]");
+        drag = {
+          id: row.dataset.outputId,
+          grip,
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+        };
+        row.classList.add("is-dragging");
+        grip.setPointerCapture?.(event.pointerId);
+      },
+    );
+    lifetime.listen(document, "pointerup", (event) => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const previous = drag;
+      const target = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest("[data-output-id]");
+      cancelDrag();
+      if (
+        target &&
+        elements.bindingConfigOutputsList.contains(target) &&
+        Math.hypot(event.clientX - previous.x, event.clientY - previous.y) >= 6
+      )
+        moveOutput(previous.id, target.dataset.outputId);
     });
-    lifetime.listen(elements.bindingConfigOutputsList, "dragover", (event) => {
-      if (draggedId) event.preventDefault();
-    });
-    lifetime.listen(elements.bindingConfigOutputsList, "drop", (event) => {
-      event.preventDefault();
-      const target = event.target.closest("[data-output-id]")?.dataset.outputId;
-      if (draggedId && target) moveOutput(draggedId, target);
-      draggedId = null;
-    });
-    lifetime.listen(elements.bindingConfigOutputsList, "dragend", () => {
-      draggedId = null;
-    });
+    lifetime.listen(document, "pointercancel", cancelDrag);
+    lifetime.listen(window, "blur", cancelDrag);
     lifetime.listen(elements.bindingConfigOutputsList, "keydown", (event) => {
       if (
         !event.altKey ||
