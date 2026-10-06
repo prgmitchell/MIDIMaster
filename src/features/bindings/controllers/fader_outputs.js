@@ -14,6 +14,7 @@ import {
 } from "../../../core/control_mapping.js";
 import { getFaderModifiers } from "../../../core/fader_modifiers.js";
 import { renderLedModeDropdown } from "./led_feedback_editor.js";
+import { createFaderListDrag } from "./fader_list_drag.js";
 
 const icon = (paths) =>
   `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
@@ -40,11 +41,19 @@ export function createFaderOutputs({
   t,
 }) {
   let selectedId = null,
-    bindingId = null,
-    drag = null;
+    bindingId = null;
   const rows = new Map();
   const locked = () =>
     Boolean(editorState.learnField || editorState.transferPrompt);
+  const drag = createFaderListDrag({
+    container: elements.bindingConfigOutputsList,
+    rowSelector: "[data-output-id]",
+    gripSelector: "[data-output-grip]",
+    getId: (row) => row.dataset.outputId,
+    move: (id, index) => moveOutput(id, getOutputOrder(getConfigBinding())[index]),
+    locked,
+    lifetime,
+  });
   const label = (kind) =>
     t(kind === "Led" ? "bindings.ledOutput" : "bindings.feedbackOutput");
   const number = (value, max) =>
@@ -79,17 +88,8 @@ export function createFaderOutputs({
     ...(binding.additional_outputs || []),
   ];
 
-  function cancelDrag() {
-    const previous = drag;
-    drag = null;
-    if (!previous) return;
-    rows.get(previous.id)?.row.classList.remove("is-dragging");
-    if (previous.grip.hasPointerCapture?.(previous.pointerId))
-      previous.grip.releasePointerCapture(previous.pointerId);
-  }
-
   function disposeOutputs() {
-    cancelDrag();
+    drag.cancel();
     // Keep the permanent controls and their event handlers when rebuilding rows.
     const ledHome = elements.bindingConfigOutputLedSettings;
     if (ledHome && listState.feedbackModeDropdown) {
@@ -450,7 +450,7 @@ export function createFaderOutputs({
     const order = getOutputOrder(binding),
       from = order.indexOf(fromId),
       to = order.indexOf(toId);
-    if (from < 0 || to < 0) return;
+    if (from < 0 || to < 0 || from === to) return;
     order.splice(to, 0, order.splice(from, 1)[0]);
     binding.output_order = order;
     binding.additional_outputs?.sort(
@@ -501,42 +501,7 @@ export function createFaderOutputs({
     });
     lifetime.listen(elements.bindingConfigOutputsList, "change", update);
     lifetime.listen(elements.bindingConfigOutputsList, "input", update);
-    lifetime.listen(
-      elements.bindingConfigOutputsList,
-      "pointerdown",
-      (event) => {
-        const grip = event.target.closest("[data-output-grip]");
-        if (!grip || locked() || event.button !== 0) return;
-        event.preventDefault();
-        cancelDrag();
-        const row = grip.closest("[data-output-id]");
-        drag = {
-          id: row.dataset.outputId,
-          grip,
-          pointerId: event.pointerId,
-          x: event.clientX,
-          y: event.clientY,
-        };
-        row.classList.add("is-dragging");
-        grip.setPointerCapture?.(event.pointerId);
-      },
-    );
-    lifetime.listen(document, "pointerup", (event) => {
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      const previous = drag;
-      const target = document
-        .elementFromPoint(event.clientX, event.clientY)
-        ?.closest("[data-output-id]");
-      cancelDrag();
-      if (
-        target &&
-        elements.bindingConfigOutputsList.contains(target) &&
-        Math.hypot(event.clientX - previous.x, event.clientY - previous.y) >= 6
-      )
-        moveOutput(previous.id, target.dataset.outputId);
-    });
-    lifetime.listen(document, "pointercancel", cancelDrag);
-    lifetime.listen(window, "blur", cancelDrag);
+    drag.bind();
     lifetime.listen(elements.bindingConfigOutputsList, "keydown", (event) => {
       if (
         !event.altKey ||

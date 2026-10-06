@@ -5,6 +5,7 @@ import { createBindingsFeature } from "../src/features/bindings/bindings.js";
 import { getFaderModifiers } from "../src/core/fader_modifiers.js";
 import { findControlConflict } from "../src/core/control_mapping.js";
 import { applyBindingDeviceMigrations } from "../src/core/midi_preferences.js";
+import { dragFaderRow } from "./lib/fader_drag_fixture.mjs";
 
 const mapping = (controller) => ({
   device_id: "midi",
@@ -167,6 +168,24 @@ try {
   await settle();
   feature.beginBindingEdit("legacy");
   assert.equal(rows().length, 4, "cancel restores removed modifiers");
+  const beforeDrag = bindings[0].modifiers.map((modifier) => modifier.id);
+  dragFaderRow(rows()[0], rows()[3]);
+  const draggedOrder = [...beforeDrag.slice(1), beforeDrag[0]];
+  assert.deepEqual(rows().map((row) => row.dataset.modifierId), draggedOrder,
+    "pointer dragging moves a modifier to the outlined position");
+  dragFaderRow(rows()[3], rows()[0], { cancel: true });
+  assert.deepEqual(rows().map((row) => row.dataset.modifierId), draggedOrder,
+    "cancelling a modifier drag keeps its order");
+  await save();
+  assert.deepEqual(bindings[0].modifiers.map((modifier) => modifier.id), draggedOrder);
+  feature.beginBindingEdit("legacy");
+  assert.deepEqual(rows().map((row) => row.dataset.modifierId), draggedOrder,
+    "modifier order survives saving and reopening");
+  dragFaderRow(rows()[3], rows()[0]);
+  assert.deepEqual(rows().map((row) => row.dataset.modifierId), beforeDrag,
+    "modifiers can also be dragged upwards");
+  await save();
+  feature.beginBindingEdit("legacy");
   const key = new window.Event("keydown", { bubbles: true });
   Object.assign(key, { altKey: true, key: "ArrowUp" });
   rows()[3].querySelector("button").dispatchEvent(key);

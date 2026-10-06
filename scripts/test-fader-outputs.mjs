@@ -4,6 +4,7 @@ import { createDomRefs } from "../src/app/dom_refs.js";
 import { createBindingsFeature } from "../src/features/bindings/bindings.js";
 import { normalizeBinding } from "../src/core/binding_model.js";
 import { applyBindingDeviceMigrations } from "../src/core/midi_preferences.js";
+import { dragFaderRow } from "./lib/fader_drag_fixture.mjs";
 
 const { document } = await createAppDom();
 const d = createDomRefs().bindings;
@@ -46,27 +47,7 @@ const input = (field, value) => {
   field.value = value;
   field.dispatchEvent(new Event("input", { bubbles: true }));
 };
-const dragOutput = (from, to, cancel = false) => {
-  const previousHitTest = document.elementFromPoint;
-  document.elementFromPoint = () => to;
-  try {
-    const down = new Event("pointerdown", { bubbles: true, cancelable: true });
-    Object.assign(down, { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
-    from.querySelector("[data-output-grip]").dispatchEvent(down);
-    assert.equal(
-      down.defaultPrevented,
-      true,
-      "pointer dragging suppresses native dragging",
-    );
-    const end = new Event(cancel ? "pointercancel" : "pointerup", {
-      bubbles: true,
-    });
-    Object.assign(end, { pointerId: 1, clientX: 10, clientY: 100 });
-    document.dispatchEvent(end);
-  } finally {
-    document.elementFromPoint = previousHitTest;
-  }
-};
+const dragOutput = (from, to, cancel = false) => dragFaderRow(from, to, { cancel });
 const chooseMode = (row, value) => {
   const trigger = row.querySelector("[data-output-mode-trigger]");
   assert.ok(trigger.querySelector("[data-output-mode-icon]"));

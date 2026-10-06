@@ -8,6 +8,7 @@ import {
 } from "../../../core/fader_modifiers.js";
 import { muteIconSvg, bindingActionIconSvg } from "../icons.js";
 import { assignModeTooltip, muteBehaviorTooltip } from "../shape_helpers.js";
+import { createFaderListDrag } from "./fader_list_drag.js";
 
 export function createFaderModifiers({
   elements,
@@ -20,10 +21,19 @@ export function createFaderModifiers({
 }) {
   let selectedId = null;
   let bindingId = null;
-  let draggedId = null;
   const dropdowns = new Map();
+  const drag = createFaderListDrag({
+    container: elements.bindingConfigModifiersList,
+    rowSelector: "[data-modifier-id]",
+    gripSelector: ".binding-config-modifier-grip",
+    getId: (row) => row.dataset.modifierId,
+    move: moveModifier,
+    locked: () => locked(),
+    lifetime,
+  });
 
   function disposeModifiers() {
+    drag.cancel();
     for (const entry of dropdowns.values()) {
       window.removeEventListener("resize", entry.root.__positionDropdownMenu);
       window.removeEventListener(
@@ -65,6 +75,19 @@ export function createFaderModifiers({
               : "bindings.soloToggleTooltip",
           )
         : muteBehaviorTooltip(value);
+
+  function moveModifier(id, to) {
+    const binding = getConfigBinding();
+    if (!binding || locked()) return;
+    const from = binding.modifiers.findIndex((modifier) => modifier.id === id);
+    if (from < 0 || to < 0 || to >= binding.modifiers.length || from === to) return;
+    binding.modifiers.splice(to, 0, binding.modifiers.splice(from, 1)[0]);
+    selectedId = id;
+    renderModifiers(binding);
+    Array.from(elements.bindingConfigModifiersList.children)
+      .find((row) => row.dataset.modifierId === id)
+      ?.querySelector(".binding-config-modifier-grip")?.focus();
+  }
 
   function remove(id) {
     const binding = getConfigBinding();
@@ -110,7 +133,6 @@ export function createFaderModifiers({
       const grip = document.createElement("button");
       grip.type = "button";
       grip.className = "binding-config-modifier-grip";
-      grip.draggable = true;
       grip.setAttribute("aria-label", t("bindings.reorderModifier"));
       grip.title = t("bindings.reorderModifier");
       grip.innerHTML = '<span class="drag-grip" aria-hidden="true"></span>';
@@ -295,45 +317,7 @@ export function createFaderModifiers({
       event.target.title = modeTooltip(modifier.kind, event.target.value);
       renderModeDropdown(dropdowns.get(id), event.target);
     });
-    lifetime.listen(
-      elements.bindingConfigModifiersList,
-      "dragstart",
-      (event) => {
-        if (locked()) {
-          event.preventDefault();
-          return;
-        }
-        draggedId =
-          event.target.closest("[data-modifier-id]")?.dataset.modifierId;
-        if (draggedId) {
-          event.dataTransfer.setData("text/plain", draggedId);
-          event.dataTransfer.effectAllowed = "move";
-        }
-      },
-    );
-    lifetime.listen(
-      elements.bindingConfigModifiersList,
-      "dragover",
-      (event) => {
-        if (draggedId) event.preventDefault();
-      },
-    );
-    lifetime.listen(elements.bindingConfigModifiersList, "drop", (event) => {
-      event.preventDefault();
-      const binding = getConfigBinding();
-      const targetId =
-        event.target.closest("[data-modifier-id]")?.dataset.modifierId;
-      if (!binding || !draggedId || !targetId || locked()) return;
-      const from = binding.modifiers.findIndex((item) => item.id === draggedId);
-      const to = binding.modifiers.findIndex((item) => item.id === targetId);
-      if (from >= 0 && to >= 0)
-        binding.modifiers.splice(to, 0, binding.modifiers.splice(from, 1)[0]);
-      draggedId = null;
-      renderModifiers(binding);
-    });
-    lifetime.listen(elements.bindingConfigModifiersList, "dragend", () => {
-      draggedId = null;
-    });
+    drag.bind();
     lifetime.listen(elements.bindingConfigModifiersList, "keydown", (event) => {
       if (
         !event.altKey ||
@@ -348,12 +332,7 @@ export function createFaderModifiers({
       const to = from + (event.key === "ArrowUp" ? -1 : 1);
       if (from < 0 || to < 0 || to >= binding.modifiers.length) return;
       event.preventDefault();
-      binding.modifiers.splice(to, 0, binding.modifiers.splice(from, 1)[0]);
-      renderModifiers(binding);
-      Array.from(elements.bindingConfigModifiersList.children)
-        .find((row) => row.dataset.modifierId === id)
-        ?.querySelector("button")
-        ?.focus();
+      moveModifier(id, to);
     });
     lifetime.listen(document, "pointerdown", (event) => {
       if (
