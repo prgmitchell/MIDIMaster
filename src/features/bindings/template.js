@@ -220,9 +220,6 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                   <button id="binding-config-output-add" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Add output" title="Add output" data-i18n-aria-label="bindings.addOutput" data-i18n-title="bindings.addOutput" aria-haspopup="menu" aria-expanded="false">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg>
                   </button>
-                  <button id="binding-config-output-remove" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Remove selected output" title="Remove selected output" data-i18n-aria-label="bindings.removeOutput" data-i18n-title="bindings.removeOutput" disabled>
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16" /></svg>
-                  </button>
                   <div id="binding-config-output-menu" class="binding-config-mode-menu hidden" role="menu">
                     <button type="button" class="binding-config-mode-option" data-output-kind="Feedback" role="menuitem" data-i18n="bindings.feedbackOutput">Feedback output</button>
                     <button type="button" class="binding-config-mode-option" data-output-kind="Led" role="menuitem" data-i18n="bindings.ledOutput">LED output</button>
@@ -390,9 +387,6 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                   <div class="binding-config-modifier-toolbar">
                     <button id="binding-config-modifier-add" type="button" class="binding-config-button binding-config-button--primary binding-config-icon-button" aria-label="Add modifier" data-i18n-aria-label="bindings.addModifier" title="Add modifier" data-i18n-title="bindings.addModifier" aria-haspopup="menu" aria-expanded="false">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16" /></svg>
-                    </button>
-                    <button id="binding-config-modifier-remove" type="button" class="binding-config-button binding-config-button--secondary binding-config-icon-button" aria-label="Remove selected modifier" data-i18n-aria-label="bindings.removeModifier" title="Remove selected modifier" data-i18n-title="bindings.removeModifier" disabled>
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16" /></svg>
                     </button>
                     <div id="binding-config-modifier-menu" class="binding-config-mode-menu hidden" role="menu">
                       <button type="button" class="binding-config-mode-option" data-modifier-kind="Mute" role="menuitem" data-i18n="bindings.mute">Mute</button>

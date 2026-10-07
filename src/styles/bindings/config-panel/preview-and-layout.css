@@ -427,7 +427,6 @@
   border-radius: 10px;
   background: var(--control-bg, rgba(11, 18, 28, .78));
 }
-.binding-config-modifier-row.is-selected { border-color: var(--accent, #53b2ff); }
 .binding-config-modifier-grip { width: 18px; padding: 0; border: 0; background: transparent; color: var(--text-secondary, #96a8c6); cursor: grab; }
 .binding-config-modifier-grip .drag-grip { display: block; width: 10px; height: 20px; }
 .binding-config-modifier-icon { display: flex; align-items: center; color: var(--text-secondary, #96a8c6); }

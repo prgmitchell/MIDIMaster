@@ -61,7 +61,6 @@ const modifierControls = [
   ["binding-config-modifiers-section", "bindingConfigModifiersSection"],
   ["binding-config-modifiers-list", "bindingConfigModifiersList"],
   ["binding-config-modifier-add", "bindingConfigModifierAdd"],
-  ["binding-config-modifier-remove", "bindingConfigModifierRemove"],
   ["binding-config-modifier-menu", "bindingConfigModifierMenu"],
 ];
 

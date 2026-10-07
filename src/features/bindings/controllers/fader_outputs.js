@@ -40,8 +40,6 @@ export function createFaderOutputs({
   listState,
   t,
 }) {
-  let selectedId = null,
-    bindingId = null;
   const rows = new Map();
   const locked = () =>
     Boolean(editorState.learnField || editorState.transferPrompt);
@@ -203,7 +201,6 @@ export function createFaderOutputs({
             ? `${t("bindings.ledMeterStrip")} ${mapping.controller + 1}`
             : `Ch ${mapping.channel} ${mapping.msg_type === "PitchBend" ? "Pitch Bend" : mapping.msg_type === "Note" ? "Note" : "CC"}${mapping.msg_type === "PitchBend" ? "" : ` ${mapping.controller}`}`;
     summary.title = `${device.textContent} — ${address.textContent}`;
-    row.classList.toggle("is-selected", output.id === selectedId);
     for (const [select, dropdown] of dropdowns) {
       select.disabled = locked();
       dropdown.button.disabled = select.disabled;
@@ -370,10 +367,6 @@ export function createFaderOutputs({
 
   function renderOutputs(binding) {
     if (!elements.bindingConfigOutputsList) return;
-    if (bindingId !== binding.id) {
-      bindingId = binding.id;
-      selectedId = null;
-    }
     const scroll = elements.bindingConfigOutputsList.scrollTop;
     disposeOutputs();
     const items = outputs(binding);
@@ -392,10 +385,6 @@ export function createFaderOutputs({
     for (const output of outputs(binding)) syncRow(output, binding);
     if (elements.bindingConfigOutputAdd)
       elements.bindingConfigOutputAdd.disabled = locked();
-    if (elements.bindingConfigOutputRemove)
-      elements.bindingConfigOutputRemove.disabled =
-        locked() ||
-        !binding.additional_outputs?.some((output) => output.id === selectedId);
   }
 
   function removeOutput(id) {
@@ -411,7 +400,6 @@ export function createFaderOutputs({
     );
     binding.output_order = getOutputOrder(binding);
     editorState.acceptedTransfers.delete(outputField(id));
-    selectedId = null;
     renderOutputs(binding);
     syncFeedbackOutputUi(binding);
   }
@@ -475,26 +463,22 @@ export function createFaderOutputs({
       const output = createFaderOutput(binding, kind);
       if (!output) return;
       (binding.additional_outputs ||= []).push(output);
-      selectedId = output.id;
       elements.bindingConfigOutputMenu.classList.add("hidden");
       elements.bindingConfigOutputAdd.setAttribute("aria-expanded", "false");
       renderOutputs(binding);
       rows.get(output.id)?.row.scrollIntoView({ block: "nearest" });
     });
-    lifetime.listen(elements.bindingConfigOutputRemove, "click", () =>
-      removeOutput(selectedId),
-    );
     lifetime.listen(elements.bindingConfigOutputsList, "click", (event) => {
       const row = event.target.closest("[data-output-id]");
       if (!row || locked()) return;
-      selectedId = row.dataset.outputId;
+      const id = row.dataset.outputId;
       if (event.target.closest("[data-output-remove]"))
-        removeOutput(selectedId);
+        removeOutput(id);
       else if (event.target.closest("[data-output-learn]")) {
         startAuxLearn(
-          selectedId === "default-led"
+          id === "default-led"
             ? "led_control"
-            : outputField(selectedId),
+            : outputField(id),
         ).catch(console.error);
       }
       updateOutputLearnUi();

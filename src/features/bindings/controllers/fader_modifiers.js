@@ -19,8 +19,6 @@ export function createFaderModifiers({
   t,
   renderMidiMappingSummary,
 }) {
-  let selectedId = null;
-  let bindingId = null;
   const dropdowns = new Map();
   const drag = createFaderListDrag({
     container: elements.bindingConfigModifiersList,
@@ -82,7 +80,6 @@ export function createFaderModifiers({
     const from = binding.modifiers.findIndex((modifier) => modifier.id === id);
     if (from < 0 || to < 0 || to >= binding.modifiers.length || from === to) return;
     binding.modifiers.splice(to, 0, binding.modifiers.splice(from, 1)[0]);
-    selectedId = id;
     renderModifiers(binding);
     Array.from(elements.bindingConfigModifiersList.children)
       .find((row) => row.dataset.modifierId === id)
@@ -96,7 +93,6 @@ export function createFaderModifiers({
       (modifier) => modifier.id !== id,
     );
     editorState.acceptedTransfers.delete(modifierField(id));
-    selectedId = null;
     renderModifiers(binding);
   }
 
@@ -106,7 +102,6 @@ export function createFaderModifiers({
     binding.modifiers = binding.modifiers.filter((modifier) => {
       if (modifier.control?.device_id?.trim()) return true;
       editorState.acceptedTransfers.delete(modifierField(modifier.id));
-      if (selectedId === modifier.id) selectedId = null;
       return false;
     });
     renderModifiers(binding);
@@ -115,10 +110,6 @@ export function createFaderModifiers({
   function renderModifiers(binding) {
     const list = elements.bindingConfigModifiersList;
     if (!list) return;
-    if (bindingId !== binding.id) {
-      selectedId = null;
-      bindingId = binding.id;
-    }
     const scrollTop = list.scrollTop;
     disposeModifiers();
     list.replaceChildren();
@@ -129,7 +120,6 @@ export function createFaderModifiers({
       const row = document.createElement("div");
       row.className = "binding-config-modifier-row";
       row.dataset.modifierId = modifier.id;
-      row.classList.toggle("is-selected", selectedId === modifier.id);
       const grip = document.createElement("button");
       grip.type = "button";
       grip.className = "binding-config-modifier-grip";
@@ -255,8 +245,6 @@ export function createFaderModifiers({
     for (const entry of dropdowns.values()) entry.button.disabled = locked();
     if (elements.bindingConfigModifierAdd)
       elements.bindingConfigModifierAdd.disabled = locked();
-    if (elements.bindingConfigModifierRemove)
-      elements.bindingConfigModifierRemove.disabled = locked() || !selectedId;
   }
 
   function bindModifiersUi() {
@@ -281,21 +269,14 @@ export function createFaderModifiers({
         mute_behavior: "ToggleOnPress",
       };
       ensureFaderModifiers(binding).push(modifier);
-      selectedId = modifier.id;
       elements.bindingConfigModifierMenu.classList.add("hidden");
       elements.bindingConfigModifierAdd.setAttribute("aria-expanded", "false");
       renderModifiers(binding);
       await startAuxLearn(modifierField(modifier.id));
     });
-    lifetime.listen(elements.bindingConfigModifierRemove, "click", () =>
-      remove(selectedId),
-    );
     lifetime.listen(elements.bindingConfigModifiersList, "click", (event) => {
       const row = event.target.closest("[data-modifier-id]");
       if (!row || locked()) return;
-      selectedId = row.dataset.modifierId;
-      for (const item of elements.bindingConfigModifiersList.children)
-        item.classList.toggle("is-selected", item === row);
       const learn = event.target.closest("[data-modifier-learn]");
       const clear = event.target.closest("[data-modifier-remove]");
       if (learn)

@@ -77,7 +77,6 @@ try {
   assert.equal(rows().length, 2, "legacy profiles retain both default rows");
   for (const row of rows()) {
     row.click();
-    assert.equal(d.bindingConfigOutputRemove.disabled, true);
     assert.equal(
       row.querySelector("[data-output-remove]").disabled,
       true,
@@ -141,8 +140,7 @@ try {
     4,
     "all destinations reopen from the saved profile",
   );
-  rows()[2].click();
-  d.bindingConfigOutputRemove.click();
+  rows()[2].querySelector("[data-output-remove]").click();
   assert.equal(rows().length, 3);
   rows()[2].querySelector("[data-output-remove]").click();
   assert.equal(rows().length, 2);
