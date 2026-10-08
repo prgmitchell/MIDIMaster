@@ -492,19 +492,8 @@ impl Binding {
         if self.targets.len() > 1 {
             self.targets.retain(|t| *t != BindingTarget::Unset);
         }
-        if self.targets.len() > 8 {
-            self.targets.truncate(8);
-        }
-        selected_special = self
-            .targets
-            .iter()
-            .find(|target| matches!(target, BindingTarget::Macro | BindingTarget::Soundboard))
-            .cloned();
         if let Some(preferred) = preferred_special {
             if selected_special.is_none() {
-                if self.targets.len() >= 8 {
-                    self.targets.truncate(7);
-                }
                 self.targets.push(preferred.clone());
                 selected_special = Some(preferred);
             }

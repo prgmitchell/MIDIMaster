@@ -142,7 +142,6 @@ fn normalize_macro_action_step(step: &MacroActionStep) -> Option<MacroActionStep
                 BindingTarget::Unset | BindingTarget::Macro | BindingTarget::Soundboard
             )
         })
-        .take(8)
         .cloned()
         .collect();
 
@@ -185,7 +184,6 @@ fn normalize_macro_draft_action_step(step: &MacroActionStep) -> Option<MacroActi
                     BindingTarget::Unset | BindingTarget::Macro | BindingTarget::Soundboard
                 )
             })
-            .take(8)
             .cloned()
             .collect()
     };

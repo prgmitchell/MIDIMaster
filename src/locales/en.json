@@ -670,8 +670,6 @@
   "midi.profileUnavailableKeepingCurrent": "Profile MIDI device unavailable. Keeping current connection.",
   "midi.savedProfileDevicesNotFound": "Saved profile MIDI device(s) not found.",
   "midi.eventStatus": "MIDI: {payload}",
-  "dialogs.targetListFullTitle": "Target List Full",
-  "dialogs.targetListFullMessage": "This fader already has 8 targets. Remove one before assigning another app.",
   "dialogs.assignFailedTitle": "Assign Failed",
   "dialogs.assignFailedMessage": "Could not resolve the focused application. Click the app window and try again.",
   "dialogs.macroAlreadyConfiguredTitle": "Macro Already Configured",

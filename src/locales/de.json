@@ -670,8 +670,6 @@
   "midi.profileUnavailableKeepingCurrent": "Profil MIDI Gerät nicht verfügbar. Stromanschluss halten.",
   "midi.savedProfileDevicesNotFound": "Gespeichertes Profil MIDI Geräte nicht gefunden.",
   "midi.eventStatus": "MIDI: {payload}",
-  "dialogs.targetListFullTitle": "Zielliste Voll",
-  "dialogs.targetListFullMessage": "Dieser Fader hat bereits 8 Ziele. Entfernen Sie eine, bevor Sie eine andere App zuordnen.",
   "dialogs.assignFailedTitle": "Zuordnen Verfehlt",
   "dialogs.assignFailedMessage": "Konnte die konzentrierte Anwendung nicht lösen. Klicken Sie auf das App-Fenster und versuchen Sie es erneut.",
   "dialogs.macroAlreadyConfiguredTitle": "Macro bereits konfiguriert",

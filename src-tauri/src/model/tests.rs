@@ -58,6 +58,61 @@ fn deserialize_targets_shape_unchanged() {
 }
 
 #[test]
+fn ensure_targets_preserves_large_application_lists() {
+    let targets: Vec<_> = (0..32)
+        .map(|index| BindingTarget::Application {
+            name: format!("app-{index}"),
+            display_name: None,
+            icon_data: None,
+        })
+        .collect();
+    for (action, special) in [
+        (BindingAction::Volume, None),
+        (BindingAction::ToggleMute, None),
+        (BindingAction::Macro, Some(BindingTarget::Macro)),
+        (BindingAction::Soundboard, Some(BindingTarget::Soundboard)),
+    ] {
+        let mut binding = crate::test_support::binding();
+        binding.action = action;
+        binding.targets = targets.clone();
+        binding.ensure_targets();
+        let mut expected = targets.clone();
+        expected.extend(special);
+        assert_eq!(binding.targets, expected);
+        assert_eq!(binding.primary_target_ref(), &targets[0]);
+        binding.ensure_targets();
+        assert_eq!(binding.normalized_targets_ref(), expected);
+    }
+}
+
+#[test]
+fn macro_normalization_preserves_large_application_lists() {
+    let targets: Vec<_> = (0..32)
+        .map(|index| BindingTarget::Application {
+            name: format!("app-{index}"),
+            display_name: None,
+            icon_data: None,
+        })
+        .collect();
+    let action = MacroActionStep {
+        targets: targets.clone(),
+        ..Default::default()
+    };
+    let steps = vec![
+        MacroStep::Action(Box::new(action.clone())),
+        MacroStep::Parallel {
+            steps: vec![action],
+        },
+    ];
+    for normalized in [
+        normalize_macro_steps(&steps),
+        normalize_macro_draft_steps(&steps),
+    ] {
+        assert_eq!(normalized, steps);
+    }
+}
+
+#[test]
 fn monitor_brightness_target_round_trips() {
     let target: BindingTarget = serde_json::from_value(serde_json::json!("MonitorBrightness"))
         .expect("monitor brightness target should deserialize");

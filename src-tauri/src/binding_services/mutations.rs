@@ -32,15 +32,6 @@ pub(crate) fn add_binding_to_active_profile(
         );
         return Err("Binding must have at least one target".to_string());
     }
-    if binding.targets.len() > 8 {
-        run_logger::warn(
-            "bindings_cmd",
-            "add_rejected",
-            &format!("binding_id={} reason=too_many_targets", binding.id),
-        );
-        return Err("Binding cannot have more than 8 targets".to_string());
-    }
-
     let (saved_profile, stale_feedback_bindings, previous_bindings, feedback_outputs_changed) = {
         let mut profile_guard = state
             .active_profile

@@ -83,10 +83,6 @@ export function createBackendEvents({
     await eventSubscriptions.subscribe("binding_aux_error", (event) => {
       const payload = parseEventPayload(event);
       if (!payload) return;
-      if (payload.reason === "target_list_full") {
-        showAlert(t("dialogs.targetListFullTitle"), t("dialogs.targetListFullMessage"));
-        return;
-      }
       if (payload.reason === "focused_app_unavailable") {
         showAlert(t("dialogs.assignFailedTitle"), t("dialogs.assignFailedMessage"));
       }

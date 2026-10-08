@@ -78,8 +78,7 @@ export function normalizeMacroDraftActionStep(step, { includeKind = false } = {}
   if (macroDraftLooksLikeLegacyTriggerPlaceholder(step)) {
     const draft = blankMacroActionStep({ includeKind });
     draft.targets = (Array.isArray(step?.targets) ? step.targets : [])
-      .filter((target) => target && target !== "Unset" && !isMacroTarget(target))
-      .slice(0, 8);
+      .filter((target) => target && target !== "Unset" && !isMacroTarget(target));
     draft.state = normalizeMacroActionState(step?.state || "Default");
     return draft;
   }
@@ -89,8 +88,7 @@ export function normalizeMacroDraftActionStep(step, { includeKind = false } = {}
   }
   const draft = blankMacroActionStep({ includeKind });
   const targets = (Array.isArray(step?.targets) ? step.targets : [])
-    .filter((target) => target && target !== "Unset" && !isMacroTarget(target))
-    .slice(0, 8);
+    .filter((target) => target && target !== "Unset" && !isMacroTarget(target));
   if (targets.length > 0) {
     draft.targets = targets;
     draft.action = "";

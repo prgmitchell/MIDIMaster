@@ -670,8 +670,6 @@
   "midi.profileUnavailableKeepingCurrent": "Profiel MIDI apparaat niet beschikbaar. Houdt de huidige verbinding.",
   "midi.savedProfileDevicesNotFound": "Opgeslagen profiel MIDI apparaat(s) niet gevonden.",
   "midi.eventStatus": "MIDI: {payload}",
-  "dialogs.targetListFullTitle": "Doellijst volledig",
-  "dialogs.targetListFullMessage": "Deze fader heeft al 8 doelen. Verwijderen voordat u een andere app toewijst.",
   "dialogs.assignFailedTitle": "Toewijzen mislukt",
   "dialogs.assignFailedMessage": "Kon de gerichte toepassing niet oplossen. Klik op het app venster en probeer het opnieuw.",
   "dialogs.macroAlreadyConfiguredTitle": "Macro is al ingesteld",

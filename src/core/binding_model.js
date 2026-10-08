@@ -52,10 +52,7 @@ export function normalizeMacroName(raw) {
 export function getBindingTargets(binding) {
   if (!binding || typeof binding !== "object") return [];
   if (Array.isArray(binding.targets) && binding.targets.length > 0) {
-    const normalized = binding.targets
-      .filter(Boolean)
-      .filter((t) => t !== "Unset")
-      .slice(0, 8);
+    const normalized = binding.targets.filter(Boolean).filter((t) => t !== "Unset");
     if (normalized.length > 0) return normalized;
   }
   if (binding.target != null) {
@@ -66,7 +63,7 @@ export function getBindingTargets(binding) {
 
 export function setBindingTargets(binding, targets) {
   if (!binding || typeof binding !== "object") return;
-  const normalized = Array.isArray(targets) ? targets.filter(Boolean).slice(0, 8) : [];
+  const normalized = Array.isArray(targets) ? targets.filter(Boolean) : [];
   if (normalized.length === 0) normalized.push("Unset");
   binding.targets = normalized;
   binding.target = normalized[0] || "Unset";
@@ -327,9 +324,7 @@ function normalizeMacroActionText(raw) {
 
 function normalizeMacroTargets(rawTargets) {
   const targets = Array.isArray(rawTargets) ? rawTargets : [];
-  return targets
-    .filter((target) => isTargetAssigned(target) && !isMacroTarget(target) && !isSoundboardTarget(target))
-    .slice(0, 8);
+  return targets.filter((target) => isTargetAssigned(target) && !isMacroTarget(target) && !isSoundboardTarget(target));
 }
 
 function normalizeMacroActionFields(step, { draft = false } = {}) {
@@ -437,7 +432,6 @@ export function normalizeBinding(binding) {
     return true;
   });
   if (preferredSpecial && !selectedSpecial) {
-    if (normalizedTargets.length >= 8) normalizedTargets.length = 7;
     normalizedTargets.push(preferredSpecial);
     selectedSpecial = preferredSpecial;
   }

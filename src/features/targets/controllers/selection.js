@@ -167,7 +167,7 @@ export function createSelection({
       selection.selectedTargets[exists] = mapped;
     } else if (exists >= 0) {
       selection.selectedTargets.splice(exists, 1);
-    } else if (selection.selectedTargets.length < 8) {
+    } else {
       selection.selectedTargets.push(mapped);
     }
     syncContainerValue(Boolean(option.ghost));

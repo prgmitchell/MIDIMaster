@@ -282,6 +282,38 @@ mod tests {
     }
 
     #[test]
+    fn large_application_target_lists_survive_saving_and_restart() {
+        let dir = test_dir("many-app-targets");
+        let store = ProfileStore::new(dir.clone());
+        let mut saved = profile("many-apps");
+        let mut binding = crate::test_support::binding();
+        let targets: Vec<_> = (0..32)
+            .map(|index| BindingTarget::Application {
+                name: format!("app-{index}"),
+                display_name: None,
+                icon_data: None,
+            })
+            .collect();
+        binding.targets = targets.clone();
+        saved.bindings.push(binding);
+        store.save_profile(saved).expect("save many apps");
+        drop(store);
+
+        let restarted = ProfileStore::new(dir.clone());
+        let loaded = restarted.load_profile("many-apps").unwrap().unwrap();
+        assert_eq!(loaded.bindings[0].normalized_targets_ref(), targets);
+        restarted.save_profile(loaded).expect("save loaded profile");
+        drop(restarted);
+
+        let reloaded = ProfileStore::new(dir.clone())
+            .load_profile("many-apps")
+            .unwrap()
+            .unwrap();
+        assert_eq!(reloaded.bindings[0].normalized_targets_ref(), targets);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn clear_assign_mode_uses_legacy_compatible_storage_and_survives_other_saves() {
         let dir = test_dir("clear-assign-compat");
         let store = ProfileStore::new(dir.clone());

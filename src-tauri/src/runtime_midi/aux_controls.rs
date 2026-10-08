@@ -224,18 +224,6 @@ pub(super) fn handle_aux_or_unmatched(
             {
                 return Ok(());
             }
-            if transition == AssignTransition::AddFocused && targets.len() >= 8 {
-                let _ = app.emit(
-                    "binding_aux_error",
-                    serde_json::json!({
-                        "binding_id": owner.id,
-                        "kind": "assign",
-                        "reason": "target_list_full"
-                    }),
-                );
-                return Ok(());
-            }
-
             let mut updated_targets: Option<Vec<model::BindingTarget>> = None;
             let mut guard = state
                 .active_profile
@@ -485,6 +473,32 @@ mod tests {
         binding.ensure_targets();
         assert_eq!(binding.targets, vec![model::BindingTarget::Unset]);
         assert_eq!(binding.target, model::BindingTarget::Unset);
+    }
+
+    #[test]
+    fn assign_add_preserves_every_app_beyond_eight_targets() {
+        let mut binding = assignment_binding(serde_json::json!(["Unset"]));
+        let mut expected = Vec::new();
+        for index in 0..32 {
+            let focused = model::BindingTarget::Application {
+                name: format!("app-{index}"),
+                display_name: None,
+                icon_data: None,
+            };
+            assert!(apply_assign_transition(
+                &mut binding,
+                AssignTransition::AddFocused,
+                Some(&focused)
+            ));
+            expected.push(focused.clone());
+            assert_eq!(binding.normalized_targets(), expected);
+            assert!(!apply_assign_transition(
+                &mut binding,
+                AssignTransition::AddFocused,
+                Some(&focused)
+            ));
+            assert_eq!(binding.normalized_targets(), expected);
+        }
     }
 
     #[test]

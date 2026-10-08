@@ -2,7 +2,7 @@ import { iconDataForApplicationName } from "../../core/target_core.js";
 import { targetFromPickerKind } from "../../core/target_model.js";
 
 export function normalizeSelectedTargets(value) {
-  if (Array.isArray(value)) return value.filter((target) => target && target !== "Unset").slice(0, 8);
+  if (Array.isArray(value)) return value.filter((target) => target && target !== "Unset");
   return value != null && value !== "Unset" ? [value] : [];
 }
 

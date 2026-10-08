@@ -670,8 +670,6 @@
   "midi.profileUnavailableKeepingCurrent": "MIDIデバイスを非公開にプロファイルします。 現在の接続を維持する.",
   "midi.savedProfileDevicesNotFound": "保存されたプロファイル MIDIデバイスが見つかりません.",
   "midi.eventStatus": "MIDI: {payload}",
-  "dialogs.targetListFullTitle": "ターゲットリスト 完全",
-  "dialogs.targetListFullMessage": "このフェーダーはすでに8つのターゲットを持っています。 別のアプリを割り当てる前に削除します.",
   "dialogs.assignFailedTitle": "失敗した割り当て",
   "dialogs.assignFailedMessage": "集中したアプリケーションを解決できません。 アプリウィンドウをクリックし、もう一度お試しください.",
   "dialogs.macroAlreadyConfiguredTitle": "マクロ すでに設定されている",

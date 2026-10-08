@@ -670,8 +670,6 @@
   "midi.profileUnavailableKeepingCurrent": "无法配置 MIDI 设备 。 保持当前连接 .",
   "midi.savedProfileDevicesNotFound": "未找到保存的配置文件 MIDI 设备 .",
   "midi.eventStatus": "MIDI: {payload}",
-  "dialogs.targetListFullTitle": "目标列表完整",
-  "dialogs.targetListFullMessage": "这个淡色器已经有8个目标. 在指定另一个应用程序之前删除一个 .",
   "dialogs.assignFailedTitle": "指定失败",
   "dialogs.assignFailedMessage": "无法解决焦点应用程序 。 点击应用程序窗口再试一次 .",
   "dialogs.macroAlreadyConfiguredTitle": "宏已经配置",

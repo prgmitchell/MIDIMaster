@@ -670,8 +670,6 @@
   "midi.profileUnavailableKeepingCurrent": "MIDI 기기를 사용할 수 없습니다. 현재 연결 유지.",
   "midi.savedProfileDevicesNotFound": "저장된 프로필 MIDI 장치(s)를 찾을 수 없습니다.",
   "midi.eventStatus": "모델 번호: {payload}",
-  "dialogs.targetListFullTitle": "대상 목록 전체",
-  "dialogs.targetListFullMessage": "이 페이더는 이미 8 개의 대상이 있습니다. 다른 앱을 할당하기 전에 하나를 제거하십시오.",
   "dialogs.assignFailedTitle": "할당 실패",
   "dialogs.assignFailedMessage": "집중된 신청을 해결할 수 없습니다. 앱 창을 클릭하고 다시 시도하십시오.",
   "dialogs.macroAlreadyConfiguredTitle": "Macro Already 구성",

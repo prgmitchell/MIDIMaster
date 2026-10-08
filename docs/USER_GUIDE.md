@@ -49,7 +49,7 @@ The Profiles dropdown shows the active profile.
 
 ## Bindings
 
-Each binding links one MIDI control to one target (plus an action). Bindings are listed in the main table.
+Each binding links one MIDI control to one or more targets (plus an action). There is no fixed limit on the number of targets per binding. Bindings are listed in the main table.
 
 ### Creating a Binding
 
