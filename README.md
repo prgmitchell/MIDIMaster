@@ -4,7 +4,7 @@ https://midimaster.app/
 
 MIDIMaster is a Windows desktop app for mapping MIDI controls like faders, knobs,
 and buttons to system audio, app audio sessions, audio devices, utility actions
-like hotkeys and AutoHotkey scripts, and supported integrations including the bundled Voicemeeter controller.
+like hotkeys and AutoHotkey scripts, and supported integrations including the bundled Voicemeeter and FxSound controllers.
 
 <img width="903" height="518" alt="midimaster" src="https://github.com/user-attachments/assets/06ec01d2-1bd6-4245-a814-4110e7566ec2" />
 

@@ -1,0 +1,11 @@
+{
+  "id": "fxsound",
+  "name": "FxSound",
+  "version": "1.0.0",
+  "api_version": "1",
+  "min_app_version": "4.9.10",
+  "entry": "plugin.mjs",
+  "icon": "icon.svg",
+  "description": "Map faders to FxSound Low/Mid/High EQ, individual bands, and effects. Switch processing and presets with buttons.",
+  "categories": ["Audio"]
+}

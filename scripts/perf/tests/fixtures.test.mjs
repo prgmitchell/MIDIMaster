@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createProfilesFixture, generateFixtureMatrix, SHAPE_TARGET_BYTES } from "../generate-fixtures.mjs";
+import { BUNDLED_PLUGIN_IDS, createProfilesFixture, generateFixtureMatrix, SHAPE_TARGET_BYTES } from "../generate-fixtures.mjs";
 
 test("icon-heavy profile fixtures hit their aggregate byte targets", () => {
   for (const shape of ["0.6mb", "5mb"]) {
@@ -54,7 +54,7 @@ test("matrix generation writes isolated app-data fixtures and disables online st
     assert.equal(appSettings.auto_check_updates, false);
     assert.equal(appSettings.midi_device_inventory_consent, "disabled");
     const zeroState = JSON.parse(await readFile(join(root, "b50-p1-light-plugins-zero", "app-data", "MIDIMaster", "plugins_state.json"), "utf8"));
-    assert.equal(zeroState.disabled.length, 4);
+    assert.deepEqual(zeroState.disabled, [...BUNDLED_PLUGIN_IDS]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

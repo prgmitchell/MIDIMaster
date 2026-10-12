@@ -1,0 +1,32 @@
+{
+  "version": "1.2.13.0",
+  "power": true,
+  "selected_preset": "General",
+  "presets": {
+    "built_in": [{ "name": "General" }, { "name": "Bass Boost" }],
+    "user_defined": []
+  },
+  "equalizer": {
+    "num_bands": 10,
+    "master_gain": 0,
+    "bands": [
+      { "index": 0, "frequency": 31.25, "gain": 0 },
+      { "index": 1, "frequency": 62.5, "gain": 0 },
+      { "index": 2, "frequency": 125, "gain": 0 },
+      { "index": 3, "frequency": 250, "gain": 0 },
+      { "index": 4, "frequency": 500, "gain": 0 },
+      { "index": 5, "frequency": 1000, "gain": 0 },
+      { "index": 6, "frequency": 2000, "gain": 0 },
+      { "index": 7, "frequency": 4000, "gain": 0 },
+      { "index": 8, "frequency": 8000, "gain": 0 },
+      { "index": 9, "frequency": 16000, "gain": 0 }
+    ]
+  },
+  "effects": {
+    "clarity": 2,
+    "ambience": 0,
+    "surround": 0,
+    "dynamicboost": 0,
+    "bass": 0
+  }
+}

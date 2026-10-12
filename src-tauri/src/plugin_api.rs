@@ -14,7 +14,7 @@ use std::{
 };
 use tauri::{AppHandle, Manager};
 use url::Url;
-const BUNDLED_PLUGIN_IDS: &[&str] = &["hue", "obs", "voicemeeter", "wavelink"];
+const BUNDLED_PLUGIN_IDS: &[&str] = &["fxsound", "hue", "obs", "voicemeeter", "wavelink"];
 const HUE_API_TIMEOUT_MS: u64 = 4500;
 const HUE_PAIR_TIMEOUT_MS: u64 = 3500;
 const PLUGIN_HTTP_DEFAULT_TIMEOUT_MS: u64 = 4500;

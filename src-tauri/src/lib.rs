@@ -17,6 +17,7 @@ mod device_target;
 mod durable_json_store;
 mod fader_curve;
 mod feedback;
+mod fxsound;
 mod midi;
 mod midi_event_queue;
 mod midi_reconciliation;
@@ -59,6 +60,7 @@ pub(crate) use app_state::AppState;
 use audio::AudioBackend;
 use commands::*;
 use durable_json_store::new_recovery_notices;
+use fxsound::{fxsound_select_preset, fxsound_snapshot, fxsound_write, FxSoundState};
 use profile_store::ProfileStore;
 use shutdown::{ShutdownAction, ShutdownCoordinator};
 
@@ -270,6 +272,7 @@ pub fn run() {
             // Shared WebSocket bridge for integration plugins.
             app.manage(WsHub::new());
             app.manage(VoicemeeterState::new());
+            app.manage(FxSoundState::default());
             app.manage(ShutdownCoordinator::new());
 
             app.manage(AppState::new(
