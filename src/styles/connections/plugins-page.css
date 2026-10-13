@@ -422,6 +422,10 @@
   overflow: auto;
 }
 
+#plugins-page .plugins-browser-scroll {
+  scrollbar-gutter: stable;
+}
+
 #plugins-page .plugins-browser-list {
   display: flex;
   flex-direction: column;
