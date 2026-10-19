@@ -11,7 +11,7 @@ export {
   normalizeAutoHotkeyScriptMapping,
 } from "./action_mappings.js";
 import { normalizeRelativeFormat } from "./relative_midi.js";
-import { normalizeFaderOutputs } from "./fader_outputs.js";
+import { normalizeFaderOutputs, normalizeFeedbackMode } from "./fader_outputs.js";
 export {
   normalizeRelativeFormat,
   decodeRelativeTwosComplement,
@@ -421,7 +421,7 @@ export function normalizeBinding(binding) {
   out.led_enabled = out.led_enabled === true;
   out.led_control = normalizeMidiMapping(out.led_control, { indicator: true, led: true });
   if (Array.isArray(out.additional_outputs)) out.additional_outputs = normalizeFaderOutputs(out.additional_outputs, normalizeMidiMapping);
-  out.feedback_mode = out.feedback_mode === "AudioReactive" ? "AudioReactive" : "FollowValue";
+  out.feedback_mode = normalizeFeedbackMode(out.feedback_mode);
   const preferredSpecial = out.action === "Macro" || out.action === "Soundboard" ? out.action : null;
   let selectedSpecial = null;
   const normalizedTargets = getBindingTargets(out).filter((target) => {

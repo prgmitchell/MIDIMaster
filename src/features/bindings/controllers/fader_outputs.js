@@ -323,6 +323,7 @@ export function createFaderOutputs({
         mode.append(
           option(t("bindings.followValue"), "FollowValue"),
           option(t("bindings.audioReactive"), "AudioReactive"),
+          option(t("bindings.alwaysOn"), "AlwaysOn"),
         );
         root.appendChild(mode);
         dropdowns.set(

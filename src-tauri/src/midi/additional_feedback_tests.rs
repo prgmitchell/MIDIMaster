@@ -142,3 +142,60 @@ fn output_lists_round_trip_and_legacy_profiles_stay_empty() {
     assert_eq!(restored.additional_outputs[0].id, "extra");
     assert_eq!(restored.additional_outputs[0].control.controller, 24);
 }
+
+#[test]
+fn always_on_owns_existing_led_feedback_and_allows_explicit_cleanup() {
+    let mut manager = tests::manager_with_test_route("usb-in", "usb-out");
+    let mut binding = crate::test_support::binding();
+    binding.device_id = "usb-in".into();
+    binding.feedback_mode = FeedbackMode::AlwaysOn;
+    for msg_type in [MidiMessageType::Note, MidiMessageType::ControlChange] {
+        binding.control.msg_type = msg_type;
+        let status = if binding.control.msg_type == MidiMessageType::Note {
+            0x90
+        } else {
+            0xB0
+        };
+        assert_eq!(
+            manager.meter_feedback_key(&binding, 1.0).unwrap().1,
+            vec![vec![status, 7, 127]]
+        );
+        manager.send_binding_feedback(&binding, 0.0).unwrap();
+        assert!(
+            !manager.output_routes["usb-out"].connection_suspect,
+            "value changes must not turn off an always-on LED"
+        );
+        assert_eq!(
+            manager.meter_feedback_key(&binding, 0.0).unwrap().1,
+            vec![vec![status, 7, 0]],
+            "profile changes and shutdown must be able to clear the LED"
+        );
+    }
+    binding.feedback_enabled = false;
+    assert!(manager.meter_feedback_key(&binding, 1.0).is_none());
+    binding.feedback_enabled = true;
+    binding.control.msg_type = MidiMessageType::PitchBend;
+    assert!(manager.meter_feedback_key(&binding, 1.0).is_none());
+    assert_eq!(
+        additional_feedback::value_feedback_sends(&binding, 0.5, false)[0].value,
+        0.5
+    );
+    binding.additional_outputs = vec![output(
+        "steady",
+        FaderOutputKind::Led,
+        MidiMessageType::Note,
+        30,
+    )];
+    binding.additional_outputs[0].feedback_mode = FeedbackMode::AlwaysOn;
+    let restored: Binding =
+        serde_json::from_value(serde_json::to_value(&binding).unwrap()).unwrap();
+    let led = &restored.led_output_bindings()[1];
+    assert_eq!(led.feedback_mode, FeedbackMode::AlwaysOn);
+    assert!(!led.uses_audio_feedback());
+    assert_eq!(
+        manager.meter_feedback_key(led, 1.0).unwrap().1,
+        vec![vec![0x90, 30, 127]]
+    );
+    binding.additional_outputs[0].enabled = false;
+    assert_eq!(binding.led_output_bindings().len(), 1);
+}

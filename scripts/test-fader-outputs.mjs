@@ -58,7 +58,7 @@ const chooseMode = (row, value) => {
   ].find(
     (option) =>
       option.value ===
-      (value === "audioReactive" ? "AudioReactive" : "FollowValue"),
+      value[0].toUpperCase() + value.slice(1),
   ).textContent;
   const option = [
     ...row.querySelectorAll(".binding-config-output-mode .target-option"),
@@ -85,6 +85,9 @@ try {
   }
   chooseMode(rows()[1], "audioReactive");
   assert.equal(d.bindingConfigFeedbackMode.value, "AudioReactive");
+  chooseMode(rows()[1], "alwaysOn");
+  assert.equal(d.bindingConfigFeedbackMode.value, "AlwaysOn");
+  assert.equal(d.bindingConfigLedHelp.dataset.i18n, "bindings.ledExistingMotorHelp");
   add("Feedback");
   add("Led");
   assert.equal(rows().length, 4);
@@ -115,12 +118,13 @@ try {
     "4",
   );
   chooseMode(led, "audioReactive");
+  chooseMode(led, "alwaysOn");
   d.bindingConfigSave.click();
   await settle();
   assert.equal(bindings[0].additional_outputs.length, 2);
   assert.equal(
     bindings[0].feedback_mode,
-    "AudioReactive",
+    "AlwaysOn",
     "default gear selection persists",
   );
   assert.equal(bindings[0].additional_outputs[0].control.msg_type, "PitchBend");
@@ -131,10 +135,13 @@ try {
   );
   assert.equal(
     bindings[0].additional_outputs[1].feedback_mode,
-    "AudioReactive",
+    "AlwaysOn",
   );
   feature.beginBindingEdit("fader");
-  assert.equal(d.bindingConfigFeedbackMode.value, "AudioReactive");
+  assert.equal(d.bindingConfigFeedbackMode.value, "AlwaysOn");
+  assert.equal(rows()[3].querySelector("[data-output-mode]").value, "AlwaysOn");
+  chooseMode(rows()[1], "followValue");
+  chooseMode(rows()[3], "audioReactive");
   assert.equal(
     rows().length,
     4,
@@ -152,6 +159,8 @@ try {
     2,
     "Cancel discards output edits",
   );
+  assert.equal(bindings[0].feedback_mode, "AlwaysOn", "Cancel restores the saved LED mode");
+  assert.equal(bindings[0].additional_outputs[1].feedback_mode, "AlwaysOn");
   const migrated = applyBindingDeviceMigrations(bindings[0], [
     { bindingId: "fader", previousDeviceId: "midi", deviceId: "reconnected" },
   ]);

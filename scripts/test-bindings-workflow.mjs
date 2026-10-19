@@ -173,6 +173,25 @@ await settle();
 assert.equal(bindings[0].led_control.msg_type, "ChannelPressure", "cancel restores saved meter type");
 assert.equal(bindings[0].led_control.controller, 7);
 
+feature.beginBindingEdit("fader-1");
+change(d.bindingConfigLedMsgType, "Existing");
+change(d.bindingConfigFeedbackMode, "AlwaysOn");
+assert.equal(d.bindingConfigLedHelp.dataset.i18n, "bindings.alwaysOnHelp");
+change(d.bindingConfigFeedbackMsgType, "Disabled");
+assert.equal(d.bindingConfigLedHelp.dataset.i18n, "bindings.ledExistingFeedbackDisabled");
+change(d.bindingConfigLedMsgType, "Note");
+assert.equal(d.bindingConfigLedHelp.dataset.i18n, "bindings.alwaysOnHelp");
+d.bindingConfigSave.click();
+await settle();
+assert.equal(bindings[0].feedback_mode, "AlwaysOn");
+assert.equal(bindings[0].feedback_enabled, false, "a separate always-on LED works with value feedback disabled");
+feature.beginBindingEdit("fader-1");
+assert.equal(d.bindingConfigFeedbackMode.value, "AlwaysOn");
+change(d.bindingConfigFeedbackMode, "FollowValue");
+d.bindingConfigCancel.click();
+await settle();
+assert.equal(bindings[0].feedback_mode, "AlwaysOn");
+
 bindings.push(
   normalizeBinding({ id: "button", control_kind: "Button", action: "ToggleMute", targets: ["Master"] }),
 );

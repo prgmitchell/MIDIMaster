@@ -34,6 +34,26 @@ fn wave_target(channel: &str) -> BindingTarget {
 }
 
 #[test]
+fn always_on_stays_lit_at_zero_value_without_an_audio_meter() {
+    let mut binding = crate::test_support::binding();
+    binding.feedback_mode = FeedbackMode::AlwaysOn;
+    binding.targets = vec![BindingTarget::Unset];
+    assert!(binding.has_led_feedback());
+    assert!(!binding.uses_audio_feedback());
+    for value in [0.0, 0.5, 1.0, f32::NAN] {
+        assert_eq!(led_level(&binding, value, &[], 0.0, INTERVAL), 1.0);
+    }
+    let restored: Binding =
+        serde_json::from_value(serde_json::to_value(&binding).unwrap()).unwrap();
+    assert_eq!(restored.feedback_mode, FeedbackMode::AlwaysOn);
+    binding.feedback_mode = FeedbackMode::FollowValue;
+    assert_eq!(led_level(&binding, 0.0, &[], 1.0, INTERVAL), 0.0);
+    assert_eq!(led_level(&binding, 0.5, &[], 1.0, INTERVAL), 0.5);
+    binding.feedback_mode = FeedbackMode::AudioReactive;
+    assert_eq!(led_level(&binding, 0.0, &[], 1.0, INTERVAL), 0.0);
+}
+
+#[test]
 fn defaults_and_round_trip_keep_existing_profiles_and_buttons_unchanged() {
     let mut json = serde_json::to_value(crate::test_support::binding()).unwrap();
     for key in ["feedback_mode", "led_enabled", "led_control"] {

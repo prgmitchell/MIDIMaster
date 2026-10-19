@@ -1,4 +1,5 @@
 import { getFaderModifiers } from "../../../core/fader_modifiers.js";
+import { normalizeFeedbackMode } from "../../../core/fader_outputs.js";
 import {
   controlsEqual,
   primaryControlMapping,
@@ -24,7 +25,12 @@ export function renderLedModeDropdown(entry, selectEl, t) {
       `<svg class="binding-config-mode-icon" data-output-mode-icon viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="M15.5 5.5 17 4l3 3-1.5 1.5M8.5 5.5 7 4 4 7l1.5 1.5M15.5 18.5 17 20l3-3-1.5-1.5M8.5 18.5 7 20l-3-3 1.5-1.5M20 12h-2M6 12H4M12 4v2M12 18v2"/></svg>`,
     );
   }
-  entry.button.title = `${t("bindings.feedbackMode")}: ${t(selectEl.value === "AudioReactive" ? "bindings.audioReactive" : "bindings.followValue")}`;
+  const modeKey = {
+    FollowValue: "bindings.followValue",
+    AudioReactive: "bindings.audioReactive",
+    AlwaysOn: "bindings.alwaysOn",
+  }[normalizeFeedbackMode(selectEl.value)];
+  entry.button.title = `${t("bindings.feedbackMode")}: ${t(modeKey)}`;
   entry.button.setAttribute("aria-label", entry.button.title);
   entry.button.disabled = selectEl.disabled;
 }
@@ -92,10 +98,7 @@ export function createLedFeedbackEditor({
       ? "bindings.ledMeterStrip"
       : "bindings.ledControlLabel";
     control.setAttribute("aria-label", t(control.dataset.i18nAriaLabel));
-    mode.value =
-      binding?.feedback_mode === "AudioReactive"
-        ? "AudioReactive"
-        : "FollowValue";
+    mode.value = normalizeFeedbackMode(binding?.feedback_mode);
     type.disabled = locked;
     mode.disabled = locked;
     for (const field of [channel, control]) {
@@ -124,14 +127,18 @@ export function createLedFeedbackEditor({
     const help = elements.bindingConfigLedHelp;
     if (help) {
       const reactive = mode.value === "AudioReactive";
+      const alwaysOn = mode.value === "AlwaysOn";
       let key = reactive
         ? "bindings.audioReactiveHelp"
-        : "bindings.ledOutputHelp";
+        : alwaysOn
+          ? "bindings.alwaysOnHelp"
+          : "bindings.ledOutputHelp";
       if (meter) key = "bindings.ledMackieMeterHelp";
       if (conflict) key = "bindings.ledAddressConflict";
       if (!enabled) {
-        if (!reactive) key = "bindings.ledExistingFeedbackHelp";
-        if (reactive && pitchBend) key = "bindings.ledExistingMotorHelp";
+        if (!reactive && !alwaysOn) key = "bindings.ledExistingFeedbackHelp";
+        if ((reactive || alwaysOn) && pitchBend)
+          key = "bindings.ledExistingMotorHelp";
         if (binding?.feedback_enabled === false)
           key = "bindings.ledExistingFeedbackDisabled";
       }
@@ -150,7 +157,9 @@ export function createLedFeedbackEditor({
             ? "bindings.ledAutomaticUnavailable"
             : mode.value === "AudioReactive"
               ? "bindings.audioReactiveHelp"
-              : "bindings.ledAutomaticKnown";
+              : mode.value === "AlwaysOn"
+                ? "bindings.alwaysOnHelp"
+                : "bindings.ledAutomaticKnown";
           help.dataset.i18n = key;
           help.textContent = t(key);
           help.title = help.textContent;
@@ -177,8 +186,7 @@ export function createLedFeedbackEditor({
   function update() {
     const binding = getConfigBinding();
     if (!binding) return;
-    binding.feedback_mode =
-      mode.value === "AudioReactive" ? "AudioReactive" : "FollowValue";
+    binding.feedback_mode = normalizeFeedbackMode(mode.value);
     binding.led_enabled = type.value !== "Existing";
     const meter = type.value === "ChannelPressure";
     const enteringMeter =

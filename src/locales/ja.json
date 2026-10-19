@@ -705,6 +705,8 @@
   "bindings.feedbackMode": "LEDモード",
   "bindings.followValue": "値に追従",
   "bindings.audioReactive": "音声に反応",
+  "bindings.alwaysOn": "常時点灯",
+  "bindings.alwaysOnHelp": "値や音声に関係なくLEDを点灯し続けます。",
   "bindings.audioReactiveHelp": "利用可能な対象の最大音量に反応。音声がない場合は消灯します。",
   "bindings.ledOutput": "LED出力",
   "bindings.ledOutputHelp": "任意の独立したNoteまたはCCアドレス。",

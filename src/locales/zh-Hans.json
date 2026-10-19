@@ -705,6 +705,8 @@
   "bindings.feedbackMode": "LED 模式",
   "bindings.followValue": "跟随数值",
   "bindings.audioReactive": "音频响应",
+  "bindings.alwaysOn": "常亮",
+  "bindings.alwaysOnHelp": "无论数值或音频如何，LED始终保持点亮。",
   "bindings.audioReactiveHelp": "跟随可用目标中的最大音量；无可用音频时熄灭。",
   "bindings.ledOutput": "LED 输出",
   "bindings.ledOutputHelp": "可选的独立 Note 或 CC 地址。",

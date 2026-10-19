@@ -705,6 +705,8 @@
   "bindings.feedbackMode": "Tryb LED",
   "bindings.followValue": "Śledź wartość",
   "bindings.audioReactive": "Reakcja na dźwięk",
+  "bindings.alwaysOn": "Zawsze włączona",
+  "bindings.alwaysOnHelp": "Dioda LED pozostaje włączona niezależnie od wartości lub dźwięku.",
   "bindings.audioReactiveHelp": "Najgłośniejszy dostępny cel; bez dźwięku światło jest wyłączone.",
   "bindings.ledOutput": "Wyjście LED",
   "bindings.ledOutputHelp": "Opcjonalny, osobny adres Note lub CC.",

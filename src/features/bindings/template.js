@@ -276,6 +276,7 @@ export const bindingsTemplate = `<div id="binding-config-panel" class="target-pa
                   <select id="binding-config-feedback-mode" class="binding-config-light-select" aria-label="Feedback mode" data-i18n-aria-label="bindings.feedbackMode">
                     <option value="FollowValue" data-i18n="bindings.followValue">Follow Value</option>
                     <option value="AudioReactive" data-i18n="bindings.audioReactive">Audio Reactive</option>
+                    <option value="AlwaysOn" data-i18n="bindings.alwaysOn">Always On</option>
                   </select>
               </div>
               <span id="binding-config-led-help" class="binding-config-toggle-help" data-i18n="bindings.ledExistingFeedbackHelp">Keeps your existing LED feedback unchanged.</span>

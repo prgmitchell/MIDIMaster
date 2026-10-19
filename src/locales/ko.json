@@ -705,6 +705,8 @@
   "bindings.feedbackMode": "LED 모드",
   "bindings.followValue": "값 따르기",
   "bindings.audioReactive": "오디오 반응",
+  "bindings.alwaysOn": "항상 켜짐",
+  "bindings.alwaysOnHelp": "값이나 오디오에 관계없이 LED를 켜 둡니다.",
   "bindings.audioReactiveHelp": "사용 가능한 대상 중 가장 큰 소리에 반응하며, 오디오가 없으면 꺼집니다.",
   "bindings.ledOutput": "LED 출력",
   "bindings.ledOutputHelp": "선택 사항: 별도의 Note 또는 CC 주소.",

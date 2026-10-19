@@ -705,6 +705,8 @@
   "bindings.feedbackMode": "Modo LED",
   "bindings.followValue": "Seguir valor",
   "bindings.audioReactive": "Reativo ao áudio",
+  "bindings.alwaysOn": "Sempre aceso",
+  "bindings.alwaysOnHelp": "Mantém o LED aceso independentemente do valor ou do áudio.",
   "bindings.audioReactiveHelp": "Alvo disponível mais alto; sem áudio, a luz fica apagada.",
   "bindings.ledOutput": "Saída LED",
   "bindings.ledOutputHelp": "Endereço Note ou CC separado, opcional.",

@@ -1,5 +1,8 @@
 import { controlsEqual, primaryControlMapping } from "./control_mapping.js";
 
+export const normalizeFeedbackMode = (mode) =>
+  ["AudioReactive", "AlwaysOn"].includes(mode) ? mode : "FollowValue";
+
 export const outputField = (id) => `output:${id}`;
 export const outputForField = (binding, field) =>
   (binding?.additional_outputs || []).find(
@@ -39,10 +42,7 @@ export function normalizeFaderOutputs(outputs, normalizeMapping) {
         kind: output.kind,
         control: { ...control, control_kind: "Continuous" },
         enabled: output.enabled !== false,
-        feedback_mode:
-          output.feedback_mode === "AudioReactive"
-            ? "AudioReactive"
-            : "FollowValue",
+        feedback_mode: normalizeFeedbackMode(output.feedback_mode),
       },
     ];
   });

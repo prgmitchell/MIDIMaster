@@ -174,4 +174,5 @@ pub enum FeedbackMode {
     #[default]
     FollowValue,
     AudioReactive,
+    AlwaysOn,
 }

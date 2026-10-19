@@ -138,7 +138,7 @@ try {
   if (feedbackLayout) {
     cases.length = 0;
     for (const width of [1280, 1480]) for (const theme of ["dark", "light"])
-      for (const feedbackMode of ["FollowValue", "AudioReactive"]) for (const feedbackOutput of ["manual", "automatic", "existing", "meter"])
+      for (const feedbackMode of ["FollowValue", "AudioReactive", "AlwaysOn"]) for (const feedbackOutput of ["manual", "automatic", "existing", "meter"])
         for (const feedbackMenu of [false, "mode", "type"])
           cases.push({ view: "fader", width, theme, feedbackMode, feedbackOutput, feedbackMenu, feedbackLayout: true });
   }

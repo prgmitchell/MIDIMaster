@@ -705,6 +705,8 @@
   "bindings.feedbackMode": "LED-modus",
   "bindings.followValue": "Waarde volgen",
   "bindings.audioReactive": "Audioreactief",
+  "bindings.alwaysOn": "Altijd aan",
+  "bindings.alwaysOnHelp": "Houdt de led aan, ongeacht de waarde of audio.",
   "bindings.audioReactiveHelp": "Luidste beschikbare doel; zonder audio blijft het licht uit.",
   "bindings.ledOutput": "LED-uitvoer",
   "bindings.ledOutputHelp": "Optioneel, apart Note- of CC-adres.",

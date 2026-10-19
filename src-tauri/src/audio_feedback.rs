@@ -83,6 +83,22 @@ pub fn release(previous: f32, next: f32, elapsed: Duration) -> f32 {
     clamp_level(next).max((previous - elapsed.as_secs_f32() / 0.16).max(0.0))
 }
 
+fn led_level(
+    binding: &Binding,
+    value: f32,
+    samples: &[AudioSample],
+    previous: f32,
+    elapsed: Duration,
+) -> f32 {
+    match binding.feedback_mode {
+        crate::model::FeedbackMode::AlwaysOn => 1.0,
+        crate::model::FeedbackMode::AudioReactive => binding_level(binding, samples)
+            .map(|v| release(previous, v, elapsed))
+            .unwrap_or(0.0),
+        crate::model::FeedbackMode::FollowValue => clamp_level(value),
+    }
+}
+
 fn led_key(
     binding: &Binding,
     midi: &crate::midi::MidiManager,
@@ -279,14 +295,8 @@ pub(crate) fn spawn(
                 .unwrap_or_default();
             if let Ok(mut midi) = state.midi.lock() {
                 for (binding, value) in bindings.iter().zip(values) {
-                    let level = if binding.uses_audio_feedback() {
-                        let previous = levels.get(&binding.id).copied().unwrap_or(0.0);
-                        binding_level(binding, &samples)
-                            .map(|v| release(previous, v, elapsed))
-                            .unwrap_or(0.0)
-                    } else {
-                        clamp_level(value)
-                    };
+                    let previous = levels.get(&binding.id).copied().unwrap_or(0.0);
+                    let level = led_level(binding, value, &samples, previous, elapsed);
                     levels.insert(binding.id.clone(), level);
                     let Some(bytes) = midi.meter_feedback_key(binding, level) else {
                         continue;

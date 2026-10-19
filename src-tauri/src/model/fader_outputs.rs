@@ -33,7 +33,7 @@ impl Binding {
                 .map(|control| &control.msg_type)
                 .unwrap_or(&self.control.msg_type);
             return self.feedback_enabled
-                && self.feedback_mode == FeedbackMode::AudioReactive
+                && self.feedback_mode != FeedbackMode::FollowValue
                 && matches!(
                     msg_type,
                     MidiMessageType::Note | MidiMessageType::ControlChange
