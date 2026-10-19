@@ -171,8 +171,9 @@ pub enum AssignMode {
 /// Which signal is sent to a continuous binding's optional LED output.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FeedbackMode {
-    #[default]
-    FollowValue,
     AudioReactive,
     AlwaysOn,
+    #[default]
+    #[serde(other)]
+    FollowValue,
 }

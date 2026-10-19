@@ -5,6 +5,7 @@ mod fader_outputs;
 mod macro_types;
 mod midi_types;
 mod osd_types;
+mod profile_feedback;
 mod profile_types;
 mod target_types;
 

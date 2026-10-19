@@ -279,6 +279,7 @@ impl Profile {
 
     pub fn normalize_for_storage(&mut self) -> bool {
         let mut changed = self.strip_derived_integration_icons();
+        changed |= super::profile_feedback::normalize_for_storage(self);
         let mut clear_assign_binding_ids = self
             .plugin_settings
             .get(CLEAR_ASSIGN_MODES_COMPAT_KEY)
@@ -325,6 +326,7 @@ impl Profile {
 
     pub fn restore_from_storage(&mut self) -> bool {
         let mut changed = self.strip_derived_integration_icons();
+        changed |= super::profile_feedback::restore_from_storage(self);
         let Some(compat_value) = self.plugin_settings.remove(CLEAR_ASSIGN_MODES_COMPAT_KEY) else {
             return changed;
         };
