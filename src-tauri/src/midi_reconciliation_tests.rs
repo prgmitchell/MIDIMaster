@@ -94,6 +94,60 @@ fn disabled_and_missing_owners_reserve_their_addresses() {
 }
 
 #[test]
+fn disabled_route_without_controls_does_not_block_a_named_reconnect() {
+    let mut profile = fixture();
+    profile.bindings.truncate(1);
+    profile.midi_device_preference.routes[1].enabled = false;
+    let connected = vec![route("midi:1", "A")];
+    assert_eq!(safe_routes(&profile, &connected), connected);
+
+    let desired = vec![
+        connected[0].clone(),
+        profile.midi_device_preference.routes[1].clone(),
+    ];
+    let updated = reconciled_profile(&profile, &desired, &connected);
+    assert_eq!(updated.bindings[0].device_id, "midi:1");
+    assert_eq!(
+        updated.bindings[0].mute_control.as_ref().unwrap().device_id,
+        "midi:1"
+    );
+    assert_eq!(updated.midi_device_preference.routes, desired);
+    assert_eq!(safe_routes(&updated, &connected), connected);
+}
+
+#[test]
+fn disabled_route_with_only_auxiliary_controls_still_reserves_its_address() {
+    let mut profile = fixture();
+    profile.bindings[0].assign_control = profile.bindings[1].mute_control.clone();
+    profile.bindings.truncate(1);
+    profile.midi_device_preference.routes[1].enabled = false;
+    assert!(safe_routes(&profile, &[route("midi:1", "A")]).is_empty());
+}
+
+#[test]
+fn reconnect_keeps_the_active_identity_when_the_disabled_route_is_listed_first() {
+    let mut profile = fixture();
+    profile.bindings.truncate(1);
+    profile.midi_device_preference.routes[1].enabled = false;
+    profile.midi_device_preference.routes.reverse();
+    let connected = vec![route("midi:1", "A")];
+    assert_eq!(safe_routes(&profile, &connected), connected);
+
+    let desired = vec![
+        profile.midi_device_preference.routes[0].clone(),
+        connected[0].clone(),
+    ];
+    let updated = reconciled_profile(&profile, &desired, &connected);
+    assert_eq!(updated.midi_device_preference.routes.len(), 2);
+    assert!(updated.midi_device_preference.routes.contains(&desired[0]));
+    assert_eq!(
+        updated.midi_device_preference.normalized_routes(),
+        connected
+    );
+    assert_eq!(safe_routes(&updated, &connected), connected);
+}
+
+#[test]
 fn duplicate_names_and_unrelated_names_never_transfer_ownership() {
     let mut profile = fixture();
     profile.midi_device_preference.routes[1].input_device_name = Some("A".into());

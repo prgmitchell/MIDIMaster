@@ -131,6 +131,16 @@ pub(crate) fn safe_routes(
                 if source == other {
                     continue;
                 }
+                // An unused disabled route need not reserve its old port index.
+                if !owner.enabled
+                    && !profile
+                        .bindings
+                        .iter()
+                        .flat_map(control_ids)
+                        .any(|id| Some(id) == owner.input_id())
+                {
+                    continue;
+                }
                 // Both ends of an overlapping move must commit together.
                 let shares_destination = owner.input_id() == next.input_id();
                 let shares_source = requested
@@ -200,7 +210,7 @@ pub(crate) fn reconciled_profile(
             migrate(&mut control.device_id);
         }
     }
-    let routes = desired
+    let mut routes = desired
         .iter()
         .map(|next| {
             if next.enabled && !accepted.iter().any(|r| same_connection(r, next)) {
@@ -213,6 +223,13 @@ pub(crate) fn reconciled_profile(
             next.clone()
         })
         .collect::<Vec<_>>();
+    // Keep connected identities ahead of stale disabled routes sharing their index.
+    routes.sort_by_key(|route| {
+        !route.enabled
+            && accepted
+                .iter()
+                .any(|active| active.input_id() == route.input_id())
+    });
     let first = routes.first().cloned().unwrap_or_default();
     updated.midi_device_preference = MidiDevicePreference {
         input_device_id: first.input_device_id,
