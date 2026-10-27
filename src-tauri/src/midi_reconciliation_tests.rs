@@ -116,6 +116,60 @@ fn disabled_route_without_controls_does_not_block_a_named_reconnect() {
 }
 
 #[test]
+fn disabling_a_shifted_route_preserves_the_baseline_for_button_migration() {
+    let mut original = fixture();
+    original.bindings.truncate(1);
+    let mut solo = original.bindings[0].mute_control.clone().unwrap();
+    solo.controller = 8;
+    original.bindings[0].modifiers = Some(vec![crate::model::FaderModifier {
+        id: "solo".into(),
+        kind: crate::model::FaderModifierKind::Solo,
+        control: Some(solo),
+        assign_mode: crate::model::AssignMode::Add,
+    }]);
+    original.midi_device_preference.routes[1].enabled = false;
+    let mut desired = original.midi_device_preference.routes.clone();
+    desired[0] = route("midi:1", "A");
+    desired[0].enabled = false;
+    desired[0].output_device_id = Some("new-output".into());
+    let disabled = reconciled_profile(&original, &desired, &[]);
+    assert!(!disabled.midi_device_preference.routes[0].enabled);
+    assert_eq!(
+        disabled.midi_device_preference.routes[0].input_id(),
+        Some("midi:0")
+    );
+    assert_eq!(
+        disabled.midi_device_preference.routes[0].output_id(),
+        Some("new-output")
+    );
+    assert_eq!(disabled.bindings[0].device_id, "midi:0");
+
+    let reloaded: Profile =
+        serde_json::from_value(serde_json::to_value(disabled).unwrap()).unwrap();
+    desired[0].enabled = true;
+    let connected = vec![desired[0].clone()];
+    assert_eq!(safe_routes(&reloaded, &connected), connected);
+    let repaired = reconciled_profile(&reloaded, &desired, &connected);
+    assert_eq!(repaired.bindings[0].device_id, "midi:1");
+    let button = repaired.bindings[0].mute_control.as_ref().unwrap();
+    let event = crate::model::MidiEvent {
+        device_id: "midi:1".into(),
+        channel: 0,
+        controller: 16,
+        value: 127,
+        value_14: None,
+        msg_type: MidiMessageType::Note,
+    };
+    assert!(crate::AppState::binding_matches_aux(button, &event));
+    let solo = repaired.bindings[0].modifier_controls().next().unwrap().1;
+    let solo_event = crate::model::MidiEvent {
+        controller: 8,
+        ..event
+    };
+    assert!(crate::AppState::binding_matches_aux(solo, &solo_event));
+}
+
+#[test]
 fn disabled_route_with_only_auxiliary_controls_still_reserves_its_address() {
     let mut profile = fixture();
     profile.bindings[0].assign_control = profile.bindings[1].mute_control.clone();

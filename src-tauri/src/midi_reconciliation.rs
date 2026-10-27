@@ -213,6 +213,15 @@ pub(crate) fn reconciled_profile(
     let mut routes = desired
         .iter()
         .map(|next| {
+            // Disabling closes the handle without migrating its controls. Keep
+            // their source address until this identity reconnects successfully.
+            if !next.enabled {
+                if let Some(i) = source_index(&saved, next) {
+                    let mut disabled = next.clone();
+                    disabled.input_device_id = saved[i].input_device_id.clone();
+                    return disabled;
+                }
+            }
             if next.enabled && !accepted.iter().any(|r| same_connection(r, next)) {
                 if let Some(i) = source_index(&saved, next) {
                     let mut old = saved[i].clone();
