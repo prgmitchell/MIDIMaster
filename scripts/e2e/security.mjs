@@ -67,23 +67,30 @@ export const security = [
       await app.shown(".connection-tab.active .plugins-browser");
       // File inputs are native browser controls; CDP supplies the selected file
       // without opening a machine-dependent OS chooser.
-      await app.session.send("DOM.enable");
+      await app.session.send("Page.enable");
       await app.session.send("Page.setInterceptFileChooserDialog", {
         enabled: true,
       });
-      await app.click(
-        ".connection-tab.active .plugins-browser [data-role='install-file']",
-      );
-      const { root } = await app.session.send("DOM.getDocument");
-      const { nodeId } = await app.session.send("DOM.querySelector", {
-        nodeId: root.nodeId,
-        selector: "input[type='file'][accept='.midimaster']",
-      });
-      assert.ok(nodeId, "plugin package input exists");
-      await app.session.send("DOM.setFileInputFiles", {
-        nodeId,
-        files: [path],
-      });
+      const selection = app.session
+        .once("Page.fileChooserOpened", 15000)
+        .then(({ backendNodeId }) =>
+          app.session.send("DOM.setFileInputFiles", {
+            backendNodeId,
+            files: [path],
+          }),
+        );
+      try {
+        await Promise.all([
+          selection,
+          app.click(
+            ".connection-tab.active .plugins-browser [data-role='install-file']",
+          ),
+        ]);
+      } finally {
+        await app.session.send("Page.setInterceptFileChooserDialog", {
+          enabled: false,
+        });
+      }
       await eventually(
         () =>
           app.eval("document.documentElement.dataset.e2ePlugin === 'active'"),

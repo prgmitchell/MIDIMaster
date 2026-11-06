@@ -58,13 +58,20 @@ export class CdpSession {
     this.listeners.set(method, [...(this.listeners.get(method) ?? []), callback]);
   }
 
-  once(method) {
-    return new Promise((resolvePromise) => {
+  once(method, timeoutMs = 0) {
+    return new Promise((resolvePromise, reject) => {
+      let timer;
+      const remove = () => this.listeners.set(method, (this.listeners.get(method) ?? []).filter((item) => item !== callback));
       const callback = (params) => {
-        this.listeners.set(method, (this.listeners.get(method) ?? []).filter((item) => item !== callback));
+        clearTimeout(timer);
+        remove();
         resolvePromise(params);
       };
       this.on(method, callback);
+      if (timeoutMs > 0) timer = setTimeout(() => {
+        remove();
+        reject(new Error(`${method}: CDP event timed out`));
+      }, timeoutMs);
     });
   }
 
