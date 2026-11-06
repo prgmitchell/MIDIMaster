@@ -97,6 +97,7 @@ jobs:
           path: |
             test-results/desktop-*/*.json
             test-results/desktop-*/artifacts/*
+            test-results/desktop-*/app-data/MIDIMaster/logs/*.log
           retention-days: 7
 
   virtual-audio-windows:

@@ -194,6 +194,10 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            #[cfg(feature = "e2e")]
+            for config in &app.config().app.windows {
+                perf_audit::e2e_webview(WebviewWindowBuilder::from_config(app, config)?).build()?;
+            }
             #[cfg(feature = "perf-audit")]
             let setup_started = std::time::Instant::now();
             #[cfg(feature = "perf-audit")]
@@ -289,17 +293,20 @@ pub fn run() {
             let osd_url = "osd.html?perf-audit=1";
             #[cfg(not(feature = "perf-audit"))]
             let osd_url = "osd.html";
-            let osd_window = WebviewWindowBuilder::new(app, "osd", WebviewUrl::App(osd_url.into()))
-                .title("MIDIMaster OSD")
-                .decorations(false)
-                .transparent(true)
-                .always_on_top(true)
-                .skip_taskbar(true)
-                .resizable(false)
-                .focused(false)
-                .shadow(false)
-                .inner_size(320.0, 120.0)
-                .build()?;
+            let osd_builder =
+                WebviewWindowBuilder::new(app, "osd", WebviewUrl::App(osd_url.into()))
+                    .title("MIDIMaster OSD")
+                    .decorations(false)
+                    .transparent(true)
+                    .always_on_top(true)
+                    .skip_taskbar(true)
+                    .resizable(false)
+                    .focused(false)
+                    .shadow(false)
+                    .inner_size(320.0, 120.0);
+            #[cfg(feature = "e2e")]
+            let osd_builder = perf_audit::e2e_webview(osd_builder);
+            let osd_window = osd_builder.build()?;
             let _ = osd_window.set_ignore_cursor_events(true);
             let _ = osd_window.hide();
             #[cfg(feature = "perf-audit")]

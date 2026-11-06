@@ -2,7 +2,7 @@
   "identifier": "com.midimaster.e2e",
   "app": {
     "windows": [{
-      "label": "main", "title": "MIDIMaster E2E", "url": "index.html?perf-audit=1",
+      "label": "main", "title": "MIDIMaster E2E", "url": "index.html?perf-audit=1", "create": false,
       "width": 1480, "height": 900, "minWidth": 1280, "minHeight": 820, "visible": false
     }]
   }

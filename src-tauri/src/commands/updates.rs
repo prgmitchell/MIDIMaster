@@ -87,7 +87,7 @@ fn show_update_notification_window(
     #[cfg(feature = "perf-audit")]
     query.push_str("&perf-audit=1");
 
-    let window = WebviewWindowBuilder::new(
+    let builder = WebviewWindowBuilder::new(
         app,
         "update",
         WebviewUrl::App(format!("update.html?{query}").into()),
@@ -100,9 +100,12 @@ fn show_update_notification_window(
     .always_on_top(true)
     .focused(false)
     .visible(false)
-    .decorations(false)
-    .build()
-    .map_err(|err| format!("Unable to show update notification: {err}"))?;
+    .decorations(false);
+    #[cfg(feature = "e2e")]
+    let builder = crate::perf_audit::e2e_webview(builder);
+    let window = builder
+        .build()
+        .map_err(|err| format!("Unable to show update notification: {err}"))?;
 
     let _ = window.center();
     send_update_notification_payload(&window, &payload);

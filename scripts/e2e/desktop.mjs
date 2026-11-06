@@ -109,7 +109,7 @@ export class Desktop {
       ...process.env,
       MIDIMASTER_PERF_APP_DATA_DIR: this.data,
       MIDIMASTER_PERF_WEBVIEW_DATA_DIR: join(this.root, "webview"),
-      WEBVIEW2_USER_DATA_FOLDER: join(this.root, "webview"),
+      MIDIMASTER_E2E_CDP_PORT: String(port),
       MIDIMASTER_PERF_RESULTS_DIR: join(this.root, "artifacts"),
       MIDIMASTER_PERF_RUN_ID: "e2e",
       MIDIMASTER_PERF_NETWORK_MODE: networkMode,
@@ -118,7 +118,6 @@ export class Desktop {
       LOCALAPPDATA: join(this.root, "local"),
       TEMP: join(this.root, "temp"),
       TMP: join(this.root, "temp"),
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-address=127.0.0.1 --remote-debugging-port=${port} --disable-background-networking --no-first-run`,
     };
     this.child = spawn(resolve("src-tauri/target/debug/midimaster.exe"), [], {
       windowsHide: true,

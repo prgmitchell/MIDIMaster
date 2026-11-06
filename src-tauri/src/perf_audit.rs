@@ -23,6 +23,29 @@ use tauri::State;
 const MAX_INJECTED_MESSAGES: u64 = 1_000_000;
 static RESULT_WRITER: OnceLock<Mutex<()>> = OnceLock::new();
 
+#[cfg(feature = "e2e")]
+pub(crate) fn e2e_webview<M: tauri::Manager<tauri::Wry>>(
+    builder: tauri::WebviewWindowBuilder<'_, tauri::Wry, M>,
+) -> tauri::WebviewWindowBuilder<'_, tauri::Wry, M> {
+    let port = std::env::var("MIDIMASTER_E2E_CDP_PORT")
+        .expect("E2E builds require a debugging port")
+        .parse::<std::num::NonZeroU16>()
+        .expect("E2E debugging port must be between 1 and 65535");
+    let data_directory = PathBuf::from(
+        std::env::var_os("MIDIMASTER_PERF_WEBVIEW_DATA_DIR")
+            .expect("E2E builds require an isolated WebView directory"),
+    );
+    assert!(
+        data_directory.is_absolute(),
+        "E2E WebView directory must be absolute"
+    );
+    // WebView2 150+ ignores WEBVIEW2_* overrides for elevated hosts such as
+    // hosted Windows runners. Pass isolation and debugging through its API.
+    builder.data_directory(data_directory).additional_browser_args(&format!(
+        "--remote-debugging-address=127.0.0.1 --remote-debugging-port={port} --disable-background-networking --no-first-run"
+    ))
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct PerfAuditSnapshot {
     schema_version: u32,

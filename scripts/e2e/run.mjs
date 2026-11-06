@@ -8,6 +8,7 @@ await build();
 const app = new Desktop(resolve("test-results", `desktop-${Date.now()}`));
 await app.prepare();
 const results = [];
+let failure = null;
 const filterIndex = process.argv.indexOf("--filter");
 const selected =
   filterIndex < 0
@@ -54,10 +55,11 @@ try {
     throw new Error(`Uncaught renderer errors: ${app.errors.join("\n")}`);
   await app.screenshot("completed");
 } catch (error) {
+  failure = error.stack;
   console.error(error.stack);
   process.exitCode = 1;
 } finally {
-  await app.json("results.json", { results, renderer_errors: app.errors });
+  await app.json("results.json", { results, renderer_errors: app.errors, failure });
   await app.stop();
   console.log(`Desktop evidence: ${app.root}`);
 }
