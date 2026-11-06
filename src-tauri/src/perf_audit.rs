@@ -189,10 +189,11 @@ pub(crate) fn perf_audit_snapshot(state: State<AppState>) -> Result<PerfAuditSna
         action_outcomes: native.action_outcomes,
         synthetic_targets: native.synthetic_targets,
         synthetic_targets_enabled: synthetic_targets_enabled(),
-        learn_pending: *state
-            .learn_pending
+        learn_pending: state
+            .midi_learning
             .lock()
-            .map_err(|_| "Learn state lock poisoned")?,
+            .map_err(|_| "Learn state lock poisoned")?
+            .is_listening(),
     })
 }
 

@@ -394,6 +394,11 @@ pub async fn hue_discover_bridges(
 }
 
 fn discover_hue_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<String>, String> {
+    // Isolated E2E journeys use explicit local protocol peers, never scan the user's LAN.
+    #[cfg(feature = "e2e")]
+    if crate::perf_audit::synthetic_targets_enabled() {
+        return Ok(Vec::new());
+    }
     #[cfg(feature = "perf-audit")]
     if crate::perf_audit::network_is_offline() {
         return Ok(Vec::new());

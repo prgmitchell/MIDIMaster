@@ -96,14 +96,11 @@ export function createConnectionTab({
         applyProfileSettings(ctx.profile?.get?.());
 
         const pairPanel = ensurePairPanel();
-        if (!pairPanel.dataset.bound) {
-          pairPanel.querySelector('[data-role="cancel"]')?.addEventListener("click", cancelPairing);
-          pairPanel.querySelector('[data-role="close"]')?.addEventListener("click", cancelPairing);
-          pairPanel.addEventListener("click", (event) => {
-            if (event.target === pairPanel) cancelPairing();
-          });
-          pairPanel.dataset.bound = "1";
-        }
+        pairPanel.querySelector('[data-role="cancel"]').onclick = cancelPairing;
+        pairPanel.querySelector('[data-role="close"]').onclick = cancelPairing;
+        pairPanel.onclick = event => {
+          if (event.target === pairPanel) cancelPairing();
+        };
 
         if (ui.bridgeIpInput) {
           ui.bridgeIpInput.addEventListener("change", async () => {
@@ -173,6 +170,7 @@ export function createConnectionTab({
         ui.pairedSummarySection = null;
         ui.pairedSummaryText = null;
         ui.pairActionBtn = null;
+        cancelPairing();
         closePairPanel();
       },
     });

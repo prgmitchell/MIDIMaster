@@ -229,7 +229,7 @@ export function createBindingsFeature({
     removeEmptySoundboardTargetOnCancel: false,
     previewOriginalBindings: null,
     learnField: null,
-    learnTimer: null,
+    learnSession: null,
     transferPrompt: null,
     previewTimer: null,
   };
@@ -475,7 +475,6 @@ export function createBindingsFeature({
     normalizeAuxControl,
     getConfigBinding,
   } = createMidiLearn({
-    invoke,
     elements,
     editorState,
     hideLearnPanel,

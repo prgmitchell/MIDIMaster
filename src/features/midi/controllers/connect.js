@@ -1,3 +1,4 @@
+import { createMidiLearnSession } from "../learn_session.js";
 import { normalizeMidiPreference } from "../device_preferences.js";
 import { routesFromResolvedPreferences } from "../route_policy.js";
 
@@ -196,34 +197,26 @@ export function createConnect({
     }
   }
 
-  async function startLearnBinding() {
-    try {
-      await invoke("start_midi_learn");
-      openLearnPanel(t("bindings.learnMessage"));
-      if (learning.learnTimer) {
-        clearInterval(learning.learnTimer);
-      }
-      learning.learnTimer = setInterval(async () => {
-        const learned = await invoke("consume_learned_control");
-        if (!learned) {
-          return;
+  function startLearnBinding() {
+    if (discovery.disposed || learning.session?.active) return;
+    openLearnPanel(t("bindings.learnMessage"));
+    const session = createMidiLearnSession({
+      invoke,
+      intervalMs: LEARN_POLL_MS,
+      onLearned: async learned => {
+        if (learning.session !== session) return;
+        learning.session = null;
+        if (typeof addBindingFromLearn === "function") await addBindingFromLearn(learned);
+      },
+      onError: error => {
+        if (learning.session === session) {
+          learning.session = null;
+          closeLearnPanel();
         }
-        clearInterval(learning.learnTimer);
-        learning.learnTimer = null;
-        if (typeof addBindingFromLearn === "function") {
-          await addBindingFromLearn(learned);
-        }
-      }, LEARN_POLL_MS);
-    } catch (error) {
-      closeLearnPanel();
-      if (
-        elements.learnPanelMessage &&
-        elements.learnPanel &&
-        !elements.learnPanel.classList.contains("hidden")
-      ) {
-        elements.learnPanelMessage.textContent = t("midi.learnFailed", { message: error });
-      }
-    }
+        console.error("MIDI learning failed", error);
+      },
+    });
+    learning.session = session;
   }
 
   async function loadMidiDevicesWithRetry() {

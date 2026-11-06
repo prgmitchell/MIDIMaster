@@ -3,7 +3,6 @@ use crate::feedback;
 use crate::midi_event_queue::log_queue_stats;
 use crate::model::{BindingTarget, Profile, SessionInfo};
 use crate::run_logger;
-use crate::runtime_helpers::classify_learned_control;
 use crate::AppState;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -264,36 +263,8 @@ pub(crate) fn spawn_feedback_refresh_loop(
 
             if last_learn_commit_check.elapsed() >= LEARN_COMMIT_CHECK_INTERVAL {
                 last_learn_commit_check = loop_started;
-                let mut commit_candidate = None;
-                if let Ok(mut candidate_guard) = state.learn_candidate.lock() {
-                    if let Some(candidate) = &*candidate_guard {
-                        if candidate.last_seen_at.elapsed() > Duration::from_millis(150) {
-                            commit_candidate =
-                                candidate_guard.take().map(|c| classify_learned_control(&c));
-                        }
-                    }
-                }
-                if let Some(candidate) = commit_candidate {
-                    if let Ok(mut pending) = state.learn_pending.lock() {
-                        if *pending {
-                            run_logger::info(
-                                "learn",
-                                "candidate_committed",
-                                &format!(
-                                    "device_id={} channel={} controller={} msg_type={:?} control_kind={:?}",
-                                    candidate.device_id,
-                                    candidate.channel,
-                                    candidate.controller,
-                                    candidate.msg_type,
-                                    candidate.control_kind
-                                ),
-                            );
-                            *pending = false;
-                            if let Ok(mut learned) = state.learned_control.lock() {
-                                *learned = Some(candidate.clone());
-                            }
-                        }
-                    }
+                if let Ok(mut learning) = state.midi_learning.lock() {
+                    learning.settle_candidate();
                 }
             }
 
@@ -439,15 +410,10 @@ pub(crate) fn spawn_feedback_refresh_loop(
             }
 
             let learn_active = state
-                .learn_pending
+                .midi_learning
                 .lock()
-                .map(|pending| *pending)
-                .unwrap_or(false)
-                || state
-                    .learn_candidate
-                    .lock()
-                    .map(|candidate| candidate.is_some())
-                    .unwrap_or(false);
+                .map(|learning| learning.is_listening())
+                .unwrap_or(false);
             let osd_active = state
                 .osd_last_update
                 .lock()

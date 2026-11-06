@@ -98,7 +98,7 @@ export function createMidiFeature({
     initialDeviceLoadPending: true,
   };
   const learning = {
-    learnTimer: null,
+    session: null,
   };
 
   let uiBound = false;
@@ -299,7 +299,7 @@ export function createMidiFeature({
       applyRoutes,
       connection,
       elements,
-      canReconcileMidi: () => canReconcileMidi() && !learning.learnTimer,
+      canReconcileMidi: () => canReconcileMidi() && !learning.session?.active,
       desiredRoutes,
       discovery,
       enumerateMidiDevices,
@@ -325,7 +325,6 @@ export function createMidiFeature({
 
   const { startSessionRefresh, stopSessionRefresh, closeLearnPanel, openLearnPanel, cancelLearnPanel } =
     createLearning({
-      invoke,
       elements,
       learning,
       sessionRefreshScheduler,
@@ -383,7 +382,7 @@ export function createMidiFeature({
     stopAutoRefresh();
     clearTimeout(discovery.availabilityTimer);
     discovery.availabilityTimer = null;
-    closeLearnPanel();
+    cancelLearnPanel();
     closeRoutesPopover();
   }
 

@@ -7,7 +7,6 @@ import {
 
 /** midi learn workflow. */
 export function createMidiLearn({
-  invoke,
   elements,
   editorState,
   hideLearnPanel,
@@ -141,19 +140,10 @@ export function createMidiLearn({
   }
 
   function stopAuxLearn(options = {}) {
-    const wasLearning = Boolean(
-      editorState.learnField || editorState.learnTimer,
-    );
     const closePanel = options.closePanel !== false;
-    if (editorState.learnTimer) {
-      clearInterval(editorState.learnTimer);
-      editorState.learnTimer = null;
-    }
+    editorState.learnSession?.cancel();
+    editorState.learnSession = null;
     editorState.learnField = null;
-    if (wasLearning)
-      invoke("cancel_midi_learn").catch((error) =>
-        console.error("Failed to cancel MIDI learning", error),
-      );
     if (closePanel) discardUnmappedModifiers();
     updateAuxLearnUi();
     renderConfigPreview();

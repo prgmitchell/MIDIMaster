@@ -147,8 +147,13 @@ export function createPairing({
     }
   }
 
-  async function pairBridge(token) {
-    const ip = effectiveBridgeIp();
+  function requirePairingSession(token) {
+    if (!token || token.cancelled || state.disposed || state.pairingCancelToken !== token) {
+      throw new Error("__PAIR_CANCELLED__");
+    }
+  }
+
+  async function pairBridge(token, ip) {
     if (!ip) {
       throw new Error("Set bridge IP first");
     }
@@ -157,9 +162,7 @@ export function createPairing({
     let lastErr = null;
 
     while (Date.now() - started < PAIR_WINDOW_MS) {
-      if (token?.cancelled) {
-        throw new Error("__PAIR_CANCELLED__");
-      }
+      requirePairingSession(token);
 
       try {
         const json = await invokeWithTimeout(
@@ -172,6 +175,7 @@ export function createPairing({
           3500,
         );
 
+        requirePairingSession(token);
         if (Array.isArray(json)) {
           const success = json.find((item) => item && item.success && item.success.username);
           if (success?.success?.username) {
@@ -208,7 +212,8 @@ export function createPairing({
     }
 
     state.pairing = true;
-    state.pairingCancelToken = { cancelled: false };
+    const token = { cancelled: false };
+    state.pairingCancelToken = token;
     renderPairActionButton();
     openPairPanel("Press the physical button on your Hue Bridge.");
     setStatus(false, "Waiting for bridge button...", {
@@ -220,9 +225,12 @@ export function createPairing({
       state.bridgeIp = ip;
       state.selectedBridgeIp = ip;
       await persistProfilePatch({ bridge_ip: ip });
-      const pairedUsername = await pairBridge(state.pairingCancelToken);
+      requirePairingSession(token);
+      const pairedUsername = await pairBridge(token, ip);
+      requirePairingSession(token);
       state.bridgeIp = ip;
       await persistProfilePatch({ bridge_ip: ip, username: pairedUsername });
+      requirePairingSession(token);
       setPairPanelMessage("Pairing complete.");
       setStatus(false, "Bridge paired", { disconnectedByUser: state.disconnectedByUser });
       state.disconnectedByUser = false;
@@ -230,6 +238,7 @@ export function createPairing({
       await connectOnce();
       closePairPanel();
     } catch (err) {
+      if (state.disposed || state.pairingCancelToken !== token) return;
       const msg = err?.message || "Pairing failed";
       if (msg === "__PAIR_CANCELLED__") {
         setStatus(false, "Pairing cancelled", { disconnectedByUser: state.disconnectedByUser });
@@ -239,10 +248,14 @@ export function createPairing({
       }
       closePairPanel();
     } finally {
-      state.pairing = false;
-      state.pairingCancelToken = null;
-      renderPairActionButton();
-      renderPairedUiState();
+      if (state.pairingCancelToken === token) {
+        state.pairing = false;
+        state.pairingCancelToken = null;
+        if (!state.disposed) {
+          renderPairActionButton();
+          renderPairedUiState();
+        }
+      }
     }
   }
 

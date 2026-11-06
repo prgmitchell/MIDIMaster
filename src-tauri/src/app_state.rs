@@ -8,11 +8,10 @@ use crate::durable_json_store::StorageRecoveryNotices;
 use crate::feedback;
 use crate::midi::MidiManager;
 use crate::midi_event_queue::MidiEventQueue;
-use crate::model::{self, LearnedControl, MidiEvent, OsdSettings, Profile};
+use crate::model::{self, MidiEvent, OsdSettings, Profile};
 use crate::profile_snapshot::ProfileSnapshot;
 use crate::profile_store::ProfileStore;
 use crate::run_logger;
-use crate::runtime_helpers::LearnCandidate;
 use crate::soundboard::SoundboardService;
 use crate::virtual_audio::VirtualAudioRuntime;
 use std::collections::HashMap;
@@ -102,9 +101,7 @@ pub(crate) struct AppState {
     pub(crate) mute_transition_until: Mutex<HashMap<BindingKey, Instant>>,
     pub(crate) last_target_mute_state: Mutex<HashMap<BindingKey, bool>>,
     pub(crate) solo: crate::solo::SoloRuntime,
-    pub(crate) learn_pending: Mutex<bool>,
-    pub(crate) learn_candidate: Mutex<Option<LearnCandidate>>,
-    pub(crate) learned_control: Mutex<Option<LearnedControl>>,
+    pub(crate) midi_learning: Mutex<crate::midi_learning::MidiLearning>,
     pub(crate) osd_last_update: Mutex<Option<Instant>>,
     pub(crate) osd_settings: Mutex<OsdSettings>,
     pub(crate) app_settings: Mutex<AppSettings>,
@@ -162,9 +159,7 @@ impl AppState {
             mute_transition_until: Mutex::new(HashMap::new()),
             last_target_mute_state: Mutex::new(HashMap::new()),
             solo: crate::solo::SoloRuntime::default(),
-            learn_pending: Mutex::new(false),
-            learn_candidate: Mutex::new(None),
-            learned_control: Mutex::new(None),
+            midi_learning: Mutex::new(Default::default()),
             osd_last_update: Mutex::new(None),
             osd_settings: Mutex::new(OsdSettings::default()),
             app_settings: Mutex::new(app_settings),

@@ -414,40 +414,35 @@ pub fn stop_midi_device(app: AppHandle, state: State<AppState>) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn start_midi_learn(state: State<AppState>) -> Result<(), String> {
+pub fn start_midi_learn(state: State<AppState>) -> Result<u64, String> {
     run_logger::info("learn", "start_requested", "");
-    *state
-        .learn_pending
+    Ok(state
+        .midi_learning
         .lock()
-        .map_err(|_| "Lock poisoned".to_string())? = true;
-    *state
-        .learn_candidate
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())? = None;
-    *state
-        .learned_control
-        .lock()
-        .map_err(|_| "Lock poisoned".to_string())? = None;
-    Ok(())
+        .map_err(|_| "Lock poisoned")?
+        .start())
 }
 
 #[tauri::command]
-pub fn cancel_midi_learn(state: State<AppState>) -> Result<(), String> {
-    *state.learn_pending.lock().map_err(|_| "Lock poisoned")? = false;
-    *state.learn_candidate.lock().map_err(|_| "Lock poisoned")? = None;
-    *state.learned_control.lock().map_err(|_| "Lock poisoned")? = None;
+pub fn cancel_midi_learn(state: State<AppState>, session_id: Option<u64>) -> Result<(), String> {
+    state
+        .midi_learning
+        .lock()
+        .map_err(|_| "Lock poisoned")?
+        .cancel(session_id);
     Ok(())
 }
 
 #[tauri::command]
 pub fn consume_learned_control(
     state: State<AppState>,
+    session_id: Option<u64>,
 ) -> Result<Option<crate::model::LearnedControl>, String> {
     let mut guard = state
-        .learned_control
+        .midi_learning
         .lock()
         .map_err(|_| "Lock poisoned".to_string())?;
-    let next = guard.take();
+    let next = guard.consume(session_id);
     if let Some(control) = next.as_ref() {
         run_logger::info(
             "learn",

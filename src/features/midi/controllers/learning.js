@@ -4,7 +4,6 @@ export function createLearning({
   learning,
   sessionRefreshScheduler,
   t,
-  invoke,
 }) {
   function startSessionRefresh(refreshFn, mainScreenEl) {
     sessionRefreshScheduler.start(refreshFn, mainScreenEl);
@@ -50,13 +49,8 @@ export function createLearning({
   }
 
   function cancelLearnPanel() {
-    if (learning.learnTimer) {
-      clearInterval(learning.learnTimer);
-      learning.learnTimer = null;
-      invoke("cancel_midi_learn").catch((error) =>
-        console.error("Failed to cancel MIDI learning", error),
-      );
-    }
+    learning.session?.cancel();
+    learning.session = null;
     closeLearnPanel();
   }
 

@@ -42,8 +42,8 @@
       "reason": "Existing native Voicemeeter FFI, edition capability tables and parameter API stay together; plugin UI/protocol scheduling is now separate. Keep this module bounded until a dedicated FFI split can preserve DLL lifetime ownership."
     },
     "src/features/bindings/bindings.js": {
-      "maxLines": 827,
-      "reason": "Feature composition and compatibility adapter for current callers. List rendering, persistence, edit sessions, learning, macros, curves, feedback and soundboard behavior live in controllers. Explicit callback wiring accounts for most remaining lines. One additional query exposes whether a mapping draft is open so automatic MIDI reconciliation cannot invalidate it. Native MIDI cancellation now explicitly receives invoke so closing the editor also stops backend learn polling."
+      "maxLines": 826,
+      "reason": "Feature composition and compatibility adapter for current callers. List rendering, persistence, edit sessions, learning, macros, curves, feedback and soundboard behavior live in controllers. Explicit callback wiring accounts for most remaining lines. One additional query exposes whether a mapping draft is open so automatic MIDI reconciliation cannot invalidate it. Native MIDI learning and cancellation use a shared session owner so delayed callbacks cannot affect a replacement session."
     },
     "src/features/plugins/tabs.js": {
       "maxLines": 813,

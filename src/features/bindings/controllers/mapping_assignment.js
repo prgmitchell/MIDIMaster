@@ -1,3 +1,4 @@
+import { createMidiLearnSession } from "../../midi/learn_session.js";
 import {
   setControlMapping,
   modifierForField,
@@ -157,85 +158,47 @@ export function createMappingAssignment({
     renderConfigModal();
   }
 
-  async function startPrimaryLearn() {
-    const binding = getBindingById(editorState.bindingId);
-    if (!binding) return;
-    if (editorState.transferPrompt || editorState.learnField) return;
-    editorState.learnField = "control";
+  function startPrimaryLearn() {
+    startAuxLearn("control");
+  }
+
+  function startAuxLearn(field) {
+    if (!getBindingById(editorState.bindingId) || editorState.transferPrompt || editorState.learnField) return;
+    editorState.learnField = field;
     renderConfigPreview();
     updateAuxLearnUi();
     setLearnPanelWaiting();
-    await invoke("start_midi_learn");
-    if (editorState.learnTimer) clearInterval(editorState.learnTimer);
-    editorState.learnTimer = setInterval(async () => {
-      try {
-        const learned = await invoke("consume_learned_control");
-        if (!learned) return;
-        const targetField = editorState.learnField;
+    const session = createMidiLearnSession({
+      invoke,
+      intervalMs: 200,
+      onLearned: async learned => {
+        if (editorState.learnSession !== session) return;
         stopAuxLearn({ closePanel: false });
-        if (targetField !== "control") return;
-        const mapping = normalizeAuxControl(learned);
-        await applyAuxMapping("control", mapping);
-      } catch {
-        stopAuxLearn();
-        renderConfigModal();
-      }
-    }, 200);
-  }
-
-  async function startAuxLearn(field) {
-    const binding = getBindingById(editorState.bindingId);
-    if (!binding) return;
-    if (editorState.transferPrompt) return;
-    if (editorState.learnField) return;
-    editorState.learnField = field;
-    updateAuxLearnUi();
-    setLearnPanelWaiting();
-    try {
-      await invoke("start_midi_learn");
-    } catch {
-      stopAuxLearn();
-      return;
-    }
-    if (editorState.learnField !== field) return;
-    if (editorState.learnTimer) clearInterval(editorState.learnTimer);
-    editorState.learnTimer = setInterval(async () => {
-      try {
-        const learned = await invoke("consume_learned_control");
-        if (!learned) return;
-        const targetField = editorState.learnField;
-        stopAuxLearn({ closePanel: false });
-        if (!targetField) return;
         const isFaderFeedbackOutput =
-          (targetField === "indicator_control" ||
-            outputForField(getConfigBinding(), targetField)?.kind ===
-              "Feedback") &&
+          (field === "indicator_control" || outputForField(getConfigBinding(), field)?.kind === "Feedback") &&
           !effectiveIsButton(getConfigBinding());
-        const mapping =
-          targetField === "indicator_control" ||
-          targetField === "led_control" ||
-          targetField.startsWith("output:")
-            ? normalizeIndicatorControl(learned, {
-                allowPitchBend: isFaderFeedbackOutput,
-                controlKind: isFaderFeedbackOutput ? "Continuous" : "Button",
-              })
-            : normalizeAuxControl(learned);
+        const mapping = field === "indicator_control" || field === "led_control" || field.startsWith("output:")
+          ? normalizeIndicatorControl(learned, {
+              allowPitchBend: isFaderFeedbackOutput,
+              controlKind: isFaderFeedbackOutput ? "Continuous" : "Button",
+            })
+          : normalizeAuxControl(learned);
         if (!mapping) {
           stopAuxLearn();
           renderConfigModal();
           return;
         }
-        if (
-          targetField === "indicator_control" &&
-          !effectiveIsButton(getConfigBinding())
-        ) {
-          mapping.control_kind = "Continuous";
-        }
-        await applyAuxMapping(targetField, mapping);
-      } catch {
+        if (field === "indicator_control" && !effectiveIsButton(getConfigBinding())) mapping.control_kind = "Continuous";
+        await applyAuxMapping(field, mapping);
+      },
+      onError: error => {
+        if (editorState.learnSession && editorState.learnSession !== session) return;
         stopAuxLearn();
-      }
-    }, 200);
+        renderConfigModal();
+        console.error("MIDI mapping learning failed", error);
+      },
+    });
+    editorState.learnSession = session;
   }
 
   return { commitTransferPrompt, startPrimaryLearn, startAuxLearn };
