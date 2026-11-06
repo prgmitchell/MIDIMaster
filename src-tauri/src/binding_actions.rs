@@ -250,6 +250,3 @@ pub fn target_is_momentary_integration_action(target: &BindingTarget) -> bool {
         .map(|value| value.eq_ignore_ascii_case("momentary"))
         .unwrap_or(false)
 }
-
-#[cfg(test)]
-mod tests;

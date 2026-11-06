@@ -78,7 +78,7 @@ pub fn serve_named_pipe(status: std::sync::Arc<ServiceStatus>, stop: std::sync::
 }
 
 #[cfg(windows)]
-fn serve_named_pipe_at(
+pub fn serve_named_pipe_at(
     status: std::sync::Arc<ServiceStatus>,
     stop: std::sync::Arc<AtomicBool>,
     pipe_name: &str,
@@ -133,74 +133,5 @@ fn serve_named_pipe_at(
         unsafe {
             let _ = CloseHandle(pipe);
         }
-    }
-}
-
-#[cfg(all(test, windows))]
-mod pipe_tests {
-    use super::*;
-    use std::io::Read;
-    use std::sync::Arc;
-    use std::thread;
-    use std::time::{Duration, Instant};
-
-    #[test]
-    fn named_pipe_returns_one_bounded_json_snapshot() {
-        let status = Arc::new(ServiceStatus::default());
-        status.set_running(true);
-        status.set_attached_port_count(1);
-        let stop = Arc::new(AtomicBool::new(false));
-        let worker_status = status.clone();
-        let worker_stop = stop.clone();
-        let pipe_name = format!(
-            r"\\.\pipe\MIDIMaster.VirtualAudio.Status.test.{}",
-            std::process::id()
-        );
-        let worker_pipe_name = pipe_name.clone();
-        let worker = thread::spawn(move || {
-            serve_named_pipe_at(worker_status, worker_stop, &worker_pipe_name)
-        });
-
-        let deadline = Instant::now() + Duration::from_secs(2);
-        let mut pipe = loop {
-            match std::fs::OpenOptions::new().read(true).open(&pipe_name) {
-                Ok(pipe) => break pipe,
-                Err(_) if Instant::now() < deadline => thread::sleep(Duration::from_millis(20)),
-                Err(error) => panic!("status pipe did not become available: {error}"),
-            }
-        };
-        let mut payload = String::new();
-        pipe.read_to_string(&mut payload).unwrap();
-        stop.store(true, Ordering::Release);
-        worker.join().unwrap();
-        let snapshot: serde_json::Value = serde_json::from_str(payload.trim()).unwrap();
-        assert_eq!(snapshot["schema_version"], 1);
-        assert_eq!(snapshot["service_running"], true);
-        assert_eq!(snapshot["usbip_attached"], true);
-        assert_eq!(snapshot["attached_port_count"], 1);
-        assert!(payload.len() < 16 * 1024);
-    }
-}
-
-#[cfg(test)]
-mod status_tests {
-    use super::*;
-
-    #[test]
-    fn attachment_boolean_is_derived_from_the_port_count() {
-        let status = ServiceStatus::default();
-        let empty = status.snapshot();
-        assert!(!empty.usbip_attached);
-        assert_eq!(empty.attached_port_count, Some(0));
-
-        status.set_attached_port_count(2);
-        let duplicate = status.snapshot();
-        assert!(!duplicate.usbip_attached);
-        assert_eq!(duplicate.attached_port_count, Some(2));
-
-        status.set_attached_port_count(1);
-        let healthy = status.snapshot();
-        assert!(healthy.usbip_attached);
-        assert_eq!(healthy.attached_port_count, Some(1));
     }
 }

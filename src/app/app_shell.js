@@ -9,6 +9,17 @@ export function createAppShell({
 }) {
   let sidebarNavIndicatorRaf = 0;
   let sidebarNavIndicatorSettleTimeout = 0;
+  const busyReasons = new Set();
+
+  function setInteractionBusy(reason, busy) {
+    if (busy) busyReasons.add(reason);
+    else busyReasons.delete(reason);
+    if (appShell) {
+      appShell.inert = busyReasons.size > 0;
+      if (appShell.inert) appShell.setAttribute("aria-busy", "true");
+      else appShell.removeAttribute("aria-busy");
+    }
+  }
 
   function loadSidebarCollapsed() {
     try {
@@ -109,6 +120,7 @@ export function createAppShell({
   }
 
   return {
+    setInteractionBusy,
     loadSidebarCollapsed,
     applySidebarCollapsed,
     toggleSidebarCollapsed,

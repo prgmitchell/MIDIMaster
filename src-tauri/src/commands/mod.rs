@@ -76,6 +76,7 @@ macro_rules! command_registry {
             export_current_profile,
             import_profile_from_file,
             start_midi_learn,
+            cancel_midi_learn,
             consume_learned_control,
             add_binding,
             remove_binding,

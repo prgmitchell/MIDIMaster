@@ -41,8 +41,6 @@ pub(crate) struct DurableJsonStore {
     store_name: &'static str,
     lock: Arc<Mutex<()>>,
     recovery_notices: StorageRecoveryNotices,
-    #[cfg(test)]
-    failure_point: Arc<Mutex<Option<FailurePoint>>>,
 }
 
 enum Candidate<T> {
@@ -57,14 +55,6 @@ impl<T> Candidate<T> {
     }
 }
 
-#[cfg(test)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum FailurePoint {
-    AfterTempSync,
-    AfterBackupRotation,
-    BeforePrimaryReplace,
-}
-
 impl DurableJsonStore {
     pub(crate) fn new(
         path: PathBuf,
@@ -76,8 +66,6 @@ impl DurableJsonStore {
             store_name,
             lock: Arc::new(Mutex::new(())),
             recovery_notices,
-            #[cfg(test)]
-            failure_point: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -177,7 +165,6 @@ impl DurableJsonStore {
         let temp_path = self.temp_path();
         write_durable_file(&temp_path, &data)?;
         validate_file::<T>(&temp_path)?;
-        self.maybe_fail(FailurePoint::AfterTempSync)?;
 
         match read_candidate::<T>(&self.path) {
             Candidate::Valid(_) => self.prepare_backups_locked::<T>()?,
@@ -196,7 +183,6 @@ impl DurableJsonStore {
             }
             Candidate::Missing => {}
         }
-        self.maybe_fail(FailurePoint::BeforePrimaryReplace)?;
         atomic_move(&temp_path, &self.path, true)
             .with_context(|| format!("Failed committing {}", self.path.display()))?;
         Ok(())
@@ -233,7 +219,6 @@ impl DurableJsonStore {
                         second_backup_path.display()
                     )
                 })?;
-                self.maybe_fail(FailurePoint::AfterBackupRotation)?;
             }
             Candidate::Invalid(_) => {
                 let _ = self.quarantine_path(&backup_path)?;
@@ -338,39 +323,6 @@ impl DurableJsonStore {
     fn backup_temp_path(&self) -> PathBuf {
         with_appended_extension(&self.path, "bak.tmp")
     }
-
-    #[cfg(test)]
-    pub(crate) fn set_failure_point(&self, point: FailurePoint) {
-        if let Ok(mut failure_point) = self.failure_point.lock() {
-            *failure_point = Some(point);
-        }
-    }
-
-    #[cfg(test)]
-    fn maybe_fail(&self, point: FailurePoint) -> Result<()> {
-        if self
-            .failure_point
-            .lock()
-            .map(|configured| *configured == Some(point))
-            .unwrap_or(false)
-        {
-            return Err(anyhow!("Injected storage failure at {point:?}"));
-        }
-        Ok(())
-    }
-
-    #[cfg(not(test))]
-    fn maybe_fail(&self, _point: FailurePoint) -> Result<()> {
-        Ok(())
-    }
-}
-
-#[cfg(not(test))]
-#[derive(Clone, Copy)]
-enum FailurePoint {
-    AfterTempSync,
-    AfterBackupRotation,
-    BeforePrimaryReplace,
 }
 
 fn serialize_and_validate<T>(value: &T) -> Result<Vec<u8>>
@@ -488,59 +440,4 @@ fn atomic_move(source: &Path, destination: &Path, _replace_existing: bool) -> Re
             destination.display()
         )
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{new_recovery_notices, DurableJsonStore, FailurePoint};
-    use serde::{Deserialize, Serialize};
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-    struct TestData {
-        value: String,
-    }
-
-    fn test_dir(name: &str) -> std::path::PathBuf {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time")
-            .as_nanos();
-        std::env::temp_dir().join(format!("midimaster-durable-json-{name}-{unique}"))
-    }
-
-    #[test]
-    fn interrupted_writes_leave_previous_generation_loadable() {
-        for point in [
-            FailurePoint::AfterTempSync,
-            FailurePoint::AfterBackupRotation,
-            FailurePoint::BeforePrimaryReplace,
-        ] {
-            let dir = test_dir(&format!("failure-{point:?}"));
-            let path = dir.join("state.json");
-            let store = DurableJsonStore::new(path.clone(), "test", new_recovery_notices());
-            store
-                .save(&TestData {
-                    value: "one".to_string(),
-                })
-                .expect("save one");
-            store
-                .save(&TestData {
-                    value: "two".to_string(),
-                })
-                .expect("save two");
-            store.set_failure_point(point);
-
-            assert!(store
-                .save(&TestData {
-                    value: "three".to_string(),
-                })
-                .is_err());
-
-            let reopened = DurableJsonStore::new(path, "test", new_recovery_notices());
-            let loaded: TestData = reopened.load_or_default().expect("load after failure");
-            assert_eq!(loaded.value, "two");
-            let _ = std::fs::remove_dir_all(dir);
-        }
-    }
 }

@@ -1,5 +1,11 @@
 /** learning workflow. */
-export function createLearning({ elements, learning, sessionRefreshScheduler, t }) {
+export function createLearning({
+  elements,
+  learning,
+  sessionRefreshScheduler,
+  t,
+  invoke,
+}) {
   function startSessionRefresh(refreshFn, mainScreenEl) {
     sessionRefreshScheduler.start(refreshFn, mainScreenEl);
   }
@@ -47,9 +53,18 @@ export function createLearning({ elements, learning, sessionRefreshScheduler, t 
     if (learning.learnTimer) {
       clearInterval(learning.learnTimer);
       learning.learnTimer = null;
+      invoke("cancel_midi_learn").catch((error) =>
+        console.error("Failed to cancel MIDI learning", error),
+      );
     }
     closeLearnPanel();
   }
 
-  return { startSessionRefresh, stopSessionRefresh, closeLearnPanel, openLearnPanel, cancelLearnPanel };
+  return {
+    startSessionRefresh,
+    stopSessionRefresh,
+    closeLearnPanel,
+    openLearnPanel,
+    cancelLearnPanel,
+  };
 }

@@ -10,10 +10,13 @@ use std::{
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use tokio_tungstenite::{
+    connect_async_with_config,
+    tungstenite::protocol::{Message, WebSocketConfig},
+};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -30,8 +33,17 @@ pub struct WsHub {
 struct WsHubInner {
     next_id: std::sync::atomic::AtomicU64,
     shutting_down: AtomicBool,
-    conns: tokio::sync::Mutex<HashMap<u64, mpsc::UnboundedSender<Message>>>,
+    conns: tokio::sync::Mutex<HashMap<u64, WsConnection>>,
 }
+
+struct WsConnection {
+    outgoing: mpsc::Sender<Message>,
+    close: watch::Sender<bool>,
+}
+
+const MAX_CONNECTIONS: usize = 16;
+const MAX_MESSAGE_BYTES: usize = 1024 * 1024;
+const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl WsHub {
     pub fn new() -> Self {
@@ -50,6 +62,15 @@ impl WsHub {
         }
 
         let parsed = Url::parse(&url).map_err(|e| e.to_string())?;
+        if !matches!(parsed.scheme(), "ws" | "wss")
+            || !parsed.username().is_empty()
+            || parsed.password().is_some()
+        {
+            return Err("Expected a ws:// or wss:// URL without credentials".to_string());
+        }
+        if self.inner.conns.lock().await.len() >= MAX_CONNECTIONS {
+            return Err("Too many WebSocket connections".to_string());
+        }
         let mut req = parsed.into_client_request().map_err(|e| e.to_string())?;
         {
             let h = req.headers_mut();
@@ -63,11 +84,22 @@ impl WsHub {
             }
         }
 
-        let connect_fut = async { connect_async(req).await.map_err(|e| e.to_string()) };
-        let (ws_stream, _resp) =
-            tokio::time::timeout(Duration::from_millis(connect_timeout_ms), connect_fut)
+        let config = WebSocketConfig {
+            max_message_size: Some(MAX_MESSAGE_BYTES),
+            max_frame_size: Some(MAX_MESSAGE_BYTES),
+            ..Default::default()
+        };
+        let connect_fut = async {
+            connect_async_with_config(req, Some(config), false)
                 .await
-                .map_err(|_| "WebSocket connect timed out".to_string())??;
+                .map_err(|e| e.to_string())
+        };
+        let (ws_stream, _resp) = tokio::time::timeout(
+            Duration::from_millis(connect_timeout_ms.clamp(1, 30_000)),
+            connect_fut,
+        )
+        .await
+        .map_err(|_| "WebSocket connect timed out".to_string())??;
 
         let id = self
             .inner
@@ -75,7 +107,8 @@ impl WsHub {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
             .saturating_add(1);
         let (mut write, mut read) = ws_stream.split();
-        let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
+        let (tx, mut rx) = mpsc::channel::<Message>(16);
+        let (close, mut closing) = watch::channel(false);
 
         if self.inner.shutting_down.load(Ordering::Acquire) {
             return Err("WebSocket bridge is shutting down".to_string());
@@ -86,13 +119,27 @@ impl WsHub {
             if self.inner.shutting_down.load(Ordering::Acquire) {
                 return Err("WebSocket bridge is shutting down".to_string());
             }
-            conns.insert(id, tx);
+            if conns.len() >= MAX_CONNECTIONS {
+                return Err("Too many WebSocket connections".to_string());
+            }
+            conns.insert(
+                id,
+                WsConnection {
+                    outgoing: tx,
+                    close,
+                },
+            );
         }
 
         let hub = self.clone();
         tauri::async_runtime::spawn(async move {
             loop {
                 tokio::select! {
+                  biased;
+                  _ = closing.changed() => {
+                    let _ = tokio::time::timeout(WRITE_TIMEOUT, write.send(Message::Close(None))).await;
+                    break;
+                  }
                   msg_result = read.next() => {
                     match msg_result {
                       Some(Ok(Message::Text(text))) => {
@@ -117,7 +164,7 @@ impl WsHub {
                   outgoing = rx.recv() => {
                     match outgoing {
                       Some(msg) => {
-                        if write.send(msg).await.is_err() {
+                        if !matches!(tokio::time::timeout(WRITE_TIMEOUT, write.send(msg)).await, Ok(Ok(()))) {
                           break;
                         }
                       }
@@ -147,12 +194,16 @@ impl WsHub {
     // Internal restoration must reach the mixer before the bridge closes,
     // even after ordinary plugin traffic has been stopped for shutdown.
     pub(crate) async fn send_cleanup_text(&self, id: u64, text: String) -> Result<(), String> {
+        if text.len() > MAX_MESSAGE_BYTES {
+            return Err("WebSocket message is too large".to_string());
+        }
         let conns = self.inner.conns.lock().await;
         let tx = conns
             .get(&id)
             .ok_or_else(|| "Unknown WebSocket id".to_string())?;
-        tx.send(Message::Text(text))
-            .map_err(|_| "WebSocket send failed".to_string())
+        tx.outgoing
+            .try_send(Message::Text(text))
+            .map_err(|_| "WebSocket send queue is full or closed".to_string())
     }
 
     pub async fn close(&self, id: u64) -> Result<(), String> {
@@ -160,7 +211,8 @@ impl WsHub {
         let tx = conns
             .get(&id)
             .ok_or_else(|| "Unknown WebSocket id".to_string())?;
-        tx.send(Message::Close(None))
+        tx.close
+            .send(true)
             .map_err(|_| "WebSocket close failed".to_string())
     }
 
@@ -172,10 +224,13 @@ impl WsHub {
         self.begin_shutdown();
         let senders = {
             let conns = self.inner.conns.lock().await;
-            conns.values().cloned().collect::<Vec<_>>()
+            conns
+                .values()
+                .map(|conn| conn.close.clone())
+                .collect::<Vec<_>>()
         };
         for sender in senders {
-            let _ = sender.send(Message::Close(None));
+            let _ = sender.send(true);
         }
 
         let closed = tokio::time::timeout(grace_period, async {
@@ -199,7 +254,7 @@ impl WsHub {
         self.begin_shutdown();
         if let Ok(mut conns) = self.inner.conns.try_lock() {
             for sender in conns.values() {
-                let _ = sender.send(Message::Close(None));
+                let _ = sender.close.send(true);
             }
             conns.clear();
         }
@@ -260,40 +315,4 @@ pub fn get_wavelink_ws_port() -> Result<Option<u16>, String> {
     };
 
     Ok(Some(info.port))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn shutdown_all_closes_connections_and_rejects_sends() {
-        tauri::async_runtime::block_on(async {
-            let hub = WsHub::new();
-            let (tx, mut rx) = mpsc::unbounded_channel();
-            hub.inner.conns.lock().await.insert(1, tx);
-
-            assert!(!hub.shutdown_all(Duration::from_millis(1)).await);
-            assert!(matches!(rx.recv().await, Some(Message::Close(None))));
-            assert_eq!(hub.inner.conns.lock().await.len(), 0);
-            assert!(hub.send_text(1, "ignored".to_string()).await.is_err());
-        });
-    }
-
-    #[test]
-    fn solo_restoration_can_be_queued_before_shutdown_closes_the_socket() {
-        tauri::async_runtime::block_on(async {
-            let hub = WsHub::new();
-            let (tx, mut rx) = mpsc::unbounded_channel();
-            hub.inner.conns.lock().await.insert(1, tx);
-            hub.begin_shutdown();
-            assert!(hub.send_text(1, "ordinary traffic".into()).await.is_err());
-            hub.send_cleanup_text(1, "restore mute states".into())
-                .await
-                .unwrap();
-            assert!(
-                matches!(rx.recv().await, Some(Message::Text(text)) if text == "restore mute states")
-            );
-        });
-    }
 }

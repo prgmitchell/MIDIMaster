@@ -22,6 +22,8 @@ fn main() {
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
     let mode = args.first().and_then(|arg| arg.to_str()).unwrap_or("");
     let result = match mode {
+        #[cfg(all(feature = "e2e", windows))]
+        "--e2e-serve" => run_isolated(),
         "--self-test" => self_test(),
         "--version" => {
             println!(
@@ -40,6 +42,41 @@ fn main() {
         eprintln!("MIDIMaster Virtual Audio: {error}");
         std::process::exit(1);
     }
+}
+
+// Same USB/IP, PCM and status servers, with private endpoints and no driver,
+// service registration or attachment monitor. Not present in release builds.
+#[cfg(all(feature = "e2e", windows))]
+fn run_isolated() -> Result<(), String> {
+    let stop = Arc::new(AtomicBool::new(false));
+    let status = Arc::new(virtual_audio::status::ServiceStatus::default());
+    let device = virtual_audio::create_device(status.clone());
+    let server = virtual_audio::usbip::Server::bind(
+        "127.0.0.1:0",
+        device.clone(),
+        status.clone(),
+        stop.clone(),
+    )
+    .map_err(|e| e.to_string())?;
+    let pid = std::process::id();
+    let audio_path = format!(r"\\.\pipe\MIDIMaster-E2E-{pid}-Audio");
+    let status_path = format!(r"\\.\pipe\MIDIMaster-E2E-{pid}-Status");
+    println!(
+        "{}",
+        serde_json::json!({ "port": server.local_addr().map_err(|e| e.to_string())?.port(), "audio": audio_path, "status": status_path })
+    );
+    let audio_status = status.clone();
+    let audio_stop = stop.clone();
+    thread::spawn(move || {
+        virtual_audio::audio_pipe::serve_audio_pipe_at(
+            device,
+            audio_status,
+            audio_stop,
+            &audio_path,
+        )
+    });
+    thread::spawn(move || virtual_audio::status::serve_named_pipe_at(status, stop, &status_path));
+    server.serve().map_err(|e| e.to_string())
 }
 
 fn self_test() -> Result<(), String> {

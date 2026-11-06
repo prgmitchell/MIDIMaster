@@ -7,6 +7,7 @@ import {
 
 /** midi learn workflow. */
 export function createMidiLearn({
+  invoke,
   elements,
   editorState,
   hideLearnPanel,
@@ -39,37 +40,51 @@ export function createMidiLearn({
 
     if (indicatorLearn) {
       const active = editorState.learnField === "indicator_control";
-      const label = active ? t("bindings.listening") : t("bindings.learnIndicatorOutput");
+      const label = active
+        ? t("bindings.listening")
+        : t("bindings.learnIndicatorOutput");
       indicatorLearn.classList.toggle("is-learning", active);
       indicatorLearn.title = label;
       indicatorLearn.setAttribute("aria-label", label);
       indicatorLearn.disabled =
-        buttonFeedbackDisabled || transferLocked || Boolean(editorState.learnField && !active);
+        buttonFeedbackDisabled ||
+        transferLocked ||
+        Boolean(editorState.learnField && !active);
     }
     if (feedbackLearn) {
       const active = editorState.learnField === "indicator_control";
-      const label = active ? t("bindings.listening") : t("bindings.learnFeedbackOutput");
+      const label = active
+        ? t("bindings.listening")
+        : t("bindings.learnFeedbackOutput");
       feedbackLearn.classList.toggle("is-learning", active);
       feedbackLearn.title = label;
       feedbackLearn.setAttribute("aria-label", label);
-      feedbackLearn.disabled = transferLocked || Boolean(editorState.learnField && !active);
+      feedbackLearn.disabled =
+        transferLocked || Boolean(editorState.learnField && !active);
     }
 
     const lockClear = transferLocked || Boolean(editorState.learnField);
-    if (indicatorClear) indicatorClear.disabled = lockClear || buttonFeedbackDisabled;
+    if (indicatorClear)
+      indicatorClear.disabled = lockClear || buttonFeedbackDisabled;
     if (feedbackClear) feedbackClear.disabled = lockClear;
     if (elements.bindingConfigIndicatorMsgType)
-      elements.bindingConfigIndicatorMsgType.disabled = lockClear || buttonFeedbackDisabled;
+      elements.bindingConfigIndicatorMsgType.disabled =
+        lockClear || buttonFeedbackDisabled;
     if (elements.bindingConfigIndicatorChannel)
-      elements.bindingConfigIndicatorChannel.disabled = lockClear || buttonFeedbackDisabled;
+      elements.bindingConfigIndicatorChannel.disabled =
+        lockClear || buttonFeedbackDisabled;
     if (elements.bindingConfigIndicatorController)
-      elements.bindingConfigIndicatorController.disabled = lockClear || buttonFeedbackDisabled;
-    if (elements.bindingConfigFeedbackMsgType) elements.bindingConfigFeedbackMsgType.disabled = lockClear;
+      elements.bindingConfigIndicatorController.disabled =
+        lockClear || buttonFeedbackDisabled;
+    if (elements.bindingConfigFeedbackMsgType)
+      elements.bindingConfigFeedbackMsgType.disabled = lockClear;
     if (elements.bindingConfigFeedbackChannel)
-      elements.bindingConfigFeedbackChannel.disabled = lockClear || feedbackDisabled;
+      elements.bindingConfigFeedbackChannel.disabled =
+        lockClear || feedbackDisabled;
     syncFeedbackControllerInputState(lockClear, feedbackDisabled);
     if (listState.indicatorMsgTypeDropdown) {
-      listState.indicatorMsgTypeDropdown.button.disabled = lockClear || buttonFeedbackDisabled;
+      listState.indicatorMsgTypeDropdown.button.disabled =
+        lockClear || buttonFeedbackDisabled;
       listState.indicatorMsgTypeDropdown.button.setAttribute(
         "aria-disabled",
         String(lockClear || buttonFeedbackDisabled),
@@ -80,38 +95,65 @@ export function createMidiLearn({
       );
     }
     const ledDisabled = binding?.led_enabled !== true;
-    if (elements.bindingConfigFeedbackMode) elements.bindingConfigFeedbackMode.disabled = lockClear;
-    for (const field of [elements.bindingConfigLedChannel, elements.bindingConfigLedController]) {
-      if (field) field.disabled = lockClear || ledDisabled || !binding?.led_control;
+    if (elements.bindingConfigFeedbackMode)
+      elements.bindingConfigFeedbackMode.disabled = lockClear;
+    for (const field of [
+      elements.bindingConfigLedChannel,
+      elements.bindingConfigLedController,
+    ]) {
+      if (field)
+        field.disabled = lockClear || ledDisabled || !binding?.led_control;
     }
-    if (binding?.led_control?.msg_type === "ChannelPressure" && elements.bindingConfigLedChannel)
+    if (
+      binding?.led_control?.msg_type === "ChannelPressure" &&
+      elements.bindingConfigLedChannel
+    )
       elements.bindingConfigLedChannel.disabled = true;
-    if (elements.bindingConfigLedMsgType) elements.bindingConfigLedMsgType.disabled = lockClear;
-    if (listState.ledMsgTypeDropdown) listState.ledMsgTypeDropdown.button.disabled = lockClear;
-    if (listState.feedbackModeDropdown) listState.feedbackModeDropdown.button.disabled = lockClear;
+    if (elements.bindingConfigLedMsgType)
+      elements.bindingConfigLedMsgType.disabled = lockClear;
+    if (listState.ledMsgTypeDropdown)
+      listState.ledMsgTypeDropdown.button.disabled = lockClear;
+    if (listState.feedbackModeDropdown)
+      listState.feedbackModeDropdown.button.disabled = lockClear;
     if (listState.feedbackOutputMsgTypeDropdown) {
       listState.feedbackOutputMsgTypeDropdown.button.disabled = lockClear;
-      listState.feedbackOutputMsgTypeDropdown.button.setAttribute("aria-disabled", String(lockClear));
-      listState.feedbackOutputMsgTypeDropdown.root.classList.toggle("is-disabled", lockClear);
+      listState.feedbackOutputMsgTypeDropdown.button.setAttribute(
+        "aria-disabled",
+        String(lockClear),
+      );
+      listState.feedbackOutputMsgTypeDropdown.root.classList.toggle(
+        "is-disabled",
+        lockClear,
+      );
     }
     for (const learnButton of [previewLearnButton, buttonLearnButton]) {
       if (!learnButton) continue;
-      const label = isButton ? t("bindings.learnButton") : t("bindings.learnFader");
+      const label = isButton
+        ? t("bindings.learnButton")
+        : t("bindings.learnFader");
       learnButton.classList.remove("is-learning");
       learnButton.textContent = label;
       learnButton.title = label;
       learnButton.setAttribute("aria-label", label);
-      learnButton.disabled = transferLocked || Boolean(editorState.learnField && !learningPrimary);
+      learnButton.disabled =
+        transferLocked || Boolean(editorState.learnField && !learningPrimary);
     }
   }
 
   function stopAuxLearn(options = {}) {
+    const wasLearning = Boolean(
+      editorState.learnField || editorState.learnTimer,
+    );
     const closePanel = options.closePanel !== false;
     if (editorState.learnTimer) {
       clearInterval(editorState.learnTimer);
       editorState.learnTimer = null;
     }
     editorState.learnField = null;
+    if (wasLearning)
+      invoke("cancel_midi_learn").catch((error) =>
+        console.error("Failed to cancel MIDI learning", error),
+      );
     if (closePanel) discardUnmappedModifiers();
     updateAuxLearnUi();
     renderConfigPreview();
@@ -135,10 +177,17 @@ export function createMidiLearn({
 
   function renderMidiMappingSummary(element, deviceId, control, controlText) {
     if (!element) return;
-    const deviceLabel = control ? labelForMidiDevice(deviceId) || String(deviceId || "").trim() : "";
+    const deviceLabel = control
+      ? labelForMidiDevice(deviceId) || String(deviceId || "").trim()
+      : "";
     const unmappedLabel = t("bindings.notMapped");
     const key = [Boolean(control), deviceLabel, controlText, unmappedLabel];
-    if (midiSummaryKeys.get(element)?.every((value, index) => value === key[index])) return;
+    if (
+      midiSummaryKeys
+        .get(element)
+        ?.every((value, index) => value === key[index])
+    )
+      return;
     midiSummaryKeys.set(element, key);
     element.innerHTML = "";
     if (!control) {
@@ -148,7 +197,9 @@ export function createMidiLearn({
 
     const wrapper = document.createElement("span");
     wrapper.className = "binding-config-midi-stack";
-    wrapper.title = deviceLabel ? `${deviceLabel} - ${controlText}` : controlText;
+    wrapper.title = deviceLabel
+      ? `${deviceLabel} - ${controlText}`
+      : controlText;
 
     const device = document.createElement("span");
     device.className = "binding-config-midi-device";
@@ -163,8 +214,13 @@ export function createMidiLearn({
     element.appendChild(wrapper);
   }
 
-  function formatPreviewMidiValue(binding, normalizedValue, rawNormalizedValue = null) {
-    const sourceValue = rawNormalizedValue != null ? rawNormalizedValue : normalizedValue;
+  function formatPreviewMidiValue(
+    binding,
+    normalizedValue,
+    rawNormalizedValue = null,
+  ) {
+    const sourceValue =
+      rawNormalizedValue != null ? rawNormalizedValue : normalizedValue;
     const clamped = Math.min(1, Math.max(0, Number(sourceValue) || 0));
     const msgType = String(binding?.control?.msg_type || "ControlChange");
     if (msgType === "PitchBend") {
@@ -178,14 +234,23 @@ export function createMidiLearn({
   function renderAssignMappingLabel(binding) {
     if (!elements.bindingConfigAssignLabel) return;
     const mode =
-      binding?.assign_mode === "Replace" ? "Replace" : binding?.assign_mode === "Clear" ? "Clear" : "Add";
+      binding?.assign_mode === "Replace"
+        ? "Replace"
+        : binding?.assign_mode === "Clear"
+          ? "Clear"
+          : "Add";
     const mappingText = formatMidiControlLabel(binding?.assign_control);
     elements.bindingConfigAssignLabel.innerHTML = "";
 
     const main = document.createElement("span");
     main.className = "binding-config-label-main";
     if (binding?.assign_control) {
-      renderMidiMappingSummary(main, binding.assign_control.device_id, binding.assign_control, mappingText);
+      renderMidiMappingSummary(
+        main,
+        binding.assign_control.device_id,
+        binding.assign_control,
+        mappingText,
+      );
     } else main.textContent = mappingText;
 
     const badge = document.createElement("span");
@@ -200,20 +265,29 @@ export function createMidiLearn({
 
   function renderMuteMappingLabel(binding) {
     if (!elements.bindingConfigMuteLabel) return;
-    const behavior = muteBehaviorLabel(binding?.mute_control?.mute_behavior || binding?.mute_behavior);
+    const behavior = muteBehaviorLabel(
+      binding?.mute_control?.mute_behavior || binding?.mute_behavior,
+    );
     const mappingText = formatMidiControlLabel(binding?.mute_control);
     elements.bindingConfigMuteLabel.innerHTML = "";
 
     const main = document.createElement("span");
     main.className = "binding-config-label-main";
     if (binding?.mute_control) {
-      renderMidiMappingSummary(main, binding.mute_control.device_id, binding.mute_control, mappingText);
+      renderMidiMappingSummary(
+        main,
+        binding.mute_control.device_id,
+        binding.mute_control,
+        mappingText,
+      );
     } else main.textContent = mappingText;
 
     const badge = document.createElement("span");
     badge.className = "binding-config-inline-badge";
     badge.textContent = behavior;
-    badge.title = muteBehaviorTooltip(binding?.mute_control?.mute_behavior || binding?.mute_behavior);
+    badge.title = muteBehaviorTooltip(
+      binding?.mute_control?.mute_behavior || binding?.mute_behavior,
+    );
     badge.setAttribute("aria-label", badge.title);
 
     elements.bindingConfigMuteLabel.appendChild(main);

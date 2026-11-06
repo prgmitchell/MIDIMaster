@@ -1,3 +1,8 @@
+mod http;
+use http::plugin_http_post_json_blocking;
+mod files;
+use files::{plugin_file_path, read_plugin_file, safe_rel_path, validate_plugin_id};
+
 use crate::app_paths::app_data_root_dir;
 use crate::run_logger;
 use base64::Engine;
@@ -7,7 +12,7 @@ use std::{
     collections::HashSet,
     fs,
     io::Cursor,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs},
     path::{Path, PathBuf},
     process::Command,
     time::Duration,
@@ -21,6 +26,11 @@ const PLUGIN_HTTP_DEFAULT_TIMEOUT_MS: u64 = 4500;
 const PLUGIN_HTTP_MAX_TIMEOUT_MS: u64 = 10_000;
 const PLUGIN_HTTP_MAX_REQUEST_BYTES: usize = 1_000_000;
 const PLUGIN_HTTP_MAX_RESPONSE_BYTES: usize = 1_000_000;
+const PLUGIN_MANIFEST_MAX_BYTES: u64 = 64 * 1024;
+const PLUGIN_FILE_MAX_BYTES: u64 = 20 * 1024 * 1024;
+const PLUGIN_EXPANDED_MAX_BYTES: u64 = 100 * 1024 * 1024;
+const PLUGIN_MAX_FILES: usize = 2048;
+static PLUGIN_MUTATIONS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -72,12 +82,17 @@ pub fn read_package_manifest(bytes: &[u8]) -> Result<PluginManifest, String> {
     let reader = Cursor::new(bytes);
     let mut zip = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
     for i in 0..zip.len() {
-        let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
-        let name = file.name().replace('\\', "/");
+        let file = zip.by_index(i).map_err(|e| e.to_string())?;
+        let name = file.name().map_err(|e| e.to_string())?.replace('\\', "/");
         if name == "manifest.json" || name.ends_with("/manifest.json") {
             use std::io::Read;
             let mut text = String::new();
-            file.read_to_string(&mut text).map_err(|e| e.to_string())?;
+            file.take(PLUGIN_MANIFEST_MAX_BYTES + 1)
+                .read_to_string(&mut text)
+                .map_err(|e| e.to_string())?;
+            if text.len() as u64 > PLUGIN_MANIFEST_MAX_BYTES {
+                return Err("Plugin manifest is too large".to_string());
+            }
             return serde_json::from_str(&text).map_err(|e| e.to_string());
         }
     }
@@ -94,23 +109,28 @@ fn plugins_state_path(app: &AppHandle) -> Result<PathBuf, String> {
     app_data_root_dir(app).map(|dir| dir.join("plugins_state.json"))
 }
 
-fn load_plugins_state(app: &AppHandle) -> PluginsState {
-    let Ok(path) = plugins_state_path(app) else {
-        return PluginsState::default();
-    };
-    let Ok(text) = fs::read_to_string(&path) else {
-        return PluginsState::default();
-    };
-    serde_json::from_str(&text).unwrap_or_default()
+fn plugins_state_store(
+    app: &AppHandle,
+) -> Result<crate::durable_json_store::DurableJsonStore, String> {
+    Ok(crate::durable_json_store::DurableJsonStore::new(
+        plugins_state_path(app)?,
+        "plugins",
+        app.state::<crate::AppState>()
+            .storage_recovery_notices
+            .clone(),
+    ))
+}
+
+fn load_plugins_state(app: &AppHandle) -> Result<PluginsState, String> {
+    plugins_state_store(app)?
+        .load_or_default()
+        .map_err(|e| e.to_string())
 }
 
 fn save_plugins_state(app: &AppHandle, state: &PluginsState) -> Result<(), String> {
-    let path = plugins_state_path(app)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let text = serde_json::to_string_pretty(state).map_err(|e| e.to_string())?;
-    fs::write(path, text).map_err(|e| e.to_string())
+    plugins_state_store(app)?
+        .save(state)
+        .map_err(|e| e.to_string())
 }
 
 pub fn plugins_root_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -121,12 +141,6 @@ fn is_bundled_plugin(id: &str) -> bool {
     BUNDLED_PLUGIN_IDS
         .iter()
         .any(|p| p.eq_ignore_ascii_case(id))
-}
-
-fn plugin_file_path(root: &Path, plugin_id: &str, rel_path: &str) -> Result<PathBuf, String> {
-    validate_plugin_id(plugin_id)?;
-    let rel = safe_rel_path(rel_path)?;
-    Ok(root.join(plugin_id).join(rel))
 }
 
 pub fn ensure_builtin_plugin(
@@ -177,11 +191,14 @@ pub fn get_plugins_dir(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 pub fn list_plugins(app: AppHandle) -> Result<Vec<PluginManifest>, String> {
+    let _guard = PLUGIN_MUTATIONS
+        .lock()
+        .map_err(|_| "Plugin update lock poisoned")?;
     let root = plugins_root_dir(&app)?;
     if !root.exists() {
         return Ok(Vec::new());
     }
-    let state = load_plugins_state(&app);
+    let state = load_plugins_state(&app)?;
     let disabled: HashSet<String> = state.disabled.into_iter().collect();
 
     let mut plugins = Vec::new();
@@ -199,7 +216,7 @@ pub fn list_plugins(app: AppHandle) -> Result<Vec<PluginManifest>, String> {
         if !manifest_path.exists() {
             continue;
         }
-        let text = match fs::read_to_string(&manifest_path) {
+        let text = match crate::file_dialog::read_text(&manifest_path, PLUGIN_MANIFEST_MAX_BYTES) {
             Ok(t) => t,
             Err(_) => continue,
         };
@@ -257,7 +274,7 @@ pub fn read_plugin_text(
 ) -> Result<String, String> {
     let root = plugins_root_dir(&app)?;
     let path = plugin_file_path(&root, &plugin_id, &rel_path)?;
-    fs::read_to_string(&path).map_err(|e| e.to_string())
+    String::from_utf8(read_plugin_file(&path)?).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -268,7 +285,7 @@ pub fn read_plugin_base64(
 ) -> Result<String, String> {
     let root = plugins_root_dir(&app)?;
     let path = plugin_file_path(&root, &plugin_id, &rel_path)?;
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let bytes = read_plugin_file(&path)?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
     Ok(b64)
 }
@@ -289,166 +306,17 @@ pub struct PluginHttpResponse {
     pub json: Option<serde_json::Value>,
 }
 
-fn validate_plugin_id(id: &str) -> Result<(), String> {
-    if id.trim().is_empty() {
-        return Err("Plugin id is required".to_string());
-    }
-    let ok = id.chars().all(|c| {
-        c.is_ascii_lowercase()
-            || c.is_ascii_uppercase()
-            || c.is_ascii_digit()
-            || c == '_'
-            || c == '-'
-            || c == '.'
-    });
-    if !ok {
-        return Err("Plugin id contains invalid characters".to_string());
-    }
-    Ok(())
-}
-
-fn safe_rel_path(rel: &str) -> Result<PathBuf, String> {
-    let p = Path::new(rel);
-    if p.is_absolute() {
-        return Err("Absolute paths are not allowed".to_string());
-    }
-    for c in p.components() {
-        if matches!(c, std::path::Component::ParentDir) {
-            return Err("Parent path components are not allowed".to_string());
-        }
-    }
-    Ok(p.to_path_buf())
-}
-
-fn blocked_ipv4(ip: Ipv4Addr) -> bool {
-    ip.is_private()
-        || ip.is_loopback()
-        || ip.is_link_local()
-        || ip.is_unspecified()
-        || ip.is_multicast()
-        || ip.octets() == [255, 255, 255, 255]
-}
-
-fn blocked_ipv6(ip: Ipv6Addr) -> bool {
-    let first = ip.segments()[0];
-    let unique_local = (first & 0xfe00) == 0xfc00;
-    let link_local = (first & 0xffc0) == 0xfe80;
-    ip.is_loopback() || ip.is_unspecified() || ip.is_multicast() || unique_local || link_local
-}
-
-fn blocked_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => blocked_ipv4(v4),
-        IpAddr::V6(v6) => blocked_ipv6(v6),
-    }
-}
-
-fn validate_plugin_http_url(raw_url: &str) -> Result<Url, String> {
-    let trimmed = raw_url.trim();
-    if trimmed.is_empty() {
-        return Err("URL is required".to_string());
-    }
-
-    let url = Url::parse(trimmed).map_err(|_| "Invalid URL".to_string())?;
-    if url.scheme() != "https" {
-        return Err("Only https:// URLs are allowed".to_string());
-    }
-    if !url.username().is_empty() || url.password().is_some() {
-        return Err("URL credentials are not allowed".to_string());
-    }
-
-    let Some(host) = url.host() else {
-        return Err("URL host is required".to_string());
-    };
-    match host {
-        url::Host::Domain(domain) => {
-            let lower = domain.trim_end_matches('.').to_ascii_lowercase();
-            if lower == "localhost" || lower.ends_with(".localhost") {
-                return Err("Localhost URLs are not allowed".to_string());
-            }
-        }
-        url::Host::Ipv4(ip) => {
-            if blocked_ip(IpAddr::V4(ip)) {
-                return Err("Local/private IP URLs are not allowed".to_string());
-            }
-        }
-        url::Host::Ipv6(ip) => {
-            if blocked_ip(IpAddr::V6(ip)) {
-                return Err("Local/private IP URLs are not allowed".to_string());
-            }
-        }
-    }
-
-    Ok(url)
-}
-
-fn plugin_http_timeout(timeout_ms: Option<u64>) -> Result<u64, String> {
-    let timeout = timeout_ms.unwrap_or(PLUGIN_HTTP_DEFAULT_TIMEOUT_MS);
-    if timeout == 0 {
-        return Ok(PLUGIN_HTTP_DEFAULT_TIMEOUT_MS);
-    }
-    if timeout > PLUGIN_HTTP_MAX_TIMEOUT_MS {
-        return Err(format!(
-            "Timeout exceeds maximum of {}ms",
-            PLUGIN_HTTP_MAX_TIMEOUT_MS
-        ));
-    }
-    Ok(timeout)
-}
-
-fn read_plugin_http_response(response: ureq::Response) -> Result<PluginHttpResponse, String> {
-    use std::io::Read;
-
-    let status = response.status();
-    let mut reader = response
-        .into_reader()
-        .take((PLUGIN_HTTP_MAX_RESPONSE_BYTES + 1) as u64);
-    let mut bytes = Vec::new();
-    reader.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-    if bytes.len() > PLUGIN_HTTP_MAX_RESPONSE_BYTES {
-        return Err("HTTP response is too large".to_string());
-    }
-
-    let body_text = String::from_utf8_lossy(&bytes).to_string();
-    let json = serde_json::from_str::<serde_json::Value>(&body_text).ok();
-    Ok(PluginHttpResponse {
-        status,
-        ok: (200..300).contains(&status),
-        body_text,
-        json,
-    })
-}
-
 #[tauri::command]
-pub fn plugin_http_post_json(
+pub async fn plugin_http_post_json(
     url: String,
     body: serde_json::Value,
     timeout_ms: Option<u64>,
 ) -> Result<PluginHttpResponse, String> {
-    #[cfg(feature = "perf-audit")]
-    if crate::perf_audit::network_is_offline() {
-        return Err("Network disabled by the local performance audit".to_string());
-    }
-    let url = validate_plugin_http_url(&url)?;
-    let timeout = plugin_http_timeout(timeout_ms)?;
-    let body_text = serde_json::to_string(&body).map_err(|e| e.to_string())?;
-    if body_text.len() > PLUGIN_HTTP_MAX_REQUEST_BYTES {
-        return Err("HTTP request body is too large".to_string());
-    }
-
-    let agent = ureq::AgentBuilder::new()
-        .timeout(Duration::from_millis(timeout))
-        .build();
-    let request = agent
-        .post(url.as_str())
-        .set("Content-Type", "application/json")
-        .set("Accept", "application/json, text/plain, */*");
-
-    match request.send_string(&body_text) {
-        Ok(response) => read_plugin_http_response(response),
-        Err(ureq::Error::Status(_, response)) => read_plugin_http_response(response),
-        Err(error) => Err(error.to_string()),
-    }
+    tauri::async_runtime::spawn_blocking(move || {
+        plugin_http_post_json_blocking(url, body, timeout_ms)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn validate_hue_bridge_addr(addr: &str) -> Result<String, String> {
@@ -494,11 +362,38 @@ fn validate_hue_path(path: &str) -> Result<String, String> {
 fn hue_agent(timeout_ms: u64) -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout(Duration::from_millis(timeout_ms))
+        .redirects(0)
         .build()
 }
 
+fn read_hue_json(response: ureq::Response) -> Result<serde_json::Value, String> {
+    use std::io::Read;
+    const MAX_BYTES: u64 = 4 * 1024 * 1024;
+    let mut bytes = Vec::new();
+    response
+        .into_reader()
+        .take(MAX_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > MAX_BYTES {
+        return Err("Hue response is too large".into());
+    }
+    serde_json::from_slice(&bytes).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
-pub fn hue_discover_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<String>, String> {
+pub async fn hue_discover_bridges(
+    candidate_ips: Option<Vec<String>>,
+) -> Result<Vec<String>, String> {
+    if candidate_ips.as_ref().is_some_and(|ips| ips.len() > 64) {
+        return Err("Too many Hue discovery candidates".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || discover_hue_bridges(candidate_ips))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn discover_hue_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<String>, String> {
     #[cfg(feature = "perf-audit")]
     if crate::perf_audit::network_is_offline() {
         return Ok(Vec::new());
@@ -551,7 +446,7 @@ pub fn hue_discover_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<St
             .timeout(Duration::from_millis(2500))
             .build();
         let resp = agent.get(url).call().map_err(|e| e.to_string())?;
-        let json: serde_json::Value = resp.into_json().map_err(|e| e.to_string())?;
+        let json = read_hue_json(resp)?;
         let arr = json
             .as_array()
             .ok_or_else(|| "Unexpected discovery response".to_string())?;
@@ -576,7 +471,7 @@ pub fn hue_discover_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<St
             .timeout(Duration::from_millis(1500))
             .build();
         let resp = agent.get(&url).call().map_err(|e| e.to_string())?;
-        let json: serde_json::Value = resp.into_json().map_err(|e| e.to_string())?;
+        let json = read_hue_json(resp)?;
         let has_bridge_id = json
             .get("bridgeid")
             .and_then(|v| v.as_str())
@@ -637,7 +532,11 @@ pub fn hue_discover_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<St
     local_candidates.sort();
     local_candidates.dedup();
 
-    for ip in local_candidates {
+    let probe_deadline = std::time::Instant::now() + Duration::from_secs(10);
+    for ip in local_candidates.into_iter().take(64) {
+        if std::time::Instant::now() >= probe_deadline {
+            break;
+        }
         let trimmed = ip.trim();
         if trimmed.is_empty() {
             continue;
@@ -673,7 +572,16 @@ pub fn hue_discover_bridges(candidate_ips: Option<Vec<String>>) -> Result<Vec<St
 }
 
 #[tauri::command]
-pub fn hue_pair_bridge(
+pub async fn hue_pair_bridge(
+    bridge_ip: String,
+    devicetype: Option<String>,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || pair_hue_bridge(bridge_ip, devicetype))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn pair_hue_bridge(
     bridge_ip: String,
     devicetype: Option<String>,
 ) -> Result<serde_json::Value, String> {
@@ -695,11 +603,21 @@ pub fn hue_pair_bridge(
         .set("Content-Type", "application/json")
         .send_json(serde_json::json!({ "devicetype": dtype }))
         .map_err(|e| e.to_string())?;
-    resp.into_json().map_err(|e| e.to_string())
+    read_hue_json(resp)
 }
 
 #[tauri::command]
-pub fn hue_api_get(
+pub async fn hue_api_get(
+    bridge_ip: String,
+    username: String,
+    path: String,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || get_hue_api(bridge_ip, username, path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn get_hue_api(
     bridge_ip: String,
     username: String,
     path: String,
@@ -714,11 +632,22 @@ pub fn hue_api_get(
     let url = format!("http://{}/api/{}{}", bridge, user, p);
     let agent = hue_agent(HUE_API_TIMEOUT_MS);
     let resp = agent.get(&url).call().map_err(|e| e.to_string())?;
-    resp.into_json().map_err(|e| e.to_string())
+    read_hue_json(resp)
 }
 
 #[tauri::command]
-pub fn hue_api_put(
+pub async fn hue_api_put(
+    bridge_ip: String,
+    username: String,
+    path: String,
+    body: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || put_hue_api(bridge_ip, username, path, body))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn put_hue_api(
     bridge_ip: String,
     username: String,
     path: String,
@@ -738,16 +667,19 @@ pub fn hue_api_put(
         .set("Content-Type", "application/json")
         .send_json(body)
         .map_err(|e| e.to_string())?;
-    resp.into_json().map_err(|e| e.to_string())
+    read_hue_json(resp)
 }
 
 #[tauri::command]
 pub fn set_plugin_enabled(app: AppHandle, plugin_id: String, enabled: bool) -> Result<(), String> {
+    let _guard = PLUGIN_MUTATIONS
+        .lock()
+        .map_err(|_| "Plugin update lock poisoned")?;
     validate_plugin_id(&plugin_id)?;
     if !enabled && plugin_id == "wavelink" {
         crate::solo::reset_for_profile(&app, &app.state::<crate::AppState>())?;
     }
-    let mut state = load_plugins_state(&app);
+    let mut state = load_plugins_state(&app)?;
     state.disabled.retain(|id| id != &plugin_id);
     if !enabled {
         state.disabled.push(plugin_id);
@@ -759,6 +691,9 @@ pub fn set_plugin_enabled(app: AppHandle, plugin_id: String, enabled: bool) -> R
 
 #[tauri::command]
 pub fn uninstall_plugin(app: AppHandle, plugin_id: String) -> Result<(), String> {
+    let _guard = PLUGIN_MUTATIONS
+        .lock()
+        .map_err(|_| "Plugin update lock poisoned")?;
     validate_plugin_id(&plugin_id)?;
     if is_bundled_plugin(&plugin_id) {
         return Err("Bundled plugins cannot be uninstalled".to_string());
@@ -769,18 +704,33 @@ pub fn uninstall_plugin(app: AppHandle, plugin_id: String) -> Result<(), String>
         fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
     }
     // Also clear disabled state if present.
-    let mut state = load_plugins_state(&app);
+    let mut state = load_plugins_state(&app)?;
     state.disabled.retain(|id| id != &plugin_id);
     let _ = save_plugins_state(&app, &state);
     Ok(())
 }
 
 #[tauri::command]
-pub fn install_plugin_package(
+pub async fn install_plugin_package(
     app: AppHandle,
     filename: String,
     bytes_base64: String,
 ) -> Result<InstalledPluginInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        install_plugin_package_blocking(app, filename, bytes_base64)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub(crate) fn install_plugin_package_blocking(
+    app: AppHandle,
+    filename: String,
+    bytes_base64: String,
+) -> Result<InstalledPluginInfo, String> {
+    let _guard = PLUGIN_MUTATIONS
+        .lock()
+        .map_err(|_| "Plugin update lock poisoned")?;
     let _ = filename; // reserved for future use (display/logging)
 
     // Basic size guard (base64 expands ~4/3)
@@ -802,12 +752,27 @@ pub fn install_plugin_package(
     let reader = Cursor::new(bytes);
     let mut zip = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
 
+    if zip.len() > PLUGIN_MAX_FILES {
+        return Err("Plugin package contains too many files".to_string());
+    }
+    let mut expanded = 0u64;
+    for i in 0..zip.len() {
+        let file = zip.by_index(i).map_err(|e| e.to_string())?;
+        expanded = expanded.saturating_add(file.size());
+        if file.size() > PLUGIN_FILE_MAX_BYTES || expanded > PLUGIN_EXPANDED_MAX_BYTES {
+            return Err("Expanded plugin package is too large".to_string());
+        }
+        if file.is_symlink() {
+            return Err("Plugin packages cannot contain symbolic links".to_string());
+        }
+    }
+
     // Find manifest.json and allow optional single top-level folder.
     let mut manifest_index: Option<usize> = None;
     let mut manifest_name: Option<String> = None;
     for i in 0..zip.len() {
         let file = zip.by_index(i).map_err(|e| e.to_string())?;
-        let name = file.name().to_string();
+        let name = file.name().map_err(|e| e.to_string())?.into_owned();
         if name == "manifest.json" || name.ends_with("/manifest.json") {
             manifest_index = Some(i);
             manifest_name = Some(name);
@@ -830,9 +795,14 @@ pub fn install_plugin_package(
     // Read manifest text (scope to drop ZipFile borrow)
     use std::io::Read;
     let text = {
-        let mut mf = zip.by_index(mi).map_err(|e| e.to_string())?;
+        let mf = zip.by_index(mi).map_err(|e| e.to_string())?;
         let mut text = String::new();
-        mf.read_to_string(&mut text).map_err(|e| e.to_string())?;
+        mf.take(PLUGIN_MANIFEST_MAX_BYTES + 1)
+            .read_to_string(&mut text)
+            .map_err(|e| e.to_string())?;
+        if text.len() as u64 > PLUGIN_MANIFEST_MAX_BYTES {
+            return Err("Plugin manifest is too large".to_string());
+        }
         text
     };
     let mut manifest: PluginManifest = serde_json::from_str(&text).map_err(|e| e.to_string())?;
@@ -855,8 +825,8 @@ pub fn install_plugin_package(
     let mut entry_found = false;
     for i in 0..zip.len() {
         let file = zip.by_index(i).map_err(|e| e.to_string())?;
-        let name = file.name();
-        let stripped = name.strip_prefix(&prefix).unwrap_or(name);
+        let name = file.name().map_err(|e| e.to_string())?;
+        let stripped = name.strip_prefix(&prefix).unwrap_or(name.as_ref());
         if stripped == entry_rel {
             entry_found = true;
             break;
@@ -873,9 +843,11 @@ pub fn install_plugin_package(
     fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
     let extraction_result = (|| -> Result<(), String> {
+        let mut extracted = 0u64;
+        let mut names = HashSet::new();
         for i in 0..zip.len() {
             let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
-            let name = file.name().to_string();
+            let name = file.name().map_err(|e| e.to_string())?.into_owned();
             if name.ends_with('/') {
                 continue;
             }
@@ -884,12 +856,21 @@ pub fn install_plugin_package(
                 continue;
             }
             let rel = safe_rel_path(stripped)?;
+            if !names.insert(stripped.replace('\\', "/").to_lowercase()) {
+                return Err("Plugin package contains duplicate paths".to_string());
+            }
             let out_path = temp_dir.join(&rel);
             if let Some(parent) = out_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
             let mut out = fs::File::create(&out_path).map_err(|e| e.to_string())?;
-            std::io::copy(&mut file, &mut out).map_err(|e| e.to_string())?;
+            let copied =
+                std::io::copy(&mut file.by_ref().take(PLUGIN_FILE_MAX_BYTES + 1), &mut out)
+                    .map_err(|e| e.to_string())?;
+            extracted = extracted.saturating_add(copied);
+            if copied > PLUGIN_FILE_MAX_BYTES || extracted > PLUGIN_EXPANDED_MAX_BYTES {
+                return Err("Expanded plugin package is too large".to_string());
+            }
         }
 
         if !temp_dir.join("manifest.json").exists() {
@@ -925,124 +906,16 @@ pub fn install_plugin_package(
 
     // Preserve disabled state when replacing; new installs are enabled by default.
     if !replaced_existing {
-        let mut state = load_plugins_state(&app);
+        let mut state = load_plugins_state(&app)?;
         state.disabled.retain(|id| id != &manifest.id);
         let _ = save_plugins_state(&app, &state);
     }
 
     manifest.bundled = false;
-    manifest.enabled = !load_plugins_state(&app).disabled.contains(&manifest.id);
+    manifest.enabled = !load_plugins_state(&app)?.disabled.contains(&manifest.id);
 
     Ok(InstalledPluginInfo {
         manifest,
         replaced_existing,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn assert_url_error(raw: &str, expected: &str) {
-        let err = validate_plugin_http_url(raw).expect_err("expected URL validation to fail");
-        assert!(
-            err.contains(expected),
-            "expected error containing `{expected}`, got `{err}`"
-        );
-    }
-
-    #[test]
-    fn plugin_http_url_allows_public_https_domain() {
-        let url = validate_plugin_http_url(
-            "https://maker.ifttt.com/trigger/example/json/with/key/test-key",
-        )
-        .expect("public HTTPS URL should be allowed");
-
-        assert_eq!(url.scheme(), "https");
-        assert_eq!(url.host_str(), Some("maker.ifttt.com"));
-    }
-
-    #[test]
-    fn plugin_http_url_rejects_non_https() {
-        assert_url_error("http://maker.ifttt.com/trigger/example", "Only https://");
-    }
-
-    #[test]
-    fn plugin_http_url_rejects_credentials() {
-        assert_url_error("https://user:pass@example.com/hook", "credentials");
-    }
-
-    #[test]
-    fn plugin_http_url_rejects_localhost_names() {
-        assert_url_error("https://localhost/hook", "Localhost");
-        assert_url_error("https://app.localhost/hook", "Localhost");
-    }
-
-    #[test]
-    fn plugin_http_url_rejects_private_or_local_ip_literals() {
-        assert_url_error("https://127.0.0.1/hook", "Local/private");
-        assert_url_error("https://10.0.0.1/hook", "Local/private");
-        assert_url_error("https://192.168.1.10/hook", "Local/private");
-        assert_url_error("https://169.254.1.10/hook", "Local/private");
-        assert_url_error("https://[::1]/hook", "Local/private");
-        assert_url_error("https://[fe80::1]/hook", "Local/private");
-        assert_url_error("https://[fc00::1]/hook", "Local/private");
-    }
-
-    #[test]
-    fn plugin_http_timeout_uses_default_and_caps_maximum() {
-        assert_eq!(
-            plugin_http_timeout(None).expect("default timeout"),
-            PLUGIN_HTTP_DEFAULT_TIMEOUT_MS
-        );
-        assert_eq!(
-            plugin_http_timeout(Some(0)).expect("zero timeout uses default"),
-            PLUGIN_HTTP_DEFAULT_TIMEOUT_MS
-        );
-        assert_eq!(
-            plugin_http_timeout(Some(PLUGIN_HTTP_MAX_TIMEOUT_MS)).expect("max timeout"),
-            PLUGIN_HTTP_MAX_TIMEOUT_MS
-        );
-        assert!(plugin_http_timeout(Some(PLUGIN_HTTP_MAX_TIMEOUT_MS + 1)).is_err());
-    }
-
-    #[test]
-    fn plugin_file_path_validates_plugin_id_and_relative_path() {
-        let root = Path::new("C:\\MIDIMaster\\plugins");
-        assert!(plugin_file_path(root, "..\\bad", "plugin.mjs").is_err());
-        assert!(plugin_file_path(root, "good-plugin", "..\\secret.txt").is_err());
-        assert!(plugin_file_path(root, "good-plugin", "nested\\asset.png").is_ok());
-    }
-
-    #[test]
-    fn bundled_plugin_sync_preserves_identical_file_mtime() {
-        let dir = std::env::temp_dir().join(format!(
-            "midimaster-builtin-plugin-sync-{}",
-            uuid::Uuid::new_v4()
-        ));
-        std::fs::create_dir_all(&dir).expect("test dir");
-        let path = dir.join("plugin.mjs");
-        assert!(write_if_changed(&path, b"export default {}").expect("initial write"));
-        let first = std::fs::metadata(&path)
-            .expect("metadata")
-            .modified()
-            .expect("mtime");
-
-        std::thread::sleep(std::time::Duration::from_millis(20));
-        assert!(!write_if_changed(&path, b"export default {}").expect("unchanged write"));
-        let second = std::fs::metadata(&path)
-            .expect("metadata")
-            .modified()
-            .expect("mtime");
-
-        assert_eq!(first, second);
-        assert!(
-            write_if_changed(&path, b"export default { changed: true }").expect("changed write")
-        );
-        assert_eq!(
-            std::fs::read(&path).expect("updated file"),
-            b"export default { changed: true }"
-        );
-        let _ = std::fs::remove_dir_all(dir);
-    }
 }

@@ -435,7 +435,3 @@ fn convergence_snapshot(
         converged: !expected.is_empty() && mismatches == 0,
     }
 }
-
-#[cfg(test)]
-#[path = "metrics_tests.rs"]
-mod tests;

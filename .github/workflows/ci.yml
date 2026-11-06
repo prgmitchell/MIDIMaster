@@ -10,9 +10,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   rust-windows:
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +44,7 @@ jobs:
         with:
           workspaces: |
             src-tauri -> target
+            virtual-audio -> target
           shared-key: windows-rust-v1
 
       - name: Validate locale catalogs
@@ -56,13 +61,11 @@ jobs:
           $files = Get-ChildItem src,src-tauri/builtin_plugins,plugin-example,scripts -Recurse -Include *.js,*.mjs
           foreach ($file in $files) {
             node --check $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "JavaScript syntax error: $($file.FullName)" }
           }
 
-      - name: Test frontend
-        run: npm.cmd test
-
-      - name: Test performance tooling
-        run: npm.cmd run perf:test
+      - name: Audit development dependencies
+        run: npm.cmd audit --audit-level=low
 
       - name: Check static performance budgets
         run: npm.cmd run perf:guard
@@ -77,11 +80,24 @@ jobs:
 
       - name: Lint (clippy)
         working-directory: src-tauri
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --lib --bins --benches --all-features -- -D warnings
 
-      - name: Test
+      - name: Lint default production features
         working-directory: src-tauri
-        run: cargo test --all-features
+        run: cargo clippy --lib --bins --locked -- -D warnings
+
+      - name: Test real desktop workflows
+        run: npm.cmd test
+
+      - name: Upload desktop evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e
+          path: |
+            test-results/desktop-*/*.json
+            test-results/desktop-*/artifacts/*
+          retention-days: 7
 
   virtual-audio-windows:
     runs-on: windows-latest
@@ -106,8 +122,21 @@ jobs:
 
       - name: Lint (clippy)
         working-directory: virtual-audio
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --lib --bins --benches --all-features -- -D warnings
 
-      - name: Test
+      - name: Build virtual audio service and installer
         working-directory: virtual-audio
-        run: cargo test --workspace --all-features
+        run: cargo build --workspace --locked
+
+  rust-dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned audit tool
+        run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Audit both Rust lockfiles
+        run: |
+          cargo audit --file src-tauri/Cargo.lock
+          cargo audit --file virtual-audio/Cargo.lock

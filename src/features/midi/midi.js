@@ -325,6 +325,7 @@ export function createMidiFeature({
 
   const { startSessionRefresh, stopSessionRefresh, closeLearnPanel, openLearnPanel, cancelLearnPanel } =
     createLearning({
+      invoke,
       elements,
       learning,
       sessionRefreshScheduler,

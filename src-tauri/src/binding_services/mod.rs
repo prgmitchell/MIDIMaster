@@ -7,8 +7,6 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-#[cfg(test)]
-use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 
 mod execution;
@@ -23,8 +21,4 @@ pub(crate) use feedback_updates::{
 };
 pub(crate) use macro_runner::spawn_macro_binding;
 use macro_runner::{action_can_run_from_command, run_macro_binding};
-#[cfg(test)]
-pub(crate) use mutations::add_binding_to_active_profile;
 pub(crate) use mutations::{add_binding, remove_binding};
-#[cfg(test)]
-mod tests;

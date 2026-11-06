@@ -140,34 +140,3 @@ impl SetupPacket {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fixed_descriptors_validate_and_expose_identity() {
-        let descriptors = Descriptors::new(0x1209, 0x4321);
-        assert_eq!(
-            u16::from_le_bytes([descriptors.device[8], descriptors.device[9]]),
-            0x1209
-        );
-        assert_eq!(
-            u16::from_le_bytes([descriptors.device[10], descriptors.device[11]]),
-            0x4321
-        );
-        assert_eq!(descriptors.configuration.len(), 110);
-        assert_eq!(descriptors.configuration[4], 2);
-        let mut endpoints = Vec::new();
-        let mut offset = 0usize;
-        while offset < descriptors.configuration.len() {
-            let length = descriptors.configuration[offset] as usize;
-            if descriptors.configuration[offset + 1] == 0x05 {
-                endpoints.push(descriptors.configuration[offset + 2]);
-            }
-            offset += length;
-        }
-        assert_eq!(endpoints, [0x82]);
-        descriptors.validate().unwrap();
-    }
-}

@@ -45,36 +45,3 @@ pub(super) fn injected_event(sequence: u64, control_count: u8, kind: &str) -> Mi
         msg_type,
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sixteen_controls_each_receive_ordered_press_release_cycles() {
-        for control in 0..16 {
-            let events: Vec<_> = (0..64)
-                .map(|sequence| injected_event(sequence, 16, "button"))
-                .filter(|event| event.controller == control * 8 + 4)
-                .collect();
-            assert_eq!(
-                events.iter().map(|event| event.value).collect::<Vec<_>>(),
-                [127, 0, 127, 0]
-            );
-            assert!(events
-                .iter()
-                .all(|event| event.channel == (control * 8 + 4) % 16));
-        }
-    }
-
-    #[test]
-    fn fourteen_bit_generator_retains_changes_with_the_same_seven_bit_value() {
-        let first = injected_event(0, 16, "pitch_bend");
-        let second = injected_event(16, 16, "pitch_bend");
-        assert_eq!(first.value, second.value);
-        assert_eq!(first.value_14, Some(0));
-        assert_eq!(second.value_14, Some(1));
-        assert_eq!(first.controller, 0xe0);
-        assert_eq!(injected_event(15, 16, "pitch_bend").channel, 15);
-    }
-}

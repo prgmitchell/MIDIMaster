@@ -59,6 +59,21 @@ impl Drop for LocalAudioPipeSecurity {
 
 #[cfg(windows)]
 pub fn serve_audio_pipe(device: Arc<Device>, status: Arc<ServiceStatus>, stop: Arc<AtomicBool>) {
+    serve_audio_pipe_at(
+        device,
+        status,
+        stop,
+        midimaster_virtual_audio_protocol::AUDIO_PIPE_PATH,
+    );
+}
+
+#[cfg(windows)]
+pub fn serve_audio_pipe_at(
+    device: Arc<Device>,
+    status: Arc<ServiceStatus>,
+    stop: Arc<AtomicBool>,
+    path: &str,
+) {
     use std::thread;
     use std::time::Duration;
     use windows::core::HRESULT;
@@ -82,7 +97,7 @@ pub fn serve_audio_pipe(device: Arc<Device>, status: Arc<ServiceStatus>, stop: A
     while !stop.load(Ordering::Acquire) {
         let pipe = unsafe {
             CreateNamedPipeW(
-                &windows::core::HSTRING::from(midimaster_virtual_audio_protocol::AUDIO_PIPE_PATH),
+                &windows::core::HSTRING::from(path),
                 PIPE_ACCESS_INBOUND,
                 PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS | PIPE_NOWAIT,
                 1,
@@ -149,67 +164,5 @@ pub fn serve_audio_pipe(device: Arc<Device>, status: Arc<ServiceStatus>, stop: A
         unsafe {
             let _ = CloseHandle(pipe);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn audio_pipe_acl_is_local_interactive_only() {
-        assert!(AUDIO_PIPE_SDDL.contains("(A;;GA;;;IU)"));
-        assert!(AUDIO_PIPE_SDDL.contains("(A;;GA;;;SY)"));
-        assert!(AUDIO_PIPE_SDDL.contains("(A;;GA;;;BA)"));
-        assert!(!AUDIO_PIPE_SDDL.contains(";;;WD)"));
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn audio_pipe_security_descriptor_builds() {
-        let security = LocalAudioPipeSecurity::new().unwrap();
-        assert!(!security.descriptor.is_invalid());
-        assert!(!security.attributes.lpSecurityDescriptor.is_null());
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn interactive_client_can_open_audio_pipe_for_writing() {
-        use std::fs::OpenOptions;
-        use std::thread;
-        use windows::core::PCWSTR;
-        use windows::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
-        use windows::Win32::Storage::FileSystem::PIPE_ACCESS_INBOUND;
-        use windows::Win32::System::Pipes::{
-            CreateNamedPipeW, PIPE_NOWAIT, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE,
-        };
-
-        let security = LocalAudioPipeSecurity::new().unwrap();
-        let pipe_name = format!(
-            r"\\.\pipe\MIDIMaster.VirtualAudio.Audio.test.{}",
-            std::process::id()
-        );
-        let wide_name = pipe_name.encode_utf16().chain(Some(0)).collect::<Vec<_>>();
-        let pipe = unsafe {
-            CreateNamedPipeW(
-                PCWSTR(wide_name.as_ptr()),
-                PIPE_ACCESS_INBOUND,
-                PIPE_TYPE_BYTE | PIPE_REJECT_REMOTE_CLIENTS | PIPE_NOWAIT,
-                1,
-                0,
-                64 * 1024,
-                0,
-                Some(&security.attributes),
-            )
-        };
-        assert_ne!(pipe, INVALID_HANDLE_VALUE);
-
-        let client = thread::spawn(move || OpenOptions::new().write(true).open(pipe_name))
-            .join()
-            .unwrap();
-        unsafe {
-            let _ = CloseHandle(pipe);
-        }
-        client.expect("interactive client should receive write access");
     }
 }

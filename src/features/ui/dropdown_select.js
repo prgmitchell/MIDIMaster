@@ -5,6 +5,13 @@ import {
   wireDropdownToggle,
 } from "./dropdown_badges.js";
 
+let viewportListenersInstalled = false;
+function repositionOpenDropdowns() {
+  document.querySelectorAll(".target-dropdown.open").forEach((root) => {
+    root.__positionDropdownMenu?.();
+  });
+}
+
 export function createSelectDropdownShell({
   selectEl,
   rootClass = "",
@@ -46,8 +53,13 @@ export function createSelectDropdownShell({
   root.appendChild(button);
   root.appendChild(menu);
   selectEl.insertAdjacentElement("afterend", root);
-  window.addEventListener("resize", root.__positionDropdownMenu);
-  window.addEventListener("scroll", root.__positionDropdownMenu, true);
+  // A global callback per shell retains detached plugin panes indefinitely.
+  // Delegate to connected, open menus so remounting does not grow listeners.
+  if (!viewportListenersInstalled) {
+    window.addEventListener("resize", repositionOpenDropdowns);
+    window.addEventListener("scroll", repositionOpenDropdowns, true);
+    viewportListenersInstalled = true;
+  }
 
   return { root, menu, display, button };
 }

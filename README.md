@@ -55,6 +55,21 @@ Build a local Windows bundle:
 cargo tauri build
 ```
 
+## Verification
+
+With Node 22+, Rust/MSVC and WebView2 installed on Windows:
+
+```powershell
+npm ci
+npm test
+```
+
+`npm test` builds and drives the real desktop app and an isolated virtual-audio
+service. It uses separate application data and private network/pipe endpoints.
+Results and failure evidence are saved under `test-results/desktop-<timestamp>/`.
+Physical hardware, live vendor integrations and installer workflows still require
+release validation.
+
 ## License
 
 MIT. See `LICENSE`.

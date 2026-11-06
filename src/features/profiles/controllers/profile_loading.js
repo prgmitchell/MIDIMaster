@@ -30,7 +30,17 @@ export function createProfileLoading({
   setProfileSelection,
   startPluginHostIfNeeded,
   targetState,
+  setProfileLoadingBusy = () => {},
 }) {
+  let pendingOperations = 0;
+  const withBusy = (operation) => async (...args) => {
+    if (++pendingOperations === 1) setProfileLoadingBusy(true);
+    try {
+      return await operation(...args);
+    } finally {
+      if (--pendingOperations === 0) setProfileLoadingBusy(false);
+    }
+  };
   async function loadProfileByName(name, options = {}) {
     const {
       applyOsd = true,
@@ -201,5 +211,9 @@ export function createProfileLoading({
     closeProfileDropdown();
   }
 
-  return { loadProfileByName, deleteProfileByName, createProfileByName };
+  return {
+    loadProfileByName: withBusy(loadProfileByName),
+    deleteProfileByName: withBusy(deleteProfileByName),
+    createProfileByName: withBusy(createProfileByName),
+  };
 }

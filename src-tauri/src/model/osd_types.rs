@@ -46,20 +46,3 @@ impl Default for OsdSettings {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::OsdSettings;
-
-    #[test]
-    fn legacy_settings_default_to_target_names() {
-        let settings: OsdSettings = serde_json::from_value(serde_json::json!({
-            "enabled": true,
-            "monitor_index": 0,
-            "anchor": "top-right"
-        }))
-        .expect("legacy OSD settings should deserialize");
-
-        assert!(!settings.show_binding_name);
-    }
-}

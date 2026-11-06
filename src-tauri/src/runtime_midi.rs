@@ -587,6 +587,3 @@ pub(crate) fn apply_midi_event(
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests;

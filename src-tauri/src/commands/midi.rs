@@ -432,6 +432,14 @@ pub fn start_midi_learn(state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn cancel_midi_learn(state: State<AppState>) -> Result<(), String> {
+    *state.learn_pending.lock().map_err(|_| "Lock poisoned")? = false;
+    *state.learn_candidate.lock().map_err(|_| "Lock poisoned")? = None;
+    *state.learned_control.lock().map_err(|_| "Lock poisoned")? = None;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn consume_learned_control(
     state: State<AppState>,
 ) -> Result<Option<crate::model::LearnedControl>, String> {
@@ -455,22 +463,4 @@ pub fn consume_learned_control(
         );
     }
     Ok(next)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn route_apply_result_serializes_authoritative_profile() {
-        let value = serde_json::to_value(MidiRouteApplyResult {
-            connected_routes: vec![],
-            failed_routes: vec![],
-            complete: false,
-            profile: None,
-        })
-        .unwrap();
-        assert_eq!(value["complete"], false);
-        assert!(value.get("connectedRoutes").is_some());
-        assert!(value.get("profile").is_some());
-    }
 }

@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 export const ROOT = new URL("../../", import.meta.url);
 export function git(args) {
@@ -17,6 +18,7 @@ export function sourceFiles(revision) {
   )
     .split(/\r?\n/)
     .filter(Boolean)
+    .filter((file) => revision || existsSync(new URL(file, ROOT)))
     .filter(
       (file) =>
         /\.(?:js|mjs|rs|css|html|ps1|json)$/.test(file) &&
@@ -28,7 +30,7 @@ const lines = (source) =>
 export function classify(file, source) {
   if (file.startsWith("scripts/fixtures/")) return "fixtures";
   if (
-    file.startsWith("scripts/test-") ||
+    file.startsWith("scripts/e2e/") ||
     file.includes("/tests/") ||
     /\/(?:tests|test_support|compatibility_tests)\.rs$/.test(file)
   )

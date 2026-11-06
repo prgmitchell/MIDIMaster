@@ -37,6 +37,9 @@ export function createSoundboardConfig({
       const draft = getConfigBinding();
       const current = normalizeSoundboardMapping(draft?.soundboard);
       if (draft && current) {
+        // Native analysis resolves relative, symlink and Windows extended paths.
+        // Keep the draft and its waveform keyed to the same resolved file.
+        current.path = analysis.path;
         const duration = Number(analysis.duration_ms) || 0;
         const next = clampSoundboardTrim(
           current.trim_start_ms,

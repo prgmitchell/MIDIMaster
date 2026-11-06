@@ -11,6 +11,8 @@ Thumbs.db
 
 # Node
 node_modules/
+test-results/
+audit-*.json
 
 # Local performance audit data (may contain machine/process metadata)
 perf-results/

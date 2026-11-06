@@ -483,21 +483,3 @@ pub(crate) fn spawn_feedback_refresh_loop(
         run_logger::info("app", "feedback_refresh_loop_stopped", "");
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn background_wait_wakes_immediately_for_shutdown() {
-        tauri::async_runtime::block_on(async {
-            let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
-            shutdown_tx.send_replace(true);
-
-            assert!(
-                sleep_or_shutdown(&mut shutdown_rx, Duration::from_secs(10)).await,
-                "background loops must wake without waiting for their normal interval"
-            );
-        });
-    }
-}

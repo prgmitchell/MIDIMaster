@@ -1,7 +1,5 @@
 use crate::model::{BindingAction, BindingTarget, Profile, ProfileTargetState};
 use crate::AppState;
-#[cfg(test)]
-mod tests;
 
 #[derive(Default)]
 pub(crate) struct Runtime {

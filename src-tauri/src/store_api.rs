@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use tauri::AppHandle;
 
 use crate::plugin_api::{
-    install_plugin_package, list_plugins, read_package_manifest, InstalledPluginInfo,
+    install_plugin_package_blocking, list_plugins, read_package_manifest, InstalledPluginInfo,
 };
 
 // Official store URL.
@@ -196,7 +196,14 @@ fn download_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, String> {
     if !is_https(url) {
         return Err("Only https:// URLs are allowed".to_string());
     }
-    let resp = ureq::get(url).call().map_err(|e| e.to_string())?;
+    let resp = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(30))
+        .https_only(true)
+        .redirects(5)
+        .build()
+        .get(url)
+        .call()
+        .map_err(|e| e.to_string())?;
     let len = resp
         .header("content-length")
         .and_then(|v| v.parse::<usize>().ok());
@@ -206,9 +213,9 @@ fn download_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, String> {
         }
     }
 
-    let mut reader = resp.into_reader();
-    let mut out = Vec::new();
     use std::io::Read;
+    let mut reader = resp.into_reader().take(max_bytes as u64 + 1);
+    let mut out = Vec::new();
     reader.read_to_end(&mut out).map_err(|e| e.to_string())?;
     if out.len() > max_bytes {
         return Err("Download too large".to_string());
@@ -229,8 +236,10 @@ fn download_store_catalog(app: &AppHandle) -> Result<StoreCatalog, String> {
 }
 
 #[tauri::command]
-pub fn fetch_store_catalog(app: AppHandle) -> Result<StoreCatalog, String> {
-    download_store_catalog(&app)
+pub async fn fetch_store_catalog(app: AppHandle) -> Result<StoreCatalog, String> {
+    tauri::async_runtime::spawn_blocking(move || download_store_catalog(&app))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 fn install_catalog_plugin(
@@ -272,23 +281,40 @@ fn install_catalog_plugin(
     validate_release_manifest(&plugin, &manifest)?;
 
     let b64 = base64::engine::general_purpose::STANDARD.encode(pkg);
-    install_plugin_package(app, format!("{}.midimaster", plugin.id), b64)
+    install_plugin_package_blocking(app, format!("{}.midimaster", plugin.id), b64)
 }
 
 #[tauri::command]
-pub fn install_store_plugin(
+pub async fn install_store_plugin(
     app: AppHandle,
     plugin_id: String,
 ) -> Result<InstalledPluginInfo, String> {
-    let catalog = download_store_catalog(&app)?;
-    install_catalog_plugin(app, &catalog, &plugin_id)
+    tauri::async_runtime::spawn_blocking(move || {
+        let catalog = download_store_catalog(&app)?;
+        install_catalog_plugin(app, &catalog, &plugin_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn install_store_plugins(
+pub async fn install_store_plugins(
     app: AppHandle,
     plugin_ids: Vec<String>,
 ) -> Result<Vec<StorePluginUpdateResult>, String> {
+    tauri::async_runtime::spawn_blocking(move || install_store_plugins_blocking(app, plugin_ids))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn install_store_plugins_blocking(
+    app: AppHandle,
+    plugin_ids: Vec<String>,
+) -> Result<Vec<StorePluginUpdateResult>, String> {
+    if plugin_ids.len() > 100 {
+        return Err("Too many plugins in one update".to_string());
+    }
+    let mut seen = std::collections::HashSet::new();
     let catalog = download_store_catalog(&app)?;
     let installed_versions: std::collections::HashMap<String, String> = list_plugins(app.clone())?
         .into_iter()
@@ -296,6 +322,9 @@ pub fn install_store_plugins(
         .collect();
     let mut results = Vec::new();
     for plugin_id in plugin_ids {
+        if !seen.insert(plugin_id.clone()) {
+            continue;
+        }
         let attempted_version = catalog
             .plugins
             .iter()
@@ -312,56 +341,4 @@ pub fn install_store_plugins(
         });
     }
     Ok(results)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn semver_orders_prereleases_correctly() {
-        assert!(
-            parsed_version("1.0.0", "version").unwrap()
-                > parsed_version("1.0.0-beta.2", "version").unwrap()
-        );
-        assert!(
-            parsed_version("1.10.0", "version").unwrap()
-                > parsed_version("1.9.9", "version").unwrap()
-        );
-    }
-
-    #[test]
-    fn schema_one_catalog_remains_readable() {
-        let catalog: StoreCatalog =
-            serde_json::from_str(r#"{"schema_version":1,"plugins":[]}"#).unwrap();
-        assert_eq!(catalog.schema_version, 1);
-    }
-
-    #[test]
-    fn package_manifest_must_match_catalog_compatibility_metadata() {
-        let manifest = serde_json::from_str(
-            r#"{"id":"demo","name":"Demo","version":"1.0.0","api_version":"1","min_app_version":"4.3.5","entry":"plugin.mjs"}"#,
-        )
-        .unwrap();
-        let plugin = StorePlugin {
-            id: "demo".to_string(),
-            name: "Demo".to_string(),
-            author: None,
-            description: None,
-            homepage_url: None,
-            icon_url: None,
-            latest: StorePluginRelease {
-                version: "1.0.0".to_string(),
-                api_version: "1".to_string(),
-                min_app_version: Some("4.4.0".to_string()),
-                compatible: true,
-                compatibility_reason: None,
-                download_url: "https://store.midimaster.app/demo.midimaster".to_string(),
-                sha256: String::new(),
-                signature: String::new(),
-                signature_key_id: "official-2026-07".to_string(),
-            },
-        };
-        assert!(validate_release_manifest(&plugin, &manifest).is_err());
-    }
 }

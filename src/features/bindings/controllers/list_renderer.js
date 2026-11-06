@@ -85,7 +85,7 @@ export function createListRenderer({
     }
   }
 
-  function renderBindings() {
+  function renderBindings(options = null) {
     if (isBindingDragActive()) {
       listState.pendingRerender = true;
       return;
@@ -149,7 +149,7 @@ export function createListRenderer({
         renderedCount += 1;
         const renderKey = bindingRenderKey(binding, index);
         const previous = previousRendered.get(bindingId);
-        if (previous?.item?.__bindingRenderKey === renderKey) {
+        if (previous?.item?.__bindingRenderKey === renderKey && options?.forceBindingId !== bindingId) {
           if (previous.item.dataset.index !== String(index)) previous.item.dataset.index = String(index);
           if (previous.item.dataset.visibleIndex !== String(visibleIndex)) {
             previous.item.dataset.visibleIndex = String(visibleIndex);

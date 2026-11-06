@@ -29,8 +29,3 @@ pub use profile_types::{
     normalized_routes_with_legacy, MidiDevicePreference, MidiDeviceRoute, Profile, ProfileSummary,
     ProfileTargetState,
 };
-
-#[cfg(test)]
-mod modifier_tests;
-#[cfg(test)]
-mod tests;

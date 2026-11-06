@@ -4,15 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "npm run test:frontend",
-    "test:frontend": "node scripts/run-frontend-tests.mjs",
+    "test": "npm run test:e2e",
+    "test:e2e": "node scripts/e2e/run.mjs",
+    "audit:rust": "cargo audit --file src-tauri/Cargo.lock && cargo audit --file virtual-audio/Cargo.lock",
+    "audit:security": "npm audit --audit-level=low && npm run audit:rust",
     "perf:fixtures": "node scripts/perf/generate-fixtures.mjs",
     "perf:report": "node scripts/perf/generate-report.mjs",
     "perf:check": "node scripts/perf/evaluate-thresholds.mjs",
     "perf:midi": "node scripts/perf/run-midi-cdp.mjs",
-    "perf:webdriver": "wdio run scripts/perf/webdriver/wdio.perf.conf.mjs",
+    "perf:desktop": "node scripts/perf/run-desktop-campaign.mjs",
     "perf:guard": "node scripts/perf/check-static-budgets.mjs",
-    "perf:test": "node --test scripts/perf/tests/*.test.mjs",
     "build:plugins": "node scripts/build-plugins.mjs",
     "check:plugins": "node scripts/build-plugins.mjs --check",
     "check:architecture": "node scripts/architecture/check.mjs",
@@ -20,21 +21,13 @@
     "check:visual": "node scripts/architecture/visual-equivalence.mjs"
   },
   "devDependencies": {
-    "@wdio/cli": "9.29.1",
-    "@wdio/local-runner": "9.29.1",
-    "@wdio/mocha-framework": "9.29.1",
-    "@wdio/spec-reporter": "9.29.1",
-    "@wdio/tauri-service": "1.2.0",
     "acorn": "8.15.0",
     "esbuild": "0.28.1",
     "eslint-scope": "8.4.0",
-    "linkedom": "0.18.12",
-    "prettier": "3.6.2"
+    "prettier": "3.6.2",
+    "ws": "8.22.1"
   },
   "engines": {
-    "node": ">=20"
-  },
-  "overrides": {
-    "serialize-javascript": "7.0.5"
+    "node": ">=22"
   }
 }

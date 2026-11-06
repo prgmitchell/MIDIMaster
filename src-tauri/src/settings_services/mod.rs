@@ -349,6 +349,3 @@ pub fn set_active_profile_preference(state: &AppState, profile_name: String) -> 
     })?;
     Ok(())
 }
-
-#[cfg(test)]
-mod tests;

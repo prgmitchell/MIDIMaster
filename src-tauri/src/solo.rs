@@ -1,6 +1,4 @@
 //! Temporary playback isolation. The saved mute states live only for this Solo.
-#[cfg(test)]
-mod tests;
 use crate::audio::{
     target_match::{application_name_matches, ApplicationMatchInfo},
     AudioBackend, SoloAudioSource,

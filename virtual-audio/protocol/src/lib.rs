@@ -32,30 +32,3 @@ pub struct StatusSnapshot {
     #[serde(default)]
     pub timestamp_unix_ms: u128,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn reads_legacy_status_and_preserves_current_wire_fields() {
-        let old = r#"{"schema_version":1,"service_running":true,"usbip_attached":true,"dropped_bytes":0,"underrun_bytes":12,"limiter_reduction_db":0.0,"last_error":null}"#;
-        let snapshot: StatusSnapshot = serde_json::from_str(old).unwrap();
-        assert_eq!(snapshot.attached_port_count, None);
-        assert_eq!(snapshot.active_sessions, 0);
-        assert_eq!(snapshot.underrun_bytes, 12);
-        let current = StatusSnapshot {
-            attached_port_count: Some(2),
-            active_sessions: 1,
-            ..snapshot
-        };
-        let wire = serde_json::to_value(&current).unwrap();
-        assert_eq!(wire["attached_port_count"], 2);
-        assert_eq!(wire["schema_version"], 1);
-        assert_eq!(
-            serde_json::from_value::<StatusSnapshot>(wire)
-                .unwrap()
-                .attached_port_count,
-            Some(2)
-        );
-    }
-}

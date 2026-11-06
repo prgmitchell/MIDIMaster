@@ -33,7 +33,7 @@ export function createProfilesFeature({
   onProfileLoaded,
   showAlert,
   showChoices,
-  setMidiReconciliationBusy,
+  setInteractionBusy = () => {},
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createProfilesFeature: invoke is required");
@@ -205,7 +205,7 @@ export function createProfilesFeature({
     saveState,
     setBindings,
     renderBindings,
-    setMidiReconciliationBusy,
+    setMidiReconciliationBusy: (busy) => setInteractionBusy("midi", busy),
     setActiveProfileMidiPreference,
     setActiveProfileName,
     setProfilePluginSettings,
@@ -213,6 +213,7 @@ export function createProfilesFeature({
   });
 
   const { loadProfileByName, deleteProfileByName, createProfileByName } = createProfileLoading({
+    setProfileLoadingBusy: (busy) => setInteractionBusy("profile", busy),
     applyOsdSettings,
     bindingFallbackName,
     buildPersistedOsdSettings: (...args) => buildPersistedOsdSettings(...args),

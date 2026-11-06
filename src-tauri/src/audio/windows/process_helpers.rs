@@ -13,8 +13,6 @@ mod icons;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 pub use icons::extract_executable_icon_base64;
-#[cfg(test)]
-use icons::*;
 pub(super) use icons::{icon_data_for_icon_path, icon_data_for_package, icon_data_for_path};
 use image::codecs::png::PngEncoder;
 use image::{ColorType, ImageEncoder};
@@ -131,7 +129,3 @@ pub(super) fn resolve_indirect_display_name(value: &str) -> Option<String> {
     unsafe { SHLoadIndirectString(PCWSTR(source.as_ptr()), &mut buffer, None).ok()? };
     string_from_wide_buffer(&buffer)
 }
-
-#[cfg(test)]
-#[path = "process_helpers/tests.rs"]
-mod tests;

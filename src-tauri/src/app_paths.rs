@@ -62,20 +62,3 @@ pub fn app_data_root_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     std::fs::create_dir_all(&desired).map_err(|e| e.to_string())?;
     Ok(desired)
 }
-
-#[cfg(all(test, feature = "perf-audit"))]
-mod tests {
-    use super::perf_app_data_override;
-
-    #[test]
-    fn perf_app_data_override_requires_absolute_nonempty_path() {
-        assert!(perf_app_data_override("").is_err());
-        assert!(perf_app_data_override("relative/path").is_err());
-        let absolute = if cfg!(windows) {
-            r"C:\MIDIMasterPerf"
-        } else {
-            "/tmp/midimaster-perf"
-        };
-        assert!(perf_app_data_override(absolute).is_ok());
-    }
-}

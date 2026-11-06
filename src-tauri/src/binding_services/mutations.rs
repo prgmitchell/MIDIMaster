@@ -56,6 +56,15 @@ pub(crate) fn add_binding_to_active_profile(
                     || existing.additional_outputs != binding.additional_outputs)
         });
         let mut removed_bindings = Vec::new();
+        // Preserve the edited row's position after removing mapping conflicts.
+        let insertion_index = profile
+            .bindings
+            .iter()
+            .take_while(|existing| existing.id != binding.id)
+            .filter(|existing| {
+                existing.device_id != binding.device_id || existing.control != binding.control
+            })
+            .count();
         profile.bindings.retain(|existing| {
             let remove = existing.id == binding.id
                 || (existing.device_id == binding.device_id && existing.control == binding.control);
@@ -65,7 +74,7 @@ pub(crate) fn add_binding_to_active_profile(
             !remove
         });
         let replacement = binding.clone();
-        profile.bindings.push(binding);
+        profile.bindings.insert(insertion_index, binding);
         let active_outputs = active_feedback_outputs(&profile.bindings);
         let stale_feedback_bindings: Vec<_> =
             stale_feedback_bindings_for_removed_outputs(&removed_bindings, &active_outputs)

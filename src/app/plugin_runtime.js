@@ -143,7 +143,7 @@ export function createPluginRuntime({
       try {
         const connectionsPanel = getConnectionsPanel();
         if (connectionsPanel && !connectionsPanel.classList.contains("hidden")) {
-          mountConnectionsTabs({ force: true });
+          await mountConnectionsTabs({ force: true });
         }
       } catch {}
     } finally {

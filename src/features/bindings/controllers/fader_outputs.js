@@ -407,6 +407,8 @@ export function createFaderOutputs({
 
   function update(event) {
     if (locked()) return;
+    // Allow an unfinished numeric edit; normalize it when the field is committed.
+    if (event.type === "input" && (event.target.value === "" || !event.target.validity?.valid)) return;
     const row = event.target.closest("[data-output-id]");
     const binding = getConfigBinding(),
       output = outputForField(binding, outputField(row?.dataset.outputId));

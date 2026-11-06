@@ -42,11 +42,11 @@ pub fn update_fader_curve_presets(
 pub fn export_appearance_theme(theme: AppearanceTheme) -> Result<Option<String>, String> {
     let theme = normalize_appearance_theme(theme)?;
     let file_name = format!("{}.json", safe_file_stem(&theme.name));
-    let Some(path) = rfd::FileDialog::new()
-        .add_filter("JSON", &["json"])
-        .set_file_name(&file_name)
-        .save_file()
-    else {
+    let Some(path) = crate::file_dialog::save(
+        rfd::FileDialog::new()
+            .add_filter("JSON", &["json"])
+            .set_file_name(&file_name),
+    ) else {
         return Ok(None);
     };
 
@@ -61,14 +61,12 @@ pub fn export_appearance_theme(theme: AppearanceTheme) -> Result<Option<String>,
 }
 
 pub fn import_appearance_theme(state: &AppState) -> Result<Option<AppAppearanceSettings>, String> {
-    let Some(path) = rfd::FileDialog::new()
-        .add_filter("JSON", &["json"])
-        .pick_file()
+    let Some(path) = crate::file_dialog::pick(rfd::FileDialog::new().add_filter("JSON", &["json"]))
     else {
         return Ok(None);
     };
 
-    let data = fs::read_to_string(&path).map_err(|err| err.to_string())?;
+    let data = crate::file_dialog::read_text(&path, 256 * 1024)?;
     let payload: AppearanceThemeFile =
         serde_json::from_str(&data).map_err(|err| err.to_string())?;
     if payload.kind != APPEARANCE_THEME_FILE_KIND || payload.version != 1 {

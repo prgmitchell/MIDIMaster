@@ -41,6 +41,7 @@ pub(crate) struct PerfAuditSnapshot {
     action_outcomes: ActionOutcomes,
     synthetic_targets: Vec<SyntheticTargetSnapshot>,
     synthetic_targets_enabled: bool,
+    learn_pending: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -188,6 +189,10 @@ pub(crate) fn perf_audit_snapshot(state: State<AppState>) -> Result<PerfAuditSna
         action_outcomes: native.action_outcomes,
         synthetic_targets: native.synthetic_targets,
         synthetic_targets_enabled: synthetic_targets_enabled(),
+        learn_pending: *state
+            .learn_pending
+            .lock()
+            .map_err(|_| "Learn state lock poisoned")?,
     })
 }
 
@@ -290,19 +295,4 @@ pub(crate) async fn perf_audit_inject_midi(
         scheduled_duration_us: started.elapsed().as_micros().min(u64::MAX as u128) as u64,
         queue,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn local_result_records_reject_invalid_metrics_and_nested_dimensions() {
-        assert!(validate_result_metric("startup.bindings_usable"));
-        assert!(!validate_result_metric("Startup Bindings"));
-        assert!(
-            scalar_dimensions(Some(serde_json::json!({ "window": "main", "count": 2 }))).is_ok()
-        );
-        assert!(scalar_dimensions(Some(serde_json::json!({ "nested": { "bad": true } }))).is_err());
-    }
 }

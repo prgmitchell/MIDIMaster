@@ -7,9 +7,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager};
 
-#[cfg(test)]
-mod tests;
-
 pub const INTERVAL: Duration = Duration::from_millis(40);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

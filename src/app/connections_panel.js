@@ -278,15 +278,20 @@ export function createConnectionsPanelController({
 
   async function reloadPlugins() {
     const nextActiveTab = getCurrentActiveTab();
+    d.connectionsPanel.inert = true;
+    d.connectionsPanel.setAttribute("aria-busy", "true");
     try {
       const pluginHost = getPluginHost();
       if (pluginHost) {
         await pluginHost.stop().catch(() => { });
       }
-    } catch { }
-    setPluginHost(null);
-    await startPluginHostIfNeeded().catch(() => { });
-    await mountConnectionsTabs({ force: true, activeTabId: nextActiveTab });
+      setPluginHost(null);
+      await startPluginHostIfNeeded();
+      await mountConnectionsTabs({ force: true, activeTabId: nextActiveTab });
+    } finally {
+      d.connectionsPanel.inert = false;
+      d.connectionsPanel.removeAttribute("aria-busy");
+    }
   }
 
   async function openConnectionsPanel() {
@@ -303,10 +308,15 @@ export function createConnectionsPanelController({
     await Promise.all(preloadTasks);
 
     d.connectionsPanel.classList.remove("hidden");
-    await mountConnectionsTabs({ activeTabId });
-    startPluginHostIfNeeded()
-      .then(() => mountConnectionsTabs({ force: true, activeTabId }))
-      .catch(() => { });
+    d.connectionsPanel.inert = true;
+    d.connectionsPanel.setAttribute("aria-busy", "true");
+    try {
+      await startPluginHostIfNeeded();
+      await mountConnectionsTabs({ activeTabId });
+    } finally {
+      d.connectionsPanel.inert = false;
+      d.connectionsPanel.removeAttribute("aria-busy");
+    }
   }
 
   function bindUi() {

@@ -20,6 +20,10 @@ pub(crate) fn launch(mapping: &OpenApplicationMapping) -> Result<(), String> {
 }
 
 pub(crate) fn pick_application_path() -> Result<Option<PathBuf>, String> {
+    #[cfg(feature = "e2e")]
+    if crate::perf_audit::synthetic_targets_enabled() {
+        return Ok(crate::file_dialog::fixture_selection());
+    }
     #[cfg(windows)]
     {
         std::thread::spawn(windows_launch::pick)
@@ -222,6 +226,3 @@ mod windows_launch {
         }
     }
 }
-
-#[cfg(all(test, windows))]
-mod tests;

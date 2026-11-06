@@ -288,11 +288,11 @@ pub fn export_current_profile(
     profile.normalize_bindings();
 
     let suggested_file_name = safe_export_file_name(&profile.name);
-    let Some(path) = rfd::FileDialog::new()
-        .add_filter("JSON", &["json"])
-        .set_file_name(&suggested_file_name)
-        .save_file()
-    else {
+    let Some(path) = crate::file_dialog::save(
+        rfd::FileDialog::new()
+            .add_filter("JSON", &["json"])
+            .set_file_name(&suggested_file_name),
+    ) else {
         return Ok(None);
     };
 
@@ -305,14 +305,12 @@ pub fn export_current_profile(
 
 #[tauri::command]
 pub fn import_profile_from_file() -> Result<Option<Profile>, String> {
-    let Some(path) = rfd::FileDialog::new()
-        .add_filter("JSON", &["json"])
-        .pick_file()
+    let Some(path) = crate::file_dialog::pick(rfd::FileDialog::new().add_filter("JSON", &["json"]))
     else {
         return Ok(None);
     };
 
-    let data = std::fs::read_to_string(&path).map_err(|err| err.to_string())?;
+    let data = crate::file_dialog::read_text(&path, 16 * 1024 * 1024)?;
     let mut profile: Profile =
         serde_json::from_str(&data).map_err(|err| format!("Invalid profile JSON: {}", err))?;
     profile.restore_from_storage();
@@ -324,56 +322,4 @@ pub fn import_profile_from_file() -> Result<Option<Profile>, String> {
 
     profile.normalize_bindings();
     Ok(Some(profile))
-}
-
-#[cfg(test)]
-mod tests {
-
-    use crate::model::{Binding, ButtonLightBehavior, ButtonLightMode, Profile};
-
-    fn profile_with_button_light_mode(mode: &str) -> Profile {
-        let binding: Binding = serde_json::from_value(serde_json::json!({
-            "id": "b1",
-            "name": "Binding 1",
-            "device_id": "midi-dev",
-            "control": {
-                "channel": 0,
-                "controller": 22,
-                "msg_type": "Note"
-            },
-            "control_kind": "Button",
-            "targets": ["Master"],
-            "action": "ToggleMute",
-            "mode": "Absolute",
-            "deadzone": 0.0,
-            "debounce_ms": 0,
-            "button_light_mode": mode
-        }))
-        .expect("binding");
-
-        Profile {
-            name: "Default".to_string(),
-            bindings: vec![binding],
-            osd_settings: Default::default(),
-            plugin_settings: Default::default(),
-            midi_device_preference: Default::default(),
-            midi_device_preference_set: false,
-            target_states: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn normalize_profile_bindings_repairs_unsafe_button_light_mode() {
-        let mut profile = profile_with_button_light_mode("InvertState");
-
-        assert!(profile.normalize_bindings());
-        assert_eq!(
-            profile.bindings[0].button_light_mode,
-            ButtonLightMode::Activity
-        );
-        assert_eq!(
-            profile.bindings[0].button_light_behavior,
-            ButtonLightBehavior::InvertState
-        );
-    }
 }

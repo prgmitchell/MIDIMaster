@@ -12,7 +12,10 @@ default = []
 custom-protocol = ["tauri/custom-protocol"]
 # Enables local-only benchmark hooks and isolated app-data overrides. Release
 # bundles are built without this feature.
-perf-audit = []
+perf-audit = ["tauri/devtools"]
+# Replaces only native file chooser input with a one-shot fixture selection.
+# Never enable this feature in distributable builds.
+e2e = ["perf-audit"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -20,7 +23,7 @@ serde_json = "1"
 
 [dependencies]
 midimaster-virtual-audio-protocol = { path = "../virtual-audio/protocol" }
-tauri = { version = "2", features = ["tray-icon", "devtools"] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2.0.0"
 tauri-plugin-single-instance = "2"
@@ -40,6 +43,7 @@ windows = { version = "0.61", features = [
   "Win32_Media_Audio_Endpoints",
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Threading",
   "Win32_System_Registry",
@@ -54,10 +58,10 @@ windows = { version = "0.61", features = [
   "Win32_UI_Input_KeyboardAndMouse"
 ] }
 windows-core = "0.61"
-tokio-tungstenite = "0.21"
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
 futures-util = "0.3"
 url = "2.5"
-zip = { version = "2.2", default-features = false, features = ["deflate"] }
+zip = { version = "9.3", default-features = false, features = ["deflate"] }
 sha2 = "0.10"
 hex = "0.4"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }

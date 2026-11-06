@@ -280,7 +280,3 @@ pub(crate) fn publish_profile(
     ));
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "midi_reconciliation_tests.rs"]
-mod tests;

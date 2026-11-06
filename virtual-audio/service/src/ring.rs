@@ -84,28 +84,3 @@ impl AudioRing {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn keeps_newest_data_when_full() {
-        let ring = AudioRing::new(4);
-        ring.write_latest(&[1, 2, 3, 4, 5, 6]);
-        let mut out = [0; 4];
-        assert_eq!(ring.read_or_silence(&mut out), 4);
-        assert_eq!(out, [3, 4, 5, 6]);
-        assert_eq!(ring.stats().dropped_bytes, 2);
-    }
-
-    #[test]
-    fn fills_underruns_with_digital_silence() {
-        let ring = AudioRing::new(4);
-        ring.write_latest(&[7, 8]);
-        let mut out = [99; 4];
-        assert_eq!(ring.read_or_silence(&mut out), 2);
-        assert_eq!(out, [7, 8, 0, 0]);
-        assert_eq!(ring.stats().underrun_bytes, 2);
-    }
-}

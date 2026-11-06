@@ -475,6 +475,7 @@ export function createBindingsFeature({
     normalizeAuxControl,
     getConfigBinding,
   } = createMidiLearn({
+    invoke,
     elements,
     editorState,
     hideLearnPanel,

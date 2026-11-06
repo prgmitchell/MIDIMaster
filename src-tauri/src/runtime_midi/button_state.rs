@@ -38,31 +38,6 @@ pub(super) fn activity_button_light_generation_is_current(
     generations.get(key).copied() == Some(generation)
 }
 
-#[cfg(test)]
-pub(super) fn activity_button_light_hold_should_continue(
-    generations: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, u64>>>,
-    binding_state: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, BindingState>>>,
-    key: &BindingKey,
-    generation: u64,
-) -> bool {
-    let generation_current = generations
-        .lock()
-        .ok()
-        .map(|generations| {
-            activity_button_light_generation_is_current(&generations, key, generation)
-        })
-        .unwrap_or(false);
-    if !generation_current {
-        return false;
-    }
-
-    binding_state
-        .lock()
-        .ok()
-        .and_then(|states| states.get(key).map(|state| state.last_value > 0.0))
-        .unwrap_or(false)
-}
-
 pub(super) fn send_activity_button_light_hold_feedback(
     feedback_values: &std::sync::Arc<std::sync::Mutex<HashMap<BindingKey, f32>>>,
     midi: &std::sync::Arc<std::sync::Mutex<crate::midi::MidiManager>>,

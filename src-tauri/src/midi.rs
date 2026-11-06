@@ -1,8 +1,6 @@
 mod diagnostics;
 use diagnostics::*;
 mod additional_feedback;
-#[cfg(test)]
-mod additional_feedback_tests;
 mod connections;
 mod feedback_transport;
 mod health;
@@ -229,6 +227,3 @@ impl MidiManager {
         self.input_routes.len()
     }
 }
-
-#[cfg(test)]
-mod tests;

@@ -107,9 +107,9 @@ pub fn pick_executable_path() -> Result<Option<PickExecutableResult>, String> {
 pub fn pick_autohotkey_script_path() -> Result<Option<PickAutoHotkeyScriptResult>, String> {
     #[cfg(target_os = "windows")]
     {
-        let picked = rfd::FileDialog::new()
-            .add_filter("AutoHotkey Scripts", &["ahk"])
-            .pick_file();
+        let picked = crate::file_dialog::pick(
+            rfd::FileDialog::new().add_filter("AutoHotkey Scripts", &["ahk"]),
+        );
         let Some(path) = picked else {
             return Ok(None);
         };

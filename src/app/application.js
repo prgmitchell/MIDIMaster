@@ -634,7 +634,7 @@ export function createApplication() {
     setActiveProfileMidiPreference: (next) => {
       profileState.midiPreference = normalizeMidiPreference(next);
     },
-    setMidiReconciliationBusy: (busy) => { appShell.inert = busy; },
+    setInteractionBusy: appShellRuntime.setInteractionBusy,
     onProfileLoaded: async ({ midiDevicePreference, midiDevicePreferenceSet }) => {
       const finish = performanceAudit.begin("profile-midi-sync");
       profileState.midiPreference = normalizeMidiPreference({

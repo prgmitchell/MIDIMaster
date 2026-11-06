@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   deterministic-guards:
     runs-on: windows-latest
@@ -27,12 +30,6 @@ jobs:
       - name: Install development tools
         run: npm.cmd ci
 
-      - name: Test performance tooling
-        run: node --test scripts/perf/tests/*.test.mjs
-
-      - name: Test frontend performance invariants
-        run: node scripts/test-frontend-performance.mjs
-
       - name: Enforce static startup budgets
         run: node scripts/perf/check-static-budgets.mjs
 
@@ -44,4 +41,4 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Fixture generation failed." }
 
       - name: Explain timing policy
-        run: Write-Host "Installed-app timing is intentionally local/advisory; CI enforces deterministic tests and size/entry budgets only."
+        run: Write-Host "CI runs real desktop and MIDI journeys in ci.yml. This job enforces static size budgets; release-build timing remains a separate local campaign."

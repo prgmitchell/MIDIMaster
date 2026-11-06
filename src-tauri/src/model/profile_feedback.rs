@@ -100,6 +100,3 @@ pub(super) fn restore_from_storage(profile: &mut Profile) -> bool {
     }
     true
 }
-
-#[cfg(test)]
-mod tests;

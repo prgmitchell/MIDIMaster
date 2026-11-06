@@ -8,10 +8,10 @@ use tauri::State;
 pub async fn pick_soundboard_audio(
     state: State<'_, AppState>,
 ) -> Result<Option<SoundboardAnalysis>, String> {
-    let Some(path) = rfd::FileDialog::new()
-        .add_filter("Audio", &["mp3", "wav", "flac", "ogg", "m4a", "mp4", "aac"])
-        .pick_file()
-    else {
+    let Some(path) = crate::file_dialog::pick(
+        rfd::FileDialog::new()
+            .add_filter("Audio", &["mp3", "wav", "flac", "ogg", "m4a", "mp4", "aac"]),
+    ) else {
         return Ok(None);
     };
     analyze_path(state, path).await.map(Some)

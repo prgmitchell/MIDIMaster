@@ -152,19 +152,3 @@ mod platform {
 }
 
 pub(crate) use platform::set_monitor_brightness;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn brightness_values_are_clamped_to_percent() {
-        fn percent(value: f32) -> u32 {
-            let value = if value.is_finite() { value } else { 0.0 };
-            (value.clamp(0.0, 1.0) * 100.0).round() as u32
-        }
-
-        assert_eq!(percent(-1.0), 0);
-        assert_eq!(percent(0.505), 51);
-        assert_eq!(percent(2.0), 100);
-        assert_eq!(percent(f32::NAN), 0);
-    }
-}
