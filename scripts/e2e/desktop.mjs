@@ -148,6 +148,23 @@ export class Desktop {
       ),
     );
     await this.session.send("Runtime.enable");
+    const { width, height } = JSON.parse(
+      await readFile("src-tauri/tauri.e2e.conf.json", "utf8"),
+    ).app.windows[0];
+    // Hosted Windows desktops can clamp native windows below the app's minimum
+    // size. Keep the real WebView's test viewport consistent with its config.
+    await this.session.send("Emulation.setDeviceMetricsOverride", {
+      width,
+      height,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await this.json(
+      "viewport.json",
+      await this.eval(
+        "({ width: innerWidth, height: innerHeight, scale: devicePixelRatio })",
+      ),
+    );
     await eventually(
       () =>
         this.eval(

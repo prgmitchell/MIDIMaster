@@ -46,6 +46,7 @@ jobs:
             src-tauri -> target
             virtual-audio -> target
           shared-key: windows-rust-v1
+          cache-on-failure: true
 
       - name: Validate locale catalogs
         run: node scripts/i18n/validate-locales.mjs
