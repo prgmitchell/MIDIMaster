@@ -25,7 +25,6 @@ export function createEvents({
   applyAppearanceUpdate,
   applyOsdSettings,
   applyTranslations,
-  bindUpdaterEvents,
   checkForUpdates,
   clampNumber,
   closeAppearanceColorPicker,
@@ -80,7 +79,6 @@ export function createEvents({
   function bindUi() {
     if (uiBound) return;
     uiBound = true;
-    bindUpdaterEvents().catch(() => {});
     virtualAudio.bindUi();
     populateLanguageSelect();
     if (elements.settingsPanel) {

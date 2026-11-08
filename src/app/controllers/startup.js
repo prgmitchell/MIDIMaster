@@ -228,6 +228,9 @@ export function createStartup({
       scheduleRetry(() => init(), 200);
       return;
     }
+    await features.settings.bindUpdaterEvents().catch((error) => {
+      diagnosticError("updater_listener_failed", error);
+    });
     diagnosticInfo("setup_listeners_start");
     await setupListeners().catch((error) => {
       diagnosticError("setup_listeners_failed", error);

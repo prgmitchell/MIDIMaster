@@ -85,11 +85,14 @@ export function createUpdaterController({ invoke, listen, dom, translate, getSet
   function formatError(error) {
     const message = String(error || translate("settings.updateCheckFailed"));
     const normalized = message.toLowerCase();
+    if (
+      /\b50[234]\b/.test(normalized) || normalized.includes("network") ||
+      normalized.includes("timeout") || normalized.includes("timed out")
+    ) {
+      return translate("settings.updateNetworkError");
+    }
     if (normalized.includes("valid release json") || normalized.includes("latest.json") || normalized.includes("404")) {
       return translate("settings.updateMetadataMissing");
-    }
-    if (normalized.includes("network") || normalized.includes("timeout")) {
-      return translate("settings.updateNetworkError");
     }
     return message;
   }
@@ -157,7 +160,7 @@ export function createUpdaterController({ invoke, listen, dom, translate, getSet
       state.available = false;
       state.body = "";
       console.error("Updater install failed:", error);
-      setStatus(String(error || translate("settings.updateInstallFailed")), "error");
+      setStatus(formatError(error || translate("settings.updateInstallFailed")), "error");
     } finally {
       state.downloading = false;
       render();
@@ -199,7 +202,10 @@ export function createUpdaterController({ invoke, listen, dom, translate, getSet
       if (payload.message) console.error("Updater event failure:", payload.message);
       setStatus(formatError(payload.message || translate("settings.updateInstallFailed")), "error");
     }
-    if (["available", "no_update", "installed"].includes(phase)) state.checking = false;
+    if (["available", "no_update", "installed"].includes(phase)) {
+      state.checking = false;
+      state.hasChecked = true;
+    }
     render();
   }
 

@@ -9,6 +9,7 @@ import { createVolumeEvents } from "./controllers/volume_events.js";
 import { createBindingCreation } from "./controllers/binding_creation.js";
 import { createBackendEvents } from "./controllers/backend_events.js";
 import { createStartup } from "./controllers/startup.js";
+import { createUpdateDialog } from "./controllers/update_dialog.js";
 
 import { mountFeatureTemplates } from "./feature_templates.js";
 import { createUiLifetime } from "./ui_lifetime.js";
@@ -307,6 +308,14 @@ export function createApplication() {
   });
 
   const { applySidebarCollapsed, scheduleSidebarNavIndicatorSync, switchAppPage } = appShellRuntime;
+  const showUpdateAvailableDialog = createUpdateDialog({
+    showChoices,
+    invoke,
+    getSettingsFeature: () => features.settings,
+    switchAppPage,
+    updateStatus: dom.settings.settingsUpdateStatus,
+    reportError: diagnosticError,
+  });
 
   applyAppearanceToDocument(loadStoredAppearance(), { matchMediaSource: window });
   applySidebarCollapsed(true);
@@ -845,49 +854,6 @@ export function createApplication() {
 
   const mountConnectionsTabs = (...args) => features.connections?.mountConnectionsTabs?.(...args);
   const openConnectionsPanel = (...args) => features.connections?.openConnectionsPanel?.(...args);
-
-  function showUpdateAvailableDialog(info = {}, { standaloneIfMainHidden = false } = {}) {
-    const latest = String(info.latestVersion || info.version || "").trim();
-    const current = String(info.currentVersion || info.current_version || "").trim();
-    if (!latest) return Promise.resolve("close");
-
-    const showInlineDialog = () =>
-      showChoices({
-        title: "Update Available",
-        message: `MIDIMaster ${latest} is available (current: ${current || "unknown"})`,
-        options: [
-          { id: "skip", label: "Skip Update", variant: "secondary" },
-          { id: "install", label: "Download and Install", variant: "primary" },
-        ],
-      }).then((choice) => {
-        if (choice === "skip") {
-          try {
-            localStorage.setItem("updaterSkippedVersion", latest);
-          } catch {
-            // ignore storage failures
-          }
-          return choice;
-        }
-        if (choice === "install") {
-          features.settings?.installAvailableUpdate?.();
-        }
-        return choice;
-      });
-
-    if (!standaloneIfMainHidden) {
-      return showInlineDialog();
-    }
-
-    return invoke("show_update_notification_window_if_main_hidden", {
-      currentVersion: current || null,
-      latestVersion: latest,
-    })
-      .then((shownStandalone) => (shownStandalone ? "standalone" : showInlineDialog()))
-      .catch((error) => {
-        diagnosticError("update_notification_window_failed", error);
-        return showInlineDialog();
-      });
-  }
 
   features.connections?.bindUi?.();
 

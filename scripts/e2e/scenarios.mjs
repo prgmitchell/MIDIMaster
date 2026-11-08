@@ -9,6 +9,7 @@ import { network } from "./network.mjs";
 import { virtualAudio } from "./virtual-audio.mjs";
 import { lifecycle } from "./lifecycle.mjs";
 import { stateTransitions } from "./state-transitions.mjs";
+import { updater } from "./updater.mjs";
 
 const row = (id) => `[data-binding-id='perf-binding-${id}']`;
 const configure = async (app, id) => {
@@ -192,4 +193,5 @@ export const scenarios = [
   ...stateTransitions,
   ...virtualAudio,
   ...lifecycle,
+  ...updater,
 ];
