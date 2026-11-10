@@ -127,18 +127,22 @@ export function createPersistence({
     saveState.resolve = null;
     saveState.reject = null;
 
+    // Reserve our position before yielding: several flushes can arrive while
+    // the same disk write is pending. Each must wait for its own predecessor.
+    const previous = saveState.running;
+    const running = (async () => {
+      if (previous) await previous.catch(() => {});
+      await persistCurrentProfile();
+    })();
+    saveState.running = running;
     try {
-      if (saveState.running) {
-        await saveState.running;
-      }
-      saveState.running = persistCurrentProfile();
-      await saveState.running;
+      await running;
       if (typeof resolve === "function") resolve();
     } catch (error) {
       if (typeof reject === "function") reject(error);
       throw error;
     } finally {
-      saveState.running = null;
+      if (saveState.running === running) saveState.running = null;
     }
   }
 

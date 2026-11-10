@@ -109,7 +109,7 @@ impl DurableJsonStore {
     where
         T: Clone + Default + DeserializeOwned + Serialize,
     {
-        let primary = read_candidate::<T>(&self.path);
+        let primary = read_candidate::<T>(&self.path)?;
         if let Candidate::Valid(value) = &primary {
             if let Err(error) = remove_file_if_exists(&self.temp_path()) {
                 run_logger::warn(
@@ -122,7 +122,7 @@ impl DurableJsonStore {
         }
 
         let backup_path = self.backup_path();
-        let backup = read_candidate::<T>(&backup_path);
+        let backup = read_candidate::<T>(&backup_path)?;
         if let Candidate::Valid(value) = &backup {
             let quarantined = self.quarantine_invalid_candidates([(&self.path, &primary)])?;
             self.write_primary_without_backup_locked(value)?;
@@ -131,7 +131,7 @@ impl DurableJsonStore {
         }
 
         let second_backup_path = self.second_backup_path();
-        let second_backup = read_candidate::<T>(&second_backup_path);
+        let second_backup = read_candidate::<T>(&second_backup_path)?;
         if let Candidate::Valid(value) = &second_backup {
             let quarantined = self
                 .quarantine_invalid_candidates([(&self.path, &primary), (&backup_path, &backup)])?;
@@ -162,11 +162,12 @@ impl DurableJsonStore {
         T: Clone + Default + DeserializeOwned + Serialize,
     {
         let data = serialize_and_validate(value)?;
+        let primary = read_candidate::<T>(&self.path)?;
         let temp_path = self.temp_path();
         write_durable_file(&temp_path, &data)?;
         validate_file::<T>(&temp_path)?;
 
-        match read_candidate::<T>(&self.path) {
+        match primary {
             Candidate::Valid(_) => self.prepare_backups_locked::<T>()?,
             Candidate::Invalid(error) => {
                 run_logger::warn(
@@ -206,10 +207,10 @@ impl DurableJsonStore {
         T: DeserializeOwned,
     {
         let backup_path = self.backup_path();
-        match read_candidate::<T>(&backup_path) {
+        match read_candidate::<T>(&backup_path)? {
             Candidate::Valid(_) => {
                 let second_backup_path = self.second_backup_path();
-                if let Candidate::Invalid(_) = read_candidate::<T>(&second_backup_path) {
+                if let Candidate::Invalid(_) = read_candidate::<T>(&second_backup_path)? {
                     let _ = self.quarantine_path(&second_backup_path)?;
                 }
                 atomic_move(&backup_path, &second_backup_path, true).with_context(|| {
@@ -339,31 +340,36 @@ fn validate_file<T>(path: &Path) -> Result<()>
 where
     T: DeserializeOwned,
 {
-    match read_candidate::<T>(path) {
+    match read_candidate::<T>(path)? {
         Candidate::Valid(_) => Ok(()),
         Candidate::Missing => Err(anyhow!("{} disappeared before validation", path.display())),
         Candidate::Invalid(error) => Err(anyhow!(error)),
     }
 }
 
-fn read_candidate<T>(path: &Path) -> Candidate<T>
+fn read_candidate<T>(path: &Path) -> Result<Candidate<T>>
 where
     T: DeserializeOwned,
 {
     let data = match fs::read(path) {
         Ok(data) => data,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Candidate::Missing,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Candidate::Missing),
         Err(error) => {
-            return Candidate::Invalid(format!("Failed reading {}: {}", path.display(), error))
+            // An I/O failure does not prove corruption. Preserve the original
+            // file and surface the error instead of restoring older data over it.
+            return Err(error).with_context(|| format!("Failed reading {}", path.display()));
         }
     };
     if data.is_empty() || data.iter().all(|byte| *byte == 0) {
-        return Candidate::Invalid(format!("{} is empty or all-NUL", path.display()));
+        return Ok(Candidate::Invalid(format!(
+            "{} is empty or all-NUL",
+            path.display()
+        )));
     }
-    match serde_json::from_slice(&data) {
+    Ok(match serde_json::from_slice(&data) {
         Ok(value) => Candidate::Valid(value),
         Err(error) => Candidate::Invalid(format!("Failed parsing {}: {}", path.display(), error)),
-    }
+    })
 }
 
 fn write_durable_file(path: &Path, data: &[u8]) -> Result<()> {

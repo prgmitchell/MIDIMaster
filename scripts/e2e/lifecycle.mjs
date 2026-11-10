@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile, readdir } from "node:fs/promises";
+import { readFile, writeFile, readdir, mkdir, rename, unlink, rmdir } from "node:fs/promises";
 import { join } from "node:path";
 import { eventually } from "./desktop.mjs";
 
@@ -178,6 +178,36 @@ export const lifecycle = [
         profile.bindings.length - 1,
       );
       assert.equal(await app.visible(`[data-binding-id='${id}']`), false);
+    },
+  ],
+  [
+    "unreadable profile storage reports an error without replacing data with a backup",
+    async (app) => {
+      const before = await app.invoke("list_profiles");
+      const profile = await app.invoke("get_active_profile");
+      const path = join(app.data, "profiles.json");
+      const preserved = join(app.root, "preserved-profiles.json");
+      const marker = join(path, "preserve.txt");
+      const original = await readFile(path);
+      await rename(path, preserved);
+      await mkdir(path);
+      await writeFile(marker, "original data");
+      const filesBefore = await readdir(app.data);
+      try {
+        await assert.rejects(app.invoke("list_profiles"), /Failed reading/);
+        await assert.rejects(app.invoke("save_profile", { profile }), /Failed reading/);
+        assert.equal(await readFile(marker, "utf8"), "original data");
+        assert.deepEqual(
+          (await readdir(app.data)).filter(name => name.includes(".corrupt-")),
+          filesBefore.filter(name => name.includes(".corrupt-")),
+        );
+      } finally {
+        await unlink(marker);
+        await rmdir(path);
+        await rename(preserved, path);
+      }
+      assert.deepEqual(await readFile(path), original);
+      assert.deepEqual(await app.invoke("list_profiles"), before);
     },
   ],
   [

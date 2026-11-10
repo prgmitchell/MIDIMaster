@@ -64,8 +64,8 @@ export function splitCsv(value, fallback = []) {
 
 export function parsePositiveIntegers(value, fallback) {
   return splitCsv(value, fallback.map(String)).map((item) => {
-    const parsed = Number.parseInt(item, 10);
-    if (!Number.isInteger(parsed) || parsed < 0) {
+    const parsed = Number(item);
+    if (!/^\d+$/.test(item) || !Number.isSafeInteger(parsed)) {
       throw new Error(`Expected a non-negative integer, got '${item}'`);
     }
     return parsed;

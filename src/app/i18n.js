@@ -8,6 +8,8 @@ let englishCatalog = {};
 let activeCatalog = {};
 let catalogsLoaded = false;
 let warnedCatalogFallback = false;
+let englishCatalogPromise = null;
+let localeRequest = 0;
 
 async function loadCatalog(locale) {
   const normalized = normalizeLocale(locale);
@@ -34,21 +36,22 @@ export function isSupportedLocale(locale) {
 }
 
 export async function initI18n(locale = "en") {
-  if (!catalogsLoaded) {
-    englishCatalog = await loadCatalog("en");
-    catalogsLoaded = true;
-  }
   await setLocale(locale);
 }
 
 export async function setLocale(locale = "en") {
+  const request = ++localeRequest;
   const normalized = normalizeLocale(locale);
-  currentLocale = normalized;
   if (!catalogsLoaded) {
-    englishCatalog = await loadCatalog("en");
+    englishCatalogPromise ??= loadCatalog("en").catch((error) => {
+      englishCatalogPromise = null;
+      throw error;
+    });
+    englishCatalog = await englishCatalogPromise;
     catalogsLoaded = true;
   }
-  activeCatalog = normalized === "en"
+  if (request !== localeRequest) return currentLocale;
+  const catalog = normalized === "en"
     ? englishCatalog
     : await loadCatalog(normalized).catch((error) => {
       if (!warnedCatalogFallback) {
@@ -57,6 +60,9 @@ export async function setLocale(locale = "en") {
       }
       return englishCatalog;
     });
+  if (request !== localeRequest) return currentLocale;
+  currentLocale = normalized;
+  activeCatalog = catalog;
   document.documentElement.lang = normalized;
   applyTranslations();
   window.dispatchEvent(new CustomEvent("midimaster:locale-changed", { detail: { locale: normalized } }));

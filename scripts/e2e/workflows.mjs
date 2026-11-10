@@ -118,6 +118,27 @@ export const workflows = [
     },
   ],
   [
+    "duplicate profile creation preserves saved bindings in the UI and native store",
+    async (app) => {
+      const before = await app.invoke("get_active_profile");
+      assert.ok(before.bindings.length > 0);
+      await assert.rejects(app.invoke("save_profile", {
+        profile: { ...before, bindings: [] },
+        activate: false,
+        createOnly: true,
+      }), /already exists/);
+      await app.click("#profile-toggle");
+      await app.fill("#profile-list .create input", before.name);
+      await app.click("#profile-list .create button");
+      await app.shown("#alert-overlay");
+      assert.equal(await app.query("#alert-title", "e.textContent"), "Profile Already Exists");
+      await app.click("#alert-close");
+      await app.hidden("#alert-overlay");
+      assert.deepEqual((await app.invoke("get_active_profile")).bindings, before.bindings);
+      if (await app.visible("#profile-list")) await app.click("#profile-toggle");
+    },
+  ],
+  [
     "general settings and locale changes reach native storage and survive reload",
     async (app) => {
       await app.click("[data-page='settings']");

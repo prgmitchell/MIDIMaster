@@ -70,6 +70,10 @@ Results and failure evidence are saved under `test-results/desktop-<timestamp>/`
 Physical hardware, live vendor integrations and installer workflows still require
 release validation.
 
+When editing bundled plugins, change their `src/` modules and run `npm run build:plugins`
+to regenerate the checked-in `plugin.mjs` files. `npm run check:plugins` checks that
+those bundles match their sources.
+
 ## License
 
 MIT. See `LICENSE`.

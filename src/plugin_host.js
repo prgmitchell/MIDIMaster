@@ -216,8 +216,12 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
           relPath: entry,
         });
         const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
-        const mod = await import(url);
-        URL.revokeObjectURL(url);
+        let mod;
+        try {
+          mod = await import(url);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
 
         console.log(`[plugins] loaded module ${pluginId}`);
 
@@ -229,9 +233,22 @@ export function createPluginHost({ invoke, listen, onUpdatePluginSettings, onInv
 
         const ctx = {
           pluginId,
-          registerIntegration,
+          registerIntegration: (integration) => {
+            if (cleanup.isDisposed()) return;
+            registerIntegration(integration);
+            cleanup.onDispose(() => {
+              if (integrations.get(integration.id) === integration) integrations.delete(integration.id);
+            });
+          },
           connections: {
-            registerTab: registerConnectionTab,
+            registerTab: (tab) => {
+              if (cleanup.isDisposed()) return;
+              registerConnectionTab(tab);
+              const registered = connectionTabs.get(tab.id);
+              cleanup.onDispose(() => {
+                if (connectionTabs.get(tab.id) === registered) connectionTabs.delete(tab.id);
+              });
+            },
           },
           app: {
             invalidateBindingsUI: () => {

@@ -77,9 +77,16 @@ export function createSettingsStore({
   }
   const options = { normalizeFaderCurvePresets, supportedLanguages };
   let state = normalizeAppSettings({}, defaultAppSettings(), options);
+  let confirmed = generalSettingsUpdate();
+  let saveTail = Promise.resolve();
+  const revisions = {};
 
   function publish(next) {
-    state = normalizeAppSettings(next, state, options);
+    const normalized = normalizeAppSettings(next, state, options);
+    for (const key of Object.keys(confirmed)) {
+      if (normalized[key] !== state[key]) revisions[key] = (revisions[key] || 0) + 1;
+    }
+    state = normalized;
     onChange?.(state);
     return state;
   }
@@ -93,7 +100,9 @@ export function createSettingsStore({
   }
 
   function hydrate(settings = {}) {
-    return publish(settings);
+    publish(settings);
+    confirmed = generalSettingsUpdate();
+    return state;
   }
 
   async function load() {
@@ -105,27 +114,43 @@ export function createSettingsStore({
     return null;
   }
 
-  function generalSettingsUpdate() {
+  function generalSettingsUpdate(settings = state) {
     return {
-      startWithWindows: state.startWithWindows,
-      startInTray: state.startInTray,
-      minimizeToTray: state.minimizeToTray,
-      exitToTray: state.exitToTray,
-      autoCheckUpdates: state.autoCheckUpdates,
-      language: state.language,
+      startWithWindows: settings.startWithWindows,
+      startInTray: settings.startInTray,
+      minimizeToTray: settings.minimizeToTray,
+      exitToTray: settings.exitToTray,
+      autoCheckUpdates: settings.autoCheckUpdates,
+      language: settings.language,
     };
   }
 
-  async function persist({ previousSettings = null } = {}) {
-    try {
-      const updated = await invoke("update_app_settings", generalSettingsUpdate());
-      return updated && typeof updated === "object" ? hydrate(updated) : state;
-    } catch (error) {
-      if (previousSettings && typeof previousSettings === "object") {
-        publish(previousSettings);
+  function persist({ previousSettings = null } = {}) {
+    const requested = generalSettingsUpdate();
+    const previous = previousSettings && normalizeAppSettings(previousSettings, state, options);
+    const patch = Object.fromEntries(Object.entries(requested).filter(
+      ([key, value]) => !previous || value !== previous[key],
+    ));
+    const submittedRevisions = { ...revisions };
+    const reconcile = (keys) => update(Object.fromEntries(keys
+      .filter((key) => revisions[key] === submittedRevisions[key])
+      .map((key) => [key, confirmed[key]])));
+
+    const saving = saveTail.then(async () => {
+      try {
+        const submitted = { ...confirmed, ...patch };
+        const updated = await invoke("update_app_settings", submitted);
+        confirmed = generalSettingsUpdate(normalizeAppSettings(updated || submitted, submitted, options));
+        // This command owns only general preferences. Its full backend snapshot
+        // may predate a separate appearance, density or privacy update.
+        return reconcile(Object.keys(requested));
+      } catch (error) {
+        reconcile(Object.keys(patch));
+        throw error;
       }
-      throw error;
-    }
+    });
+    saveTail = saving.catch(() => {});
+    return saving;
   }
 
   return {

@@ -6,8 +6,7 @@ import { localeCodes, targetLocales } from "../../src/app/locales.js";
 const root = process.cwd();
 const localeDir = path.join(root, "src", "locales");
 const locales = targetLocales.map((locale) => locale.code);
-const sourceScanRoots = [path.join(root, "src", "app"), path.join(root, "src", "features")];
-const sourceScanFiles = [path.join(root, "src", "app_entry.js"), path.join(root, "src", "index.html")];
+const sourceScanRoots = [path.join(root, "src")];
 
 function placeholders(value) {
   return Array.from(String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g))
@@ -74,7 +73,6 @@ async function validateLocaleSync() {
 
 async function findUsedTranslationKeys() {
   const files = [
-    ...sourceScanFiles,
     ...(await Promise.all(sourceScanRoots.map((dir) => collectFiles(dir)))).flat(),
   ];
   const uniqueFiles = Array.from(new Set(files));
@@ -115,6 +113,12 @@ async function validateUsedKeys(english) {
 const english = await readJson(path.join(localeDir, "en.json"));
 const englishKeys = Object.keys(english).sort();
 let failed = false;
+for (const key of englishKeys) {
+  if (typeof english[key] !== "string") {
+    console.error(`[i18n] en: non-string translation for ${key}`);
+    failed = true;
+  }
+}
 if (!(await validateLocaleSync())) {
   failed = true;
 }
@@ -134,6 +138,11 @@ for (const locale of locales) {
   }
 
   const keys = Object.keys(catalog).sort();
+  const missing = englishKeys.filter((key) => !Object.prototype.hasOwnProperty.call(catalog, key));
+  if (missing.length > 0) {
+    console.error(`[i18n] ${locale}: missing keys: ${missing.join(", ")}`);
+    failed = true;
+  }
   const extra = keys.filter((key) => !Object.prototype.hasOwnProperty.call(english, key));
   if (extra.length > 0) {
     console.error(`[i18n] ${locale}: extra keys: ${extra.join(", ")}`);
@@ -143,6 +152,11 @@ for (const locale of locales) {
   const untranslatedFallbacks = [];
   for (const key of englishKeys) {
     if (!Object.prototype.hasOwnProperty.call(catalog, key)) continue;
+    if (typeof catalog[key] !== "string") {
+      console.error(`[i18n] ${locale}: non-string translation for ${key}`);
+      failed = true;
+      continue;
+    }
     const expected = placeholders(english[key]);
     const actual = placeholders(catalog[key]);
     if (!sameArray(expected, actual)) {

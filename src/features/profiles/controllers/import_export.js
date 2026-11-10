@@ -39,12 +39,7 @@ export function createImportExport({
       const baseName = normalizeProfileName(importedProfile.name) || "Imported Profile";
       let nextName = baseName;
 
-      let profiles = [];
-      try {
-        profiles = await invoke("list_profiles");
-      } catch {
-        profiles = [];
-      }
+      const profiles = await invoke("list_profiles");
       const existingNames = new Set(
         (profiles || []).map((profile) => normalizeProfileName(profile?.name)).filter(Boolean),
       );

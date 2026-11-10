@@ -22,12 +22,7 @@ export function createProfileMenu({
   viewState,
 }) {
   async function refreshProfiles(preferredName = "") {
-    let profiles = [];
-    try {
-      profiles = await invoke("list_profiles");
-    } catch {
-      profiles = [];
-    }
+    let profiles = await invoke("list_profiles");
 
     const hasDefault = profiles.some((p) => p && p.name === "Default");
     if (!hasDefault) {
@@ -115,7 +110,7 @@ export function createProfileMenu({
     });
 
     const createProfile = async () => {
-      await createProfileByName(createInput.value);
+      if (!(await createProfileByName(createInput.value))) return;
       createInput.value = "";
       if (d.profilePageCreateInput) d.profilePageCreateInput.value = "";
     };

@@ -758,7 +758,6 @@ export function createApplication() {
     refreshSessions,
     addBindingFromLearn: bindingCreation.addBindingFromLearn,
     getSavedMidiDeviceIds: preferenceActions.getSavedMidiDeviceIds,
-    clearSavedMidiDeviceIds: preferenceActions.clearSavedMidiDeviceIds,
     onConnected: (connection = {}) => {
       viewState.activeMidiRouteCount = enabledMidiRouteCount(connection.routes || []);
       queueMidiDeviceInventorySubmit("midi_connected");

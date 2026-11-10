@@ -84,8 +84,6 @@ export function createClientPreferences({
     return normalizedId;
   }
 
-  async function clearSavedMidiDeviceIds() {}
-
   async function hydrateClientPreferences(loadedSettings = null) {
     try {
       const settings = loadedSettings || (await invoke("get_app_settings"));
@@ -135,7 +133,6 @@ export function createClientPreferences({
   return {
     getSavedMidiDeviceIds,
     midiDeviceLabelForBindingDevice,
-    clearSavedMidiDeviceIds,
     hydrateClientPreferences,
   };
 }

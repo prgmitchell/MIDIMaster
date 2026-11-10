@@ -38,32 +38,35 @@ impl AudioRing {
 
     pub fn write_latest(&self, input: &[u8]) {
         let mut ring = self.inner.lock().expect("audio ring poisoned");
-        for &byte in input {
-            if ring.size == ring.bytes.len() {
-                ring.read = (ring.read + 1) % ring.bytes.len();
-                ring.size -= 1;
-                ring.dropped += 1;
-            }
-            let write = ring.write;
-            ring.bytes[write] = byte;
-            ring.write = (write + 1) % ring.bytes.len();
-            ring.size += 1;
+        let capacity = ring.bytes.len();
+        if input.len() >= capacity {
+            ring.dropped += (ring.size + input.len() - capacity) as u64;
+            ring.bytes.copy_from_slice(&input[input.len() - capacity..]);
+            ring.read = 0;
+            ring.write = 0;
+            ring.size = capacity;
+            return;
         }
+        let dropped = input.len().saturating_sub(capacity - ring.size);
+        ring.read = (ring.read + dropped) % capacity;
+        ring.dropped += dropped as u64;
+        let write = ring.write;
+        let first = input.len().min(capacity - write);
+        ring.bytes[write..write + first].copy_from_slice(&input[..first]);
+        ring.bytes[..input.len() - first].copy_from_slice(&input[first..]);
+        ring.write = (write + input.len()) % capacity;
+        ring.size = ring.size + input.len() - dropped;
     }
 
     pub fn read_or_silence(&self, output: &mut [u8]) -> usize {
         let mut ring = self.inner.lock().expect("audio ring poisoned");
-        let mut read = 0usize;
-        for byte in output.iter_mut() {
-            if ring.size == 0 {
-                *byte = 0;
-            } else {
-                *byte = ring.bytes[ring.read];
-                ring.read = (ring.read + 1) % ring.bytes.len();
-                ring.size -= 1;
-                read += 1;
-            }
-        }
+        let read = output.len().min(ring.size);
+        let first = read.min(ring.bytes.len() - ring.read);
+        output[..first].copy_from_slice(&ring.bytes[ring.read..ring.read + first]);
+        output[first..read].copy_from_slice(&ring.bytes[..read - first]);
+        output[read..].fill(0);
+        ring.read = (ring.read + read) % ring.bytes.len();
+        ring.size -= read;
         ring.underruns += (output.len() - read) as u64;
         read
     }

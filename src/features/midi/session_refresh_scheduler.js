@@ -9,6 +9,8 @@ export function createSessionRefreshScheduler({
   let refresh = null;
   let mainScreen = null;
   let visibilityListenerBound = false;
+  let generation = 0;
+  let running = null;
 
   function isHidden() {
     return Boolean(documentRef.hidden || mainScreen?.classList.contains("hidden"));
@@ -20,16 +22,27 @@ export function createSessionRefreshScheduler({
 
   function schedule(delayMs) {
     if (!refresh) return;
+    const scheduledGeneration = generation;
     timer = setTimer(async () => {
       timer = null;
-      if (!isHidden()) await refresh();
-      schedule(delay());
+      if (running) await running;
+      if (scheduledGeneration !== generation || !refresh) return;
+      if (!isHidden()) {
+        const operation = Promise.resolve().then(refresh).catch((error) => {
+          console.error("Failed to refresh audio sessions", error);
+        });
+        running = operation;
+        await operation;
+        if (running === operation) running = null;
+      }
+      if (scheduledGeneration === generation) schedule(delay());
     }, delayMs);
   }
 
   function restart(delayMs = 0) {
     if (!refresh) return;
-    if (timer) clearTimer(timer);
+    generation++;
+    if (timer !== null) clearTimer(timer);
     timer = null;
     schedule(delayMs);
   }
@@ -37,23 +50,31 @@ export function createSessionRefreshScheduler({
   function ensureVisibilityListener() {
     if (visibilityListenerBound) return;
     visibilityListenerBound = true;
-    documentRef.addEventListener("visibilitychange", () => {
-      if (!documentRef.hidden) restart(0);
-    });
+    documentRef.addEventListener("visibilitychange", onVisibilityChange);
+  }
+
+  function onVisibilityChange() {
+    if (!documentRef.hidden) restart(0);
   }
 
   function start(refreshFn, mainScreenEl) {
+    const wasActive = Boolean(refresh);
     refresh = refreshFn;
     mainScreen = mainScreenEl;
     ensureVisibilityListener();
-    if (!timer) schedule(delay());
+    if (!wasActive) restart(delay());
   }
 
   function stop() {
-    if (timer) clearTimer(timer);
+    generation++;
+    if (timer !== null) clearTimer(timer);
     timer = null;
     refresh = null;
     mainScreen = null;
+    if (visibilityListenerBound) {
+      documentRef.removeEventListener("visibilitychange", onVisibilityChange);
+      visibilityListenerBound = false;
+    }
   }
 
   return { start, stop, restart };

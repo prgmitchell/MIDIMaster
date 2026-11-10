@@ -62,10 +62,26 @@ impl ProfileStore {
             .cloned())
     }
 
-    pub fn save_profile(&self, mut profile: Profile) -> Result<()> {
+    pub fn save_profile(&self, profile: Profile) -> Result<()> {
+        self.write_profile(profile, false)
+    }
+
+    pub fn create_profile(&self, profile: Profile) -> Result<()> {
+        self.write_profile(profile, true)
+    }
+
+    fn write_profile(&self, mut profile: Profile, create_only: bool) -> Result<()> {
         profile.strip_derived_integration_icons();
         let mut cache = self.cache()?;
         let cache = cache.as_mut().expect("profile cache initialized");
+        if create_only
+            && cache
+                .profiles
+                .iter()
+                .any(|existing| existing.name == profile.name)
+        {
+            anyhow::bail!("Profile already exists: {}", profile.name);
+        }
         let mut candidate = cache.profiles.clone();
         if let Some(existing) = candidate
             .iter_mut()

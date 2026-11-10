@@ -711,7 +711,11 @@ Use this checklist when you are preparing a plugin to share with other users.
 - Treat `ctx.profile` as sensitive storage.
   - Do not log tokens.
   - Avoid embedding secrets in your plugin source.
-- Only request the minimum permissions you need.
+- Plugins run in the main application's JavaScript context and receive access to
+  `ctx.tauri.invoke`. API v1 does not provide a per-plugin permission sandbox.
+  Install only plugins whose code and publisher you trust. Package signatures
+  verify the publisher and package integrity; they do not restrict runtime access.
+- Use only the application commands and external-service credentials your integration needs.
 
 ### Test Matrix
 

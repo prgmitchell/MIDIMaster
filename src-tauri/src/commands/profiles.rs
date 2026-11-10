@@ -175,6 +175,7 @@ pub fn save_profile(
     state: State<AppState>,
     mut profile: Profile,
     activate: Option<bool>,
+    create_only: Option<bool>,
 ) -> Result<(), String> {
     profile.normalize_bindings();
     normalize_profile_midi_preference(&mut profile);
@@ -199,10 +200,12 @@ pub fn save_profile(
             .map_err(|_| "Lock poisoned")?
             .include_in(&mut profile);
     }
-    state
-        .profile_store
-        .save_profile(profile.clone())
-        .map_err(|err| err.to_string())?;
+    if create_only.unwrap_or(false) {
+        state.profile_store.create_profile(profile.clone())
+    } else {
+        state.profile_store.save_profile(profile.clone())
+    }
+    .map_err(|err| err.to_string())?;
     if update_active {
         set_active_profile_state(&state, &app, &profile, false)?;
     }

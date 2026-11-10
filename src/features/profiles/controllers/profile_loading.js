@@ -30,6 +30,8 @@ export function createProfileLoading({
   setProfileSelection,
   startPluginHostIfNeeded,
   targetState,
+  showAlert,
+  t,
   setProfileLoadingBusy = () => {},
 }) {
   let pendingOperations = 0;
@@ -147,12 +149,7 @@ export function createProfileLoading({
 
     const current = typeof getActiveProfileName === "function" ? getActiveProfileName() || "" : "";
     if (n === current) {
-      let profiles = [];
-      try {
-        profiles = await invoke("list_profiles");
-      } catch {
-        profiles = [];
-      }
+      let profiles = await invoke("list_profiles");
 
       const hasDefault = profiles.some((p) => p && p.name === "Default");
       if (!hasDefault) {
@@ -170,11 +167,7 @@ export function createProfileLoading({
             midi_device_preference_set: true,
           },
         });
-        try {
-          profiles = await invoke("list_profiles");
-        } catch {
-          profiles = [{ name: "Default" }];
-        }
+        profiles = await invoke("list_profiles");
       }
 
       const fallbackName =
@@ -193,8 +186,14 @@ export function createProfileLoading({
     const name = normalizeProfileName(rawName);
     if (!name) return;
     await flushProfileSave();
+    const profiles = await invoke("list_profiles");
+    if (profiles.some((profile) => profile.name === name)) {
+      await showAlert?.(t("profiles.alreadyExistsTitle"), t("profiles.alreadyExistsMessage", { name }));
+      return false;
+    }
     await invoke("save_profile", {
       activate: false,
+      createOnly: true,
       profile: {
         name,
         bindings: [],
@@ -209,6 +208,7 @@ export function createProfileLoading({
     await loadProfileByName(name);
     await refreshProfiles(name);
     closeProfileDropdown();
+    return true;
   }
 
   return {

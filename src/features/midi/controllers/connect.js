@@ -8,7 +8,6 @@ export function createConnect({
   addBindingFromLearn,
   applyRoutes,
   cancelLearnPanel,
-  clearSavedMidiDeviceIds,
   clearUnavailableDeviceSelections,
   closeLearnPanel,
   closeRoutesPopover,
@@ -182,9 +181,6 @@ export function createConnect({
     // User intentionally entered manual selection flow; do not auto-reconnect
     // to the profile's preferred device until they explicitly connect or a profile sync occurs.
     connection.suspendProfileAutoReconnect = true;
-    if (typeof clearSavedMidiDeviceIds === "function") {
-      await clearSavedMidiDeviceIds();
-    }
     connection.currentProfilePreference = normalizeMidiPreference({ routes: [], configured: true });
     discardRouteDrafts();
     if (typeof onProfileDeviceSelected === "function") {

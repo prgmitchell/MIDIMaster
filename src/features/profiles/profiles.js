@@ -154,16 +154,16 @@ export function createProfilesFeature({
       lifetime.listen(d.profilePageCreateInput, "keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
-          createProfileByName(d.profilePageCreateInput.value).then(() => {
-            d.profilePageCreateInput.value = "";
+          createProfileByName(d.profilePageCreateInput.value).then((created) => {
+            if (created) d.profilePageCreateInput.value = "";
           });
         }
       });
     }
     if (d.profilePageCreateButton) {
       lifetime.listen(d.profilePageCreateButton, "click", () => {
-        createProfileByName(d.profilePageCreateInput?.value || "").then(() => {
-          if (d.profilePageCreateInput) d.profilePageCreateInput.value = "";
+        createProfileByName(d.profilePageCreateInput?.value || "").then((created) => {
+          if (created && d.profilePageCreateInput) d.profilePageCreateInput.value = "";
         });
       });
     }
@@ -213,6 +213,8 @@ export function createProfilesFeature({
   });
 
   const { loadProfileByName, deleteProfileByName, createProfileByName } = createProfileLoading({
+    showAlert,
+    t,
     setProfileLoadingBusy: (busy) => setInteractionBusy("profile", busy),
     applyOsdSettings,
     bindingFallbackName,
