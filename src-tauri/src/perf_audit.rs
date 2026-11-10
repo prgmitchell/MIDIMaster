@@ -8,6 +8,8 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "e2e")]
+pub(crate) mod e2e_audio;
 mod injection;
 mod metrics;
 mod synthetic;

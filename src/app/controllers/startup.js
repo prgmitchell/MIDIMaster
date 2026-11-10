@@ -24,6 +24,7 @@ export function createStartup({
   profileState,
   queueMidiDeviceInventorySubmit,
   recordPerformanceResult,
+  refreshSessions,
   requestBindingsRerender,
   settingsStore,
   setupListeners,
@@ -190,6 +191,7 @@ export function createStartup({
       features.midi.loadMidiDevicesWithRetry(),
       features.settings.loadMonitorOptions(),
       features.settings.loadOsdSettings(),
+      refreshSessions({ force: true }),
     ]);
     applyCurrentOsdAppearance();
 

@@ -285,6 +285,7 @@ export function createActionPolicy({
         },
         {
           label: t("targets.action.setDefaultDevice"),
+          description: t("targets.action.setDefaultDeviceHelp"),
           value: "SetDefaultDevice",
           kind: "action",
           icon_data: SET_DEFAULT_DEVICE_ICON_DATA,

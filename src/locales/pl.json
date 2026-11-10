@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "Włączenie / wyłączenie",
   "targets.action.setDefault": "Ustaw domyślne",
   "targets.action.setDefaultDevice": "Ustaw domyślne urządzenie",
+  "targets.action.setDefaultDeviceHelp": "Wybierz kilka urządzeń odtwarzania lub nagrywania, aby przełączać je kolejno po każdym naciśnięciu.",
   "targets.action.setValue": "Ustaw wartość",
   "targets.action.trigger": "Trigger",
   "targets.noRunningApplications": "Nie znaleziono uruchomionych aplikacji.",

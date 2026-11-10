@@ -2,6 +2,7 @@ use crate::audio::target_match::{
     application_name_matches, split_session_id, ApplicationMatchInfo,
 };
 use crate::audio::AudioBackend;
+mod devices;
 #[path = "windows/meter.rs"]
 mod meter;
 mod solo_sources;
@@ -221,23 +222,11 @@ impl AudioBackend for WindowsAudioBackend {
     }
 
     fn list_playback_devices(&self) -> Result<Vec<PlaybackDeviceInfo>> {
-        let _com = init_com()?;
-        let enumerator = get_device_enumerator()?;
-        let default_device = get_default_device_from_flow(&enumerator, eRender)?;
-        let default_id = device_id_string(&default_device);
-        with_shared_icon_cache(|icon_cache| {
-            list_devices_for_flow(&enumerator, eRender, default_id, icon_cache)
-        })
+        devices::list(DeviceTargetKind::Playback)
     }
 
     fn list_recording_devices(&self) -> Result<Vec<PlaybackDeviceInfo>> {
-        let _com = init_com()?;
-        let enumerator = get_device_enumerator()?;
-        let default_device = get_default_device_from_flow(&enumerator, eCapture)?;
-        let default_id = device_id_string(&default_device);
-        with_shared_icon_cache(|icon_cache| {
-            list_devices_for_flow(&enumerator, eCapture, default_id, icon_cache)
-        })
+        devices::list(DeviceTargetKind::Recording)
     }
 
     fn set_master_volume(&self, volume: f32) -> Result<()> {
@@ -432,23 +421,7 @@ impl AudioBackend for WindowsAudioBackend {
     }
 
     fn set_default_device(&self, device_id: &str) -> Result<()> {
-        let _com = init_com()?;
-        let enumerator = get_device_enumerator()?;
-        let (kind, raw_id) = parse_device_target(device_id);
-        let flow = match kind {
-            DeviceTargetKind::Playback => eRender,
-            DeviceTargetKind::Recording => eCapture,
-        };
-
-        let exists = enumerate_active_devices(&enumerator, flow)?
-            .iter()
-            .any(|(_, id)| id == raw_id);
-        if !exists {
-            return Err(anyhow!("Device not found"));
-        }
-
-        set_default_audio_endpoint(raw_id)?;
-        Ok(())
+        devices::set_default(device_id)
     }
 
     fn set_session_mute(&self, session_id: &str, muted: bool) -> Result<()> {

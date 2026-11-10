@@ -10,6 +10,7 @@ import { virtualAudio } from "./virtual-audio.mjs";
 import { lifecycle } from "./lifecycle.mjs";
 import { stateTransitions } from "./state-transitions.mjs";
 import { updater } from "./updater.mjs";
+import { audioDevices } from "./audio-devices.mjs";
 
 const row = (id) => `[data-binding-id='perf-binding-${id}']`;
 const configure = async (app, id) => {
@@ -187,6 +188,7 @@ export const scenarios = [
     },
   ],
   ...workflows,
+  ...audioDevices,
   ...security,
   ...editors,
   ...network,

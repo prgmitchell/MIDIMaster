@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "Toggle Mute",
   "targets.action.setDefault": "Set Default",
   "targets.action.setDefaultDevice": "Set Default Device",
+  "targets.action.setDefaultDeviceHelp": "Selecciona varios dispositivos de reproducción o grabación para cambiar al siguiente con cada pulsación.",
   "targets.action.setValue": "Valor de conjunto",
   "targets.action.trigger": "Trigger",
   "targets.noRunningApplications": "No se han encontrado solicitudes.",

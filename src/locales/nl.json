@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "Dempen aan/uit",
   "targets.action.setDefault": "Standaard instellen",
   "targets.action.setDefaultDevice": "Standaardapparaat instellen",
+  "targets.action.setDefaultDeviceHelp": "Selecteer meerdere afspeel- of opnameapparaten om bij elke druk op de knop naar het volgende te schakelen.",
   "targets.action.setValue": "Waarde instellen",
   "targets.action.trigger": "Trigger",
   "targets.noRunningApplications": "Geen lopende toepassingen gevonden.",

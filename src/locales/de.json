@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "Toggle Mutes",
   "targets.action.setDefault": "Set Default",
   "targets.action.setDefaultDevice": "Standard-Gerät einstellen",
+  "targets.action.setDefaultDeviceHelp": "Wähle mehrere Wiedergabe- oder Aufnahmegeräte aus, um bei jedem Tastendruck zum nächsten zu wechseln.",
   "targets.action.setValue": "Wert bestimmen",
   "targets.action.trigger": "Auslöser",
   "targets.noRunningApplications": "Keine laufenden Anwendungen gefunden.",

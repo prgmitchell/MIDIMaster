@@ -730,7 +730,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "es": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -1463,7 +1464,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "de": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -2196,7 +2198,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "it": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -2929,7 +2932,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "pt-BR": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -3662,7 +3666,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "nl": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -4395,7 +4400,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "pl": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -5128,7 +5134,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "ja": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -5861,7 +5868,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "ko": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -6594,7 +6602,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "zh-Hans": {
     "bindings.feedbackDisabled": "75081b593d15cf6e631971bc6768723f593b88b172477e40ae7d363e4829816d",
@@ -7327,7 +7336,8 @@
     "bindings.removeOutput": "2ba2fbedf7950811f123de237f27ef83df4cf0ad3271d317601919aaf78768eb",
     "bindings.reorderOutput": "fa778fe790159c3accac9e76f3b765698f251193226215a142362a2e9a9ee7dd",
     "bindings.defaultOutput": "20a426dd2316ace6a1497b4141a88acd957a8868ee87bfc0310cfc4f97a8a34c",
-    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348"
+    "bindings.outputsHelp": "27b3b5482ae46ddd48df8452869bf91233ca5f85bc10b2cf08cf30f3b1610348",
+    "targets.action.setDefaultDeviceHelp": "eab4f81a8505475bae7fdb34b5b3526119cd6177a85e06067e7dff87d95ff29b"
   },
   "settings.appearance.description": "Customize how MIDIMaster looks and feels.",
   "settings.appearance.themePresets": "Theme Presets",

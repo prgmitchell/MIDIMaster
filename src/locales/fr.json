@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "Toggle Mute",
   "targets.action.setDefault": "Définir par défaut",
   "targets.action.setDefaultDevice": "Définir le périphérique par défaut",
+  "targets.action.setDefaultDeviceHelp": "Sélectionnez plusieurs périphériques de lecture ou d’enregistrement pour passer au suivant à chaque pression.",
   "targets.action.setValue": "Définir la valeur",
   "targets.action.trigger": "Déclencheur",
   "targets.noRunningApplications": "Aucune application courante trouvée.",

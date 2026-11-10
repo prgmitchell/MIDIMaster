@@ -543,6 +543,7 @@ export function createApplication() {
     queueMidiDeviceInventorySubmit: (reason) => queueMidiDeviceInventorySubmit(reason),
     recordPerformanceResult: (...args) => recordPerformanceResult(...args),
 
+    refreshSessions: (...args) => refreshSessions(...args),
     requestBindingsRerender: (...args) => requestBindingsRerender(...args),
     settingsStore,
     setupListeners: (...args) => backendEvents.setupListeners(...args),

@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "Alternar Mudo",
   "targets.action.setDefault": "Definir o Padrão",
   "targets.action.setDefaultDevice": "Definir o Dispositivo Padrão",
+  "targets.action.setDefaultDeviceHelp": "Selecione vários dispositivos de reprodução ou gravação para alternar entre eles a cada pressionamento.",
   "targets.action.setValue": "Definir valor",
   "targets.action.trigger": "Trigger",
   "targets.noRunningApplications": "Nenhuma aplicação em execução encontrada.",

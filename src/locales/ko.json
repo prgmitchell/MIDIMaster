@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "관련 기사",
   "targets.action.setDefault": "기본 설정",
   "targets.action.setDefaultDevice": "기본 장치 설정",
+  "targets.action.setDefaultDeviceHelp": "여러 재생 또는 녹음 장치를 선택하면 버튼을 누를 때마다 다음 장치로 전환됩니다.",
   "targets.action.setValue": "설정 값",
   "targets.action.trigger": "더 큰",
   "targets.noRunningApplications": "찾을 수 없습니다.",

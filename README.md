@@ -12,6 +12,15 @@ like hotkeys and AutoHotkey scripts, and supported integrations including the bu
 
 MIDIMaster currently supports Windows.
 
+## Switch between headphones and speakers
+
+On a button binding, select your headphones under **Playback Devices** and choose
+**Set Default Device**. Add your speakers to the same binding with the same action.
+Each press switches to the next selected device; releasing the button does nothing.
+Devices cycle in selection order, skipping disconnected devices. A single selected
+device always becomes the default. Recording devices cycle separately, so a button
+can still set both a playback device and a microphone.
+
 ## Plugins and the Store
 
 MIDIMaster supports runtime plugins and an in-app Store for integrations. Plugins

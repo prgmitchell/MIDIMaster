@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "切换静音",
   "targets.action.setDefault": "设置默认",
   "targets.action.setDefaultDevice": "设置默认设备",
+  "targets.action.setDefaultDeviceHelp": "选择多个播放或录音设备，每次按下按钮时依次切换。",
   "targets.action.setValue": "设定值",
   "targets.action.trigger": "触发",
   "targets.noRunningApplications": "未找到正在运行的应用程序 .",

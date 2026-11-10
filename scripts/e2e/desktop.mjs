@@ -6,6 +6,9 @@ import { createServer } from "node:net";
 import { CdpSession, findTarget } from "../perf/capture-cdp.mjs";
 import { createProfilesFixture } from "../perf/generate-fixtures.mjs";
 
+// E2E features must not overwrite a running cargo tauri dev executable.
+const targetDirectory = resolve("src-tauri/target/e2e");
+
 export const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function eventually(predicate, message, timeout = 15000) {
   const deadline = Date.now() + timeout;
@@ -27,6 +30,8 @@ export async function build() {
         "src-tauri/Cargo.toml",
         "--features",
         "e2e",
+        "--target-dir",
+        targetDirectory,
         "--locked",
       ],
       {
@@ -119,7 +124,7 @@ export class Desktop {
       TEMP: join(this.root, "temp"),
       TMP: join(this.root, "temp"),
     };
-    this.child = spawn(resolve("src-tauri/target/debug/midimaster.exe"), [], {
+    this.child = spawn(join(targetDirectory, "debug/midimaster.exe"), [], {
       windowsHide: true,
       env,
       stdio: ["ignore", "pipe", "pipe"],

@@ -628,6 +628,7 @@
   "targets.action.toggleMute": "トグルミュート",
   "targets.action.setDefault": "デフォルト設定",
   "targets.action.setDefaultDevice": "デフォルトデバイスを設定する",
+  "targets.action.setDefaultDeviceHelp": "複数の再生デバイスまたは録音デバイスを選択すると、ボタンを押すたびに順番に切り替わります。",
   "targets.action.setValue": "値セット",
   "targets.action.trigger": "トリガー",
   "targets.noRunningApplications": "実行中のアプリケーションが見つかりません.",
