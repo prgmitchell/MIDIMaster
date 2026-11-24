@@ -212,6 +212,37 @@ pub fn save_profile(
     Ok(())
 }
 
+/// Update only the supplied preferences. Binding edits, OSD, and captured target state
+/// have independent writers and can change while a renderer save is queued.
+#[tauri::command]
+pub fn update_profile_preferences(
+    state: State<AppState>,
+    expected_profile: String,
+    plugin_settings: Option<std::collections::HashMap<String, serde_json::Value>>,
+    midi_device_preference: Option<crate::model::MidiDevicePreference>,
+) -> Result<(), String> {
+    let mut active = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
+    let mut profile = active
+        .as_ref()
+        .filter(|p| p.name == expected_profile)
+        .ok_or("Active profile changed before preference update")?
+        .profile()
+        .clone();
+    if let Some(settings) = plugin_settings {
+        profile.plugin_settings = settings;
+    }
+    if let Some(preference) = midi_device_preference {
+        profile.midi_device_preference = preference;
+        profile.midi_device_preference_set = true;
+    }
+    state
+        .profile_store
+        .save_configuration(profile.clone())
+        .map_err(|err| err.to_string())?;
+    *active = Some(AppState::profile_snapshot(profile));
+    Ok(())
+}
+
 #[tauri::command]
 pub fn delete_profile(state: State<AppState>, name: String) -> Result<(), String> {
     state

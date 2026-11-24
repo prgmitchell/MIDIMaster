@@ -1,5 +1,5 @@
 import { createUiLifetime } from "../../app/ui_lifetime.js";
-import { createEvents } from "./controllers/events.js";
+import { bindAppearanceControls } from "./controllers/appearance_events.js";
 import { createPreferences } from "./controllers/preferences.js";
 import { createMonitors } from "./controllers/monitors.js";
 import { createDropdowns } from "./controllers/dropdowns.js";
@@ -9,7 +9,6 @@ import { createOsdAppearance } from "./controllers/osd_appearance.js";
 import { createAppearanceEditor } from "./controllers/appearance_editor.js";
 import { createColorPicker } from "./controllers/color_picker.js";
 import { createAppearancePresets } from "./controllers/appearance_presets.js";
-import { DEFAULT_OSD_SETTINGS, OSD_STYLES, OSD_ANCHORS } from "../../core/osd_settings.js";
 
 import { getBuiltInAppearancePresets } from "../../app/appearance.js";
 
@@ -76,10 +75,6 @@ export function createSettingsFeature({
 
   const appearanceColorPickerState = createAppearanceColorPickerState();
   const defaultSettingsSection = "startup";
-  const defaultOsdAppearance = DEFAULT_OSD_SETTINGS;
-  const defaultOsdAnchor = DEFAULT_OSD_SETTINGS.anchor;
-  const osdStyles = new Set(OSD_STYLES);
-  const osdAnchors = new Set(OSD_ANCHORS);
   const languageOptions = Array.isArray(i18n?.supportedLocales)
     ? i18n.supportedLocales
     : [{ code: "en", label: "English" }];
@@ -101,26 +96,8 @@ export function createSettingsFeature({
     translate: t,
     getSettings: getAppSettings,
   });
-  const updateState = updater.state;
-  const renderUpdateUi = updater.render;
-  const renderSidebarVersion = updater.renderSidebarVersion;
-  const setStaticUpdateStatus = updater.setStaticStatus;
-  const checkForUpdates = updater.checkForUpdates;
-  const ensureAutoUpdateCheck = updater.ensureAutoUpdateCheck;
-  const installAvailableUpdate = updater.installAvailableUpdate;
-  const bindUpdaterEvents = updater.bindEvents;
-  const loadCurrentAppVersion = updater.loadCurrentVersion;
-
-  function setTextContent(target, text, selector = null) {
-    const value = String(text ?? "");
-    if (!target) return;
-    const node = selector ? target.querySelector(selector) : null;
-    if (node) {
-      node.textContent = value;
-      return;
-    }
-    target.textContent = value;
-  }
+  const { render: renderUpdateUi, checkForUpdates, ensureAutoUpdateCheck, installAvailableUpdate,
+    bindEvents: bindUpdaterEvents, loadCurrentVersion: loadCurrentAppVersion } = updater;
 
   function clampNumber(value, min, max, fallback) {
     const number = Number(value);
@@ -137,17 +114,7 @@ export function createSettingsFeature({
     return Math.min(100, Math.max(0, ((Number(value) - min) / range) * 100));
   }
 
-  const {
-    appearanceEl,
-    currentAppearance,
-    setAppearanceState,
-    syncRange,
-    appendSvgIcon,
-    renderAppearancePresets,
-    appearanceColorControlIntensity,
-    applyAppearanceColorControlValue,
-    applyAppearanceColorControlIntensity,
-  } = createAppearancePresets({
+  const presets = createAppearancePresets({
     appearanceBuiltInPresetIds,
     appearanceBuiltInPresets,
     applyAppearance,
@@ -159,16 +126,9 @@ export function createSettingsFeature({
     sliderFillPercent,
     t,
   });
+  const { appearanceEl, currentAppearance, setAppearanceState, syncRange, appendSvgIcon, renderAppearancePresets, appearanceColorControlIntensity } = presets;
 
-  const {
-    syncAppearanceColorPickerUi,
-    positionAppearanceColorPicker,
-    openAppearanceColorPicker,
-    closeAppearanceColorPicker,
-    setAppearanceColorPickerHsv,
-    updateAppearanceColorPickerFromField,
-    setAppearanceColorPickerHex,
-  } = createColorPicker({
+  const picker = createColorPicker({
     appearanceColorPickerState,
     appearanceEl,
     applyAppearanceUpdate: (...args) => applyAppearanceUpdate(...args),
@@ -176,13 +136,7 @@ export function createSettingsFeature({
     t,
   });
 
-  const {
-    syncAppearanceControls,
-    persistAppearanceSettings,
-    applyAppearanceUpdate,
-    selectCustomAppearanceTheme,
-    deleteCustomAppearanceTheme,
-  } = createAppearanceEditor({
+  const editor = createAppearanceEditor({
     appearanceColorControlIntensity,
     appearanceColorControls,
     appearanceEl,
@@ -195,6 +149,7 @@ export function createSettingsFeature({
     syncRange,
     t,
   });
+  const { syncAppearanceControls, applyAppearanceUpdate } = editor;
 
   const { syncOsdAppearanceUi } = createOsdAppearance({
     elements,
@@ -204,15 +159,13 @@ export function createSettingsFeature({
   });
 
   const {
-    syncMidiDeviceInventoryToggle,
+    bindUi: bindNavigation,
     closeSettingsPanel,
     openSettingsPanel,
     activateSettingsSection,
-    scheduleSettingsNavIndicatorSync,
   } = createNavigation({
     elements,
     defaultSettingsSection,
-    getAppSettings,
     syncAppearanceControls,
     syncOsdAppearanceControls: (...args) => syncOsdAppearanceControls(...args),
     viewState,
@@ -220,7 +173,7 @@ export function createSettingsFeature({
   });
 
   const {
-    scheduleOsdAppearanceSync,
+    bindUi: bindOsd,
     syncOsdSettingsUi,
     applyOsdSettings,
     loadOsdSettings,
@@ -272,8 +225,7 @@ export function createSettingsFeature({
   const {
     syncAppSettingsUI,
     persistAppSettings,
-    normalizeLanguage,
-    populateLanguageSelect,
+    bindUi: bindPreferences,
     loadAppSettings,
   } = createPreferences({
     applyTranslations,
@@ -287,71 +239,53 @@ export function createSettingsFeature({
     setAppearanceState,
     settingsStore,
     showSettingsAlert,
-    syncMidiDeviceInventoryToggle,
     t,
   });
 
-  const { bindUi } = createEvents({
-    lifetime,
-    activateSettingsSection,
-    appearanceColorPickerState,
-    appearanceEl,
-    applyAppearanceColorControlIntensity,
-    applyAppearanceColorControlValue,
-    applyAppearanceUpdate,
-    applyOsdSettings,
-    applyTranslations,
-    checkForUpdates,
-    clampNumber,
-    closeAppearanceColorPicker,
-    closeSettingsPanel,
-    currentAppearance,
-    elements,
-    defaultOsdAppearance,
-    defaultSettingsSection,
-    deleteCustomAppearanceTheme,
-    ensureAutoUpdateCheck,
-    getAppSettings,
-    getMonitorOptions,
-    getOsdSettings,
-    i18n,
-    installAvailableUpdate,
-    invoke,
-    loadAppSettings,
-    loadCurrentAppVersion,
-    loadMonitorOptions,
-    loadOsdSettings,
-    normalizeLanguage,
-    onMidiDeviceInventoryConsentChanged,
-    onUpdateAvailableClick,
-    openAppearanceColorPicker,
-    openSettingsPanel,
-    persistAppSettings,
-    persistAppearanceSettings,
-    populateLanguageSelect,
-    positionAppearanceColorPicker,
-    renderAllSettingsSelectDropdowns,
-    renderMonitorDropdownOptions,
-    renderUpdateUi,
-    scheduleOsdAppearanceSync,
-    scheduleSettingsControlSync,
-    scheduleSettingsNavIndicatorSync,
-    selectCustomAppearanceTheme,
-    setAppearanceColorPickerHex,
-    setAppearanceColorPickerHsv,
-    setStaticUpdateStatus,
-    sliderFillPercent,
-    syncAppSettingsUI,
-    syncAppearanceColorPickerUi,
-    syncAppearanceControls,
-    syncOsdAppearanceUi,
-    t,
-    uiBound,
-    updateAppearanceColorPickerFromField,
-    updateState,
-    viewState,
-    virtualAudio,
-  });
+  function bindUi() {
+    if (uiBound) return;
+    uiBound = true;
+    virtualAudio.bindUi();
+    bindNavigation(lifetime);
+    bindOsd({ lifetime, getMonitorOptions, renderMonitorDropdownOptions });
+    bindPreferences({ lifetime, invoke, ensureAutoUpdateCheck, onMidiDeviceInventoryConsentChanged });
+    bindAppearanceControls({ lifetime, panel: elements.settingsPanel, presets, editor, picker,
+      pickerState: appearanceColorPickerState, sliderFillPercent, t });
+    updater.bindUi(lifetime, onUpdateAvailableClick);
+
+    if (elements.settingsButton) {
+      lifetime.listen(elements.settingsButton, "click", async () => {
+        await loadOsdSettings();
+        await loadMonitorOptions();
+        await loadAppSettings();
+        await loadCurrentAppVersion();
+        syncAppSettingsUI(getAppSettings());
+        renderAllSettingsSelectDropdowns();
+        if (getAppSettings().autoCheckUpdates !== false) {
+          await checkForUpdates({ silent: true });
+        }
+        openSettingsPanel();
+      });
+    }
+
+    if (elements.openLogsFolderButton) {
+      lifetime.listen(elements.openLogsFolderButton, "click", async () => {
+        try {
+          await invoke("open_logs_folder");
+        } catch (error) {
+          console.error(`Unable to open logs folder: ${error}`);
+        }
+      });
+    }
+    lifetime.listen(window, "midimaster:locale-changed", () => {
+      applyTranslations();
+      renderAllSettingsSelectDropdowns();
+      renderMonitorDropdownOptions(typeof getMonitorOptions === "function" ? getMonitorOptions() || [] : []);
+      renderUpdateUi();
+    });
+    renderAllSettingsSelectDropdowns();
+    scheduleSettingsControlSync();
+  }
 
   return {
     bindUi,

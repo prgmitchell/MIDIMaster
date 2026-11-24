@@ -7,7 +7,7 @@ import {
 import { normalizeRelativeFormat } from "../../../core/binding_model.js";
 
 /** create row mode workflow. */
-export function createRowModeController({ finishBindingUiMutation, invoke, renderBindings, t }) {
+export function createRowModeController({ bindingEdits, renderBindings, t }) {
   function createRowMode(binding) {
     const modeDropdown = document.createElement("div");
     modeDropdown.className = "target-dropdown mode-dropdown";
@@ -60,31 +60,26 @@ export function createRowModeController({ finishBindingUiMutation, invoke, rende
     };
 
     const applyModeSelection = async (nextModeValue) => {
+      const draft = structuredClone(binding);
       if (nextModeValue === "button_toggle" || nextModeValue === "button_match") {
-        const keepButtonAction = effectiveIsButton(binding) && binding.action !== "ToggleMute";
-        binding.control_kind = "Button";
+        const keepButtonAction = effectiveIsButton(draft) && draft.action !== "ToggleMute";
+        draft.control_kind = "Button";
         if (!keepButtonAction) {
-          binding.action = "ToggleMute";
+          draft.action = "ToggleMute";
         }
-        binding.mute_behavior = nextModeValue === "button_match" ? "SetFromValue" : "ToggleOnPress";
-        if (binding.mute_control && typeof binding.mute_control === "object") {
-          binding.mute_control.mute_behavior = binding.mute_behavior;
+        draft.mute_behavior = nextModeValue === "button_match" ? "SetFromValue" : "ToggleOnPress";
+        if (draft.mute_control && typeof draft.mute_control === "object") {
+          draft.mute_control.mute_behavior = draft.mute_behavior;
         }
-      } else if (nextModeValue === "fader_rel") {
-        binding.control_kind = "Continuous";
-        binding.mode = "Relative";
-        binding.relative_format = normalizeRelativeFormat(binding.relative_format);
-        binding.action = "Volume";
       } else {
-        binding.control_kind = "Continuous";
-        binding.mode = "Absolute";
-        binding.relative_format = normalizeRelativeFormat(binding.relative_format);
-        binding.action = "Volume";
+        draft.control_kind = "Continuous";
+        draft.mode = nextModeValue === "fader_rel" ? "Relative" : "Absolute";
+        draft.relative_format = normalizeRelativeFormat(draft.relative_format);
+        draft.action = "Volume";
       }
 
-      await invoke("add_binding", { binding });
+      await bindingEdits.save(binding, draft);
       renderBindings();
-      finishBindingUiMutation("mode change");
     };
 
     modeOptions.forEach((option) => {
@@ -108,7 +103,11 @@ export function createRowModeController({ finishBindingUiMutation, invoke, rende
         modeDropdown.classList.remove("open");
         modeMenu.classList.add("hidden");
         modeButton.setAttribute("aria-expanded", "false");
-        await applyModeSelection(option.value);
+        try {
+          await applyModeSelection(option.value);
+        } catch (error) {
+          console.error("Failed to change binding mode:", error);
+        }
       });
       modeMenu.appendChild(optionButton);
     });

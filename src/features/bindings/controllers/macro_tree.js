@@ -1,4 +1,4 @@
-import { macroActionUsesValue, macroIntegrationActionLabel, macroActionHasTarget } from "../macro_draft.js";
+import { macroActionUsesValue, macroIntegrationActionLabel } from "../macro_draft.js";
 
 /** macro tree workflow. */
 export function createMacroTree({ elements, macroState, resolveTargetDisplay, t }) {
@@ -69,21 +69,6 @@ export function createMacroTree({ elements, macroState, resolveTargetDisplay, t 
       .trim();
     if (targets.length > 1) return `${label || "Targets"} +${targets.length - 1}`;
     return label || "Target";
-  }
-
-  function macroStepSummary(step) {
-    if (!step) return "";
-    if (step.kind === "wait") {
-      return t("macro.waitSummary", { duration: macroWaitDurationLabel(step) });
-    }
-    if (step.kind === "parallel") {
-      const count = Array.isArray(step.steps) ? step.steps.length : 0;
-      return t("macro.parallelSummary", { actions: macroActionCountLabel(count) });
-    }
-    if (!String(step.action || "").trim() || !macroActionHasTarget(step)) {
-      return t("macro.chooseAction");
-    }
-    return `${macroActionTitle(step.action, step)} - ${macroTargetTitle(step)}`;
   }
 
   function macroWaitDurationLabel(step) {
@@ -197,7 +182,6 @@ export function createMacroTree({ elements, macroState, resolveTargetDisplay, t 
   return {
     macroActionTitle,
     macroTargetTitle,
-    macroStepSummary,
     macroWaitDurationLabel,
     macroActionCountLabel,
     macroPathKey,

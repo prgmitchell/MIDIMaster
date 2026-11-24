@@ -67,13 +67,22 @@ pub fn set_audio_meter_samples(
 }
 
 #[tauri::command]
+pub(crate) fn edit_profile_bindings(
+    state: State<AppState>,
+    expected_profile: String,
+    edits: binding_services::BindingEdits,
+) -> Result<Vec<String>, String> {
+    binding_services::commit_binding_edits(state.inner(), Some(&expected_profile), edits)
+}
+
+#[tauri::command]
 pub fn add_binding(state: State<AppState>, binding: Binding) -> Result<(), String> {
     binding_services::add_binding(state.inner(), binding)
 }
 
 #[tauri::command]
 pub async fn remove_binding(state: State<'_, AppState>, binding: Binding) -> Result<(), String> {
-    binding_services::remove_binding(state.inner(), binding).await
+    binding_services::remove_binding(state.inner(), binding)
 }
 
 #[tauri::command]

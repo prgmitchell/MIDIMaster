@@ -2,11 +2,10 @@
 export function createRowNameController({
   beginBindingEdit,
   fallbackNameFor,
-  finishBindingUiMutation,
+  bindingEdits,
   flushPendingRerender,
   getEditingId,
   getPendingFocusId,
-  invoke,
   nameDrafts,
   setEditingId,
   setPendingFocusId,
@@ -82,12 +81,16 @@ export function createRowNameController({
         const draftValue = nameDrafts.get(binding.id);
         const trimmedName = (draftValue ?? nameInput.value).trim();
         nameDrafts.delete(binding.id);
-        binding.name = trimmedName || fallbackName;
+        const draft = { ...binding, name: trimmedName || fallbackName };
         setEditingId(null);
         setPendingFocusId(null);
-        await invoke("add_binding", { binding });
-        flushPendingRerender({ fallbackRender: true });
-        finishBindingUiMutation("rename binding");
+        try {
+          await bindingEdits.save(binding, draft);
+        } catch (error) {
+          console.error("Failed to rename binding:", error);
+        } finally {
+          flushPendingRerender({ fallbackRender: true });
+        }
       });
       nameField = nameInput;
     } else {

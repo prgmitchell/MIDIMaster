@@ -1,5 +1,7 @@
 import {
   normalizeOsdAnchor,
+  normalizeOsdAppearance,
+  normalizeOsdStyle,
   toOsdCommandSettings,
   fromOsdSettings,
   DEFAULT_OSD_SETTINGS,
@@ -145,7 +147,71 @@ export function createOsdSettings({
     return list.find((monitor) => Boolean(monitor?.is_primary)) || list[0];
   }
 
+  function bindUi({ lifetime, getMonitorOptions, renderMonitorDropdownOptions }) {
+    const panel = elements.settingsPanel;
+    lifetime.listen(window, "resize", scheduleOsdAppearanceSync);
+    if (panel && "ResizeObserver" in window && elements.osdPositionPicker) {
+      const observer = new ResizeObserver(scheduleOsdAppearanceSync);
+      viewState.osdPreviewResizeObserver = observer;
+      observer.observe(elements.osdPositionPicker);
+      const screen = elements.osdPositionPicker.querySelector(".settings-osd-preview-screen");
+      if (screen) observer.observe(screen);
+    }
+    lifetime.listen(panel, "click", (event) => {
+      const button = event.target.closest("[data-osd-style-option]");
+      if (button && panel.contains(button) && elements.osdStyleSelect) {
+        elements.osdStyleSelect.value = normalizeOsdStyle(button.dataset.osdStyleOption);
+        elements.osdStyleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    lifetime.listen(elements.osdStyleSelect, "change", () => {
+      applyOsdSettings({ style: normalizeOsdStyle(elements.osdStyleSelect.value) });
+    });
+    for (const [key, input] of [["opacity", elements.osdTransparencyInput], ["scale", elements.osdScaleInput]]) {
+      const patch = () => ({ [key]: normalizeOsdAppearance({ [key]: Number(input.value) / 100 })[key] });
+      lifetime.listen(input, "input", () => syncOsdAppearanceUi({ ...getOsdSettings(), ...patch() }));
+      lifetime.listen(input, "change", () => applyOsdSettings(patch()));
+    }
+    if (elements.osdEnabledToggle) {
+      lifetime.listen(elements.osdEnabledToggle, "change", () => {
+        const enabled =
+          elements.osdEnabledToggle.type === "checkbox"
+            ? elements.osdEnabledToggle.checked
+            : elements.osdEnabledToggle.value === "enabled";
+        applyOsdSettings({ enabled });
+      });
+    }
+
+    if (elements.osdMonitorSelect) {
+      lifetime.listen(elements.osdMonitorSelect, "change", () => {
+        const nextIndex = Number(elements.osdMonitorSelect.value || 0);
+        const selectedOption = elements.osdMonitorSelect.options[elements.osdMonitorSelect.selectedIndex];
+        const monitorName = selectedOption?.dataset?.rawName || null;
+        const monitorId = selectedOption?.dataset?.stableId || null;
+        applyOsdSettings({ monitorIndex: nextIndex, monitorName, monitorId });
+        const currentMonitors = typeof getMonitorOptions === "function" ? getMonitorOptions() || [] : [];
+        renderMonitorDropdownOptions(currentMonitors);
+      });
+    }
+
+    if (elements.osdLabelModeSelect) {
+      lifetime.listen(elements.osdLabelModeSelect, "change", () => {
+        applyOsdSettings({ showBindingName: elements.osdLabelModeSelect.value === "binding" });
+      });
+    }
+
+    if (elements.osdPositionPicker) {
+      lifetime.listen(elements.osdPositionPicker, "click", (event) => {
+        const dot = event.target.closest(".osd-position-dot");
+        if (!dot) return;
+        const anchor = dot.dataset.anchor || "top-right";
+        applyOsdSettings({ anchor });
+      });
+    }
+  }
+
   return {
+    bindUi,
     scheduleOsdAppearanceSync,
     syncOsdSettingsUi,
     applyOsdSettings,

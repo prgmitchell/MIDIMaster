@@ -32,7 +32,7 @@ where
         .save(&updated_settings)
         .map_err(|err| err.to_string())?;
     if let Some(profile) = &updated_profile {
-        if let Err(error) = state.profile_store.save_profile(profile.clone()) {
+        if let Err(error) = state.profile_store.save_configuration(profile.clone()) {
             if let Err(rollback_error) = state.app_settings_store.save(&settings) {
                 run_logger::error(
                     "settings",

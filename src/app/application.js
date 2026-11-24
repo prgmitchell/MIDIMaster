@@ -1,3 +1,5 @@
+import { createProfileWriteQueue } from "../features/profiles/write_queue.js";
+import { createBindingPersistence } from "../features/bindings/controllers/binding_persistence.js";
 import { getFaderModifiers } from "../core/fader_modifiers.js";
 import { createApplicationState } from "./application_state.js";
 import { createClientPreferences } from "./controllers/client_preferences.js";
@@ -98,6 +100,22 @@ export function createApplication() {
     event.preventDefault();
   });
 
+  function setBindings(bindings) {
+    profileState.bindings = bindings;
+    profileState.bindingLookupIndex = createBindingLookupIndex(bindings);
+    try {
+      getPluginHost()?.setBindings?.(bindings);
+    } catch (error) {
+      diagnosticError("plugin_bindings_update_failed", error);
+    }
+  }
+
+  const profileWrites = createProfileWriteQueue();
+  const bindingEdits = createBindingPersistence({
+    profileWrites, invoke, getBindings: () => profileState.bindings, setBindings,
+    getProfileName: () => profileState.name,
+  });
+
   function getPluginHost() {
     return features.plugins?.getPluginHost?.() || null;
   }
@@ -130,7 +148,6 @@ export function createApplication() {
     sidebarCollapseToggle,
     appPages,
     appNavItems,
-    osd,
   } = dom.shell;
   const { connectionsPanel } = dom.connections;
   const { resetAppDataButton } = dom.settings;
@@ -207,7 +224,6 @@ export function createApplication() {
   });
 
   const {
-    stableStringify,
     integrationTargetKey,
     normalizeSessionKey,
     resolveOsdTarget,
@@ -431,7 +447,7 @@ export function createApplication() {
     midiOutputStorageKey,
     profileState,
     settingsStore,
-    stripDeviceStateSuffix: (...args) => stripDeviceStateSuffix(...args),
+    stripDeviceStateSuffix,
   });
 
   const bindingFeedback = createBindingFeedback({ features });
@@ -450,11 +466,11 @@ export function createApplication() {
     findBindingSlider: (...args) => bindingDisplay.findBindingSlider(...args),
     findInlineMuteButton: (...args) => bindingFeedback.findInlineMuteButton(...args),
     flashBindingTrigger: (...args) => bindingDisplay.flashBindingTrigger(...args),
-    knownMidiRouteCount: (...args) => knownMidiRouteCount(...args),
+    knownMidiRouteCount,
     getTargetMetadata: () => [audioState.sessions, audioState.playbackDevices,
       audioState.recordingDevices, audioState.focusedSession],
     liveState,
-    midiControlSignature: (...args) => midiControlSignature(...args),
+    midiControlSignature,
     profileState,
     resolveTargetVolume,
     resolveTargetKey,
@@ -475,12 +491,10 @@ export function createApplication() {
   });
 
   const bindingCreation = createBindingCreation({
-    invoke,
     features,
     viewState,
     showAlert,
-    scheduleBindingsSave,
-    syncPluginHostBindings,
+    bindingEdits,
     learnPanel,
     learnPanelActions,
     learnPanelCancel,
@@ -493,9 +507,10 @@ export function createApplication() {
   });
 
   const backendEvents = createBackendEvents({
-    applyOsdAppearanceAttributes: (...args) => applyOsdAppearanceAttributes(...args),
+    setBindings,
+    applyOsdAppearanceAttributes,
     defaultOsdSettings,
-    diagnosticError: (...args) => diagnosticError(...args),
+    diagnosticError,
     eventSubscriptions,
     features,
     findInlineMuteButton: (...args) => bindingFeedback.findInlineMuteButton(...args),
@@ -508,8 +523,8 @@ export function createApplication() {
     queueMidiUiEvent,
     queuePerfMidiDispatch,
     queueVolumeUpdatePayload: (...args) => midiDisplay.queueVolumeUpdatePayload(...args),
-    refreshSessions: (...args) => refreshSessions(...args),
-    requestBindingsRerender: (...args) => requestBindingsRerender(...args),
+    refreshSessions,
+    requestBindingsRerender,
     setInlineMuteButtonState: (...args) => bindingFeedback.setInlineMuteButtonState(...args),
     showAlert,
     syncButtonValueVisual: (...args) => midiDisplay.syncButtonValueVisual(...args),
@@ -521,34 +536,35 @@ export function createApplication() {
   });
 
   const startup = createStartup({
-    applyGlobalAppearance: (...args) => applyGlobalAppearance(...args),
-    applyOsdAppearanceAttributes: (...args) => applyOsdAppearanceAttributes(...args),
+    setBindings,
+    applyGlobalAppearance,
+    applyOsdAppearanceAttributes,
 
-    bindSystemAppearanceListener: (...args) => bindSystemAppearanceListener(...args),
-    bindTauriApi: (...args) => bindTauriApi(...args),
+    bindSystemAppearanceListener,
+    bindTauriApi,
     clientPreferences,
-    diagnosticError: (...args) => diagnosticError(...args),
-    diagnosticInfo: (...args) => diagnosticInfo(...args),
+    diagnosticError,
+    diagnosticInfo,
     features,
     getSavedMidiDeviceIds: (...args) => preferenceActions.getSavedMidiDeviceIds(...args),
     hydrateClientPreferences: (...args) => preferenceActions.hydrateClientPreferences(...args),
     invoke,
 
-    loadStoredAppearance: (...args) => loadStoredAppearance(...args),
+    loadStoredAppearance,
     mainScreen,
     maybePromptMidiDeviceInventoryConsent: () => maybePromptMidiDeviceInventoryConsent(),
     midiStatus,
     osdState,
     profileState,
     queueMidiDeviceInventorySubmit: (reason) => queueMidiDeviceInventorySubmit(reason),
-    recordPerformanceResult: (...args) => recordPerformanceResult(...args),
+    recordPerformanceResult,
 
-    refreshSessions: (...args) => refreshSessions(...args),
-    requestBindingsRerender: (...args) => requestBindingsRerender(...args),
+    refreshSessions,
+    requestBindingsRerender,
     settingsStore,
     setupListeners: (...args) => backendEvents.setupListeners(...args),
     showAlert,
-    showUpdateAvailableDialog: (...args) => showUpdateAvailableDialog(...args),
+    showUpdateAvailableDialog,
 
     startupState,
     viewState,
@@ -568,7 +584,7 @@ export function createApplication() {
     getConnectionsPanel: () => connectionsPanel,
     getBindingTargets,
     setBindingTargets,
-    saveBindingsForProfile,
+    bindingEdits,
     isBindingInteractionActive: bindingDisplay.isBindingInteractionActive,
     requestBindingsRerender,
     mountConnectionsTabs: (options) => features.connections?.mountConnectionsTabs?.(options),
@@ -624,10 +640,8 @@ export function createApplication() {
       profileState.pluginSettings = next;
     },
     getBindings: () => profileState.bindings,
-    setBindings: (next) => {
-      profileState.bindings = next;
-      rebuildBindingLookupIndex();
-    },
+    setBindings,
+    profileWrites,
     normalizeBinding,
     bindingFallbackName,
     renderBindings: (...args) => features.bindings?.renderBindings(...args),
@@ -640,7 +654,6 @@ export function createApplication() {
     applyOsdSettings: (...args) => features.settings?.applyOsdSettings(...args),
     getCurrentMidiPreference: () =>
       features.midi?.getDesiredMidiPreference?.() || profileState.midiPreference,
-    getActiveProfileMidiPreference: () => profileState.midiPreference,
     setActiveProfileMidiPreference: (next) => {
       profileState.midiPreference = normalizeMidiPreference(next);
     },
@@ -699,9 +712,6 @@ export function createApplication() {
     getPlaybackDevices: () => audioState.playbackDevices,
     getRecordingDevices: () => audioState.recordingDevices,
     getBindings: () => profileState.bindings,
-    setBindings: (next) => {
-      profileState.bindings = next;
-    },
     bindingFallbackName,
     controlLabel,
     getMidiDeviceLabel: (id) => features.midi?.getDeviceMappingLabel(id) || preferenceActions.midiDeviceLabelForBindingDevice(id),
@@ -709,7 +719,7 @@ export function createApplication() {
     getVolumeForTarget,
     getMuteForTarget,
     i18n: { t },
-    saveBindingsForProfile,
+    bindingEdits,
     getFaderCurvePresets: () => settingsStore.get().faderCurvePresets || [],
     saveFaderCurvePresets,
     getPluginHost,
@@ -733,7 +743,6 @@ export function createApplication() {
     resolveOsdTarget,
     showAlert: (title, message = "") => showAlert(title, message),
     showConfirm: (options = {}) => alertsController.showConfirm(options),
-    onBindingsRendered: rebuildBindingLookupIndex,
   });
   const midiInventoryController = createMidiInventoryController({
     invoke,
@@ -772,9 +781,7 @@ export function createApplication() {
       queueMidiDeviceInventorySubmit("device_inventory_changed");
     },
     onProfileDeviceSelected: async (nextPreference) => {
-      const normalized = normalizeMidiPreference(nextPreference);
-      profileState.midiPreference = normalized;
-      await features.profiles?.updateProfileMidiPreference?.(normalized);
+      await features.profiles.updateProfileMidiPreference(nextPreference);
       queueMidiDeviceInventorySubmit("midi_routes_changed");
     },
   });
@@ -785,10 +792,6 @@ export function createApplication() {
 
   function bindingFallbackName(_binding, index) {
     return t("bindings.bindingFallback", { number: index + 1 });
-  }
-
-  function rebuildBindingLookupIndex() {
-    profileState.bindingLookupIndex = createBindingLookupIndex(profileState.bindings);
   }
 
   function requestBindingsRerender(reason = "") {
@@ -904,24 +907,6 @@ export function createApplication() {
       localStorage.clear();
       window.location.reload();
     });
-  }
-
-  async function saveBindingsForProfile() {
-    if (features.profiles && typeof features.profiles.saveBindingsForProfile === "function") {
-      return features.profiles.saveBindingsForProfile();
-    }
-  }
-
-  function scheduleBindingsSave(reason = "binding update") {
-    saveBindingsForProfile()?.catch((error) => {
-      console.error(`Failed to save profile after ${reason}:`, error);
-    });
-  }
-
-  function syncPluginHostBindings() {
-    try {
-      getPluginHost()?.setBindings?.(profileState.bindings);
-    } catch {}
   }
 
   lifetime.listen(document, "pointermove", (event) => {

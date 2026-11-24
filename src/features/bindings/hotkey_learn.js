@@ -7,7 +7,7 @@ export function createHotkeyLearnController({
   windowRef = window,
 }) {
   let activeBindingId = null;
-  let cleanup = null;
+  let finish = null;
 
   function hidePanel() {
     dom.learnPanel?.classList.add("hidden");
@@ -18,10 +18,7 @@ export function createHotkeyLearnController({
   }
 
   function stop(result = null) {
-    cleanup?.();
-    cleanup = null;
-    activeBindingId = null;
-    hidePanel();
+    finish?.(result);
     return result;
   }
 
@@ -38,10 +35,13 @@ export function createHotkeyLearnController({
 
     return new Promise((resolve) => {
       let settled = false;
-      const finish = (mapping) => {
+      finish = (mapping) => {
         if (settled) return;
         settled = true;
-        stop(mapping);
+        cleanup();
+        finish = null;
+        activeBindingId = null;
+        hidePanel();
         resolve(mapping);
       };
       const onCancel = () => finish(null);
@@ -63,12 +63,12 @@ export function createHotkeyLearnController({
       dom.learnPanelCancel?.addEventListener("click", onCancel);
       dom.learnPanelClose?.addEventListener("click", onCancel);
       dom.learnPanel?.addEventListener("click", onOverlay);
-      cleanup = () => {
+      function cleanup() {
         windowRef.removeEventListener("keydown", onKeydown, true);
         dom.learnPanelCancel?.removeEventListener("click", onCancel);
         dom.learnPanelClose?.removeEventListener("click", onCancel);
         dom.learnPanel?.removeEventListener("click", onOverlay);
-      };
+      }
     });
   }
 

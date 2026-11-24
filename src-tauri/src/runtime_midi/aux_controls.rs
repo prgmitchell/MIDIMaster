@@ -243,7 +243,7 @@ pub(super) fn handle_aux_or_unmatched(
                 if updated_targets.is_some() {
                     state
                         .profile_store
-                        .save_profile(updated_profile.clone())
+                        .save_configuration(updated_profile.clone())
                         .map_err(|err| err.to_string())?;
                     *guard = Some(AppState::profile_snapshot(updated_profile.clone()));
                     state.sync_feedback_values(&updated_profile);

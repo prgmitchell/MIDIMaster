@@ -234,7 +234,35 @@ export function createUpdaterController({ invoke, listen, dom, translate, getSet
     unlisten = null;
   }
 
+  function bindUi(lifetime, onUpdateAvailableClick) {
+    if (dom.checkForUpdatesButton) {
+      lifetime.listen(dom.checkForUpdatesButton, "click", () => {
+        if (state.available) {
+          installAvailableUpdate();
+          return;
+        }
+        checkForUpdates();
+      });
+    }
+    if (dom.topbarUpdateButton) {
+      lifetime.listen(dom.topbarUpdateButton, "click", () => {
+        if (!state.available || state.downloading) return;
+        if (typeof onUpdateAvailableClick === "function") {
+          onUpdateAvailableClick({
+            currentVersion: state.currentVersion,
+            latestVersion: state.latestVersion,
+            body: state.body,
+          });
+        }
+      });
+    }
+    setStaticStatus("settings.noUpdateCheckYet");
+    render();
+    loadCurrentVersion().catch(() => {});
+  }
+
   return {
+    bindUi,
     state,
     render,
     renderSidebarVersion,

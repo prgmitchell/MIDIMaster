@@ -1,7 +1,6 @@
 import { createMacroTree } from "./macro_tree.js";
 import { createMacroConfig } from "./macro_config.js";
 import { createMacroDrag } from "./macro_drag.js";
-import { createMacroActionControls } from "./macro_action_controls.js";
 
 import { createMacroCards } from "./macro_cards.js";
 import { createMacroActionProperties } from "./macro_action_properties.js";
@@ -24,7 +23,6 @@ export function createMacroWorkspace({
   const {
     macroActionTitle,
     macroTargetTitle,
-    macroStepSummary,
     macroWaitDurationLabel,
     macroActionCountLabel,
     macroPathKey,
@@ -48,7 +46,6 @@ export function createMacroWorkspace({
     ensureMacroConfigDom,
     updateMacroDraft,
     commitMacroDraftEdit,
-    setMacroActionFromTargetSelect,
     setMacroActionTargetFromTargetSelect,
     applyMacroActionOptionToStep,
     buildMacroStateSelect,
@@ -56,12 +53,12 @@ export function createMacroWorkspace({
     lifetime,
     createBindingConfigButton,
     elements,
-    getConfigBinding: (...args) => getConfigBinding(...args),
+    getConfigBinding,
     macroPathForFirstStep,
     macroState,
     normalizeMacroSelectedPath,
-    renderConfigModal: (...args) => renderConfigModal(...args),
-    renderConfigPreview: (...args) => renderConfigPreview(...args),
+    renderConfigModal,
+    renderConfigPreview,
     renderMacroEditor: (...args) => renderMacroEditor(...args),
     t,
     wireMacroButton,
@@ -70,16 +67,10 @@ export function createMacroWorkspace({
   const { cancelMacroDrag, endMacroDrag, updateMacroDrag, createMacroDragHandle } = createMacroDrag({
     elements,
     findMacroPathForStep,
-    getConfigBinding: (...args) => getConfigBinding(...args),
+    getConfigBinding,
     getMacroStepAtPath,
     macroState,
     updateMacroDraft,
-  });
-
-  const { buildMacroActionControls } = createMacroActionControls({
-    buildMacroStateSelect,
-    getConfigBinding: (...args) => getConfigBinding(...args),
-    startHotkeyLearn,
   });
 
   const {
@@ -144,7 +135,7 @@ export function createMacroWorkspace({
     macroPathForFirstStep,
     macroState,
     normalizeMacroSelectedPath,
-    renderConfigPreview: (...args) => renderConfigPreview(...args),
+    renderConfigPreview,
     renderMacroProperties,
     renderMacroStepCard,
     scrollSelectedMacroStepIntoView,

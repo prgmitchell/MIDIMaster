@@ -1,19 +1,12 @@
-import { buildPersistedMidiPreference as buildPersistedMidiDevicePreference } from "../../../core/midi_preferences.js";
-
-/** profile menu workflow. */
 export function createProfileMenu({
-  buildPersistedOsdSettings,
+  listProfilesWithDefault,
   closeProfileDropdown,
   createProfileByName,
   d,
-  defaults,
   deleteProfileByName,
   exportProfileByName,
   getActiveProfileName,
-  getCurrentMidiPreference,
-  getOsdSettings,
   importProfileFromFile,
-  invoke,
   loadProfileByName,
   renderProfilePage,
   setProfileSelection,
@@ -22,26 +15,7 @@ export function createProfileMenu({
   viewState,
 }) {
   async function refreshProfiles(preferredName = "") {
-    let profiles = await invoke("list_profiles");
-
-    const hasDefault = profiles.some((p) => p && p.name === "Default");
-    if (!hasDefault) {
-      await invoke("save_profile", {
-        profile: {
-          name: "Default",
-          bindings: [],
-          osd_settings: buildPersistedOsdSettings(
-            typeof getOsdSettings === "function" ? getOsdSettings() || defaults : defaults,
-          ),
-          plugin_settings: {},
-          midi_device_preference: buildPersistedMidiDevicePreference(
-            typeof getCurrentMidiPreference === "function" ? getCurrentMidiPreference() : null,
-          ),
-          midi_device_preference_set: true,
-        },
-      });
-      profiles = await invoke("list_profiles");
-    }
+    const profiles = await listProfilesWithDefault();
 
     const currentSelection =
       preferredName ||

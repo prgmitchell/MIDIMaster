@@ -1,26 +1,11 @@
-import {
-  normalizeMidiDeviceInventorySettings,
-  MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
-} from "../../../app/midi_device_inventory.js";
-
-/** navigation workflow. */
 export function createNavigation({
   elements,
   defaultSettingsSection,
-  getAppSettings,
   syncAppearanceControls,
   syncOsdAppearanceControls,
   viewState,
   virtualAudio,
 }) {
-  function syncMidiDeviceInventoryToggle(settings = null) {
-    if (!elements.midiDeviceInventoryConsentToggle) return;
-    const current = settings || (typeof getAppSettings === "function" ? getAppSettings() || {} : {});
-    const inventory = normalizeMidiDeviceInventorySettings(current);
-    elements.midiDeviceInventoryConsentToggle.checked =
-      inventory.consent === "enabled" && inventory.noticeVersion >= MIDI_DEVICE_INVENTORY_NOTICE_VERSION;
-  }
-
   function closeSettingsPanel() {
     if (!elements.settingsPanel) return;
     virtualAudio.setActive(false).catch(() => {});
@@ -106,8 +91,21 @@ export function createNavigation({
     });
   }
 
+  function bindUi(lifetime) {
+    const panel = elements.settingsPanel;
+    if (!panel) return;
+    activateSettingsSection(defaultSettingsSection);
+    lifetime.listen(window, "resize", () => scheduleSettingsNavIndicatorSync());
+    lifetime.listen(panel, "click", (event) => {
+      const section = event.target.closest("[data-settings-section]");
+      if (section && panel.contains(section)) activateSettingsSection(section.dataset.settingsSection);
+      if (event.target === panel && panel.classList.contains("target-panel")) closeSettingsPanel();
+    });
+    lifetime.listen(elements.settingsPanelClose, "click", closeSettingsPanel);
+  }
+
   return {
-    syncMidiDeviceInventoryToggle,
+    bindUi,
     closeSettingsPanel,
     openSettingsPanel,
     activateSettingsSection,

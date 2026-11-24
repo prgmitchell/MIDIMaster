@@ -47,6 +47,18 @@ function createReconnectController({
   }
   return { reset, grow, run };
 }
+function bindAutoConnectPreference(input, profile, applyProfileSettings) {
+  applyProfileSettings(profile?.get?.());
+  input?.addEventListener("change", async () => {
+    const auto_connect = input.checked;
+    applyProfileSettings({ auto_connect });
+    try {
+      await profile?.set?.({ ...profile.get?.(), auto_connect });
+    } catch (error) {
+      console.error("Failed to save auto-connect preference:", error);
+    }
+  });
+}
 
 // src-tauri/builtin_plugins/obs/src/protocol.js
 var LOCAL_WRITE_QUIET_MS = 1200;
@@ -291,18 +303,7 @@ function createConnectionTab({
           el?.addEventListener("change", saveObsSettingsToStorage);
           el?.addEventListener("input", saveObsSettingsToStorage);
         });
-        applyProfileSettings(ctx.profile?.get?.());
-        if (ui.autoConnectInput) {
-          ui.autoConnectInput.addEventListener("change", () => {
-            const next = Boolean(ui.autoConnectInput.checked);
-            applyProfileSettings({ auto_connect: next });
-            try {
-              const current = ctx.profile?.get?.() || {};
-              ctx.profile?.set?.({ ...current, auto_connect: next });
-            } catch {
-            }
-          });
-        }
+        bindAutoConnectPreference(ui.autoConnectInput, ctx.profile, applyProfileSettings);
         if (ui.connectBtn) {
           ui.connectBtn.addEventListener("click", () => {
             if (state.connecting) return;

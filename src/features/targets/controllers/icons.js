@@ -104,12 +104,8 @@ export function createIcons({
   }
 
   return {
-    mediaIconForAction,
     mediaActionOptions,
     closeTargetMenus,
-    systemTargetIconKind,
-    createSystemTargetIcon,
-    createFallbackTargetIcon,
     createTargetIcon,
   };
 }

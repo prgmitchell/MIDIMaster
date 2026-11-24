@@ -98,19 +98,30 @@ export const faderDetails = [
 
 export const targetDetails = [
   [
+    "cancelling a new soundboard target leaves the saved binding intact throughout editing",
+    async (app) => {
+      const original = await activeBinding(app, "editor-hotkey");
+      await target(app, "Soundboard");
+      await app.shown("#binding-config-soundboard-waveform");
+      assert.deepEqual(await activeBinding(app, "editor-hotkey"), original);
+      await app.click("#binding-config-cancel");
+      await app.hidden("#binding-config-panel");
+      assert.deepEqual(await activeBinding(app, "editor-hotkey"), original);
+    },
+  ],
+  [
     "hotkey learning records keyboard input and cancellation preserves the draft",
     async (app) => {
       // Selecting an existing target removes it. Re-add it to start learning.
       await target(app, "Hotkey");
       await app.hidden("#target-panel");
+      await eventually(async () => !(await activeBinding(app, "editor-hotkey")).hotkey, "original hotkey removed");
+      const original = await activeBinding(app, "editor-hotkey");
       await target(app, "Hotkey");
       await app.shown("#learn-panel");
       await app.click("#learn-panel-cancel");
       await app.hidden("#learn-panel");
-      assert.equal(
-        (await activeBinding(app, "editor-hotkey"))?.hotkey ?? null,
-        null,
-      );
+      assert.deepEqual(await activeBinding(app, "editor-hotkey"), original);
       await target(app, "Hotkey");
       await app.shown("#learn-panel");
       await app.key("F11", 122, 2);

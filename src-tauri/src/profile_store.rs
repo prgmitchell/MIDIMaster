@@ -8,6 +8,13 @@ use std::time::SystemTime;
 
 type Result<T> = anyhow::Result<T>;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProfileWrite {
+    Replace,
+    Create,
+    EditConfiguration,
+}
+
 #[derive(Clone)]
 pub struct ProfileStore {
     storage: DurableJsonStore,
@@ -63,18 +70,23 @@ impl ProfileStore {
     }
 
     pub fn save_profile(&self, profile: Profile) -> Result<()> {
-        self.write_profile(profile, false)
+        self.write_profile(profile, ProfileWrite::Replace)
     }
 
     pub fn create_profile(&self, profile: Profile) -> Result<()> {
-        self.write_profile(profile, true)
+        self.write_profile(profile, ProfileWrite::Create)
     }
 
-    fn write_profile(&self, mut profile: Profile, create_only: bool) -> Result<()> {
+    /// Runtime checkpoints can advance independently of the active binding snapshot.
+    pub(crate) fn save_configuration(&self, profile: Profile) -> Result<()> {
+        self.write_profile(profile, ProfileWrite::EditConfiguration)
+    }
+
+    fn write_profile(&self, mut profile: Profile, mode: ProfileWrite) -> Result<()> {
         profile.strip_derived_integration_icons();
         let mut cache = self.cache()?;
         let cache = cache.as_mut().expect("profile cache initialized");
-        if create_only
+        if mode == ProfileWrite::Create
             && cache
                 .profiles
                 .iter()
@@ -87,6 +99,12 @@ impl ProfileStore {
             .iter_mut()
             .find(|existing| existing.name == profile.name)
         {
+            if mode == ProfileWrite::EditConfiguration {
+                profile.target_states = crate::profile_target_state::states_for_profile(
+                    &profile,
+                    std::mem::take(&mut existing.target_states),
+                );
+            }
             *existing = profile;
         } else {
             candidate.push(profile);
@@ -105,13 +123,15 @@ impl ProfileStore {
     pub(crate) fn update_target_states(
         &self,
         name: &str,
-        states: Vec<crate::model::ProfileTargetState>,
+        entries: Vec<crate::model::ProfileTargetState>,
     ) -> Result<()> {
         let mut cache = self.cache()?;
         let cache = cache.as_mut().expect("profile cache initialized");
         let Some(profile) = cache.profiles.iter().find(|profile| profile.name == name) else {
             return Ok(());
         };
+        // Binding edits and checkpoints may reach the store in either order.
+        let states = crate::profile_target_state::states_for_profile(profile, entries);
         if profile.target_states == states {
             return Ok(());
         }

@@ -100,26 +100,7 @@ pub(super) fn trigger_supplemental_soundboard(
     }
     #[cfg(feature = "perf-audit")]
     crate::perf_audit::record_unverified_action();
-    let result = binding
-        .soundboard
-        .as_ref()
-        .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())
-        .and_then(|mapping| state.soundboard.play_binding(&binding.id, mapping));
-    if let Err(err) = result {
-        run_logger::warn(
-            "bindings",
-            "soundboard_play_failed",
-            &format!("binding_id={} error={}", binding.id, err),
-        );
-        binding_actions::emit_localized_action_error(
-            app,
-            "soundboard_play_failed",
-            &binding.id,
-            "dialogs.soundboardPlaybackFailedTitle",
-            "dialogs.soundboardPlaybackFailedMessage",
-            serde_json::json!({ "message": err }),
-        );
-    }
+    let _ = binding_actions::play_soundboard_action(state, app, binding, None);
 }
 
 pub(super) fn handle_special_action(
@@ -154,46 +135,12 @@ pub(super) fn handle_special_action(
         }
         #[cfg(feature = "perf-audit")]
         crate::perf_audit::record_unverified_action();
-        let result = binding
-            .soundboard
-            .as_ref()
-            .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())
-            .and_then(|mapping| state.soundboard.play_binding(&binding.id, mapping));
-        if let Err(err) = result {
-            run_logger::warn(
-                "bindings",
-                "soundboard_play_failed",
-                &format!("binding_id={} error={}", binding.id, err),
-            );
-            let _ = app.emit(
-                "binding_action_error",
-                serde_json::json!({
-                    "reason": "soundboard_play_failed",
-                    "binding_id": binding.id,
-                    "title_key": "dialogs.soundboardPlaybackFailedTitle",
-                    "message_key": "dialogs.soundboardPlaybackFailedMessage",
-                    "params": { "message": err },
-                }),
-            );
-        }
+        let _ = binding_actions::play_soundboard_action(state, app, binding, None);
         return Ok(true);
     }
 
-    let shared_button_action = matches!(
-        binding.action,
-        model::BindingAction::MediaPlayPause
-            | model::BindingAction::MediaNextTrack
-            | model::BindingAction::MediaPrevTrack
-            | model::BindingAction::MediaStop
-            | model::BindingAction::Hotkey
-            | model::BindingAction::OpenApplication
-            | model::BindingAction::RunAutoHotkeyScript
-            | model::BindingAction::FocusWindow
-            | model::BindingAction::FullScreenshot
-            | model::BindingAction::SnipScreenshot
-            | model::BindingAction::ToggleScreenRecording
-    );
-    if shared_button_action {
+    // SwitchProfile has already handled its special release feedback above.
+    if binding_actions::is_press_only_button_action(&binding.action) {
         #[cfg(feature = "perf-audit")]
         if event.value > 0 {
             crate::perf_audit::record_unverified_action();

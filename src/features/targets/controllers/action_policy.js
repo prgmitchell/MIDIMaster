@@ -322,14 +322,5 @@ export function createActionPolicy({
     return actions;
   }
 
-  return {
-    normalizeButtonActionOption,
-    valueActionOption,
-    addValueAction,
-    captureActionOptions,
-    collectIntegrationTargetOptions,
-    hydrateIntegrationActionsForTarget,
-    loadMacroNavActionOptionsForDropdown,
-    buildActionOptionsForTargetOption,
-  };
+  return { buildActionOptionsForTargetOption };
 }

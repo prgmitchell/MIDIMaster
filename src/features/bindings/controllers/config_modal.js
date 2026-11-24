@@ -1,10 +1,7 @@
 import {
-  normalizeSoundboardMapping,
-  setBindingTargets as setTargets,
   getBindingTargets as getTargets,
 } from "../../../core/binding_model.js";
 import {
-  cloneBindingDraft,
   isSoundboardTarget,
   ensureBindingShape,
   isMacroTarget,
@@ -23,14 +20,11 @@ export function createConfigModal({
   elements,
   editorState,
   ensureMacroConfigDom,
-  finishBindingUiMutation,
   getBindings,
   getConfigBinding,
   hotkeyLearn,
   loadSoundboardAnalysis,
   macroState,
-  persistBindingBackend,
-  renderBindings,
   renderConfigPreview,
   renderCurveCards,
   renderCustomCurveEditor,
@@ -39,7 +33,6 @@ export function createConfigModal({
   renderOutputs = () => {},
   renderSoundboardEditor,
   restoreConfigPreviewBindings,
-  setBindings,
   soundboardState,
   stopAuxLearn,
   stopConfigPreviewTimer,
@@ -51,16 +44,6 @@ export function createConfigModal({
   updateAuxLearnUi,
 }) {
   async function closeConfigModal({ commit = false } = {}) {
-    if (editorState.initialPersistence) {
-      await editorState.initialPersistence;
-      editorState.initialPersistence = null;
-    }
-    const emptySoundboardBindingToClean =
-      !commit &&
-      editorState.removeEmptySoundboardTargetOnCancel &&
-      !normalizeSoundboardMapping(editorState.draft?.soundboard)
-        ? cloneBindingDraft(getBindingById(editorState.bindingId))
-        : null;
     await stopSoundboardPreview();
     soundboardState.analysisToken += 1;
     soundboardState.virtualAudioStatusToken += 1;
@@ -81,41 +64,14 @@ export function createConfigModal({
     if (!commit) {
       await restoreConfigPreviewBindings();
     }
-    if (emptySoundboardBindingToClean) {
-      try {
-        setTargets(
-          emptySoundboardBindingToClean,
-          getTargets(emptySoundboardBindingToClean).filter(
-            (target) => !isSoundboardTarget(target),
-          ),
-        );
-        emptySoundboardBindingToClean.soundboard = null;
-        if (emptySoundboardBindingToClean.action === "Soundboard") {
-          emptySoundboardBindingToClean.action = "ToggleMute";
-        }
-        ensureBindingShape(emptySoundboardBindingToClean);
-        await persistBindingBackend(emptySoundboardBindingToClean);
-        setBindings(
-          getBindings().map((binding) =>
-            binding.id === emptySoundboardBindingToClean.id
-              ? emptySoundboardBindingToClean
-              : binding,
-          ),
-        );
-        renderBindings();
-        finishBindingUiMutation("cancel empty soundboard target");
-      } catch (error) {
-        console.error("Failed to remove canceled Soundboard target:", error);
-      }
-    }
+    editorState.previewAppliedBindings = null;
+    editorState.pendingPreview = null;
     editorState.previewOriginalBindings = null;
     editorState.acceptedTransfers.clear();
     editorState.draft = null;
     editorState.bindingId = null;
     macroState.pageOpen = false;
     editorState.soundboardPageOpen = false;
-    editorState.initialPersistence = null;
-    editorState.removeEmptySoundboardTargetOnCancel = false;
     macroState.selectedPath = null;
     if (elements.bindingConfigPanel)
       elements.bindingConfigPanel.classList.add("hidden");

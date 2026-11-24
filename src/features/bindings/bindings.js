@@ -8,7 +8,6 @@ import { createConfigEvents } from "./controllers/config_events.js";
 import { createListRenderer } from "./controllers/list_renderer.js";
 import { createEditSession } from "./controllers/edit_session.js";
 import { createMappingAssignment } from "./controllers/mapping_assignment.js";
-import { createBindingPersistence } from "./controllers/binding_persistence.js";
 import { createAuxiliaryModes } from "./controllers/auxiliary_modes.js";
 import { createConfigModal } from "./controllers/config_modal.js";
 
@@ -39,7 +38,6 @@ export function createBindingsFeature({
   getPlaybackDevices,
   getRecordingDevices,
   getBindings: readBindings,
-  setBindings: writeBindings,
   bindingFallbackName,
   controlLabel,
   getMidiDeviceLabel,
@@ -47,7 +45,7 @@ export function createBindingsFeature({
   getVolumeForTarget,
   getMuteForTarget,
   i18n,
-  saveBindingsForProfile,
+  bindingEdits,
   getFaderCurvePresets,
   saveFaderCurvePresets,
   getPluginHost,
@@ -65,7 +63,6 @@ export function createBindingsFeature({
   resolveOsdTarget,
   showConfirm,
   showAlert,
-  onBindingsRendered,
 }) {
   if (typeof invoke !== "function") {
     throw new Error("createBindingsFeature: invoke is required");
@@ -83,7 +80,6 @@ export function createBindingsFeature({
   }
 
   const getBindings = typeof readBindings === "function" ? readBindings : () => [];
-  const setBindings = typeof writeBindings === "function" ? writeBindings : () => {};
   const listState = {
     buttonLightDropdown: null,
     indicatorMsgTypeDropdown: null,
@@ -140,7 +136,6 @@ export function createBindingsFeature({
   const getMuted = typeof getMuteForTarget === "function" ? getMuteForTarget : () => false;
   const getLiveMidiValue =
     typeof getLiveMidiValueForControl === "function" ? getLiveMidiValueForControl : () => null;
-  const saveProfile = typeof saveBindingsForProfile === "function" ? saveBindingsForProfile : async () => {};
   const getCurvePresets = typeof getFaderCurvePresets === "function" ? getFaderCurvePresets : () => [];
   const saveCurvePresets =
     typeof saveFaderCurvePresets === "function"
@@ -180,10 +175,9 @@ export function createBindingsFeature({
     container: elements.bindingsContainer,
     getDragState: getDrag,
     setDragState: setDrag,
-    getBindings: getBindings,
-    setBindings: setBindings,
+    getBindings,
+    bindingEdits,
     renderBindings: () => renderBindings(),
-    finishMutation: (reason) => finishBindingUiMutation(reason),
     flushPendingRerender: () => flushPendingRerender(),
   });
   const {
@@ -225,9 +219,9 @@ export function createBindingsFeature({
     bindingId: null,
     draft: null,
     soundboardPageOpen: false,
-    initialPersistence: null,
-    removeEmptySoundboardTargetOnCancel: false,
     previewOriginalBindings: null,
+    previewAppliedBindings: null,
+    pendingPreview: null,
     learnField: null,
     learnSession: null,
     transferPrompt: null,
@@ -496,15 +490,12 @@ export function createBindingsFeature({
     startConfigPreviewTimer,
     parseDisplayTags,
   } = createEditPreview({
+    bindingEdits,
     editorState,
     getBindings,
     getConfigBinding,
-    invoke,
-    persistBindingBackend: (...args) => persistBindingBackend(...args),
     renderBindings: (...args) => renderBindings(...args),
     renderConfigPreview: (...args) => renderConfigPreview(...args),
-    setBindings,
-    syncPluginHostBindings: (...args) => syncPluginHostBindings(...args),
   });
 
   const { renderPreviewTarget, renderConfigPreview } = createConfigPreview({
@@ -584,14 +575,11 @@ export function createBindingsFeature({
     elements,
     editorState,
     ensureMacroConfigDom,
-    finishBindingUiMutation: (...args) => finishBindingUiMutation(...args),
     getBindings,
     getConfigBinding,
     hotkeyLearn,
     loadSoundboardAnalysis,
     macroState,
-    persistBindingBackend: (...args) => persistBindingBackend(...args),
-    renderBindings: (...args) => renderBindings(...args),
     renderConfigPreview,
     renderCurveCards,
     renderCustomCurveEditor,
@@ -600,7 +588,6 @@ export function createBindingsFeature({
     renderOutputs,
     renderSoundboardEditor,
     restoreConfigPreviewBindings,
-    setBindings,
     soundboardState,
     stopAuxLearn,
     stopConfigPreviewTimer,
@@ -620,15 +607,6 @@ export function createBindingsFeature({
     syncIndicatorUi,
     t,
   });
-
-  const { persistBindingBackend, syncPluginHostBindings, finishBindingUiMutation } = createBindingPersistence(
-    {
-      getBindings,
-      getHost,
-      invoke,
-      saveProfile,
-    },
-  );
 
   const { commitTransferPrompt, startPrimaryLearn, startAuxLearn } = createMappingAssignment({
     t,
@@ -664,22 +642,19 @@ export function createBindingsFeature({
     closeConfigModal,
     elements,
     editorState,
-    finishBindingUiMutation,
+    bindingEdits,
     getBindings,
     getBindingById,
     getConfigBinding,
     getDrag,
     getEditingId,
-    invoke,
     listState,
     loadSoundboardOutputDevices,
     loadSoundboardVirtualAudioStatus,
     macroPathForFirstStep,
     macroState,
-    persistBindingBackend,
     renderBindings: (...args) => renderBindings(...args),
     renderConfigModal,
-    setBindings,
     setEditingId,
     setPendingFocusId,
     soundboardState,
@@ -700,7 +675,7 @@ export function createBindingsFeature({
     confirmAction,
     elements,
     fallbackNameFor,
-    finishBindingUiMutation,
+    bindingEdits,
     flushPendingRerender,
     flushQueuedBindingReveal,
     focusBindingNameInput,
@@ -715,7 +690,6 @@ export function createBindingsFeature({
     isBindingDragActive,
     listState,
     nameDrafts,
-    onBindingsRendered,
     openConfigModal,
     pulseMomentaryValue,
     queueBindingsScrollLayoutSync,
@@ -723,7 +697,6 @@ export function createBindingsFeature({
     renderedBindings,
     resolveRenderedBindingVolume,
     setActionIcon,
-    setBindings,
     setEditingId,
     setMuteButtonState,
     setPendingFocusId,
@@ -739,6 +712,7 @@ export function createBindingsFeature({
   });
 
   const { bindConfigModalUi } = createConfigEvents({
+    alertAction,
     lifetime,
     activeCustomCurvePreset,
     addCustomCurvePoint,

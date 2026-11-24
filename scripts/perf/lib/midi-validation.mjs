@@ -2,7 +2,7 @@ import { midiQueueSettled } from "./midi-collection.mjs";
 import { matchesRenderedBindingValue } from "../../../src/app/performance_rendered_value.js";
 
 const PROFILE_MUTATING_COMMANDS = new Set([
-  "save_profile", "load_profile", "delete_profile", "add_binding", "remove_binding",
+  "save_profile", "load_profile", "delete_profile", "add_binding", "remove_binding", "edit_profile_bindings", "update_profile_preferences",
   "stop_midi_device", "stop_midi_route", "start_midi_device", "start_midi_device_routes",
 ]);
 

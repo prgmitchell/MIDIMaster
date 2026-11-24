@@ -51,3 +51,16 @@ export function createReconnectController({
   }
   return { reset, grow, run };
 }
+
+export function bindAutoConnectPreference(input, profile, applyProfileSettings) {
+  applyProfileSettings(profile?.get?.());
+  input?.addEventListener("change", async () => {
+    const auto_connect = input.checked;
+    applyProfileSettings({ auto_connect });
+    try {
+      await profile?.set?.({ ...profile.get?.(), auto_connect });
+    } catch (error) {
+      console.error("Failed to save auto-connect preference:", error);
+    }
+  });
+}

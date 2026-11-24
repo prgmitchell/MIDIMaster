@@ -20,9 +20,8 @@ export function createBindingDragController({
   getDragState,
   setDragState,
   getBindings,
-  setBindings,
+  bindingEdits,
   renderBindings,
-  finishMutation,
   flushPendingRerender,
   documentRef = document,
 }) {
@@ -112,20 +111,26 @@ export function createBindingDragController({
       ? findPlaceholderVisibleIndex(container.children, visibleBindingIds)
       : null;
     setDragState(null);
+    // Leave the row at the drop position while the native write is pending.
+    if (active && newIndex !== null) container.insertBefore(dragState.item, dragState.placeholder);
     cleanup(dragState);
 
     if (active && newIndex !== null) {
       const destinationVisibleIndex = newIndex > visibleIndex ? newIndex - 1 : newIndex;
+      const previous = getBindings();
       const result = reorderVisibleBindings(
-        getBindings(),
+        previous,
         visibleBindingIds,
         bindingId,
         destinationVisibleIndex,
       );
       if (result.changed) {
-        setBindings(result.bindings);
+        try {
+          await bindingEdits.applyList(previous, result.bindings);
+        } catch (error) {
+          console.error("Failed to reorder bindings:", error);
+        }
         renderBindings();
-        finishMutation("reorder bindings");
       }
     }
     flushPendingRerender();

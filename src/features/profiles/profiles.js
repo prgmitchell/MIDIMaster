@@ -1,3 +1,4 @@
+import { buildPersistedMidiPreference } from "../../core/midi_preferences.js";
 import { createUiLifetime } from "../../app/ui_lifetime.js";
 import { createImportExport } from "./controllers/import_export.js";
 import { createProfileMenu } from "./controllers/profile_menu.js";
@@ -10,6 +11,7 @@ import { closeAllDropdowns } from "../ui/dropdown_badges.js";
 
 export function createProfilesFeature({
   invoke,
+  profileWrites,
   i18n,
   dom,
   defaultOsdSettings,
@@ -28,7 +30,6 @@ export function createProfilesFeature({
   setOsdSettings,
   applyOsdSettings,
   getCurrentMidiPreference,
-  getActiveProfileMidiPreference,
   setActiveProfileMidiPreference,
   onProfileLoaded,
   showAlert,
@@ -49,13 +50,6 @@ export function createProfilesFeature({
   };
   const lifetime = createUiLifetime();
   let uiBound = false;
-  const saveState = {
-    timer: null,
-    promise: null,
-    running: null,
-    resolve: null,
-    reject: null,
-  };
   const targetState = createProfileTargetState({ invoke, getActiveProfileName, getBindings, getPluginHost });
 
   function normalizeProfileName(name) {
@@ -81,6 +75,35 @@ export function createProfilesFeature({
 
   function buildPersistedOsdSettings(source) {
     return toPersistedOsdSettings(source || {}, defaults);
+  }
+
+  function emptyProfile(name, midiPreference) {
+    return {
+      name,
+      bindings: [],
+      osd_settings: buildPersistedOsdSettings(getOsdSettings?.() || defaults),
+      plugin_settings: {},
+      midi_device_preference: buildPersistedMidiPreference(midiPreference),
+      midi_device_preference_set: true,
+    };
+  }
+
+  async function listProfilesWithDefault() {
+    const profiles = await invoke("list_profiles");
+    if (profiles.some((profile) => profile.name === "Default")) return profiles;
+    try {
+      await invoke("save_profile", {
+        profile: emptyProfile("Default", getCurrentMidiPreference?.()),
+        activate: false,
+        createOnly: true,
+      });
+    } catch (error) {
+      // A second caller may have created Default while this request was in flight.
+      const current = await invoke("list_profiles");
+      if (current.some((profile) => profile.name === "Default")) return current;
+      throw error;
+    }
+    return invoke("list_profiles");
   }
 
   function setProfileSelection(name) {
@@ -182,35 +205,12 @@ export function createProfilesFeature({
     });
   }
 
-  const {
-    reconcileMidiRoutes,
-    getProfileNameForSave,
-    ensureSaveProfilePromise,
-    persistCurrentProfile,
-    settleScheduledProfileSave,
-    saveBindingsForProfile,
-    flushProfileSave,
-    updateProfilePluginSettings,
-    updateProfileMidiPreference,
-  } = createPersistence({
-    buildPersistedOsdSettings: (...args) => buildPersistedOsdSettings(...args),
-    currentProfileSelection: (...args) => currentProfileSelection(...args),
-    getActiveProfileMidiPreference,
-    getActiveProfileName,
-    getBindings,
-    getOsdSettings,
-    getPluginHost,
-    getProfilePluginSettings,
-    invoke,
-    saveState,
-    setBindings,
-    renderBindings,
-    setMidiReconciliationBusy: (busy) => setInteractionBusy("midi", busy),
-    setActiveProfileMidiPreference,
-    setActiveProfileName,
-    setProfilePluginSettings,
-    setProfileSelection: (...args) => setProfileSelection(...args),
-  });
+  const { reconcileMidiRoutes, flushProfileSave, updateProfilePluginSettings, updateProfileMidiPreference } =
+    createPersistence({
+      invoke, profileWrites, getActiveProfileName, getPluginHost, getProfilePluginSettings,
+      setProfilePluginSettings, setActiveProfileMidiPreference, setBindings, renderBindings,
+      setMidiReconciliationBusy: (busy) => setInteractionBusy("midi", busy),
+    });
 
   const { loadProfileByName, deleteProfileByName, createProfileByName } = createProfileLoading({
     showAlert,
@@ -218,17 +218,16 @@ export function createProfilesFeature({
     setProfileLoadingBusy: (busy) => setInteractionBusy("profile", busy),
     applyOsdSettings,
     bindingFallbackName,
-    buildPersistedOsdSettings: (...args) => buildPersistedOsdSettings(...args),
-    closeProfileDropdown: (...args) => closeProfileDropdown(...args),
+    emptyProfile,
+    listProfilesWithDefault,
+    closeProfileDropdown,
     defaults,
-    flushProfileSave: (...args) => flushProfileSave(...args),
+    flushProfileSave,
     getActiveProfileName,
-    getCurrentMidiPreference,
-    getOsdSettings,
     getPluginHost,
     invoke,
     normalizeBinding,
-    normalizeProfileName: (...args) => normalizeProfileName(...args),
+    normalizeProfileName,
     onProfileLoaded,
     refreshProfiles: (...args) => refreshProfiles(...args),
     renderBindings,
@@ -237,53 +236,49 @@ export function createProfilesFeature({
     setBindings,
     setOsdSettings,
     setProfilePluginSettings,
-    setProfileSelection: (...args) => setProfileSelection(...args),
+    setProfileSelection,
     startPluginHostIfNeeded,
     targetState,
   });
 
   const { renderProfilePage } = createProfilePage({
     d,
-    deleteProfileByName: (...args) => deleteProfileByName(...args),
+    deleteProfileByName,
     exportProfileByName: (...args) => exportProfileByName(...args),
-    loadProfileByName: (...args) => loadProfileByName(...args),
+    loadProfileByName,
     refreshProfiles: (...args) => refreshProfiles(...args),
-    t: (...args) => t(...args),
+    t,
     viewState,
   });
 
   const { refreshProfiles } = createProfileMenu({
-    buildPersistedOsdSettings: (...args) => buildPersistedOsdSettings(...args),
-    closeProfileDropdown: (...args) => closeProfileDropdown(...args),
-    createProfileByName: (...args) => createProfileByName(...args),
+    listProfilesWithDefault,
+    closeProfileDropdown,
+    createProfileByName,
     d,
-    defaults,
-    deleteProfileByName: (...args) => deleteProfileByName(...args),
+    deleteProfileByName,
     exportProfileByName: (...args) => exportProfileByName(...args),
     getActiveProfileName,
-    getCurrentMidiPreference,
-    getOsdSettings,
     importProfileFromFile: (...args) => importProfileFromFile(...args),
-    invoke,
-    loadProfileByName: (...args) => loadProfileByName(...args),
-    renderProfilePage: (...args) => renderProfilePage(...args),
-    setProfileSelection: (...args) => setProfileSelection(...args),
-    t: (...args) => t(...args),
-    updateProfileMenuSelection: (...args) => updateProfileMenuSelection(...args),
+    loadProfileByName,
+    renderProfilePage,
+    setProfileSelection,
+    t,
+    updateProfileMenuSelection,
     viewState,
   });
 
   const { exportProfileByName, importProfileFromFile, exportCurrentProfile } = createImportExport({
-    buildImportedProfileName: (...args) => buildImportedProfileName(...args),
-    closeProfileDropdown: (...args) => closeProfileDropdown(...args),
+    buildImportedProfileName,
+    closeProfileDropdown,
     getActiveProfileName,
     invoke,
-    loadProfileByName: (...args) => loadProfileByName(...args),
-    normalizeProfileName: (...args) => normalizeProfileName(...args),
-    refreshProfiles: (...args) => refreshProfiles(...args),
+    loadProfileByName,
+    normalizeProfileName,
+    refreshProfiles,
     showAlert,
     showChoices,
-    t: (...args) => t(...args),
+    t,
     flushProfileSave,
     targetState,
   });
@@ -300,7 +295,6 @@ export function createProfilesFeature({
     deleteProfileByName,
     setProfileSelection,
     closeProfileDropdown,
-    saveBindingsForProfile,
     flushProfileSave,
     reconcileMidiRoutes,
     updateProfilePluginSettings,

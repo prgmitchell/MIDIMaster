@@ -29,7 +29,7 @@ export function createPluginRuntime({
   getConnectionsPanel,
   getBindingTargets,
   setBindingTargets,
-  saveBindingsForProfile,
+  bindingEdits,
   isBindingInteractionActive,
   requestBindingsRerender,
   mountConnectionsTabs,
@@ -131,13 +131,7 @@ export function createPluginRuntime({
       } catch {}
 
       try {
-        metadataChanged = hydrateIntegrationDisplayMetadata();
-        if (metadataChanged) {
-          try {
-            pluginHost.setBindings(getBindings());
-          } catch {}
-          await saveBindingsForProfile();
-        }
+        metadataChanged = await hydrateIntegrationDisplayMetadata();
       } catch {}
 
       try {
@@ -175,12 +169,12 @@ export function createPluginRuntime({
     };
   }
 
-  function hydrateIntegrationDisplayMetadata() {
+  async function hydrateIntegrationDisplayMetadata() {
     const bindings = getBindings();
     if (!Array.isArray(bindings) || !bindings.length) return false;
     let changed = false;
 
-    for (const b of bindings) {
+    const nextBindings = bindings.map((b) => {
       const targets = getBindingTargets(b);
       let updatedAny = false;
       const nextTargets = targets.map((t) => {
@@ -215,10 +209,14 @@ export function createPluginRuntime({
       });
 
       if (updatedAny) {
-        setBindingTargets(b, nextTargets);
+        const draft = { ...b };
+        setBindingTargets(draft, nextTargets);
         changed = true;
+        return draft;
       }
-    }
+      return b;
+    });
+    if (changed) await bindingEdits.applyList(bindings, nextBindings);
 
     return changed;
   }

@@ -1,3 +1,4 @@
+import { bindAutoConnectPreference } from "../../../plugin_sources/shared/runtime.js";
 import { ui, setStatus } from "./protocol.js";
 
 /** connection tab workflow. */
@@ -72,17 +73,7 @@ export function createConnectionTab({
         });
 
         // Auto-connect (profile-scoped)
-        applyProfileSettings(ctx.profile?.get?.());
-        if (ui.autoConnectInput) {
-          ui.autoConnectInput.addEventListener("change", () => {
-            const next = Boolean(ui.autoConnectInput.checked);
-            applyProfileSettings({ auto_connect: next });
-            try {
-              const current = ctx.profile?.get?.() || {};
-              ctx.profile?.set?.({ ...current, auto_connect: next });
-            } catch {}
-          });
-        }
+        bindAutoConnectPreference(ui.autoConnectInput, ctx.profile, applyProfileSettings);
 
         if (ui.connectBtn) {
           ui.connectBtn.addEventListener("click", () => {

@@ -9,6 +9,33 @@ pub(crate) struct Runtime {
 }
 
 // Labels and derived icons can change on reconnect without changing the target.
+fn same_integration_data(left: &serde_json::Value, right: &serde_json::Value) -> bool {
+    let (Some(left_fields), Some(right_fields)) = (left.as_object(), right.as_object()) else {
+        return left == right;
+    };
+    let display_field = |key: &str| {
+        matches!(
+            key,
+            "label"
+                | "icon_data"
+                | "iconData"
+                | "display_label"
+                | "displayLabel"
+                | "action_label"
+                | "action_value"
+                | "action_kind"
+                | "button_action"
+                | "osd_value_text"
+        )
+    };
+    left_fields
+        .iter()
+        .all(|(key, value)| display_field(key) || right_fields.get(key) == Some(value))
+        && right_fields
+            .keys()
+            .all(|key| display_field(key) || left_fields.contains_key(key))
+}
+
 fn same_target(left: &BindingTarget, right: &BindingTarget) -> bool {
     match (left, right) {
         (
@@ -23,35 +50,15 @@ fn same_target(left: &BindingTarget, right: &BindingTarget) -> bool {
                 data: right_data,
             },
         ) => {
-            fn identity(data: &serde_json::Value) -> serde_json::Value {
-                let mut data = data.clone();
-                if let Some(data) = data.as_object_mut() {
-                    for key in [
-                        "label",
-                        "icon_data",
-                        "iconData",
-                        "display_label",
-                        "displayLabel",
-                        "action_label",
-                        "action_value",
-                        "action_kind",
-                        "button_action",
-                        "osd_value_text",
-                    ] {
-                        data.remove(key);
-                    }
-                }
-                data
-            }
             left_id == right_id
                 && left_kind == right_kind
-                && identity(left_data) == identity(right_data)
+                && same_integration_data(left_data, right_data)
         }
         _ => left == right,
     }
 }
 
-pub(crate) fn contains_target(profile: &Profile, target: &BindingTarget) -> bool {
+fn contains_target(profile: &Profile, target: &BindingTarget) -> bool {
     profile.bindings.iter().any(|binding| {
         matches!(
             binding.action,
@@ -63,18 +70,21 @@ pub(crate) fn contains_target(profile: &Profile, target: &BindingTarget) -> bool
     })
 }
 
+pub(crate) fn states_for_profile(
+    profile: &Profile,
+    mut states: Vec<ProfileTargetState>,
+) -> Vec<ProfileTargetState> {
+    states.retain(|entry| contains_target(profile, &entry.target));
+    states
+}
+
 fn native(target: &BindingTarget) -> bool {
     target.supports_volume() && !matches!(target, BindingTarget::Integration { .. })
 }
 
 impl Runtime {
     pub(crate) fn activate(&mut self, profile: &Profile, restore: bool) {
-        let states = profile
-            .target_states
-            .iter()
-            .filter(|entry| contains_target(profile, &entry.target))
-            .cloned()
-            .collect::<Vec<_>>();
+        let states = states_for_profile(profile, profile.target_states.clone());
         if restore {
             self.pending = states
                 .iter()
@@ -91,12 +101,7 @@ impl Runtime {
 
     pub(crate) fn include_in(&self, profile: &mut Profile) {
         if self.name == profile.name {
-            profile.target_states = self
-                .states
-                .iter()
-                .filter(|entry| contains_target(profile, &entry.target))
-                .cloned()
-                .collect();
+            profile.target_states = states_for_profile(profile, self.states.clone());
         }
     }
 
@@ -251,12 +256,7 @@ pub(crate) fn checkpoint(state: &AppState) -> Result<(), String> {
     if runtime.name != profile.name {
         return Ok(());
     }
-    let entries = runtime
-        .states
-        .iter()
-        .filter(|entry| contains_target(&profile, &entry.target))
-        .cloned()
-        .collect();
+    let entries = runtime.states.clone();
     drop(runtime);
     state
         .profile_store

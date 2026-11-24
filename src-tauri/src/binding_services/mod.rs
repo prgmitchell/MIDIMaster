@@ -21,4 +21,4 @@ pub(crate) use feedback_updates::{
 };
 pub(crate) use macro_runner::spawn_macro_binding;
 use macro_runner::{action_can_run_from_command, run_macro_binding};
-pub(crate) use mutations::{add_binding, remove_binding};
+pub(crate) use mutations::{add_binding, commit_binding_edits, remove_binding, BindingEdits};

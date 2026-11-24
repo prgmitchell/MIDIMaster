@@ -7,6 +7,7 @@ import { localCustomCurvePoint, segmentIndexForCurveX } from "../curve_geometry.
 export function createConfigEvents({
   lifetime,
   activeCustomCurvePreset,
+  alertAction,
   addCustomCurvePoint,
   cancelMacroDrag,
   clearTransferPrompt,
@@ -100,7 +101,11 @@ export function createConfigEvents({
     }
     if (elements.bindingConfigSave) {
       lifetime.listen(elements.bindingConfigSave, "click", async () => {
-        await saveConfigModal();
+        try {
+          await saveConfigModal();
+        } catch (error) {
+          alertAction(t("dialogs.actionFailedTitle"), String(error));
+        }
       });
     }
     if (elements.bindingConfigName) {

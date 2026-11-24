@@ -342,5 +342,5 @@ export function createSelectionDisplay({
     display.appendChild(chipsWrap);
   }
 
-  return { actionLabel, cachedDisplayForTarget, optionForTarget, renderChip, setDisplay };
+  return { optionForTarget, setDisplay };
 }

@@ -78,7 +78,7 @@ pub fn update_osd_settings(
         updated_profile.osd_settings = updated.clone();
         state
             .profile_store
-            .save_profile(updated_profile.clone())
+            .save_configuration(updated_profile.clone())
             .map_err(|err| err.to_string())?;
         *profile_guard = Some(AppState::profile_snapshot(updated_profile));
     }

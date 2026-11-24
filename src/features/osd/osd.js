@@ -104,7 +104,7 @@ export function createOsdFeature({
     return String(integrationDataForTarget(target).osd_value_text || "").trim();
   }
 
-  function createOsdCard(_display) {
+  function createOsdCard() {
     const card = document.createElement("div");
     card.className = "osd-card";
 
@@ -153,7 +153,7 @@ export function createOsdFeature({
     }, 250);
   }
 
-  function renderVolumeOsd(target, volume, focusSession, options = null) {
+  function showCard(target, focusSession, options) {
     if (!osd) return;
 
     const displayTarget = options?.displayTarget || target;
@@ -168,7 +168,7 @@ export function createOsdFeature({
       if (item.timer) clearTimeout(item.timer);
       refs = item.refs;
     } else {
-      refs = createOsdCard(display);
+      refs = createOsdCard();
       item = {
         element: refs.card,
         refs,
@@ -180,6 +180,19 @@ export function createOsdFeature({
       refs.card.classList.add("visible");
       notifyRendered();
     }
+
+    if (!osdDebugAlways) {
+      item.timer = setTimeout(() => {
+        removeOsdCard(key);
+      }, 1500);
+    }
+    return { item, refs, display, displayTarget };
+  }
+
+  function renderVolumeOsd(target, volume, focusSession, options = null) {
+    const card = showCard(target, focusSession, options);
+    if (!card) return;
+    const { item, refs, display, displayTarget } = card;
 
     const displayLabel = String(options?.label || "").trim()
       || displayLabelForTarget(display, displayTarget);
@@ -217,12 +230,6 @@ export function createOsdFeature({
     const percent = Math.round(clampedVolume * 100);
     refs.fillDiv.style.transform = `scaleX(${clampedVolume})`;
     refs.valueSpan.textContent = valueText || `${percent}%`;
-
-    if (!osdDebugAlways) {
-      item.timer = setTimeout(() => {
-        removeOsdCard(key);
-      }, 1500);
-    }
   }
 
   function showVolumeOsd(target, volume, focusSession, options = null) {
@@ -233,32 +240,9 @@ export function createOsdFeature({
   }
 
   function showMuteOsd(target, muted, focusSession, options = null) {
-    if (!osd) return;
-
-    const displayTarget = options?.displayTarget || target;
-    const display = resolveDisplay(displayTarget, focusSession);
-    if (!display) return;
-
-    const key = getOsdKey(displayTarget, options);
-    let item = activeOsdCards.get(key);
-    let refs;
-
-    if (item) {
-      if (item.timer) clearTimeout(item.timer);
-      refs = item.refs;
-    } else {
-      refs = createOsdCard(display);
-      item = {
-        element: refs.card,
-        refs,
-        timer: null,
-      };
-      osd.appendChild(refs.card);
-      activeOsdCards.set(key, item);
-      refs.card.offsetHeight;
-      refs.card.classList.add("visible");
-      notifyRendered();
-    }
+    const card = showCard(target, focusSession, options);
+    if (!card) return;
+    const { item, refs, display, displayTarget } = card;
 
     item.displaySignature = null;
     renderLabelWithTags(
@@ -273,12 +257,6 @@ export function createOsdFeature({
     refs.fillDiv.style.backgroundColor = muted ? "#ff4444" : "";
     refs.valueSpan.textContent = muted ? "\ud83d\udd07" : "\ud83d\udd0a";
     refs.valueSpan.style.fontSize = "24px";
-
-    if (!osdDebugAlways) {
-      item.timer = setTimeout(() => {
-        removeOsdCard(key);
-      }, 1500);
-    }
   }
 
   function hideVolumeOsd() {

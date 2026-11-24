@@ -29,7 +29,7 @@ export function createListRenderer({
   confirmAction,
   elements,
   fallbackNameFor,
-  finishBindingUiMutation,
+  bindingEdits,
   flushPendingRerender,
   flushQueuedBindingReveal,
   focusBindingNameInput,
@@ -44,7 +44,6 @@ export function createListRenderer({
   isBindingDragActive,
   listState,
   nameDrafts,
-  onBindingsRendered,
   openConfigModal,
   pulseMomentaryValue,
   queueBindingsScrollLayoutSync,
@@ -52,7 +51,6 @@ export function createListRenderer({
   renderedBindings,
   resolveRenderedBindingVolume,
   setActionIcon,
-  setBindings,
   setEditingId,
   setMuteButtonState,
   setPendingFocusId,
@@ -126,7 +124,7 @@ export function createListRenderer({
       elements.bindingsContainer.replaceChildren(empty);
       restoreElementScroll(elements.bindingsContainer, scrollPosition);
       queueBindingsScrollLayoutSync();
-      onBindingsRendered?.();
+
       return;
     }
 
@@ -318,13 +316,8 @@ export function createListRenderer({
             return;
           }
           try {
-            await invoke("remove_binding", { binding });
-            const next = getBindings();
-            const currentIndex = next.findIndex((candidate) => candidate.id === binding.id);
-            if (currentIndex >= 0) next.splice(currentIndex, 1);
-            setBindings(next);
+            await bindingEdits.remove(binding);
             renderBindings();
-            finishBindingUiMutation("delete binding");
           } catch (err) {
             console.error("Failed to remove binding:", err);
           }
@@ -386,10 +379,11 @@ export function createListRenderer({
             return;
           }
           try {
-            await invoke("remove_binding", { binding });
-          } catch {}
-          renderBindings();
-          finishBindingUiMutation("delete broken binding");
+            await bindingEdits.remove(binding);
+            renderBindings();
+          } catch (error) {
+            console.error("Failed to remove broken binding:", error);
+          }
         };
         errorItem.appendChild(delBtn);
 
@@ -419,17 +413,16 @@ export function createListRenderer({
 
     queueBindingsScrollLayoutSync();
     flushQueuedBindingReveal();
-    onBindingsRendered?.();
+
   }
 
   const { createRowName } = createRowNameController({
     beginBindingEdit,
     fallbackNameFor,
-    finishBindingUiMutation,
+    bindingEdits,
     flushPendingRerender,
     getEditingId,
     getPendingFocusId,
-    invoke,
     nameDrafts,
     setEditingId,
     setPendingFocusId,
@@ -437,8 +430,7 @@ export function createListRenderer({
   });
 
   const { createRowMode } = createRowModeController({
-    finishBindingUiMutation,
-    invoke,
+    bindingEdits,
     renderBindings,
     t,
   });
@@ -447,10 +439,9 @@ export function createListRenderer({
     bindingLastValues,
     bindingMuteValues,
     buildTarget,
-    finishBindingUiMutation,
+    bindingEdits,
     getMuted,
     getVol,
-    invoke,
     openConfigModal,
     renderBindings,
     renderedBindings,

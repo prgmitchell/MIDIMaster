@@ -1,14 +1,13 @@
 import {
   getBindingTargets as getTargets,
-  normalizeHotkeyMapping,
   normalizeOpenApplicationMapping,
   normalizeAutoHotkeyScriptMapping,
-  normalizeSoundboardMapping,
   setBindingTargets as setTargets,
   normalizeMacroSteps,
   getPrimaryBindingTarget as getPrimaryTarget,
 } from "../../../core/binding_model.js";
 import {
+  cloneBindingDraft,
   isMacroTarget,
   isSoundboardTarget,
   isHotkeyTarget,
@@ -18,15 +17,91 @@ import {
 import { ensureMacroName } from "../macro_draft.js";
 import { resolveTargetChangeVolumeValue } from "../value_sync.js";
 
-/** create row target workflow. */
+function selectedAction(binding, selected, requestedAction) {
+  if (!selected.some((target) => target && target !== "Unset")) return "ToggleMute";
+  if (selected.every(isMacroTarget)) return "Macro";
+  if (selected.every(isSoundboardTarget)) return "Soundboard";
+  const regularAction = (action) => action && action !== "Macro" && action !== "Soundboard";
+  if (regularAction(requestedAction)) return requestedAction;
+  return regularAction(binding.action) ? binding.action : "ToggleMute";
+}
+
+async function draftTargetChange(binding, isButton, picker, startHotkeyLearn, showConflict) {
+  const previous = getTargets(binding);
+  const selected = Array.isArray(picker.__selectedTargets)
+    ? picker.__selectedTargets
+    : picker.__selectedTarget
+      ? [picker.__selectedTarget]
+      : [];
+  const macro = selected.some(isMacroTarget);
+  const sound = selected.some(isSoundboardTarget);
+  if (isButton && macro && sound) {
+    showConflict();
+    return null;
+  }
+
+  const draft = cloneBindingDraft(binding);
+  setTargets(draft, selected);
+  draft.action = isButton ? selectedAction(binding, selected, picker.dataset.action) : "Volume";
+  if (isButton && macro) {
+    draft.macro_steps = previous.some(isMacroTarget) ? normalizeMacroSteps(draft.macro_steps) : [];
+    ensureMacroName(draft, { defaultIfBlank: !previous.some(isMacroTarget) });
+  } else if (isButton && previous.some(isMacroTarget)) {
+    draft.macro_steps = [];
+    draft.macro_name = "";
+  }
+  if (!sound && (previous.some(isSoundboardTarget) || binding.action === "Soundboard"))
+    draft.soundboard = null;
+  const hotkey = selected.some(isHotkeyTarget);
+  if (isButton && hotkey && !previous.some(isHotkeyTarget)) {
+    draft.hotkey = await startHotkeyLearn(draft);
+    if (!draft.hotkey) return null;
+  } else if (isButton && !hotkey && previous.some(isHotkeyTarget)) {
+    draft.hotkey = null;
+    if (draft.action === "Hotkey") draft.action = picker.dataset.action || "ToggleMute";
+  }
+  if (
+    isButton &&
+    !selected.some(isOpenApplicationTarget) &&
+    previous.some(isOpenApplicationTarget) &&
+    draft.action === "OpenApplication"
+  )
+    draft.action = picker.dataset.action || "ToggleMute";
+  if (
+    isButton &&
+    !selected.some(isAutoHotkeyScriptTarget) &&
+    previous.some(isAutoHotkeyScriptTarget) &&
+    draft.action === "RunAutoHotkeyScript"
+  )
+    draft.action = picker.dataset.action || "ToggleMute";
+  draft.open_application =
+    draft.action === "OpenApplication"
+      ? normalizeOpenApplicationMapping(picker.getOpenApplication?.() || picker.__openApplication)
+      : null;
+  draft.autohotkey_script =
+    draft.action === "RunAutoHotkeyScript"
+      ? normalizeAutoHotkeyScriptMapping(
+          picker.getAutoHotkeyScript?.() || picker.__autoHotkeyScript,
+        )
+      : null;
+  const utilityTarget =
+    hotkey || selected.some(isOpenApplicationTarget) || selected.some(isAutoHotkeyScriptTarget);
+  if (
+    !utilityTarget &&
+    ((draft.action === "OpenApplication" && !draft.open_application) ||
+      (draft.action === "RunAutoHotkeyScript" && !draft.autohotkey_script))
+  )
+    return null;
+  return draft;
+}
+
 export function createRowTargetController({
   bindingLastValues,
   bindingMuteValues,
   buildTarget,
-  finishBindingUiMutation,
+  bindingEdits,
   getMuted,
   getVol,
-  invoke,
   openConfigModal,
   renderBindings,
   renderedBindings,
@@ -38,8 +113,9 @@ export function createRowTargetController({
   startHotkeyLearn,
 }) {
   function createRowTarget(binding, isButton, readControls) {
+    const targets = getTargets(binding);
     const targetSelect = buildTarget(
-      getTargets(binding),
+      targets,
       isButton,
       binding.action,
       binding.hotkey?.display || "",
@@ -48,19 +124,13 @@ export function createRowTargetController({
       {
         macroDisplayName: binding.macro_name,
         macroAlreadyConfigured:
-          isButton &&
-          (binding.action === "Macro" ||
-            getTargets(binding).some(isMacroTarget)),
+          isButton && (binding.action === "Macro" || targets.some(isMacroTarget)),
         onMacroAlreadyConfigured: showMacroAlreadyConfiguredError,
         soundboardAlreadyConfigured:
-          isButton &&
-          (binding.action === "Soundboard" ||
-            getTargets(binding).some(isSoundboardTarget)),
+          isButton && (binding.action === "Soundboard" || targets.some(isSoundboardTarget)),
         onSoundboardAlreadyConfigured: showSoundboardAlreadyConfiguredError,
-        macroBlockedBySoundboard:
-          isButton && getTargets(binding).some(isSoundboardTarget),
-        soundboardBlockedByMacro:
-          isButton && getTargets(binding).some(isMacroTarget),
+        macroBlockedBySoundboard: isButton && targets.some(isSoundboardTarget),
+        soundboardBlockedByMacro: isButton && targets.some(isMacroTarget),
         onSpecialActionConflict: showSpecialActionConflictError,
       },
     );
@@ -69,209 +139,29 @@ export function createRowTargetController({
       targetSelect.setAttribute("aria-busy", "true");
       try {
         const { volumeSlider, muteButton } = readControls();
-        const previousTargets = getTargets(binding);
-        const previousHadHotkeyTarget = previousTargets.some(isHotkeyTarget);
-        const previousHadOpenApplicationTarget = previousTargets.some(
-          isOpenApplicationTarget,
+        const draft = await draftTargetChange(
+          binding,
+          isButton,
+          targetSelect,
+          startHotkeyLearn,
+          showSpecialActionConflictError,
         );
-        const previousHadAutoHotkeyScriptTarget = previousTargets.some(
-          isAutoHotkeyScriptTarget,
-        );
-        const previousHadMacroTarget = previousTargets.some(isMacroTarget);
-        const previousHadSoundboardTarget =
-          previousTargets.some(isSoundboardTarget);
-        const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
-          ? targetSelect.__selectedTargets
-          : targetSelect.__selectedTarget
-            ? [targetSelect.__selectedTarget]
-            : [];
-        const hasSelectedTarget = selectedTargets.some(
-          (target) => target && target !== "Unset",
-        );
-        const hasHotkeyTarget = selectedTargets.some(isHotkeyTarget);
-        const hasOpenApplicationTarget = selectedTargets.some(
-          isOpenApplicationTarget,
-        );
-        const hasAutoHotkeyScriptTarget = selectedTargets.some(
-          isAutoHotkeyScriptTarget,
-        );
-        const hasMacroTarget = selectedTargets.some(isMacroTarget);
-        const hasSoundboardTarget = selectedTargets.some(isSoundboardTarget);
-        const hasRegularTarget = selectedTargets.some(
-          (target) => !isMacroTarget(target) && !isSoundboardTarget(target),
-        );
-        const previousAction = binding.action;
-        const previousHotkey = normalizeHotkeyMapping(binding.hotkey);
-        const previousOpenApplication = normalizeOpenApplicationMapping(
-          binding.open_application,
-        );
-        const previousAutoHotkeyScript = normalizeAutoHotkeyScriptMapping(
-          binding.autohotkey_script,
-        );
-        const previousSoundboard = normalizeSoundboardMapping(
-          binding.soundboard,
-        );
-
-        if (isButton && hasMacroTarget && hasSoundboardTarget) {
-          showSpecialActionConflictError();
+        if (!draft) {
           renderBindings({ forceBindingId: binding.id });
-          finishBindingUiMutation("special action conflict");
           return;
         }
-
-        setTargets(binding, selectedTargets);
-
-        if (isButton) {
-          if (!hasSelectedTarget) {
-            binding.action = "ToggleMute";
-          } else if (hasRegularTarget) {
-            const requestedAction =
-              targetSelect.dataset.action || binding.action || "ToggleMute";
-            binding.action =
-              requestedAction === "Macro" || requestedAction === "Soundboard"
-                ? previousAction === "Macro" || previousAction === "Soundboard"
-                  ? "ToggleMute"
-                  : previousAction
-                : requestedAction;
-          } else if (hasMacroTarget) {
-            binding.action = "Macro";
-          } else if (hasSoundboardTarget) {
-            binding.action = "Soundboard";
-          } else {
-            binding.action =
-              targetSelect.dataset.action || binding.action || "ToggleMute";
-          }
-        } else {
-          binding.action = "Volume";
-        }
-
-        if (isButton && hasMacroTarget) {
-          binding.macro_steps = previousHadMacroTarget
-            ? normalizeMacroSteps(binding.macro_steps)
-            : [];
-          ensureMacroName(binding, { defaultIfBlank: !previousHadMacroTarget });
-        }
-
-        if (isButton && hasSoundboardTarget) {
-          binding.soundboard = previousSoundboard;
-        } else if (
-          previousHadSoundboardTarget ||
-          previousAction === "Soundboard"
-        ) {
-          binding.soundboard = null;
-        }
-
-        if (isButton && previousHadMacroTarget && !hasMacroTarget) {
-          binding.macro_steps = [];
-          binding.macro_name = "";
-        }
-
-        if (isButton && !hasHotkeyTarget && previousHadHotkeyTarget) {
-          binding.hotkey = null;
-          targetSelect?.setHotkeyDisplay?.("");
-          if (binding.action === "Hotkey") {
-            binding.action = targetSelect.dataset.action || "ToggleMute";
-          }
-        }
-
-        if (
-          isButton &&
-          !hasOpenApplicationTarget &&
-          previousHadOpenApplicationTarget
-        ) {
-          binding.open_application = null;
-          if (binding.action === "OpenApplication") {
-            binding.action = targetSelect.dataset.action || "ToggleMute";
-          }
-        }
-
-        if (
-          isButton &&
-          !hasAutoHotkeyScriptTarget &&
-          previousHadAutoHotkeyScriptTarget
-        ) {
-          binding.autohotkey_script = null;
-          if (binding.action === "RunAutoHotkeyScript") {
-            binding.action = targetSelect.dataset.action || "ToggleMute";
-          }
-        }
-
-        if (isButton && hasHotkeyTarget && !previousHadHotkeyTarget) {
-          const learnedHotkey = await startHotkeyLearn(binding);
-          if (!learnedHotkey) {
-            setTargets(binding, previousTargets);
-            binding.action = previousAction || "ToggleMute";
-            binding.hotkey = previousHotkey;
-            binding.open_application = previousOpenApplication;
-            binding.autohotkey_script = previousAutoHotkeyScript;
-            binding.soundboard = previousSoundboard;
-            await invoke("add_binding", { binding });
-            renderBindings({ forceBindingId: binding.id });
-            finishBindingUiMutation("target rollback");
-            return;
-          }
-          binding.hotkey = learnedHotkey;
-          targetSelect?.setHotkeyDisplay?.(binding.hotkey?.display || "");
-        }
-
-        if (isButton && binding.action === "OpenApplication") {
-          binding.open_application = normalizeOpenApplicationMapping(
-            targetSelect?.getOpenApplication?.() ||
-              targetSelect?.__openApplication,
-          );
-        } else {
-          binding.open_application = null;
-        }
-
-        if (isButton && binding.action === "RunAutoHotkeyScript") {
-          binding.autohotkey_script = normalizeAutoHotkeyScriptMapping(
-            targetSelect?.getAutoHotkeyScript?.() ||
-              targetSelect?.__autoHotkeyScript,
-          );
-        } else {
-          binding.autohotkey_script = null;
-        }
-
-        if (
-          isButton &&
-          !hasHotkeyTarget &&
-          !hasOpenApplicationTarget &&
-          !hasAutoHotkeyScriptTarget &&
-          binding.action === "OpenApplication" &&
-          !binding.open_application
-        ) {
-          setTargets(binding, previousTargets);
-          binding.action = previousAction || "ToggleMute";
-          binding.hotkey = previousHotkey;
-          binding.open_application = previousOpenApplication;
-          binding.autohotkey_script = previousAutoHotkeyScript;
-          await invoke("add_binding", { binding });
+        const added = (predicate) =>
+          isButton && getTargets(draft).some(predicate) && !getTargets(binding).some(predicate);
+        const openMacro = added(isMacroTarget);
+        const openSoundboard = added(isSoundboardTarget);
+        if (openSoundboard && !draft.soundboard) {
+          openConfigModal(binding.id, { soundboardPage: true, targetDraft: draft });
           renderBindings({ forceBindingId: binding.id });
-          finishBindingUiMutation("target rollback");
           return;
         }
-
-        if (
-          isButton &&
-          !hasHotkeyTarget &&
-          !hasOpenApplicationTarget &&
-          !hasAutoHotkeyScriptTarget &&
-          binding.action === "RunAutoHotkeyScript" &&
-          !binding.autohotkey_script
-        ) {
-          setTargets(binding, previousTargets);
-          binding.action = previousAction || "ToggleMute";
-          binding.hotkey = previousHotkey;
-          binding.open_application = previousOpenApplication;
-          binding.autohotkey_script = previousAutoHotkeyScript;
-          await invoke("add_binding", { binding });
-          renderBindings({ forceBindingId: binding.id });
-          finishBindingUiMutation("target rollback");
-          return;
-        }
-
+        await bindingEdits.save(binding, draft);
         if (!isButton) {
-          const primaryTarget = getPrimaryTarget(binding);
+          const primaryTarget = getPrimaryTarget(draft);
           const newVolume = resolveTargetChangeVolumeValue({
             targetVolume: getVol(primaryTarget),
             cachedVolume: bindingLastValues[binding.id],
@@ -299,26 +189,12 @@ export function createRowTargetController({
           renderedBindings.register(binding.id, { target: primaryTarget });
         }
 
-        const initialPersistence = invoke("add_binding", { binding });
-        if (isButton && hasMacroTarget && !previousHadMacroTarget) {
-          openConfigModal(binding.id, {
-            macroPage: true,
-            initialPersistence,
-          });
-        } else if (
-          isButton &&
-          hasSoundboardTarget &&
-          !previousHadSoundboardTarget
-        ) {
-          openConfigModal(binding.id, {
-            soundboardPage: true,
-            removeEmptySoundboardTargetOnCancel: true,
-            initialPersistence,
-          });
-        }
-        await initialPersistence;
         renderBindings({ forceBindingId: binding.id });
-        finishBindingUiMutation("target change");
+        if (openMacro) openConfigModal(binding.id, { macroPage: true });
+        if (openSoundboard) openConfigModal(binding.id, { soundboardPage: true });
+      } catch (error) {
+        renderBindings({ forceBindingId: binding.id });
+        console.error("Failed to change binding targets:", error);
       } finally {
         targetSelect.inert = false;
         targetSelect.removeAttribute("aria-busy");

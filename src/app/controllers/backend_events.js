@@ -20,6 +20,7 @@ export function createBackendEvents({
   midiStatus,
   osdState,
   profileState,
+  setBindings,
   invoke,
   getPluginHost,
   queueMidiUiEvent,
@@ -107,21 +108,16 @@ export function createBackendEvents({
 
     await eventSubscriptions.subscribe("binding_aux_assign_update", (event) => {
       const payload = parseEventPayload(event);
-      if (payload?.binding_id) {
-        const binding = profileState.bindings.find((b) => b && b.id === payload.binding_id);
-        if (binding) {
-          if (Array.isArray(payload.targets)) {
-            setBindingTargets(binding, payload.targets);
-          } else if (payload.target) {
-            const nextTargets = getBindingTargets(binding);
-            const exists = nextTargets.some(
-              (target) => JSON.stringify(target) === JSON.stringify(payload.target),
-            );
-            if (!exists) {
-              nextTargets.push(payload.target);
-              setBindingTargets(binding, nextTargets);
-            }
-          }
+      const binding = profileState.bindingLookupIndex.findById(payload?.binding_id);
+      if (binding) {
+        const targets = getBindingTargets(binding);
+        const next = Array.isArray(payload.targets) ? payload.targets :
+          payload.target && !targets.some((target) => JSON.stringify(target) === JSON.stringify(payload.target))
+            ? [...targets, payload.target] : null;
+        if (next) {
+          const updated = { ...binding };
+          setBindingTargets(updated, next);
+          setBindings(profileState.bindings.map((row) => row === binding ? updated : row));
         }
       }
       refreshSessions().catch((error) => {

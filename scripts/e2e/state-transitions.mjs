@@ -1,8 +1,93 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { eventually, pause } from "./desktop.mjs";
 
 export const stateTransitions = [
+  [
+    "checkpoints survive binding edits and retire when the target is removed",
+    async (app) => {
+      const profile = await app.invoke("get_active_profile");
+      const integration = { integration_id: "e2e-checkpoint", kind: "channel", data: { id: "one", label: "Channel" } };
+      const binding = {
+        ...profile.bindings[0], id: "checkpoint-binding", device_id: "checkpoint-controller",
+        action: "Volume", targets: [{ Integration: integration }],
+      };
+      const edit = (edits) => app.invoke("edit_profile_bindings", { expectedProfile: profile.name, edits });
+      const entry = {
+        target: { Integration: { ...integration, data: { id: "one", label: "Renamed channel" } } },
+        state: { volume: 0.375 },
+      };
+      const checkpoint = () => app.invoke("checkpoint_profile_state", {
+        profileName: profile.name, targetStates: [entry],
+      });
+      const storedCheckpoint = async () => {
+        const profiles = JSON.parse(await readFile(join(app.data, "profiles.json"), "utf8"));
+        const active = profiles.find((p) => p.name === profile.name);
+        return active.target_states?.find((item) => item.target.Integration?.integration_id === integration.integration_id);
+      };
+      await edit({ upsert: [binding] });
+      try {
+        assert.equal(await checkpoint(), true);
+        await edit({ upsert: [{ ...binding, name: "Updated binding" }] });
+        assert.deepEqual((await storedCheckpoint())?.state, entry.state);
+        await Promise.all([edit({ removeIds: [binding.id] }), checkpoint()]);
+        assert.equal(await storedCheckpoint(), undefined);
+      } finally {
+        await edit({ removeIds: [binding.id] });
+      }
+    },
+  ],
+  [
+    "binding transactions reject stale profiles and invalid batches without a partial save",
+    async (app) => {
+      const before = await app.invoke("get_active_profile");
+      const [first] = before.bindings;
+      const edit = (expectedProfile, edits) => app.invoke("edit_profile_bindings", { expectedProfile, edits });
+      const upsert = [{ ...first, name: "Uncommitted rename" }];
+      await assert.rejects(edit("Different profile", { upsert }), /Active profile changed/);
+      await assert.rejects(edit(before.name, { upsert, order: [] }), /before reorder/);
+      const duplicateControl = { ...first, id: first.id + "-duplicate" };
+      await assert.rejects(edit(before.name, { upsert: [first, duplicateControl] }), /same MIDI control/);
+      await assert.rejects(edit(before.name, { upsert: [duplicateControl, first] }), /same MIDI control/);
+      const current = await app.invoke("get_active_profile");
+      assert.deepEqual(current.bindings, before.bindings);
+      const stored = JSON.parse(await readFile(join(app.data, "profiles.json"), "utf8"));
+      assert.equal(stored.find((p) => p.name === before.name).bindings[0].name, first.name);
+    },
+  ],
+  [
+    "a binding edit and a preference update preserve each other's changes",
+    async (app) => {
+      const profile = await app.invoke("get_active_profile");
+      const original = profile.bindings.slice(0, 2);
+      assert.equal(original.length, 2);
+      const changed = original.map((binding) => ({ ...binding, name: binding.name + " edited" }));
+      const saveBindings = (upsert) => app.invoke("edit_profile_bindings", {
+        expectedProfile: profile.name, edits: { upsert },
+      });
+      const savePreferences = (pluginSettings) => app.invoke("update_profile_preferences", {
+        expectedProfile: profile.name, pluginSettings,
+      });
+      try {
+        await Promise.all([
+          saveBindings(changed),
+          savePreferences({ ...profile.plugin_settings, e2e: { enabled: true } }),
+        ]);
+        const active = await app.invoke("get_active_profile");
+        const stored = JSON.parse(await readFile(join(app.data, "profiles.json"), "utf8"));
+        for (const saved of [active, stored.find((entry) => entry.name === profile.name)]) {
+          assert.deepEqual(saved.bindings.slice(0, 2).map((b) => b.name), changed.map((b) => b.name));
+          assert.equal(saved.plugin_settings.e2e.enabled, true);
+          assert.deepEqual(saved.bindings.map((b) => b.id), profile.bindings.map((b) => b.id));
+        }
+      } finally {
+        await saveBindings(original);
+        await savePreferences(profile.plugin_settings);
+      }
+    },
+  ],
   [
     "stale MIDI learning sessions cannot cancel or consume a replacement session",
     async (app) => {

@@ -22,6 +22,7 @@ export function createStartup({
   midiStatus,
   osdState,
   profileState,
+  setBindings,
   queueMidiDeviceInventorySubmit,
   recordPerformanceResult,
   refreshSessions,
@@ -75,7 +76,7 @@ export function createStartup({
     }
 
     try {
-      profileState.bindings = [];
+      setBindings([]);
     } catch (error) {
       diagnosticError("startup_empty_bindings_render_failed", error);
     }

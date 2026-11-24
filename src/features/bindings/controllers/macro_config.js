@@ -222,75 +222,6 @@ export function createMacroConfig({
     renderConfigPreview();
   }
 
-  function setMacroActionFromTargetSelect(step, targetSelect, previous = {}) {
-    const selectedTargets = Array.isArray(targetSelect.__selectedTargets)
-      ? targetSelect.__selectedTargets
-      : targetSelect.__selectedTarget
-        ? [targetSelect.__selectedTarget]
-        : [];
-    if (selectedTargets.some(isMacroTarget) || targetSelect.dataset.action === "Macro") {
-      Object.assign(step, previous);
-      return false;
-    }
-    const usableTargets = selectedTargets.filter(
-      (target) => target && target !== "Unset" && !isMacroTarget(target),
-    );
-    if (usableTargets.length === 0) {
-      clearMacroActionStep(step);
-      return true;
-    }
-
-    const hasHotkeyTarget = usableTargets.some(isHotkeyTarget);
-    const hasOpenApplicationTarget = usableTargets.some(isOpenApplicationTarget);
-    const hasAutoHotkeyScriptTarget = usableTargets.some(isAutoHotkeyScriptTarget);
-    step.targets = usableTargets;
-    step.action = hasHotkeyTarget
-      ? "Hotkey"
-      : hasOpenApplicationTarget
-        ? "OpenApplication"
-        : hasAutoHotkeyScriptTarget
-          ? "RunAutoHotkeyScript"
-          : targetSelect.dataset.action || step.action || "ToggleMute";
-
-    const usesDirectUtilityTarget = hasHotkeyTarget || hasOpenApplicationTarget || hasAutoHotkeyScriptTarget;
-    const actionRole = usesDirectUtilityTarget
-      ? ""
-      : String(targetSelect.dataset.actionRole || "")
-          .trim()
-          .toLowerCase();
-    const actionLabel = usesDirectUtilityTarget ? "" : String(targetSelect.dataset.actionLabel || "").trim();
-    const valueKind = usesDirectUtilityTarget ? "" : String(targetSelect.dataset.valueKind || "").trim();
-    if (actionRole) step.action_role = actionRole;
-    else delete step.action_role;
-    if (actionLabel) step.action_label = actionLabel;
-    else delete step.action_label;
-    if (valueKind) step.value_kind = valueKind;
-    else delete step.value_kind;
-    if (step.action === "Volume" && step.action_role === "value") {
-      step.value = Math.min(1, Math.max(0, Number(step.value ?? previous.value ?? 1)));
-    } else {
-      delete step.value;
-    }
-
-    step.hotkey = step.action === "Hotkey" ? normalizeHotkeyMapping(step.hotkey) : null;
-    step.open_application =
-      step.action === "OpenApplication"
-        ? normalizeOpenApplicationMapping(
-            targetSelect?.getOpenApplication?.() || targetSelect?.__openApplication,
-          )
-        : null;
-    step.autohotkey_script =
-      step.action === "RunAutoHotkeyScript"
-        ? normalizeAutoHotkeyScriptMapping(
-            targetSelect?.getAutoHotkeyScript?.() || targetSelect?.__autoHotkeyScript,
-          )
-        : null;
-    step.state = normalizeMacroActionState(
-      step.state || (step.action === "ToggleMute" || step.action === "ToggleEffect" ? "Toggle" : "Default"),
-    );
-    return true;
-  }
-
   function sameMacroTargets(a = [], b = []) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
     return a.every((target, index) => JSON.stringify(target) === JSON.stringify(b[index]));
@@ -422,7 +353,6 @@ export function createMacroConfig({
     ensureMacroConfigDom,
     updateMacroDraft,
     commitMacroDraftEdit,
-    setMacroActionFromTargetSelect,
     setMacroActionTargetFromTargetSelect,
     applyMacroActionOptionToStep,
     buildMacroStateSelect,

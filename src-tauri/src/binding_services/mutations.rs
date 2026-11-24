@@ -1,226 +1,233 @@
 use super::*;
+use std::collections::HashMap;
+
+#[derive(Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct BindingEdits {
+    pub upsert: Vec<Binding>,
+    pub remove_ids: Vec<String>,
+    pub order: Option<Vec<String>>,
+}
+
+impl BindingEdits {
+    fn apply(self, bindings: &mut Vec<Binding>, claim_existing: bool) -> Result<(), String> {
+        let previous: HashMap<_, _> = bindings.iter().map(|b| (b.id.as_str(), b)).collect();
+        let mut claimed = HashSet::new();
+        let mut submitted_controls = HashSet::new();
+        let mut replacements = HashMap::new();
+        let mut append_order = Vec::new();
+        for mut binding in self.upsert {
+            binding.ensure_targets();
+            binding.normalize_button_light_serialization();
+            if binding.targets.is_empty() {
+                return Err("Binding must have at least one target".into());
+            }
+            let key = BindingKey::from_binding(&binding);
+            let original = previous.get(binding.id.as_str());
+            // A label-only edit must also work for imported profiles with shared controls.
+            let claims_control =
+                claim_existing || original.is_none_or(|old| BindingKey::from_binding(old) != key);
+            if !submitted_controls.insert(key.clone()) && (claims_control || claimed.contains(&key))
+            {
+                return Err("Two edited bindings claim the same MIDI control".into());
+            }
+            if claims_control {
+                claimed.insert(key);
+            }
+            append_order.push(binding.id.clone());
+            if replacements.insert(binding.id.clone(), binding).is_some() {
+                return Err("Binding appears twice in an edit".into());
+            }
+        }
+        let removed: HashSet<_> = self.remove_ids.into_iter().collect();
+        let edited_ids: HashSet<_> = replacements.keys().cloned().collect();
+        bindings.retain_mut(|existing| {
+            if let Some(replacement) = replacements.remove(&existing.id) {
+                *existing = replacement;
+                return true;
+            }
+            !removed.contains(&existing.id)
+                && !edited_ids.contains(&existing.id)
+                && !claimed.contains(&BindingKey::from_binding(existing))
+        });
+        bindings.extend(append_order.iter().filter_map(|id| replacements.remove(id)));
+        if let Some(order) = self.order {
+            let positions: HashMap<_, _> =
+                order.iter().enumerate().map(|(i, id)| (id, i)).collect();
+            if positions.len() != bindings.len()
+                || order.len() != bindings.len()
+                || bindings
+                    .iter()
+                    .any(|binding| !positions.contains_key(&binding.id))
+            {
+                return Err("Binding list changed before reorder".into());
+            }
+            bindings.sort_by_key(|binding| positions[&binding.id]);
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn commit_binding_edits(
+    state: &AppState,
+    expected_profile: Option<&str>,
+    edits: BindingEdits,
+) -> Result<Vec<String>, String> {
+    let updated_ids: HashSet<_> = edits
+        .upsert
+        .iter()
+        .map(|binding| binding.id.clone())
+        .collect();
+    let changes_controls = !updated_ids.is_empty() || !edits.remove_ids.is_empty();
+    // Finish any in-flight MIDI batch before retiring a control and its hardware feedback.
+    let _dispatch = state
+        .midi_dispatch_lock
+        .lock()
+        .map_err(|_| "Lock poisoned")?;
+    let mut active = state.active_profile.lock().map_err(|_| "Lock poisoned")?;
+    if let Some(expected) = expected_profile {
+        if active.as_ref().map(|snapshot| snapshot.name.as_str()) != Some(expected) {
+            return Err("Active profile changed before binding edit".into());
+        }
+    }
+    let mut profile = active
+        .as_ref()
+        .map(|snapshot| snapshot.profile().clone())
+        .unwrap_or_else(|| model::Profile {
+            name: "Default".into(),
+            bindings: vec![],
+            osd_settings: Default::default(),
+            plugin_settings: Default::default(),
+            midi_device_preference: Default::default(),
+            midi_device_preference_set: false,
+            target_states: vec![],
+        });
+    let previous = active.clone();
+    edits.apply(&mut profile.bindings, expected_profile.is_none())?;
+    state
+        .profile_store
+        .save_configuration(profile.clone())
+        .map_err(|err| err.to_string())?;
+    let next = AppState::profile_snapshot(profile);
+    *active = Some(next.clone());
+    drop(active);
+    if changes_controls {
+        let previous_bindings = previous
+            .as_ref()
+            .map(|snapshot| snapshot.bindings.as_slice())
+            .unwrap_or_default();
+        reconcile_edited_bindings(state, previous_bindings, &next, &updated_ids);
+    }
+    Ok(next
+        .bindings
+        .iter()
+        .map(|binding| binding.id.clone())
+        .collect())
+}
+
+fn reconcile_edited_bindings(
+    state: &AppState,
+    before: &[Binding],
+    profile: &model::Profile,
+    updated: &HashSet<String>,
+) {
+    let current: HashMap<_, _> = profile.bindings.iter().map(|b| (&b.id, b)).collect();
+    let outputs = active_feedback_outputs(&profile.bindings);
+    let active_controls: HashSet<_> = profile
+        .bindings
+        .iter()
+        .map(resolved_binding_feedback_control_key)
+        .collect();
+    state.cancel_activity_button_light_holds();
+    for previous in before {
+        let replacement = current.get(&previous.id).copied();
+        if replacement.is_some() && !updated.contains(&previous.id) {
+            continue;
+        }
+        for output in
+            stale_feedback_bindings_for_removed_outputs(std::slice::from_ref(previous), &outputs)
+        {
+            let clear = should_clear_stale_feedback_hardware(&output, replacement);
+            clear_binding_feedback_output(state, &output, clear);
+        }
+        if replacement.is_none() {
+            let key = BindingKey::from_binding(previous);
+            if let Ok(mut values) = state.binding_action_values.lock() {
+                values.remove(&key);
+            }
+            if let Ok(mut values) = state.binding_state.lock() {
+                values.remove(&key);
+            }
+            // Ordinary faders also need their motor returned to zero on removal.
+            if !binding_has_clearable_feedback_output(previous)
+                && !active_controls.contains(&resolved_binding_feedback_control_key(previous))
+            {
+                clear_binding_feedback_output(state, previous, true);
+            }
+        }
+    }
+    feedback::reconcile_assign_feedback_outputs(state, before, &profile.bindings);
+    state.sync_feedback_values(profile);
+    state.send_idle_button_light_feedback_values(profile);
+    for previous in before.iter().filter(|b| updated.contains(&b.id)) {
+        let Some(binding) = current.get(&previous.id) else {
+            continue;
+        };
+        let enabled_new_output = !previous.feedback_enabled && binding.feedback_enabled;
+        let outputs_changed = previous.additional_outputs != binding.additional_outputs;
+        if binding.is_button_binding()
+            || !binding.has_value_feedback()
+            || !(enabled_new_output || outputs_changed)
+        {
+            continue;
+        }
+        let key = BindingKey::from_binding(binding);
+        let value = state
+            .feedback_values
+            .lock()
+            .ok()
+            .and_then(|values| values.get(&key).copied());
+        if let Some(value) = value {
+            send_resolved_binding_feedback(
+                state,
+                binding,
+                value,
+                false,
+                true,
+                &format!("feedback_outputs_changed:{}", binding.id),
+            );
+        }
+    }
+}
 
 pub fn add_binding(state: &AppState, binding: Binding) -> Result<(), String> {
-    add_binding_to_active_profile(state, binding)
-}
-
-pub(crate) fn add_binding_to_active_profile(
-    state: &AppState,
-    mut binding: Binding,
-) -> Result<(), String> {
-    run_logger::info(
-        "bindings_cmd",
-        "add_requested",
-        &format!(
-            "binding_id={} device_id={} channel={} controller={} action={:?} control_kind={:?} mode={:?} relative_format={:?}",
-            binding.id,
-            binding.device_id,
-            binding.control.channel,
-            binding.control.controller,
-            binding.action,
-            binding.control_kind,
-            binding.mode,
-            binding.relative_format
-        ),
-    );
-    binding.ensure_targets();
-    if binding.targets.is_empty() {
-        run_logger::warn(
-            "bindings_cmd",
-            "add_rejected",
-            &format!("binding_id={} reason=no_targets", binding.id),
-        );
-        return Err("Binding must have at least one target".to_string());
-    }
-    let (saved_profile, stale_feedback_bindings, previous_bindings, feedback_outputs_changed) = {
-        let mut profile_guard = state
-            .active_profile
-            .lock()
-            .map_err(|_| "Lock poisoned".to_string())?;
-        let mut profile = profile_guard
-            .as_ref()
-            .map(|snapshot| snapshot.profile().clone())
-            .unwrap_or(model::Profile {
-                name: "Default".to_string(),
-                bindings: Vec::new(),
-                osd_settings: model::OsdSettings::default(),
-                plugin_settings: std::collections::HashMap::new(),
-                midi_device_preference: model::MidiDevicePreference::default(),
-                midi_device_preference_set: false,
-                target_states: Vec::new(),
-            });
-        let previous_bindings = profile.bindings.clone();
-        let feedback_outputs_changed = previous_bindings.iter().any(|existing| {
-            existing.id == binding.id
-                && ((!existing.feedback_enabled && binding.feedback_enabled)
-                    || existing.additional_outputs != binding.additional_outputs)
-        });
-        let mut removed_bindings = Vec::new();
-        // Preserve the edited row's position after removing mapping conflicts.
-        let insertion_index = profile
-            .bindings
-            .iter()
-            .take_while(|existing| existing.id != binding.id)
-            .filter(|existing| {
-                existing.device_id != binding.device_id || existing.control != binding.control
-            })
-            .count();
-        profile.bindings.retain(|existing| {
-            let remove = existing.id == binding.id
-                || (existing.device_id == binding.device_id && existing.control == binding.control);
-            if remove {
-                removed_bindings.push(existing.clone());
-            }
-            !remove
-        });
-        let replacement = binding.clone();
-        profile.bindings.insert(insertion_index, binding);
-        let active_outputs = active_feedback_outputs(&profile.bindings);
-        let stale_feedback_bindings: Vec<_> =
-            stale_feedback_bindings_for_removed_outputs(&removed_bindings, &active_outputs)
-                .into_iter()
-                .map(|previous| {
-                    let clear_hardware =
-                        should_clear_stale_feedback_hardware(&previous, Some(&replacement));
-                    (previous, clear_hardware)
-                })
-                .collect();
-        state
-            .profile_store
-            .save_profile(profile.clone())
-            .map_err(|err| err.to_string())?;
-        *profile_guard = Some(AppState::profile_snapshot(profile.clone()));
-        (
-            profile,
-            stale_feedback_bindings,
-            previous_bindings,
-            feedback_outputs_changed,
-        )
-    };
-    state.cancel_activity_button_light_holds();
-    for (binding, clear_hardware) in stale_feedback_bindings {
-        clear_binding_feedback_output(state, &binding, clear_hardware);
-    }
-    feedback::reconcile_assign_feedback_outputs(state, &previous_bindings, &saved_profile.bindings);
-    state.sync_feedback_values(&saved_profile);
-    state.send_idle_button_light_feedback_values(&saved_profile);
-    if feedback_outputs_changed {
-        if let Some(binding) = saved_profile.bindings.iter().find(|binding| {
-            binding.has_value_feedback()
-                && !binding.is_button_binding()
-                && previous_bindings.iter().any(|previous| {
-                    previous.id == binding.id
-                        && (!previous.feedback_enabled
-                            || previous.additional_outputs != binding.additional_outputs)
-                })
-        }) {
-            let key = BindingKey::from_binding(binding);
-            let value = state
-                .feedback_values
-                .lock()
-                .ok()
-                .and_then(|values| values.get(&key).copied());
-            if let Some(value) = value {
-                send_resolved_binding_feedback(
-                    state,
-                    binding,
-                    value,
-                    false,
-                    true,
-                    &format!("feedback_outputs_changed:{}", binding.id),
-                );
-            }
-        }
-    }
-    run_logger::info(
-        "bindings_cmd",
-        "add_succeeded",
-        &format!(
-            "profile={} binding_count={}",
-            saved_profile.name,
-            saved_profile.bindings.len()
-        ),
-    );
-    Ok(())
-}
-
-pub async fn remove_binding(state: &AppState, binding: Binding) -> Result<(), String> {
-    run_logger::info(
-        "bindings_cmd",
-        "remove_requested",
-        &format!("binding_id={} device_id={}", binding.id, binding.device_id),
-    );
-    // Persist a candidate first, then publish it to the background loop.
-    let saved_profile = {
-        let mut profile_guard = state
-            .active_profile
-            .lock()
-            .map_err(|_| "Lock poisoned".to_string())?;
-
-        if let Some(profile) = profile_guard.as_ref() {
-            let mut updated = profile.profile().clone();
-            updated
-                .bindings
-                .retain(|existing| existing.id != binding.id);
-            state
-                .profile_store
-                .save_profile(updated.clone())
-                .map_err(|err| err.to_string())?;
-            *profile_guard = Some(AppState::profile_snapshot(updated.clone()));
-            Some(updated)
-        } else {
-            None
-        }
-    };
-
-    // Clear internal state only after the profile save succeeds.
-    let key = BindingKey::from_binding(&binding);
-    let output_key = resolved_binding_feedback_control_key(&binding).to_binding_key();
-    if let Ok(mut feedback) = state.feedback_values.lock() {
-        feedback.remove(&key);
-        feedback.remove(&output_key);
-    }
-    if let Ok(mut values) = state.binding_action_values.lock() {
-        values.remove(&key);
-    }
-    if let Ok(mut states) = state.binding_state.lock() {
-        states.remove(&key);
-    }
-
-    // Wait for any pending background loop iterations to finish.
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let current_bindings = saved_profile
-        .as_ref()
-        .map(|profile| profile.bindings.as_slice())
-        .unwrap_or(&[]);
-    feedback::reconcile_assign_feedback_outputs(
+    commit_binding_edits(
         state,
-        std::slice::from_ref(&binding),
-        current_bindings,
-    );
+        None,
+        BindingEdits {
+            upsert: vec![binding],
+            ..Default::default()
+        },
+    )
+    .map(|_| ())
+}
 
-    // Send 0.0 value to the binding's feedback destination.
-    if let Ok(mut midi) = state.midi.lock() {
-        if binding.is_button_binding() {
-            let _ = midi.send_binding_light_feedback(&binding, 0.0);
-        } else {
-            let _ = midi.send_binding_feedback_position(&binding, 0.0);
-        }
+pub fn remove_binding(state: &AppState, binding: Binding) -> Result<(), String> {
+    if state
+        .active_profile
+        .lock()
+        .map_err(|_| "Lock poisoned")?
+        .is_none()
+    {
+        return Ok(());
     }
-
-    run_logger::info(
-        "bindings_cmd",
-        "remove_succeeded",
-        &format!(
-            "binding_id={} binding_count={}",
-            binding.id,
-            saved_profile
-                .as_ref()
-                .map(|profile| profile.bindings.len())
-                .unwrap_or(0)
-        ),
-    );
-
-    Ok(())
+    commit_binding_edits(
+        state,
+        None,
+        BindingEdits {
+            remove_ids: vec![binding.id],
+            ..Default::default()
+        },
+    )
+    .map(|_| ())
 }

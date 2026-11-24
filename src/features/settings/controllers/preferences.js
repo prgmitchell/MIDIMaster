@@ -1,3 +1,8 @@
+import {
+  normalizeMidiDeviceInventorySettings,
+  MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+} from "../../../app/midi_device_inventory.js";
+
 /** preferences workflow. */
 export function createPreferences({
   applyTranslations,
@@ -11,9 +16,16 @@ export function createPreferences({
   setAppearanceState,
   settingsStore,
   showSettingsAlert,
-  syncMidiDeviceInventoryToggle,
   t,
 }) {
+  function syncMidiDeviceInventoryToggle(settings = null) {
+    if (!elements.midiDeviceInventoryConsentToggle) return;
+    const current = settings || (typeof getAppSettings === "function" ? getAppSettings() || {} : {});
+    const inventory = normalizeMidiDeviceInventorySettings(current);
+    elements.midiDeviceInventoryConsentToggle.checked =
+      inventory.consent === "enabled" && inventory.noticeVersion >= MIDI_DEVICE_INVENTORY_NOTICE_VERSION;
+  }
+
   function syncAppSettingsUI(nextSettings) {
     const current = typeof getAppSettings === "function" ? getAppSettings() || {} : {};
     const merged = { ...current, ...(nextSettings || {}) };
@@ -91,7 +103,76 @@ export function createPreferences({
     }
   }
 
+  function bindUi({ lifetime, invoke, ensureAutoUpdateCheck, onMidiDeviceInventoryConsentChanged }) {
+    populateLanguageSelect();
+    const toggles = [
+      ["startWithWindows", elements.startWithWindowsSelect],
+      ["startInTray", elements.startInTraySelect],
+      ["minimizeToTray", elements.minimizeToTraySelect],
+      ["exitToTray", elements.exitToTraySelect],
+      ["autoCheckUpdates", elements.autoCheckUpdatesButton],
+    ];
+    for (const [key, input] of toggles) {
+      lifetime.listen(input, "change", () => {
+        const previousSettings = getAppSettings();
+        syncAppSettingsUI({ [key]: input.checked });
+        persistAppSettings({ previousSettings });
+        if (key === "autoCheckUpdates") ensureAutoUpdateCheck();
+      });
+    }
+    if (elements.languageSelect) {
+      lifetime.listen(elements.languageSelect, "change", async () => {
+        const language = normalizeLanguage(elements.languageSelect.value);
+        syncAppSettingsUI({ language });
+        await i18n?.setLocale?.(language).catch((error) => {
+          console.error("Failed to apply language setting", error);
+        });
+        applyTranslations();
+        renderUpdateUi();
+        persistAppSettings();
+      });
+    }
+    if (elements.midiDeviceInventoryConsentToggle) {
+      lifetime.listen(elements.midiDeviceInventoryConsentToggle, "change", async () => {
+        const consent = elements.midiDeviceInventoryConsentToggle.checked ? "enabled" : "disabled";
+        const previous = normalizeMidiDeviceInventorySettings(
+          typeof getAppSettings === "function" ? getAppSettings() || {} : {},
+        );
+        syncAppSettingsUI({
+          midiDeviceInventoryConsent: consent,
+          midiDeviceInventoryNoticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+        });
+        try {
+          const updated = await invoke("update_midi_device_inventory_consent", {
+            consent,
+            noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+          });
+          const normalized = normalizeMidiDeviceInventorySettings(
+            updated || {
+              consent,
+              noticeVersion: MIDI_DEVICE_INVENTORY_NOTICE_VERSION,
+            },
+          );
+          syncAppSettingsUI({
+            midiDeviceInventoryConsent: normalized.consent,
+            midiDeviceInventoryNoticeVersion: normalized.noticeVersion,
+          });
+          if (typeof onMidiDeviceInventoryConsentChanged === "function") {
+            onMidiDeviceInventoryConsentChanged(normalized);
+          }
+        } catch (error) {
+          console.error("Failed to update MIDI device inventory consent", error);
+          syncAppSettingsUI({
+            midiDeviceInventoryConsent: previous.consent,
+            midiDeviceInventoryNoticeVersion: previous.noticeVersion,
+          });
+        }
+      });
+    }
+  }
+
   return {
+    bindUi,
     syncAppSettingsUI,
     persistAppSettings,
     normalizeLanguage,

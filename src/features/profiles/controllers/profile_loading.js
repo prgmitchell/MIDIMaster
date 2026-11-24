@@ -1,6 +1,5 @@
 import {
   normalizeMidiPreference as toClientMidiDevicePreference,
-  buildPersistedMidiPreference as buildPersistedMidiDevicePreference,
 } from "../../../core/midi_preferences.js";
 import { fromOsdSettings, DEFAULT_OSD_SETTINGS } from "../../../core/osd_settings.js";
 
@@ -8,13 +7,12 @@ import { fromOsdSettings, DEFAULT_OSD_SETTINGS } from "../../../core/osd_setting
 export function createProfileLoading({
   applyOsdSettings,
   bindingFallbackName,
-  buildPersistedOsdSettings,
+  emptyProfile,
+  listProfilesWithDefault,
   closeProfileDropdown,
   defaults,
   flushProfileSave,
   getActiveProfileName,
-  getCurrentMidiPreference,
-  getOsdSettings,
   getPluginHost,
   invoke,
   normalizeBinding,
@@ -102,9 +100,6 @@ export function createProfileLoading({
     const host = typeof getPluginHost === "function" ? getPluginHost() : null;
     if (host) {
       try {
-        host.setBindings(nextBindings);
-      } catch {}
-      try {
         host.setProfileState({ name: profile.name, plugin_settings: pps });
       } catch {}
     }
@@ -149,27 +144,7 @@ export function createProfileLoading({
 
     const current = typeof getActiveProfileName === "function" ? getActiveProfileName() || "" : "";
     if (n === current) {
-      let profiles = await invoke("list_profiles");
-
-      const hasDefault = profiles.some((p) => p && p.name === "Default");
-      if (!hasDefault) {
-        await invoke("save_profile", {
-          profile: {
-            name: "Default",
-            bindings: [],
-            osd_settings: buildPersistedOsdSettings(
-              typeof getOsdSettings === "function" ? getOsdSettings() || defaults : defaults,
-            ),
-            plugin_settings: {},
-            midi_device_preference: buildPersistedMidiDevicePreference(
-              typeof getCurrentMidiPreference === "function" ? getCurrentMidiPreference() : null,
-            ),
-            midi_device_preference_set: true,
-          },
-        });
-        profiles = await invoke("list_profiles");
-      }
-
+      const profiles = await listProfilesWithDefault();
       const fallbackName =
         profiles.find((p) => p && p.name === "Default")?.name || profiles[0]?.name || "Default";
 
@@ -194,16 +169,7 @@ export function createProfileLoading({
     await invoke("save_profile", {
       activate: false,
       createOnly: true,
-      profile: {
-        name,
-        bindings: [],
-        osd_settings: buildPersistedOsdSettings(
-          typeof getOsdSettings === "function" ? getOsdSettings() || defaults : defaults,
-        ),
-        plugin_settings: {},
-        midi_device_preference: buildPersistedMidiDevicePreference({ routes: [] }),
-        midi_device_preference_set: true,
-      },
+      profile: emptyProfile(name, { routes: [] }),
     });
     await loadProfileByName(name);
     await refreshProfiles(name);

@@ -11,22 +11,14 @@ export function createEditPreview({
   editorState,
   getBindings,
   getConfigBinding,
-  invoke,
-  persistBindingBackend,
+  bindingEdits,
   renderBindings,
   renderConfigPreview,
-  setBindings,
-  syncPluginHostBindings,
 }) {
-  function cloneBindingsList(list) {
-    return (Array.isArray(list) ? list : [])
-      .map((binding) => cloneBindingDraft(binding))
-      .filter(Boolean);
-  }
-
   function rememberConfigPreviewOriginalBindings() {
     if (!editorState.previewOriginalBindings) {
-      editorState.previewOriginalBindings = cloneBindingsList(getBindings());
+      editorState.previewOriginalBindings = [...getBindings()];
+      editorState.previewAppliedBindings = editorState.previewOriginalBindings;
     }
   }
 
@@ -80,7 +72,7 @@ export function createEditPreview({
     const draft = getConfigBinding();
     if (!draft || !editorState.bindingId) return null;
     rememberConfigPreviewOriginalBindings();
-    let nextBindings = cloneBindingsList(editorState.previewOriginalBindings);
+    let nextBindings = [...editorState.previewOriginalBindings];
     for (const entry of editorState.acceptedTransfers.values()) {
       if (entry.field === "control") {
         nextBindings = applyPreviewConflict(nextBindings, entry.conflict);
@@ -97,67 +89,29 @@ export function createEditPreview({
     return nextBindings;
   }
 
-  async function persistBindingsDiff(previousBindings, nextBindings, reason) {
-    const previous = cloneBindingsList(previousBindings);
-    const next = cloneBindingsList(nextBindings);
-    const nextById = new Map(next.map((binding) => [binding.id, binding]));
-    const previousById = new Map(
-      previous.map((binding) => [binding.id, binding]),
-    );
-
-    for (const binding of previous) {
-      if (!nextById.has(binding.id)) {
-        await invoke("remove_binding", { binding });
-      }
-    }
-
-    for (const binding of next) {
-      const previousBinding = previousById.get(binding.id);
-      if (
-        !previousBinding ||
-        bindingSnapshotKey(previousBinding) !== bindingSnapshotKey(binding)
-      ) {
-        await persistBindingBackend(binding);
-      }
-    }
-  }
-
   async function applyPrimaryControlPreview() {
-    const nextBindings = buildPrimaryControlPreviewBindings();
-    if (!nextBindings) return;
-    const previousBindings = cloneBindingsList(getBindings());
-    setBindings(cloneBindingsList(nextBindings));
-    renderBindings();
-    syncPluginHostBindings();
-    try {
-      await persistBindingsDiff(
-        previousBindings,
-        nextBindings,
-        "control preview",
-      );
-    } catch (err) {
-      console.error("Failed to apply control preview:", err);
-    }
+    const next = buildPrimaryControlPreviewBindings();
+    if (!next) return;
+    const previousWrite = editorState.pendingPreview;
+    const apply = async () => {
+      await bindingEdits.applyList(editorState.previewAppliedBindings, next);
+      const applied = new Map(editorState.previewAppliedBindings.map((binding) => [binding.id, binding]));
+      editorState.previewAppliedBindings = next.map((binding) => {
+        const old = applied.get(binding.id);
+        return old && bindingSnapshotKey(old) === bindingSnapshotKey(binding) ? old : binding;
+      });
+      renderBindings();
+    };
+    const pending = Promise.resolve(previousWrite).then(apply);
+    editorState.pendingPreview = pending.catch(() => {});
+    await pending;
   }
 
   async function restoreConfigPreviewBindings() {
     if (!editorState.previewOriginalBindings) return;
-    const previousBindings = cloneBindingsList(getBindings());
-    const restoredBindings = cloneBindingsList(
-      editorState.previewOriginalBindings,
-    );
-    setBindings(restoredBindings);
+    await editorState.pendingPreview;
+    await bindingEdits.applyList(editorState.previewAppliedBindings, editorState.previewOriginalBindings);
     renderBindings();
-    syncPluginHostBindings();
-    try {
-      await persistBindingsDiff(
-        previousBindings,
-        restoredBindings,
-        "control preview rollback",
-      );
-    } catch (err) {
-      console.error("Failed to restore control preview:", err);
-    }
   }
 
   function stopConfigPreviewTimer() {

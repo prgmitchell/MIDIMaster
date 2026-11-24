@@ -31,7 +31,7 @@ export function createCurveWorkspace({
     elements,
     getConfigBinding,
     getCurvePresets,
-    renderConfigModal: (...args) => renderConfigModal(...args),
+    renderConfigModal,
     saveCurvePresets,
     setActionIcon,
     t,
@@ -49,7 +49,7 @@ export function createCurveWorkspace({
     curveState,
     elements,
     getConfigBinding,
-    renderConfigModal: (...args) => renderConfigModal(...args),
+    renderConfigModal,
     renderConfigPreview,
     syncCurvePresetToolbar,
   });

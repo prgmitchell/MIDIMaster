@@ -201,6 +201,25 @@ export function createListControls({
     return renderedBindings.get(targetId)?.item || null;
   }
 
+  function revealRow(item) {
+    const reduceMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+    item.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+    item.classList.remove("binding-item-revealed");
+    void item.offsetWidth;
+    item.classList.add("binding-item-revealed");
+    clearTimeout(item.__bindingRevealTimer);
+    item.__bindingRevealTimer = setTimeout(
+      () => {
+        item.classList.remove("binding-item-revealed");
+      },
+      reduceMotion ? 700 : 1800,
+    );
+  }
+
   function flushQueuedBindingReveal() {
     const bindingId = listState.pendingRevealBindingId;
     if (!bindingId) return;
@@ -209,22 +228,7 @@ export function createListControls({
     requestAnimationFrame(() => {
       const item = findRenderedBindingItem(bindingId);
       if (!item) return;
-      const reduceMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
-      item.scrollIntoView({
-        behavior: reduceMotion ? "auto" : "smooth",
-        block: "center",
-        inline: "nearest",
-      });
-      item.classList.remove("binding-item-revealed");
-      void item.offsetWidth;
-      item.classList.add("binding-item-revealed");
-      clearTimeout(item.__bindingRevealTimer);
-      item.__bindingRevealTimer = setTimeout(
-        () => {
-          item.classList.remove("binding-item-revealed");
-        },
-        reduceMotion ? 700 : 1800,
-      );
+      revealRow(item);
     });
   }
 
@@ -255,22 +259,7 @@ export function createListControls({
     const openRenderedPicker = async () => {
       const item = findRenderedBindingItem(targetId);
       if (!item) return false;
-      const reduceMotion = Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
-      item.scrollIntoView({
-        behavior: reduceMotion ? "auto" : "smooth",
-        block: "center",
-        inline: "nearest",
-      });
-      item.classList.remove("binding-item-revealed");
-      void item.offsetWidth;
-      item.classList.add("binding-item-revealed");
-      clearTimeout(item.__bindingRevealTimer);
-      item.__bindingRevealTimer = setTimeout(
-        () => {
-          item.classList.remove("binding-item-revealed");
-        },
-        reduceMotion ? 700 : 1800,
-      );
+      revealRow(item);
 
       const targetDropdown = item.querySelector(".binding-target-dropdown");
       if (typeof targetDropdown?.openTargetPicker === "function") {

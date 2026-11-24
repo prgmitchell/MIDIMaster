@@ -38,24 +38,7 @@ pub async fn apply_binding_action(
                 .iter()
                 .any(|target| matches!(target, model::BindingTarget::Soundboard))
         {
-            let sound_result = binding
-                .soundboard
-                .as_ref()
-                .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())
-                .and_then(|mapping| state.soundboard.play_binding(&binding.id, mapping));
-            if let Err(err) = sound_result {
-                let _ = app.emit(
-                    "binding_action_error",
-                    serde_json::json!({
-                        "reason": "soundboard_play_failed",
-                        "binding_id": binding.id,
-                        "title_key": "dialogs.soundboardPlaybackFailedTitle",
-                        "message_key": "dialogs.soundboardPlaybackFailedMessage",
-                        "params": { "message": err },
-                        "silent": silent,
-                    }),
-                );
-            }
+            let _ = binding_actions::play_soundboard_action(state, &app, &binding, silent);
         }
     }
     if matches!(effective_action, model::BindingAction::Macro) {
@@ -80,24 +63,7 @@ pub async fn apply_binding_action(
         if !binding.is_button_binding() {
             return Err("Soundboard actions require a button binding".to_string());
         }
-        let mapping = binding
-            .soundboard
-            .as_ref()
-            .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())?;
-        if let Err(err) = state.soundboard.play_binding(&binding.id, mapping) {
-            let _ = app.emit(
-                "binding_action_error",
-                serde_json::json!({
-                    "reason": "soundboard_play_failed",
-                    "binding_id": binding.id,
-                    "title_key": "dialogs.soundboardPlaybackFailedTitle",
-                    "message_key": "dialogs.soundboardPlaybackFailedMessage",
-                    "params": { "message": err },
-                    "silent": silent,
-                }),
-            );
-            return Err(err);
-        }
+        binding_actions::play_soundboard_action(state, &app, &binding, silent)?;
         return set_binding_feedback(
             app,
             state,

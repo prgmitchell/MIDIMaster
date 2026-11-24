@@ -206,12 +206,7 @@ export function createPanelMetadata({ elements, t }) {
   return {
     categoryLabel,
     targetPanelParts,
-    categoryForOption,
-    descriptionForOption,
-    tagsForOption,
-    optionSearchText,
     normalizePanelOptions,
-    categorySvg,
     createCategoryIcon,
   };
 }

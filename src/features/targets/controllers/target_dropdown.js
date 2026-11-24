@@ -173,7 +173,7 @@ export function createTargetDropdown({
       return mapTargetOptionToTarget(option, { fallbackTarget: selection.selectedTargets[0] });
     }
 
-    const { actionLabel, cachedDisplayForTarget, optionForTarget, renderChip, setDisplay } =
+    const { optionForTarget, setDisplay } =
       createSelectionDisplay({
         t,
         getHost,
@@ -188,30 +188,21 @@ export function createTargetDropdown({
         createTargetIcon,
         container,
         display,
-        hasUnavailableSuffix: (...args) => hasUnavailableSuffix(...args),
+        hasUnavailableSuffix,
         includeValueAction,
-        integrationFromTarget: (...args) => integrationFromTarget(...args),
+        integrationFromTarget,
         isBindingButton,
         macroDisplayName,
         placeholderOption,
         selection,
-        stripUnavailableSuffix: (...args) => stripUnavailableSuffix(...args),
+        stripUnavailableSuffix,
         suppressActionTags,
         syncContainerValue: (...args) => syncContainerValue(...args),
         targetDisplayCache,
-        targetIdentity: (...args) => targetIdentity(...args),
+        targetIdentity,
       });
 
-    const {
-      normalizeButtonActionOption,
-      valueActionOption,
-      addValueAction,
-      captureActionOptions,
-      collectIntegrationTargetOptions,
-      hydrateIntegrationActionsForTarget,
-      loadMacroNavActionOptionsForDropdown,
-      buildActionOptionsForTargetOption,
-    } = createActionPolicy({
+    const { buildActionOptionsForTargetOption } = createActionPolicy({
       callInvoke,
       t,
       getSess,
@@ -222,7 +213,7 @@ export function createTargetDropdown({
       mediaActionOptions,
       includeValueAction,
       includeWindowFocusAction,
-      targetIdentity: (...args) => targetIdentity(...args),
+      targetIdentity,
     });
 
     const { syncContainerValue, selectOption } = createSelection({
@@ -233,17 +224,17 @@ export function createTargetDropdown({
       container,
       macroAlreadyConfigured,
       macroBlockedBySoundboard,
-      mapOptionToTarget: (...args) => mapOptionToTarget(...args),
+      mapOptionToTarget,
       onMacroAlreadyConfigured,
       onSoundboardAlreadyConfigured,
       onSpecialActionConflict,
-      optionForTarget: (...args) => optionForTarget(...args),
+      optionForTarget,
       selection,
-      setDisplay: (...args) => setDisplay(...args),
+      setDisplay,
       soundboardAlreadyConfigured,
       soundboardBlockedByMacro,
       targetDisplayCache,
-      targetIdentity: (...args) => targetIdentity(...args),
+      targetIdentity,
     });
 
     const { openTargetPicker } = createPicker({
@@ -263,16 +254,16 @@ export function createTargetDropdown({
       getPlayback,
       getRecording,
       targetKey,
-      buildActionOptionsForTargetOption: (...args) => buildActionOptionsForTargetOption(...args),
+      buildActionOptionsForTargetOption,
       currentTarget,
-      filterPickerOptions: (...args) => filterPickerOptions(...args),
+      filterPickerOptions,
       includeValueAction,
       isBindingButton,
       overConfigModal,
-      selectOption: (...args) => selectOption(...args),
+      selectOption,
       selection,
-      stripUnavailableSuffix: (...args) => stripUnavailableSuffix(...args),
-      targetIdentity: (...args) => targetIdentity(...args),
+      stripUnavailableSuffix,
+      targetIdentity,
       targetOnly,
     });
 

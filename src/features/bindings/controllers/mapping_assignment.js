@@ -60,17 +60,7 @@ export function createMappingAssignment({
     return "Mapping";
   }
 
-  async function commitTransferPrompt() {
-    if (!editorState.transferPrompt) return;
-    const { field, mapping, conflict } = editorState.transferPrompt;
-    clearTransferPrompt();
-    const binding = getConfigBinding();
-    if (!binding) return;
-    if (!conflict || !conflict.binding) return;
-    const sameBindingTransfer = conflict.binding.id === binding.id;
-    if (sameBindingTransfer && conflict.field !== field) {
-      setControlMapping(binding, conflict.field, null);
-    }
+  function assignLearnedMapping(binding, field, mapping) {
     if (field === "control") {
       binding.device_id = mapping.device_id;
       binding.control = {
@@ -90,6 +80,20 @@ export function createMappingAssignment({
       if (field === "indicator_control") binding.feedback_enabled = true;
       if (field === "led_control") binding.led_enabled = true;
     }
+  }
+
+  async function commitTransferPrompt() {
+    if (!editorState.transferPrompt) return;
+    const { field, mapping, conflict } = editorState.transferPrompt;
+    clearTransferPrompt();
+    const binding = getConfigBinding();
+    if (!binding) return;
+    if (!conflict || !conflict.binding) return;
+    const sameBindingTransfer = conflict.binding.id === binding.id;
+    if (sameBindingTransfer && conflict.field !== field) {
+      setControlMapping(binding, conflict.field, null);
+    }
+    assignLearnedMapping(binding, field, mapping);
     if (sameBindingTransfer) {
       editorState.acceptedTransfers.delete(field);
     } else {
@@ -131,25 +135,7 @@ export function createMappingAssignment({
       return;
     }
 
-    if (field === "control") {
-      binding.device_id = mapping.device_id;
-      binding.control = {
-        channel: mapping.channel,
-        controller: mapping.controller,
-        msg_type: mapping.msg_type || "ControlChange",
-      };
-      binding.control_kind = normalizeControlKind(mapping.control_kind);
-      binding.mode = mapping.mode || binding.mode || "Absolute";
-    } else {
-      if (field === "mute_control" && mapping && typeof mapping === "object") {
-        mapping.mute_behavior = normalizeMuteBehavior(
-          mapping.mute_behavior || binding.mute_behavior,
-        );
-      }
-      setControlMapping(binding, field, mapping);
-      if (field === "indicator_control") binding.feedback_enabled = true;
-      if (field === "led_control") binding.led_enabled = true;
-    }
+    assignLearnedMapping(binding, field, mapping);
     editorState.acceptedTransfers.delete(field);
     if (field === "control") {
       await applyPrimaryControlPreview();

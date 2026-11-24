@@ -20,41 +20,68 @@ pub fn emit_localized_action_error(
     );
 }
 
-pub(super) fn autohotkey_script_display(binding: &Binding) -> String {
-    binding
-        .autohotkey_script
-        .as_ref()
-        .map(|mapping| {
-            let display = mapping.display.trim();
-            if display.is_empty() {
-                mapping.path.trim()
-            } else {
-                display
-            }
-            .to_string()
+fn launch_display<'a>(mapping: Option<(&'a str, &'a str)>, fallback: &'a str) -> String {
+    mapping
+        .and_then(|(display, path)| {
+            [display.trim(), path.trim()]
+                .into_iter()
+                .find(|value| !value.is_empty())
         })
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "AutoHotkey script".to_string())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+pub(super) fn autohotkey_script_display(binding: &Binding) -> String {
+    launch_display(
+        binding
+            .autohotkey_script
+            .as_ref()
+            .map(|m| (m.display.as_str(), m.path.as_str())),
+        "AutoHotkey script",
+    )
 }
 
 pub(super) fn open_application_display(binding: &Binding) -> String {
-    binding
-        .open_application
-        .as_ref()
-        .map(|mapping| {
-            let display = mapping.display.trim();
-            if display.is_empty() {
-                mapping.path.trim()
-            } else {
-                display
-            }
-            .to_string()
-        })
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "application".to_string())
+    launch_display(
+        binding
+            .open_application
+            .as_ref()
+            .map(|m| (m.display.as_str(), m.path.as_str())),
+        "application",
+    )
 }
 
-pub(super) fn is_press_only_button_action(action: &model::BindingAction) -> bool {
+pub(crate) fn play_soundboard_action(
+    state: &AppState,
+    app: &AppHandle,
+    binding: &Binding,
+    silent: Option<bool>,
+) -> Result<(), String> {
+    let result = binding
+        .soundboard
+        .as_ref()
+        .ok_or_else(|| "Select an audio file for this Soundboard action".to_string())
+        .and_then(|mapping| state.soundboard.play_binding(&binding.id, mapping));
+    if let Err(error) = &result {
+        run_logger::warn(
+            "bindings",
+            "soundboard_play_failed",
+            &format!("binding_id={} error={}", binding.id, error),
+        );
+        let _ = app.emit(
+            "binding_action_error",
+            serde_json::json!({
+                "reason": "soundboard_play_failed", "binding_id": binding.id,
+                "title_key": "dialogs.soundboardPlaybackFailedTitle",
+                "message_key": "dialogs.soundboardPlaybackFailedMessage",
+                "params": { "message": error }, "silent": silent,
+            }),
+        );
+    }
+    result
+}
+
+pub(crate) fn is_press_only_button_action(action: &model::BindingAction) -> bool {
     matches!(
         action,
         model::BindingAction::MediaPlayPause

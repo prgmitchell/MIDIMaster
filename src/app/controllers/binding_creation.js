@@ -8,12 +8,10 @@ import { normalizeCustomCurvePoints } from "../../core/binding_model.js";
 
 /** binding creation workflow. */
 export function createBindingCreation({
-  invoke,
   features,
   viewState,
   showAlert,
-  scheduleBindingsSave,
-  syncPluginHostBindings,
+  bindingEdits,
   learnPanel,
   learnPanelActions,
   learnPanelCancel,
@@ -136,6 +134,8 @@ export function createBindingCreation({
   async function addBindingFromLearn(learned) {
     try {
       const learnedMapping = normalizeLearnedControlMapping(learned);
+      const previous = profileState.bindings;
+      const next = [...previous];
       const conflict = findCreateBindingConflict(learnedMapping);
 
       if (conflict && conflict.field === "control") {
@@ -174,18 +174,17 @@ export function createBindingCreation({
           return;
         }
 
-        setControlMapping(conflict.binding, conflict.field, null);
-        await invoke("add_binding", { binding: conflict.binding });
+        const ownerDraft = structuredClone(conflict.binding);
+        setControlMapping(ownerDraft, conflict.field, null);
+        next[previous.findIndex((row) => row.id === ownerDraft.id)] = ownerDraft;
       }
 
       const binding = createBindingFromLearn(learned);
-      profileState.bindings.push(binding);
-      await invoke("add_binding", { binding });
+      next.push(binding);
+      await bindingEdits.applyList(previous, next);
       viewState.editingBindingId = null;
       viewState.pendingFocusBindingId = null;
       features.bindings?.renderBindings();
-      syncPluginHostBindings();
-      scheduleBindingsSave("add binding learn");
       await features.bindings?.openBindingTargetPicker?.(binding.id);
       hideCreateLearnPanel();
     } catch (error) {

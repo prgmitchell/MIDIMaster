@@ -7,7 +7,6 @@ import {
 } from "../shape_helpers.js";
 import {
   getBindingTargets as getTargets,
-  normalizeSoundboardMapping,
 } from "../../../core/binding_model.js";
 
 /** edit session workflow. */
@@ -15,22 +14,19 @@ export function createEditSession({
   closeConfigModal,
   elements,
   editorState,
-  finishBindingUiMutation,
+  bindingEdits,
   getBindings,
   getBindingById,
   getConfigBinding,
   getDrag,
   getEditingId,
-  invoke,
   listState,
   loadSoundboardOutputDevices,
   loadSoundboardVirtualAudioStatus,
   macroPathForFirstStep,
   macroState,
-  persistBindingBackend,
   renderBindings,
   renderConfigModal,
-  setBindings,
   setEditingId,
   setPendingFocusId,
   soundboardState,
@@ -40,7 +36,7 @@ export function createEditSession({
     const binding = getBindingById(bindingId);
     if (!binding) return;
     editorState.bindingId = bindingId;
-    editorState.draft = cloneBindingDraft(binding);
+    editorState.draft = cloneBindingDraft(options.targetDraft || binding);
     ensureBindingShape(editorState.draft);
     macroState.pageOpen = Boolean(
       options.macroPage &&
@@ -54,12 +50,6 @@ export function createEditSession({
       options.soundboardPage &&
         (editorState.draft?.action === "Soundboard" ||
           getTargets(editorState.draft).some(isSoundboardTarget)),
-    );
-    editorState.initialPersistence = options.initialPersistence || null;
-    editorState.removeEmptySoundboardTargetOnCancel = Boolean(
-      options.removeEmptySoundboardTargetOnCancel &&
-        editorState.soundboardPageOpen &&
-        !normalizeSoundboardMapping(editorState.draft.soundboard),
     );
     soundboardState.analysis = options.soundboardAnalysis || null;
     soundboardState.analysisError = "";
@@ -78,15 +68,13 @@ export function createEditSession({
 
   async function saveConfigModal() {
     if (editorState.transferPrompt) return;
-    if (editorState.initialPersistence) {
-      await editorState.initialPersistence;
-      editorState.initialPersistence = null;
-    }
+    await editorState.pendingPreview;
     const original = getBindingById(editorState.bindingId);
     const draft = getConfigBinding();
     if (!original || !draft) return;
 
-    let nextBindings = [...getBindings()];
+    const previous = getBindings();
+    const nextBindings = [...previous];
     for (const entry of editorState.acceptedTransfers.values()) {
       const { conflict } = entry;
       if (!conflict?.binding) continue;
@@ -95,9 +83,6 @@ export function createEditSession({
       );
       if (conflictIndex < 0) continue;
       if (conflict.field === "control") {
-        await invoke("remove_binding", {
-          binding: nextBindings[conflictIndex],
-        });
         nextBindings.splice(conflictIndex, 1);
         continue;
       }
@@ -106,8 +91,6 @@ export function createEditSession({
       );
       setControlMapping(nextConflictBinding, conflict.field, null);
       nextBindings[conflictIndex] = nextConflictBinding;
-      setBindings(nextBindings);
-      await persistBindingBackend(nextConflictBinding);
     }
 
     const bindingIndex = nextBindings.findIndex(
@@ -120,11 +103,9 @@ export function createEditSession({
         (item) => item.control?.device_id,
       );
     nextBindings[bindingIndex] = nextBinding;
-    setBindings(nextBindings);
-    await persistBindingBackend(nextBinding);
+    await bindingEdits.applyList(previous, nextBindings);
     renderBindings();
     await closeConfigModal({ commit: true });
-    finishBindingUiMutation("config save");
   }
 
   function beginBindingEdit(bindingId, forceInline = false) {

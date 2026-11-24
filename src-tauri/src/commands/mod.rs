@@ -78,6 +78,8 @@ macro_rules! command_registry {
             start_midi_learn,
             cancel_midi_learn,
             consume_learned_control,
+            edit_profile_bindings,
+            update_profile_preferences,
             add_binding,
             remove_binding,
             update_midi_feedback,

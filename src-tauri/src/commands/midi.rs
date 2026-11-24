@@ -269,7 +269,7 @@ pub fn start_midi_device_routes(
         publish_profile(&mut profile_guard, updated, |p| {
             state
                 .profile_store
-                .save_profile(p.clone())
+                .save_configuration(p.clone())
                 .map_err(|e| e.to_string())
         })
     } else {
