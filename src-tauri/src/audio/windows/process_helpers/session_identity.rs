@@ -153,11 +153,7 @@ pub(in crate::audio::windows) fn should_skip_session(
     }
 
     let is_svchost = labels.iter().any(|label| label == "svchost");
-    if is_svchost && display_name.is_none() {
-        return true;
-    }
-
-    false
+    is_svchost && display_name.is_none()
 }
 
 pub(in crate::audio::windows) fn canonical_label(label: &str) -> String {
