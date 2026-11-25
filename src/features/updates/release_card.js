@@ -1,3 +1,4 @@
+import { applyTranslations, getLocale, t } from "../../app/i18n.js";
 import { loadRelease, releaseUrl, renderReleaseNotes, versionNumber } from "./release_notes.js";
 
 export function createReleaseCard({ invoke, onClose, onSkip, onInstall }) {
@@ -9,23 +10,24 @@ export function createReleaseCard({ invoke, onClose, onSkip, onInstall }) {
         <img src="assets/MIDIMaster.png" alt="" width="26" height="26" draggable="false">
         MIDIMaster
       </div>
-      <button class="release-close" type="button" aria-label="Close" title="Close">
+      <button class="release-close" type="button" data-i18n-aria-label="common.close" data-i18n-title="common.close">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
       </button>
-      <h1 id="release-title" tabindex="-1">What’s new in <span></span></h1>
+      <h1 id="release-title" tabindex="-1"></h1>
       <div class="release-meta"></div>
     </div>
-    <section class="release-notes" tabindex="0" aria-label="Release notes"></section>
+    <section class="release-notes" tabindex="0" data-i18n-aria-label="release.notes"></section>
     <p class="release-status" role="status" hidden></p>
     <div class="release-footer">
-      <a class="release-link"><span>View release on GitHub</span>
+      <a class="release-link"><span></span>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M6 5h9v9"/></svg>
       </a>
       <div class="release-actions">
-        <button class="release-skip" type="button">Skip update</button>
-        <button class="release-install" type="button">Download and install</button>
+        <button class="release-skip" type="button" data-i18n="release.skip"></button>
+        <button class="release-install" type="button" data-i18n="settings.downloadAndInstall"></button>
       </div>
     </div>`;
+  applyTranslations(card);
   const notes = card.querySelector(".release-notes");
   const meta = card.querySelector(".release-meta");
   const link = card.querySelector(".release-link");
@@ -40,7 +42,7 @@ export function createReleaseCard({ invoke, onClose, onSkip, onInstall }) {
 
   function updateMeta() {
     meta.replaceChildren();
-    for (const value of [current && `Installed ${current}`, published]) {
+    for (const value of [current && t("release.installed", { version: current }), published]) {
       if (!value) continue;
       const part = document.createElement("span");
       part.textContent = value;
@@ -50,7 +52,7 @@ export function createReleaseCard({ invoke, onClose, onSkip, onInstall }) {
 
   function updateLink() {
     link.href = releaseUrl(latest, previous);
-    link.querySelector("span").textContent = previous ? "Full changelog" : "View release on GitHub";
+    link.querySelector("span").textContent = previous ? t("release.changelog") : t("release.viewOnGitHub");
   }
 
   function setStatus(message, { error = false } = {}) {
@@ -76,11 +78,11 @@ export function createReleaseCard({ invoke, onClose, onSkip, onInstall }) {
     notesLoaded = false;
     previous = null;
     published = "";
-    card.querySelector("#release-title span").textContent = version;
+    card.querySelector("#release-title").textContent = t("release.title", { version });
     updateLink();
     updateMeta();
     notes.scrollTop = 0;
-    notes.textContent = "Loading release notes…";
+    notes.textContent = t("release.loading");
     notes.setAttribute("aria-busy", "true");
     try {
       const release = await loadRelease(version);
@@ -89,12 +91,12 @@ export function createReleaseCard({ invoke, onClose, onSkip, onInstall }) {
       notesLoaded = true;
       const date = new Date(release.published_at);
       if (release.published_at && Number.isFinite(date.getTime())) {
-        published = date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+        published = date.toLocaleDateString(getLocale(), { year: "numeric", month: "short", day: "numeric" });
       }
       updateMeta();
       updateLink();
     } catch {
-      if (latest === version) notes.textContent = "Release notes are unavailable right now.";
+      if (latest === version) notes.textContent = t("release.unavailable");
     } finally {
       if (latest === version) notes.setAttribute("aria-busy", "false");
     }
@@ -105,7 +107,7 @@ export function createReleaseCard({ invoke, onClose, onSkip, onInstall }) {
     try {
       await invoke("open_update_release_link", { version: latest, previousVersion: previous });
     } catch {
-      setStatus("Couldn’t open the link in your browser.", { error: true });
+      setStatus(t("release.linkFailed"), { error: true });
     }
   });
   card.querySelector(".release-close").addEventListener("click", onClose);

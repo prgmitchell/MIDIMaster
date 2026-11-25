@@ -1,3 +1,4 @@
+import { t } from "./app/i18n.js";
 import { createReleaseCard } from "./features/updates/release_card.js";
 
 export function setupUpdateNotificationWindow({
@@ -88,12 +89,12 @@ export function setupUpdateNotificationWindow({
 
   async function installUpdate() {
     setBusy(true);
-    setStatus("Starting download...");
+    setStatus(t("settings.downloadingUpdate"));
     try {
       await invoke("download_and_install_update");
     } catch (error) {
       setBusy(false);
-      setStatus(String(error || "Update install failed."), { error: true });
+      setStatus(String(error || t("settings.updateInstallFailed")), { error: true });
     }
   }
 
@@ -119,17 +120,17 @@ export function setupUpdateNotificationWindow({
       const downloaded = Number(payload.downloaded || 0);
       const total = Number(payload.content_length || 0);
       if (total > 0) {
-        setStatus(`Downloading update... ${Math.min(100, Math.round((downloaded / total) * 100))}%`);
+        setStatus(t("settings.downloadingUpdatePercent", { percent: Math.min(100, Math.round((downloaded / total) * 100)) }));
       } else {
-        setStatus("Downloading update...");
+        setStatus(t("settings.downloadingUpdate"));
       }
     } else if (phase === "downloaded") {
-      setStatus("Update downloaded. Installing...");
+      setStatus(t("settings.updateDownloadedInstalling"));
     } else if (phase === "installed") {
-      setStatus("Update installed. Restarting app...");
+      setStatus(t("settings.updateInstalledRestarting"));
     } else if (phase === "failed") {
       setBusy(false);
-      setStatus(String(payload.message || "Update install failed."), { error: true });
+      setStatus(String(payload.message || t("settings.updateInstallFailed")), { error: true });
     }
   });
 

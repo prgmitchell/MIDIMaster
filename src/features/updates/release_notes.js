@@ -1,3 +1,5 @@
+import { t } from "../../app/i18n.js";
+
 const repo = "https://github.com/prgmitchell/MIDIMaster";
 const releases = new Map();
 
@@ -87,6 +89,6 @@ export function renderReleaseNotes(container, body, version) {
     }
   }
   container.replaceChildren(fragment);
-  if (!container.childNodes.length) container.textContent = "No release notes were published for this version.";
+  if (!container.childNodes.length) container.textContent = t("release.empty");
   return previousVersion;
 }
