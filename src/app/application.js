@@ -325,7 +325,6 @@ export function createApplication() {
 
   const { applySidebarCollapsed, scheduleSidebarNavIndicatorSync, switchAppPage } = appShellRuntime;
   const showUpdateAvailableDialog = createUpdateDialog({
-    showChoices,
     invoke,
     getSettingsFeature: () => features.settings,
     switchAppPage,

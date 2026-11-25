@@ -1,14 +1,10 @@
+import { createReleaseCard } from "./features/updates/release_card.js";
+
 export function setupUpdateNotificationWindow({
   params = new URLSearchParams(window.location.search),
   invoke: invokeOverride,
   listen: listenOverride,
 } = {}) {
-  const updateMessage = document.getElementById("update-message");
-  const updateStatus = document.getElementById("update-status");
-  const installButton = document.getElementById("install-button");
-  const skipButton = document.getElementById("skip-button");
-  const closeButton = document.getElementById("close-button");
-  const updateCard = document.querySelector(".update-card");
   const themeStorageKey = "uiTheme";
 
   let latestVersion = String(params.get("latestVersion") || "").trim();
@@ -36,16 +32,16 @@ export function setupUpdateNotificationWindow({
     return tauriListen(eventName, handler);
   }
 
-  function setStatus(message, { error = false } = {}) {
-    if (!updateStatus) return;
-    updateStatus.textContent = String(message || "");
-    updateStatus.classList.toggle("error", Boolean(error));
-  }
-
-  function setBusy(isBusy) {
-    if (installButton) installButton.disabled = Boolean(isBusy);
-    if (skipButton) skipButton.disabled = Boolean(isBusy);
-  }
+  const { card, setRelease, setBusy, setStatus } = createReleaseCard({
+    invoke,
+    onInstall: installUpdate,
+    onClose: closeWindow,
+    onSkip: () => {
+      rememberSkippedVersion();
+      closeWindow();
+    },
+  });
+  document.getElementById("update-window").append(card);
 
   function applyStoredTheme() {
     let theme = "dark";
@@ -62,19 +58,12 @@ export function setupUpdateNotificationWindow({
     document.body.classList.toggle("dark-mode", theme === "dark");
   }
 
-  function renderUpdateCopy() {
-    if (!updateMessage) return;
-    const latest = latestVersion || "a new version";
-    const current = currentVersion || "unknown";
-    updateMessage.textContent = `MIDIMaster ${latest} is available (current: ${current}).`;
-  }
-
   function applyPayload(payload = {}) {
     if (!payload || typeof payload !== "object") return;
     applyStoredTheme();
     latestVersion = String(payload.latest_version || payload.latestVersion || latestVersion || "").trim();
     currentVersion = String(payload.current_version || payload.currentVersion || currentVersion || "").trim();
-    renderUpdateCopy();
+    setRelease(latestVersion, currentVersion);
   }
 
   function rememberSkippedVersion() {
@@ -108,20 +97,7 @@ export function setupUpdateNotificationWindow({
     }
   }
 
-  skipButton?.addEventListener("click", () => {
-    rememberSkippedVersion();
-    closeWindow();
-  });
-
-  closeButton?.addEventListener("click", () => {
-    closeWindow();
-  });
-
-  installButton?.addEventListener("click", () => {
-    installUpdate();
-  });
-
-  updateCard?.addEventListener("mousedown", startDrag);
+  card.querySelector(".release-header").addEventListener("mousedown", startDrag);
   window.addEventListener("focus", applyStoredTheme);
   window.addEventListener("storage", (event) => {
     if (event.key === themeStorageKey) {
@@ -158,5 +134,5 @@ export function setupUpdateNotificationWindow({
   });
 
   applyStoredTheme();
-  renderUpdateCopy();
+  setRelease(latestVersion, currentVersion);
 }

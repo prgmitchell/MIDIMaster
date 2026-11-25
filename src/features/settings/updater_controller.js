@@ -241,7 +241,9 @@ export function createUpdaterController({ invoke, listen, dom, translate, getSet
           installAvailableUpdate();
           return;
         }
-        checkForUpdates();
+        checkForUpdates().then((info) => {
+          if (info?.available) onUpdateAvailableClick?.(info);
+        });
       });
     }
     if (dom.topbarUpdateButton) {

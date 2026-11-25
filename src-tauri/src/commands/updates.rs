@@ -93,9 +93,9 @@ fn show_update_notification_window(
         WebviewUrl::App(format!("update.html?{query}").into()),
     )
     .title("MIDIMaster Update")
-    .inner_size(420.0, 230.0)
-    .min_inner_size(420.0, 230.0)
-    .resizable(false)
+    .inner_size(612.0, 570.0)
+    .min_inner_size(400.0, 340.0)
+    .resizable(true)
     .maximizable(false)
     .always_on_top(true)
     .focused(false)
@@ -152,6 +152,32 @@ pub async fn show_update_notification_window_if_main_hidden(
         },
     )?;
     Ok(true)
+}
+
+#[tauri::command]
+pub fn open_update_release_link(
+    version: String,
+    previous_version: Option<String>,
+) -> Result<(), String> {
+    let version = semver::Version::parse(&version).map_err(|err| err.to_string())?;
+    let repo = "https://github.com/prgmitchell/MIDIMaster";
+    let url = if let Some(previous) = previous_version {
+        let previous = semver::Version::parse(&previous).map_err(|err| err.to_string())?;
+        format!("{repo}/compare/v{previous}...v{version}")
+    } else {
+        format!("{repo}/releases/tag/v{version}")
+    };
+    #[cfg(target_os = "windows")]
+    let opener = "explorer.exe";
+    #[cfg(target_os = "macos")]
+    let opener = "open";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let opener = "xdg-open";
+    std::process::Command::new(opener)
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]

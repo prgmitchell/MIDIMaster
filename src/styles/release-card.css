@@ -1,0 +1,183 @@
+.release-dialog {
+  padding: 0;
+  width: min(612px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  border: 1px solid var(--control-border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: 0 24px 80px #0006;
+  overflow: hidden;
+}
+
+.release-dialog::backdrop {
+  background: var(--overlay-bg);
+}
+
+.release-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100dvh - 34px);
+  color: var(--text-primary);
+  background: var(--surface);
+  font-family: var(--app-font-family);
+}
+
+.release-header {
+  position: relative;
+  flex: none;
+  padding: 24px 30px 21px;
+  border-bottom: 1px solid var(--control-border);
+  background: radial-gradient(ellipse at 100% 0%, var(--accent-soft), transparent 66%);
+}
+
+.release-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+.release-brand img { object-fit: contain; }
+
+.release-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font: 650 32px/1.13 var(--app-font-family);
+  letter-spacing: -0.035em;
+  outline: none;
+}
+
+.release-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 9px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.release-meta span + span::before {
+  content: "·";
+  margin: 0 9px;
+}
+
+.release-card button,
+.release-link {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.release-card .release-close {
+  position: absolute;
+  inset: 14px 14px auto auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-width: 0;
+  padding: 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.release-card svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.release-notes {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 52dvh;
+  padding: 21px 30px 24px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  color: var(--text-secondary);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.release-notes p,
+.release-notes ul,
+.release-notes ol,
+.release-notes h3 {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.release-notes > :is(p, ul, ol, h3) + :is(p, ul, ol, h3) { margin-top: 16px; }
+.release-notes > p:first-child { color: var(--text-primary); }
+.release-notes strong, .release-notes h3 { color: var(--text-primary); }
+.release-notes ul, .release-notes ol { padding-left: 19px; }
+.release-notes li { padding-left: 3px; }
+.release-notes li + li { margin-top: 7px; }
+.release-notes li::marker { color: var(--accent); font-size: 0.86em; }
+.release-notes code { font-size: 0.9em; }
+
+.release-footer {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 15px 24px;
+  border-top: 1px solid var(--control-border);
+  background: var(--surface-raised);
+}
+
+.release-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.release-link svg { width: 13px; height: 13px; }
+.release-link:hover span { text-decoration: underline; }
+.release-actions { display: flex; gap: 8px; margin-left: auto; }
+.release-actions button {
+  min-height: 37px;
+  padding: 8px 14px;
+  border: 1px solid var(--control-border-strong);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: var(--control-bg);
+  font-size: 13px;
+  font-weight: 650;
+}
+.release-card .release-close:hover, .release-skip:hover { background: var(--control-bg-hover); color: var(--text-primary); }
+.release-actions .release-install { background: var(--accent); border-color: transparent; color: var(--app-bg); }
+.release-install:hover { filter: brightness(1.08); }
+.release-actions button:disabled { opacity: 0.6; cursor: default; }
+.release-card :is(button, a, section):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.release-card .release-status { flex: none; margin: 0; padding: 7px 30px; color: var(--text-secondary); font-size: 13px; }
+.release-card .release-status.error { color: var(--danger); }
+
+@media (max-width: 480px) {
+  .release-header, .release-notes { padding-left: 20px; padding-right: 20px; }
+  .release-footer { padding: 12px 16px; }
+  .release-header h1 { font-size: 27px; }
+}

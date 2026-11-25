@@ -5,9 +5,43 @@ import { eventually } from "./desktop.mjs";
 
 async function announceUpdate(app) {
   await app.eval(`window.__TAURI__.event.emit('updater_status', {
-    phase: 'available', current_version: '4.9.11', version: '4.9.12'
+    phase: 'available', current_version: '1.0.0', version: '1.1.0'
   })`);
   await app.shown("#topbar-update-button");
+}
+
+async function openReleaseDialog(app, responseCode = 200) {
+  const release = {
+    tag_name: "v1.1.0",
+    body: "- Updated **volume controls**.\n\n[Full changelog](https://github.com/prgmitchell/MIDIMaster/compare/v1.0.0...v1.1.0)",
+  };
+  await app.session.send("Fetch.enable", {
+    patterns: [
+      {
+        urlPattern:
+          "https://api.github.com/repos/prgmitchell/MIDIMaster/releases/tags/v1.1.0",
+      },
+    ],
+  });
+  try {
+    const response = app.session
+      .once("Fetch.requestPaused", 10000)
+      .then(({ requestId }) =>
+        app.session.send("Fetch.fulfillRequest", {
+          requestId,
+          responseCode,
+          responseHeaders: [
+            { name: "Content-Type", value: "application/json" },
+            { name: "Access-Control-Allow-Origin", value: "*" },
+          ],
+          body: Buffer.from(JSON.stringify(release)).toString("base64"),
+        }),
+      );
+    await Promise.all([response, app.click("#topbar-update-button")]);
+    await app.shown('.release-notes[aria-busy="false"]');
+  } finally {
+    await app.session.send("Fetch.disable");
+  }
 }
 
 async function installAttempts(app) {
@@ -18,26 +52,37 @@ async function installAttempts(app) {
 
 export const updater = [
   [
-    "update dialog dismiss and skip do not start an installation",
+    "update dialog shows GitHub release notes and dismisses or skips without installing",
     async (app) => {
       await app.click('.sidebar-nav-item[data-page="bindings"]');
       await announceUpdate(app);
       const before = await installAttempts(app);
-      await app.click("#topbar-update-button");
-      await app.shown("#alert-overlay");
+      await openReleaseDialog(app);
       assert.match(
-        await app.query("#alert-title", "e.textContent"),
-        /Update Available/,
+        await app.query("#release-title", "e.textContent"),
+        /1\.1\.0/,
       );
-      await app.click("#alert-close");
-      await app.hidden("#alert-overlay");
+      assert.equal(
+        await app.query(".release-notes", "e.querySelectorAll('li').length"),
+        1,
+      );
+      assert.equal(
+        await app.query(".release-notes strong", "e.textContent"),
+        "volume controls",
+      );
+      assert.equal(
+        await app.query(".release-link", "e.href"),
+        "https://github.com/prgmitchell/MIDIMaster/compare/v1.0.0...v1.1.0",
+      );
+      await app.click(".release-close");
+      await app.hidden(".release-dialog");
       assert.equal(await installAttempts(app), before);
       await app.click("#topbar-update-button");
-      await app.click("#alert-secondary");
-      await app.hidden("#alert-overlay");
+      await app.click(".release-skip");
+      await app.hidden(".release-dialog");
       assert.equal(
         await app.eval("localStorage.getItem('updaterSkippedVersion')"),
-        "4.9.12",
+        "1.1.0",
       );
       assert.equal(await installAttempts(app), before);
       assert.equal(await app.visible('[data-page-panel="bindings"]'), true);
@@ -56,9 +101,17 @@ export const updater = [
       await app.click('.sidebar-nav-item[data-page="bindings"]');
       await announceUpdate(app);
       const before = await installAttempts(app);
-      await app.click("#topbar-update-button");
-      await app.click("#alert-ok");
-      await app.hidden("#alert-overlay");
+      await openReleaseDialog(app, 503);
+      assert.match(
+        await app.query(".release-notes", "e.textContent"),
+        /unavailable/,
+      );
+      assert.equal(
+        await app.query(".release-link", "e.href"),
+        "https://github.com/prgmitchell/MIDIMaster/releases/tag/v1.1.0",
+      );
+      await app.click(".release-install");
+      await app.hidden(".release-dialog");
       await eventually(
         async () => (await installAttempts(app)) === before + 1,
         "one native install attempt",

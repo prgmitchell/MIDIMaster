@@ -140,6 +140,7 @@ macro_rules! command_registry {
             install_store_plugin,
             install_store_plugins,
             show_update_notification_window_if_main_hidden,
+            open_update_release_link,
             close_update_notification_window,
             start_update_notification_window_drag,
             check_for_updates,

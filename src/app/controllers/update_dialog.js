@@ -1,5 +1,6 @@
+import { createReleaseCard } from "../../features/updates/release_card.js";
+
 export function createUpdateDialog({
-  showChoices,
   invoke,
   getSettingsFeature,
   switchAppPage,
@@ -11,15 +12,29 @@ export function createUpdateDialog({
     const current = String(info.currentVersion || info.current_version || "").trim();
     if (!latest) return Promise.resolve("close");
 
-    const showInlineDialog = () =>
-      showChoices({
-        title: "Update Available",
-        message: `MIDIMaster ${latest} is available (current: ${current || "unknown"})`,
-        options: [
-          { id: "skip", label: "Skip Update", variant: "secondary" },
-          { id: "install", label: "Download and Install", variant: "primary" },
-        ],
-      }).then((choice) => {
+    const showInlineDialog = () => {
+      const existing = document.querySelector("dialog.release-dialog[open]");
+      if (existing) existing.close("close");
+      const dialog = document.createElement("dialog");
+      dialog.className = "release-dialog";
+      dialog.setAttribute("aria-labelledby", "release-title");
+      const release = createReleaseCard({
+        invoke,
+        onClose: () => dialog.close("close"),
+        onSkip: () => dialog.close("skip"),
+        onInstall: () => dialog.close("install"),
+      });
+      dialog.append(release.card);
+      document.body.append(dialog);
+      release.setRelease(latest, current);
+      dialog.showModal();
+      release.card.querySelector("h1").focus();
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close("close");
+      });
+      return new Promise((resolve) => dialog.addEventListener("close", () => {
+        const choice = dialog.returnValue || "close";
+        dialog.remove();
         if (choice === "skip") {
           try {
             localStorage.setItem("updaterSkippedVersion", latest);
@@ -37,8 +52,9 @@ export function createUpdateDialog({
           updateStatus?.scrollIntoView({ block: "center", behavior: "instant" });
           settings.installAvailableUpdate();
         }
-        return choice;
-      });
+        resolve(choice);
+      }, { once: true }));
+    };
 
     if (!standaloneIfMainHidden) return showInlineDialog();
 
