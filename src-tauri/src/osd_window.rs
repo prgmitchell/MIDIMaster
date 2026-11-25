@@ -2,7 +2,7 @@ use crate::model::OsdSettings;
 use crate::monitors::resolve_monitor_for_osd;
 use crate::run_logger;
 use crate::AppState;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 use std::time::Instant;
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize,
@@ -28,12 +28,6 @@ pub(crate) fn osd_settings_update_payload(settings: &OsdSettings) -> serde_json:
 
 pub(crate) fn emit_osd_settings_update(app: &AppHandle, settings: &OsdSettings) {
     let _ = app.emit("osd_settings_update", osd_settings_update_payload(settings));
-}
-
-#[derive(Default)]
-struct OsdWindowCache {
-    placement_signature: Option<OsdPlacementSignature>,
-    topmost_applied: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -65,17 +59,7 @@ fn placement_signature(
     }
 }
 
-fn osd_window_cache() -> &'static Mutex<OsdWindowCache> {
-    static CACHE: OnceLock<Mutex<OsdWindowCache>> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(OsdWindowCache::default()))
-}
-
-fn reset_osd_window_cache() {
-    if let Ok(mut cache) = osd_window_cache().lock() {
-        cache.placement_signature = None;
-        cache.topmost_applied = false;
-    }
-}
+static PLACEMENT_CACHE: Mutex<Option<OsdPlacementSignature>> = Mutex::new(None);
 
 fn apply_osd_settings_if_needed(app: &AppHandle, settings: &OsdSettings, force: bool) {
     let Some(osd_window) = app.get_webview_window("osd") else {
@@ -83,21 +67,11 @@ fn apply_osd_settings_if_needed(app: &AppHandle, settings: &OsdSettings, force: 
     };
 
     if !settings.enabled {
-        let _ = osd_window.hide();
-        reset_osd_window_cache();
-        return;
-    }
-
-    let topmost_needed = osd_window_cache()
-        .lock()
-        .map(|cache| force || !cache.topmost_applied)
-        .unwrap_or(true);
-    if topmost_needed {
-        let _ = osd_window.set_always_on_top(true);
-        force_topmost(&osd_window);
-        if let Ok(mut cache) = osd_window_cache().lock() {
-            cache.topmost_applied = true;
+        set_osd_visible(&osd_window, false);
+        if let Ok(mut cache) = PLACEMENT_CACHE.lock() {
+            *cache = None;
         }
+        return;
     }
 
     let selected = resolve_monitor_for_osd(app, settings);
@@ -109,9 +83,9 @@ fn apply_osd_settings_if_needed(app: &AppHandle, settings: &OsdSettings, force: 
         let scale = settings.scale.clamp(0.75, 1.5);
         let monitor_name = monitor.name().map(String::as_str).unwrap_or_default();
         let signature = placement_signature(settings, monitor_name, *position, *size, scale_factor);
-        let placement_needed = osd_window_cache()
+        let placement_needed = PLACEMENT_CACHE
             .lock()
-            .map(|cache| force || cache.placement_signature.as_ref() != Some(&signature))
+            .map(|cache| force || cache.as_ref() != Some(&signature))
             .unwrap_or(true);
         if !placement_needed {
             return;
@@ -197,12 +171,12 @@ fn apply_osd_settings_if_needed(app: &AppHandle, settings: &OsdSettings, force: 
                 scale
             ),
         );
-        if let Ok(mut cache) = osd_window_cache().lock() {
-            cache.placement_signature = Some(signature);
+        if let Ok(mut cache) = PLACEMENT_CACHE.lock() {
+            *cache = Some(signature);
         }
     } else if force {
-        if let Ok(mut cache) = osd_window_cache().lock() {
-            cache.placement_signature = None;
+        if let Ok(mut cache) = PLACEMENT_CACHE.lock() {
+            *cache = None;
         }
     }
 }
@@ -222,7 +196,7 @@ pub(crate) fn emit_osd_update(
     if !settings.enabled || silent {
         if !settings.enabled {
             if let Some(osd_window) = app.get_webview_window("osd") {
-                let _ = osd_window.hide();
+                set_osd_visible(&osd_window, false);
             }
         }
         return;
@@ -237,10 +211,10 @@ pub(crate) fn emit_osd_update(
     };
 
     let was_visible = osd_window.is_visible().unwrap_or(false);
-    if !was_visible {
-        let _ = osd_window.show();
-    }
     apply_osd_settings_if_needed(app, &settings, !was_visible);
+    if !was_visible {
+        set_osd_visible(&osd_window, true);
+    }
 
     let mut osd_payload = payload.clone();
     if let Some(map) = osd_payload.as_object_mut() {
@@ -257,25 +231,40 @@ pub(crate) fn emit_osd_update(
 }
 
 #[cfg(target_os = "windows")]
-fn force_topmost(window: &tauri::WebviewWindow) {
+pub(crate) fn set_osd_visible(window: &tauri::WebviewWindow, visible: bool) {
     if let Ok(hwnd) = window.hwnd() {
         use windows::Win32::Foundation::HWND;
         use windows::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+            SetWindowPos, HWND_TOPMOST, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+            SWP_NOZORDER, SWP_SHOWWINDOW,
+        };
+        // Tauri's normal show activates the window on Windows. Keep both visibility
+        // transitions native so hiding after idle uses the same window state.
+        let (insert_after, visibility_flags) = if visible {
+            (Some(HWND_TOPMOST), SWP_SHOWWINDOW)
+        } else {
+            (None, SWP_HIDEWINDOW | SWP_NOZORDER)
         };
         unsafe {
             let _ = SetWindowPos(
-                HWND(hwnd.0 as _),
-                Some(HWND_TOPMOST),
+                HWND(hwnd.0),
+                insert_after,
                 0,
                 0,
                 0,
                 0,
-                SWP_NOMOVE | SWP_NOSIZE,
+                visibility_flags | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
             );
         }
     }
 }
 
 #[cfg(not(target_os = "windows"))]
-fn force_topmost(_window: &tauri::WebviewWindow) {}
+pub(crate) fn set_osd_visible(window: &tauri::WebviewWindow, visible: bool) {
+    if visible {
+        let _ = window.set_always_on_top(true);
+        let _ = window.show();
+    } else {
+        let _ = window.hide();
+    }
+}

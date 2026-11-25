@@ -400,7 +400,7 @@ pub(crate) fn spawn_feedback_refresh_loop(
                         .unwrap_or(false);
                     if should_hide {
                         if let Some(osd_window) = app_handle.get_webview_window("osd") {
-                            let _ = osd_window.hide();
+                            crate::osd_window::set_osd_visible(&osd_window, false);
                         }
                         if let Ok(mut guard) = state.osd_last_update.lock() {
                             *guard = None;

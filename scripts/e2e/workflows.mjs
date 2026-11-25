@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { fromOsdSettings } from "../../src/core/osd_settings.js";
 import { eventually } from "./desktop.mjs";
 import { midiCollectionExpression } from "../perf/lib/midi-collection.mjs";
 import { validateMidiResult } from "../perf/lib/midi-validation.mjs";
@@ -13,6 +14,38 @@ async function configure(app, id) {
 }
 
 export const workflows = [
+  [
+    "volume faders show the OSD after idle without taking focus",
+    async (app) => {
+      const settings = fromOsdSettings(await app.invoke("get_osd_settings"));
+      const osdVisible = () =>
+        app.invoke("plugin:window|is_visible", { label: "osd" });
+      try {
+        await app.invoke("update_osd_settings", { ...settings, enabled: true });
+        for (let cycle = 0; cycle < 2; cycle++) {
+          await eventually(async () => !(await osdVisible()), "OSD hidden");
+          await app.invoke("perf_audit_inject_midi", {
+            messageCount: 3,
+            ratePerSecond: 30,
+            controlCount: 1,
+            messageKind: "continuous",
+          });
+          await eventually(osdVisible, "volume OSD shown");
+          assert.equal(
+            await app.invoke("plugin:window|is_always_on_top", { label: "osd" }),
+            true,
+          );
+          assert.equal(
+            await app.invoke("plugin:window|is_focused", { label: "osd" }),
+            false,
+            "volume OSD took focus",
+          );
+        }
+      } finally {
+        await app.invoke("update_osd_settings", settings);
+      }
+    },
+  ],
   [
     "MIDI bursts reach native actions and visible values without dropped events",
     async (app) => {

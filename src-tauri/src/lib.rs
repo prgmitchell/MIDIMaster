@@ -302,13 +302,14 @@ pub fn run() {
                     .skip_taskbar(true)
                     .resizable(false)
                     .focused(false)
+                    .focusable(false)
+                    .visible(false)
                     .shadow(false)
                     .inner_size(320.0, 120.0);
             #[cfg(feature = "e2e")]
             let osd_builder = perf_audit::e2e_webview(osd_builder);
             let osd_window = osd_builder.build()?;
             let _ = osd_window.set_ignore_cursor_events(true);
-            let _ = osd_window.hide();
             #[cfg(feature = "perf-audit")]
             {
                 log_startup_milestone("osd_window_created", phase_started, setup_started);

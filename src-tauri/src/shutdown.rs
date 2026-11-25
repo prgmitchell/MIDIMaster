@@ -136,7 +136,11 @@ async fn wait_for_background_tasks(tasks: &mut [JoinHandle<()>], wait_timeout: D
 
 fn hide_windows(app: &AppHandle) {
     for window in app.webview_windows().values() {
-        let _ = window.hide();
+        if window.label() == "osd" {
+            crate::osd_window::set_osd_visible(window, false);
+        } else {
+            let _ = window.hide();
+        }
     }
 }
 
